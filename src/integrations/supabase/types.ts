@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_ml_tasks: {
+        Row: {
+          agent_task_id: string | null
+          confidence_scores: Json | null
+          created_at: string | null
+          id: string
+          input_data: Json
+          ml_operation_type: string
+          ml_results: Json | null
+          model_versions: Json | null
+          processing_time_ms: number | null
+        }
+        Insert: {
+          agent_task_id?: string | null
+          confidence_scores?: Json | null
+          created_at?: string | null
+          id?: string
+          input_data: Json
+          ml_operation_type: string
+          ml_results?: Json | null
+          model_versions?: Json | null
+          processing_time_ms?: number | null
+        }
+        Update: {
+          agent_task_id?: string | null
+          confidence_scores?: Json | null
+          created_at?: string | null
+          id?: string
+          input_data?: Json
+          ml_operation_type?: string
+          ml_results?: Json | null
+          model_versions?: Json | null
+          processing_time_ms?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_ml_tasks_agent_task_id_fkey"
+            columns: ["agent_task_id"]
+            isOneToOne: false
+            referencedRelation: "agent_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_tasks: {
         Row: {
           assigned_agents: string[] | null
@@ -579,6 +623,56 @@ export type Database = {
         }
         Relationships: []
       }
+      material_style_analysis: {
+        Row: {
+          color_palette: Json | null
+          created_at: string | null
+          id: string
+          material_id: string | null
+          ml_model_version: string | null
+          room_suitability: Json | null
+          style_confidence: Json | null
+          style_tags: string[] | null
+          texture_analysis: Json | null
+          trend_score: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          color_palette?: Json | null
+          created_at?: string | null
+          id?: string
+          material_id?: string | null
+          ml_model_version?: string | null
+          room_suitability?: Json | null
+          style_confidence?: Json | null
+          style_tags?: string[] | null
+          texture_analysis?: Json | null
+          trend_score?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          color_palette?: Json | null
+          created_at?: string | null
+          id?: string
+          material_id?: string | null
+          ml_model_version?: string | null
+          room_suitability?: Json | null
+          style_confidence?: Json | null
+          style_tags?: string[] | null
+          texture_analysis?: Json | null
+          trend_score?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_style_analysis_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       materials_catalog: {
         Row: {
           category: Database["public"]["Enums"]["material_category"]
@@ -626,6 +720,149 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      ml_models: {
+        Row: {
+          confidence_threshold: number | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          model_path: string | null
+          model_type: string
+          name: string
+          performance_metrics: Json | null
+          status: string | null
+          updated_at: string | null
+          version: string
+        }
+        Insert: {
+          confidence_threshold?: number | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          model_path?: string | null
+          model_type: string
+          name: string
+          performance_metrics?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          version: string
+        }
+        Update: {
+          confidence_threshold?: number | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          model_path?: string | null
+          model_type?: string
+          name?: string
+          performance_metrics?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
+      ml_processing_queue: {
+        Row: {
+          assigned_worker: string | null
+          completed_at: string | null
+          created_at: string | null
+          error_details: string | null
+          id: string
+          input_data: Json
+          priority: number | null
+          progress_data: Json | null
+          result_data: Json | null
+          started_at: string | null
+          status: string | null
+          task_type: string
+          user_id: string
+        }
+        Insert: {
+          assigned_worker?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_details?: string | null
+          id?: string
+          input_data: Json
+          priority?: number | null
+          progress_data?: Json | null
+          result_data?: Json | null
+          started_at?: string | null
+          status?: string | null
+          task_type: string
+          user_id: string
+        }
+        Update: {
+          assigned_worker?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_details?: string | null
+          id?: string
+          input_data?: Json
+          priority?: number | null
+          progress_data?: Json | null
+          result_data?: Json | null
+          started_at?: string | null
+          status?: string | null
+          task_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ml_training_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          dataset_info: Json | null
+          error_message: string | null
+          id: string
+          metrics: Json | null
+          model_id: string | null
+          progress_percentage: number | null
+          started_at: string | null
+          status: string | null
+          training_config: Json
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dataset_info?: Json | null
+          error_message?: string | null
+          id?: string
+          metrics?: Json | null
+          model_id?: string | null
+          progress_percentage?: number | null
+          started_at?: string | null
+          status?: string | null
+          training_config: Json
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dataset_info?: Json | null
+          error_message?: string | null
+          id?: string
+          metrics?: Json | null
+          model_id?: string | null
+          progress_percentage?: number | null
+          started_at?: string | null
+          status?: string | null
+          training_config?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ml_training_jobs_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "ml_models"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       moodboard_items: {
         Row: {
