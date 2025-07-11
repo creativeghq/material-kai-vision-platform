@@ -1,7 +1,15 @@
 import React from 'react';
-import { Search, Bell, Settings, User, Zap } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Search, Bell, Settings, User, Zap, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface HeaderProps {
   searchQuery: string;
@@ -9,6 +17,21 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) => {
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <header className="border-b bg-card">
       <div className="flex h-16 items-center px-6">
@@ -38,9 +61,29 @@ export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) =
           <Button variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon">
-            <User className="w-4 h-4" />
-          </Button>
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>
+                      {user.email ? getInitials(user.email) : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem disabled>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>{user.email}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </header>
