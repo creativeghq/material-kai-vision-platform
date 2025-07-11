@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AITestingPanel } from './AITestingPanel';
 import { MetadataFieldsManagement } from './MetadataFieldsManagement';
+import { RAGManagementPanel } from './RAGManagementPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -223,10 +224,11 @@ export const AdminPanel: React.FC = () => {
       </div>
 
       <Tabs defaultValue="recent" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="recent">Recent Activity</TabsTrigger>
           <TabsTrigger value="scores">Score Analysis</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="rag">RAG System</TabsTrigger>
           <TabsTrigger value="metadata">Metadata Fields</TabsTrigger>
           <TabsTrigger value="testing">AI Testing</TabsTrigger>
         </TabsList>
@@ -379,6 +381,10 @@ export const AdminPanel: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="rag" className="space-y-4">
+          <RAGManagementPanel />
         </TabsContent>
 
         <TabsContent value="metadata" className="space-y-4">
