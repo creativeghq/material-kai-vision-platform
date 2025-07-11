@@ -3,6 +3,10 @@ export { clientMLService, ClientMLService } from './clientMLService';
 export { serverMLService, ServerMLService } from './serverMLService';
 export { hybridMLService, HybridMLService } from './hybridMLService';
 
+// Style analysis services
+export { styleAnalysisService, StyleAnalysisService } from './styleAnalysisService';
+export { hybridStyleAnalysisService, HybridStyleAnalysisService } from './hybridStyleAnalysisService';
+
 // Individual service components
 export { ImageClassifierService } from './imageClassifier';
 export { TextEmbedderService } from './textEmbedder';
@@ -26,6 +30,16 @@ export {
   type HybridMLOptions,
   type HybridMLResult
 } from './hybridMLService';
+
+export {
+  type HybridStyleAnalysisOptions,
+  type HybridStyleResult
+} from './hybridStyleAnalysisService';
+
+export {
+  type StyleAnalysisResult,
+  type StyleAnalysisOptions
+} from './styleAnalysisService';
 
 export {
   type ServerMLRequest,
