@@ -189,35 +189,53 @@ export const Designer3DPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             {generatedImages.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* First Image - Top */}
-                <div>
-                  <h4 className="font-medium mb-2">Design Variation 1</h4>
-                  <div className="aspect-square w-full overflow-hidden rounded-lg border">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-muted-foreground">Design Variation 1</h4>
+                  <div className="aspect-square w-full overflow-hidden rounded-lg border bg-muted">
                     <img 
                       src={generatedImages[0]} 
                       alt="Generated interior design - variation 1"
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error('Image 1 failed to load:', generatedImages[0]);
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
                   </div>
                 </div>
                 
                 {/* Second Image - Bottom */}
-                {generatedImages[1] && (
-                  <div>
-                    <h4 className="font-medium mb-2">Design Variation 2</h4>
-                    <div className="aspect-square w-full overflow-hidden rounded-lg border">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-muted-foreground">Design Variation 2</h4>
+                  <div className="aspect-square w-full overflow-hidden rounded-lg border bg-muted">
+                    {generatedImages[1] ? (
                       <img 
                         src={generatedImages[1]} 
                         alt="Generated interior design - variation 2"
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('Image 2 failed to load:', generatedImages[1]);
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
-                    </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />
+                          <p className="text-sm">Generating second variation...</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
                 
                 {/* 3D Viewer for first image */}
-                <ThreeJsViewer imageUrl={generatedImages[0]} className="h-64" />
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-muted-foreground">3D Viewer</h4>
+                  <ThreeJsViewer imageUrl={generatedImages[0]} className="h-64 rounded-lg border" />
+                </div>
               </div>
             ) : (
               <div className="aspect-square w-full border border-dashed border-muted-foreground/25 rounded-lg flex items-center justify-center">
