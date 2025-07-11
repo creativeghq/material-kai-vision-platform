@@ -182,6 +182,81 @@ export type Database = {
         }
         Relationships: []
       }
+      moodboard_items: {
+        Row: {
+          added_at: string
+          id: string
+          material_id: string
+          moodboard_id: string
+          notes: string | null
+          position: number
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          material_id: string
+          moodboard_id: string
+          notes?: string | null
+          position?: number
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          material_id?: string
+          moodboard_id?: string
+          notes?: string | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moodboard_items_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moodboard_items_moodboard_id_fkey"
+            columns: ["moodboard_id"]
+            isOneToOne: false
+            referencedRelation: "moodboards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moodboards: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean
+          title: string
+          updated_at: string
+          user_id: string
+          view_preference: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          title: string
+          updated_at?: string
+          user_id: string
+          view_preference?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+          view_preference?: string
+        }
+        Relationships: []
+      }
       processing_queue: {
         Row: {
           completed_at: string | null

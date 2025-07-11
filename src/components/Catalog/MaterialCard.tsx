@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Material } from '@/types/materials';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Heart, Share2, Eye, Edit, Camera } from 'lucide-react';
+import { Heart, Share2, Eye, Edit, Camera, Plus } from 'lucide-react';
+import { AddToBoardModal } from '@/components/MoodBoard/AddToBoardModal';
 
 interface MaterialCardProps {
   material: Material;
   onView?: (material: Material) => void;
   onEdit?: (material: Material) => void;
   onFavorite?: (material: Material) => void;
+  onAddToBoard?: (material: Material) => void;
   showActions?: boolean;
 }
 
@@ -18,10 +20,19 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
   onView,
   onEdit,
   onFavorite,
+  onAddToBoard,
   showActions = true
 }) => {
+  const [showAddToBoardModal, setShowAddToBoardModal] = useState(false);
+
   const handleCardClick = () => {
     onView?.(material);
+  };
+
+  const handleAddToBoard = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowAddToBoardModal(true);
+    onAddToBoard?.(material);
   };
 
   return (
@@ -106,6 +117,15 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
                 >
                   <Edit className="w-3 h-3" />
                 </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7"
+                  onClick={handleAddToBoard}
+                  title="Add to MoodBoard"
+                >
+                  <Plus className="w-3 h-3" />
+                </Button>
               </div>
               <div className="flex space-x-1">
                 <Button 
@@ -134,6 +154,13 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
             </div>
           )}
         </div>
+
+        {/* Add to Board Modal */}
+        <AddToBoardModal 
+          open={showAddToBoardModal}
+          onOpenChange={setShowAddToBoardModal}
+          material={material}
+        />
       </CardContent>
     </Card>
   );

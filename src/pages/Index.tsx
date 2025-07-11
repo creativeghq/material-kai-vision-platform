@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout/Layout';
 import { Dashboard } from '@/components/Dashboard/Dashboard';
 import { MaterialRecognition } from '@/components/Recognition/MaterialRecognition';
 import { MaterialCatalog } from '@/components/Catalog/MaterialCatalog';
+import { MoodBoardPage } from '@/components/MoodBoard/MoodBoardPage';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -15,6 +16,8 @@ const Index = () => {
         return <MaterialRecognition />;
       case 'catalog':
         return <MaterialCatalog />;
+      case 'moodboard':
+        return <MoodBoardPage />;
       default:
         return (
           <div className="flex items-center justify-center h-64">
