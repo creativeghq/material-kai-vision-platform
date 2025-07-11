@@ -232,15 +232,22 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
 
     console.log('HF result type:', typeof result);
     console.log('HF result instanceof Blob:', result instanceof Blob);
+    console.log('HF result constructor name:', result?.constructor?.name);
     
-    // Handle the response properly - it should be a Blob
-    if (result instanceof Blob) {
-      const arrayBuffer = await result.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      return `data:image/png;base64,${base64}`;
+    // Handle the response - it should be a Blob according to the docs
+    if (result && (result instanceof Blob || result.constructor?.name === 'Blob')) {
+      try {
+        const arrayBuffer = await result.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        return `data:image/png;base64,${base64}`;
+      } catch (blobError) {
+        console.error('Error processing blob:', blobError);
+        throw new Error(`Failed to process blob response: ${blobError.message}`);
+      }
     } else {
       console.error('Unexpected result type from HF:', result);
-      throw new Error('Unexpected response format from Hugging Face');
+      console.error('Result details:', JSON.stringify(result, null, 2));
+      throw new Error(`Unexpected response format from Hugging Face: ${typeof result}`);
     }
     
   } catch (error) {
