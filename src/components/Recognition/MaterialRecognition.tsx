@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { ImageUpload } from './ImageUpload';
-import { RecognitionResults } from './RecognitionResults';
+import React, { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Upload, FileImage, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { RecognitionResult } from '@/types/materials';
-import { Play, Settings, History } from 'lucide-react';
+import { RecognitionResults } from './RecognitionResults';
 
-// Mock recognition service
+// Mock recognition service with proper types
 const mockRecognitionService = (files: File[]): Promise<RecognitionResult[]> => {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -23,7 +24,24 @@ const mockRecognitionService = (files: File[]): Promise<RecognitionResult[]> => 
         const material = materials[index % materials.length];
         
         return {
-          materialId: `mat-${Date.now()}-${index}`,
+          // New schema properties
+          id: `result-${index + 1}`,
+          file_id: `file-${index + 1}`,
+          material_id: `mat-${index + 1}`,
+          confidence_score: material.confidence,
+          detection_method: 'visual' as const,
+          ai_model_version: 'v1.0',
+          properties_detected: {
+            color: material.color,
+            finish: material.finish,
+            brand: material.brand
+          },
+          processing_time_ms: 1500 + Math.random() * 1000,
+          user_verified: false,
+          created_at: new Date().toISOString(),
+          
+          // Legacy properties for backward compatibility
+          materialId: `mat-${index + 1}`,
           name: material.name,
           confidence: material.confidence,
           imageUrl: URL.createObjectURL(file),
@@ -32,191 +50,193 @@ const mockRecognitionService = (files: File[]): Promise<RecognitionResult[]> => 
             finish: material.finish,
             brand: material.brand,
           },
-          processingTime: 1.2 + Math.random() * 2,
+          processingTime: 1500 + Math.random() * 1000,
         };
       });
       resolve(results);
-    }, 2000 + Math.random() * 1000); // Simulate processing time
+    }, 2000 + Math.random() * 1000);
   });
 };
 
 export const MaterialRecognition: React.FC = () => {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [results, setResults] = useState<RecognitionResult[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingHistory, setProcessingHistory] = useState<RecognitionResult[]>([]);
+  const [results, setResults] = useState<RecognitionResult[]>([]);
+  const [progress, setProgress] = useState(0);
 
-  const handleImagesSelected = (files: File[]) => {
-    setSelectedFiles(files);
-  };
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    setFiles(prev => [...prev, ...acceptedFiles]);
+    setResults([]);
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.bmp', '.tiff']
+    },
+    multiple: true,
+    maxSize: 10 * 1024 * 1024 // 10MB
+  });
 
   const startRecognition = async () => {
-    if (selectedFiles.length === 0) return;
+    if (files.length === 0) return;
     
     setIsProcessing(true);
+    setProgress(0);
     setResults([]);
-    
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + Math.random() * 10;
+      });
+    }, 200);
+
     try {
-      const recognitionResults = await mockRecognitionService(selectedFiles);
+      const recognitionResults = await mockRecognitionService(files);
       setResults(recognitionResults);
-      setProcessingHistory(prev => [...recognitionResults, ...prev].slice(0, 10)); // Keep last 10
+      setProgress(100);
     } catch (error) {
       console.error('Recognition failed:', error);
     } finally {
       setIsProcessing(false);
+      clearInterval(progressInterval);
     }
   };
 
-  const clearResults = () => {
+  const clearFiles = () => {
+    setFiles([]);
     setResults([]);
-    setSelectedFiles([]);
+    setProgress(0);
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Material Recognition</h1>
-          <p className="text-muted-foreground">
-            Upload images for AI-powered material identification
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon">
-            <Settings className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="icon">
-            <History className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Recognition Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">
-              {processingHistory.length}
-            </div>
-            <p className="text-xs text-muted-foreground">Total Processed</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">
-              {processingHistory.length > 0 
-                ? Math.round((processingHistory.reduce((acc, r) => acc + r.confidence, 0) / processingHistory.length) * 100) + '%'
-                : '0%'
-              }
-            </div>
-            <p className="text-xs text-muted-foreground">Avg Confidence</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">
-              {processingHistory.length > 0 
-                ? (processingHistory.reduce((acc, r) => acc + r.processingTime, 0) / processingHistory.length).toFixed(1) + 's'
-                : '0s'
-              }
-            </div>
-            <p className="text-xs text-muted-foreground">Avg Processing</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">
-              {selectedFiles.length}
-            </div>
-            <p className="text-xs text-muted-foreground">Images Selected</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Image Upload */}
-      <ImageUpload 
-        onImagesSelected={handleImagesSelected}
-        isProcessing={isProcessing}
-      />
-
-      {/* Action Buttons */}
-      {selectedFiles.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Badge variant="secondary">
-                  {selectedFiles.length} image{selectedFiles.length !== 1 ? 's' : ''} ready
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  Ready for AI analysis
-                </span>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileImage className="w-5 h-5" />
+            Material Recognition
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* File Upload Area */}
+          <div
+            {...getRootProps()}
+            className={`
+              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+              ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
+            `}
+          >
+            <input {...getInputProps()} />
+            <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            {isDragActive ? (
+              <p className="text-lg">Drop the images here...</p>
+            ) : (
+              <div>
+                <p className="text-lg mb-2">Drag & drop material images here</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  or click to select files (JPEG, PNG, WebP)
+                </p>
+                <Button variant="outline">Select Images</Button>
               </div>
-              <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={clearResults}
-                  disabled={isProcessing}
-                >
-                  Clear
-                </Button>
-                <Button 
-                  onClick={startRecognition}
-                  disabled={isProcessing || selectedFiles.length === 0}
-                  className="min-w-[140px]"
-                >
-                  <Play className="w-4 h-4 mr-2" />
-                  {isProcessing ? 'Processing...' : 'Start Recognition'}
+            )}
+          </div>
+
+          {/* Selected Files */}
+          {files.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium">Selected Files ({files.length})</h3>
+                <Button variant="ghost" size="sm" onClick={clearFiles}>
+                  Clear All
                 </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Recognition Results */}
-      <RecognitionResults 
-        results={results}
-        isLoading={isProcessing}
-      />
-
-      {/* Recent History */}
-      {processingHistory.length > 0 && !isProcessing && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <History className="w-5 h-5 mr-2" />
-              Recent Recognition History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {processingHistory.slice(0, 5).map((result, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-muted rounded-lg overflow-hidden">
-                      <img 
-                        src={result.imageUrl} 
-                        alt={result.name}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {files.map((file, index) => (
+                  <div key={index} className="relative group">
+                    <div className="aspect-square rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{result.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {result.processingTime.toFixed(1)}s processing time
-                      </p>
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <div className="mt-1 text-xs text-center truncate px-1">
+                      {file.name}
                     </div>
                   </div>
-                  <Badge variant="secondary">
-                    {Math.round(result.confidence * 100)}% confidence
-                  </Badge>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          {/* Recognition Controls */}
+          {files.length > 0 && (
+            <div className="flex gap-3">
+              <Button
+                onClick={startRecognition}
+                disabled={isProcessing}
+                className="flex-1"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Start Recognition
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Progress */}
+          {isProcessing && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Analyzing materials...</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="w-full" />
+            </div>
+          )}
+
+          {/* Status Messages */}
+          {results.length > 0 && !isProcessing && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span className="text-green-800 dark:text-green-200">
+                Recognition completed! Found {results.length} material{results.length !== 1 ? 's' : ''}.
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Results */}
+      {results.length > 0 && (
+        <RecognitionResults results={results} />
       )}
     </div>
   );

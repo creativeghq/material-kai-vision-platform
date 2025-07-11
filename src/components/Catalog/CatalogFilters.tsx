@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Material, MaterialCategory } from '@/types/materials';
+import { Material, MaterialCategory, MaterialCategories } from '@/types/materials';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -100,7 +100,7 @@ export const CatalogFilters: React.FC<CatalogFiltersProps> = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {Object.values(MaterialCategory).map((category) => (
+              {Object.values(MaterialCategories).map((category) => (
                 <SelectItem key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </SelectItem>

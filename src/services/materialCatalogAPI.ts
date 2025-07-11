@@ -1,147 +1,183 @@
-// Mock material database
-import { Material, MaterialCategory } from '@/types/materials';
+import { Material, MaterialCategories } from '@/types/materials';
 
+// Mock data for demonstration
 export const mockMaterials: Material[] = [
   {
-    id: 'mat-001',
-    name: 'Carrara White Marble',
-    category: MaterialCategory.STONE,
-    description: 'Premium Italian marble with distinctive gray veining. Perfect for luxury countertops and flooring.',
-    imageUrl: '/placeholder.svg',
+    id: '1',
+    name: 'Italian Carrara Marble',
+    category: 'concrete' as const,
+    description: 'Premium white marble with subtle gray veining',
+    imageUrl: 'https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?w=400',
     metadata: {
       color: 'white',
       finish: 'polished',
-      size: '12x24 inches',
-      brand: 'Marble Masters',
+      brand: 'Carrara Co.',
       properties: {
-        diffuse: '#F8F8FF',
-        roughness: 0.1,
-        metallic: 0.0,
-        specular: '#FFFFFF'
+        hardness: 3,
+        density: 2.7
       }
     },
-    vectorEmbedding: [0.1, 0.2, 0.3], // Simplified vector
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15')
+    properties: {
+      hardness: 3,
+      density: 2.7
+    },
+    chemical_composition: { CaCO3: 95 },
+    safety_data: {},
+    standards: ['ASTM C503'],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date()
   },
   {
-    id: 'mat-002', 
-    name: 'American Oak Hardwood',
-    category: MaterialCategory.WOOD,
-    description: 'Classic oak hardwood with natural grain patterns. Durable and timeless for flooring and furniture.',
-    imageUrl: '/placeholder.svg',
+    id: '2',
+    name: 'American White Oak',
+    category: 'wood' as const,
+    description: 'High-quality hardwood with distinctive grain patterns',
+    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
     metadata: {
-      color: 'brown',
+      color: 'light brown',
       finish: 'natural',
-      size: '5x3/4 inches',
       brand: 'Forest Pride',
       properties: {
-        diffuse: '#DEB887',
-        roughness: 0.6,
-        metallic: 0.0
+        hardness: 7,
+        grain: 'straight'
       }
     },
-    vectorEmbedding: [0.4, 0.5, 0.6],
-    createdAt: new Date('2024-01-10'),
-    updatedAt: new Date('2024-01-10')
+    properties: {
+      hardness: 7,
+      density: 0.75
+    },
+    chemical_composition: { cellulose: 45, lignin: 25 },
+    safety_data: {},
+    standards: ['ASTM D143'],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date()
   },
   {
-    id: 'mat-003',
-    name: 'Brushed Stainless Steel',
-    category: MaterialCategory.METAL,
-    description: 'Industrial-grade stainless steel with brushed finish. Corrosion-resistant and modern aesthetic.',
-    imageUrl: '/placeholder.svg',
+    id: '3',
+    name: 'Brushed Aluminum',
+    category: 'metals' as const,
+    description: 'Lightweight metal with brushed finish for modern applications',
+    imageUrl: 'https://images.unsplash.com/photo-1565814329452-e1efa11c5b89?w=400',
     metadata: {
       color: 'silver',
       finish: 'brushed',
-      size: '4x8 feet',
-      brand: 'SteelCraft Pro',
+      brand: 'MetalWorks',
       properties: {
-        diffuse: '#C0C0C0',
-        roughness: 0.3,
-        metallic: 0.9,
-        specular: '#FFFFFF'
+        hardness: 5,
+        corrosionResistance: 'excellent'
       }
     },
-    vectorEmbedding: [0.7, 0.8, 0.9],
-    createdAt: new Date('2024-01-08'),
-    updatedAt: new Date('2024-01-08')
-  },
-  {
-    id: 'mat-004',
-    name: 'Subway Tile White',
-    category: MaterialCategory.CERAMIC,
-    description: 'Classic white subway tiles with beveled edges. Perfect for kitchen backsplashes and bathroom walls.',
-    imageUrl: '/placeholder.svg',
-    metadata: {
-      color: 'white',
-      finish: 'glossy',
-      size: '3x6 inches',
-      brand: 'CeramicArt',
-      properties: {
-        diffuse: '#FFFFFF',
-        roughness: 0.1,
-        metallic: 0.0
-      }
+    properties: {
+      density: 2.7,
+      thermal_conductivity: 205
     },
-    vectorEmbedding: [0.2, 0.3, 0.4],
-    createdAt: new Date('2024-01-05'),
-    updatedAt: new Date('2024-01-05')
+    chemical_composition: { Al: 99 },
+    safety_data: {},
+    standards: ['ASTM B221'],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date()
   },
   {
-    id: 'mat-005',
-    name: 'Polished Concrete',
-    category: MaterialCategory.CONCRETE,
-    description: 'Modern polished concrete with smooth finish. Industrial chic for floors and countertops.',
-    imageUrl: '/placeholder.svg',
+    id: '4',
+    name: 'Porcelain Tile',
+    category: 'ceramics' as const,
+    description: 'Durable ceramic tile with matte finish',
+    imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
     metadata: {
       color: 'gray',
-      finish: 'polished',
-      size: 'custom',
-      brand: 'Urban Concrete',
+      finish: 'matte',
+      brand: 'CeramicCorp',
       properties: {
-        diffuse: '#808080',
-        roughness: 0.2,
-        metallic: 0.0
+        waterAbsorption: 'low',
+        frostResistance: 'high'
       }
     },
-    vectorEmbedding: [0.5, 0.6, 0.7],
-    createdAt: new Date('2024-01-03'),
-    updatedAt: new Date('2024-01-03')
+    properties: {
+      hardness: 6,
+      water_absorption: 0.5
+    },
+    chemical_composition: { SiO2: 50, Al2O3: 20 },
+    safety_data: {},
+    standards: ['ISO 13006'],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date()
   },
   {
-    id: 'mat-006',
-    name: 'Linen Canvas Fabric',
-    category: MaterialCategory.FABRIC,
-    description: 'Natural linen fabric with soft texture. Perfect for upholstery and window treatments.',
-    imageUrl: '/placeholder.svg',
+    id: '5',
+    name: 'Linen Fabric',
+    category: 'textiles' as const,
+    description: 'Natural fiber fabric with organic texture',
+    imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
     metadata: {
       color: 'beige',
       finish: 'natural',
-      size: '54 inches wide',
-      brand: 'Textile House',
+      brand: 'Natural Textiles',
       properties: {
-        diffuse: '#F5F5DC',
-        roughness: 0.8,
-        metallic: 0.0
+        weave: 'plain',
+        weight: 'medium'
       }
     },
-    vectorEmbedding: [0.3, 0.4, 0.5],
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01')
+    properties: {
+      thread_count: 150,
+      weight: 180
+    },
+    chemical_composition: { cellulose: 70 },
+    safety_data: {},
+    standards: ['ASTM D3775'],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    id: '6',
+    name: 'Acrylic Plastic',
+    category: 'plastics' as const,
+    description: 'Clear, lightweight plastic with excellent optical clarity',
+    imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
+    metadata: {
+      color: 'clear',
+      finish: 'glossy',
+      brand: 'PlasticTech',
+      properties: {
+        transparency: 'high',
+        flexibility: 'medium'
+      }
+    },
+    properties: {
+      density: 1.18,
+      melting_point: 160
+    },
+    chemical_composition: { PMMA: 100 },
+    safety_data: {},
+    standards: ['ASTM D792'],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date()
   }
 ];
 
-// Mock API functions
+// API functions
 export const materialCatalogAPI = {
   getAllMaterials: async (): Promise<Material[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
     return mockMaterials;
   },
 
-  getMaterialsByCategory: async (category: MaterialCategory): Promise<Material[]> => {
+  getMaterialsByCategory: async (category: string): Promise<Material[]> => {
     await new Promise(resolve => setTimeout(resolve, 300));
-    return mockMaterials.filter(material => material.category === category);
+    return mockMaterials.filter(material => 
+      category === 'all' || material.category === category
+    );
   },
 
   searchMaterials: async (query: string): Promise<Material[]> => {
@@ -158,39 +194,5 @@ export const materialCatalogAPI = {
   getMaterialById: async (id: string): Promise<Material | null> => {
     await new Promise(resolve => setTimeout(resolve, 200));
     return mockMaterials.find(material => material.id === id) || null;
-  },
-
-  addMaterial: async (material: Omit<Material, 'id' | 'createdAt' | 'updatedAt'>): Promise<Material> => {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    const newMaterial: Material = {
-      ...material,
-      id: `mat-${Date.now()}`,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    mockMaterials.push(newMaterial);
-    return newMaterial;
-  },
-
-  updateMaterial: async (id: string, updates: Partial<Material>): Promise<Material | null> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const materialIndex = mockMaterials.findIndex(m => m.id === id);
-    if (materialIndex === -1) return null;
-    
-    mockMaterials[materialIndex] = {
-      ...mockMaterials[materialIndex],
-      ...updates,
-      updatedAt: new Date()
-    };
-    return mockMaterials[materialIndex];
-  },
-
-  deleteMaterial: async (id: string): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    const materialIndex = mockMaterials.findIndex(m => m.id === id);
-    if (materialIndex === -1) return false;
-    
-    mockMaterials.splice(materialIndex, 1);
-    return true;
   }
 };

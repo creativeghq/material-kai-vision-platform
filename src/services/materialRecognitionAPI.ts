@@ -8,6 +8,53 @@ import type {
   ProcessingJob
 } from '@/types/materials';
 
+// Helper function to map database response to our types
+function mapToMaterial(dbMaterial: any): Material {
+  return {
+    ...dbMaterial,
+    metadata: {
+      color: '',
+      finish: '',
+      brand: '',
+      properties: dbMaterial.properties || {}
+    },
+    createdAt: new Date(dbMaterial.created_at),
+    updatedAt: new Date(dbMaterial.updated_at)
+  };
+}
+
+function mapToRecognitionResult(dbResult: any): RecognitionResult {
+  return {
+    ...dbResult,
+    // Legacy properties for backward compatibility
+    materialId: dbResult.material_id || '',
+    name: dbResult.material?.name || 'Unknown Material',
+    confidence: dbResult.confidence_score,
+    imageUrl: '',
+    metadata: {
+      color: '',
+      finish: '',
+      brand: '',
+      properties: dbResult.properties_detected || {}
+    },
+    processingTime: dbResult.processing_time_ms || 0,
+  };
+}
+
+function mapToUploadedFile(dbFile: any): UploadedFile {
+  return {
+    ...dbFile,
+    file_type: dbFile.file_type as 'image' | 'document' | '3d_model'
+  };
+}
+
+function mapToProcessingJob(dbJob: any): ProcessingJob {
+  return {
+    ...dbJob,
+    job_type: dbJob.job_type as 'recognition' | '3d_reconstruction' | 'batch_analysis'
+  };
+}
+
 export class MaterialRecognitionAPI {
   // Upload files to storage
   static async uploadFiles(files: File[], userId: string): Promise<UploadedFile[]> {
@@ -47,7 +94,7 @@ export class MaterialRecognitionAPI {
         throw new Error(`Database error: ${dbError.message}`);
       }
 
-      uploadedFiles.push(fileRecord);
+      uploadedFiles.push(mapToUploadedFile(fileRecord));
     }
 
     return uploadedFiles;
@@ -113,7 +160,7 @@ export class MaterialRecognitionAPI {
         throw new Error(`Recognition failed: ${processError.message}`);
       }
 
-      return job;
+      return mapToProcessingJob(job);
     } catch (error) {
       console.error('Material recognition error:', error);
       throw error;
@@ -122,26 +169,36 @@ export class MaterialRecognitionAPI {
 
   // Get recognition results for a job
   static async getRecognitionResults(jobId: string): Promise<RecognitionResult[]> {
+    // First get the job to extract file IDs
+    const { data: job, error: jobError } = await supabase
+      .from('processing_queue')
+      .select('input_data')
+      .eq('id', jobId)
+      .single();
+
+    if (jobError || !job) {
+      throw new Error(`Failed to fetch job: ${jobError?.message}`);
+    }
+
+    const fileIds = (job.input_data as any)?.file_ids || [];
+    
+    if (!Array.isArray(fileIds) || fileIds.length === 0) {
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('recognition_results')
       .select(`
         *,
         material:materials_catalog(*)
       `)
-      .in('file_id', 
-        supabase
-          .from('processing_queue')
-          .select('input_data')
-          .eq('id', jobId)
-          .single()
-          .then(result => result.data?.input_data?.file_ids || [])
-      );
+      .in('file_id', fileIds);
 
     if (error) {
       throw new Error(`Failed to fetch results: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(mapToRecognitionResult);
   }
 
   // Get all materials catalog
@@ -151,8 +208,8 @@ export class MaterialRecognitionAPI {
       .select('*')
       .order('name');
 
-    if (category) {
-      query = query.eq('category', category);
+    if (category && category !== 'all') {
+      query = query.eq('category', category as any);
     }
 
     const { data, error } = await query;
@@ -161,7 +218,7 @@ export class MaterialRecognitionAPI {
       throw new Error(`Failed to fetch materials: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(mapToMaterial);
   }
 
   // Search materials using vector similarity
@@ -177,7 +234,7 @@ export class MaterialRecognitionAPI {
       throw new Error(`Search failed: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(mapToMaterial);
   }
 
   // Get processing job status
@@ -192,7 +249,7 @@ export class MaterialRecognitionAPI {
       throw new Error(`Failed to fetch job status: ${error.message}`);
     }
 
-    return data;
+    return mapToProcessingJob(data);
   }
 
   // Verify recognition result
@@ -240,6 +297,6 @@ export class MaterialRecognitionAPI {
       throw new Error(`Failed to fetch user results: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(mapToRecognitionResult);
   }
 }
