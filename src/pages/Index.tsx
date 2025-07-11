@@ -1,388 +1,543 @@
-
-import React from 'react';
-import { ArrowRight, Play, CheckCircle, Sparkles, Box, Brain, Eye, Layers, Users, Shield, TrendingUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Upload, 
+  Search, 
+  Grid3X3, 
+  Eye, 
+  Brain, 
+  Settings, 
+  User, 
+  Bell, 
+  Home,
+  Archive,
+  Palette,
+  Database,
+  Activity,
+  Plus,
+  Filter,
+  RefreshCw,
+  Download,
+  Share2,
+  Star,
+  Heart,
+  Camera,
+  Zap
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Index = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
-      {/* Navigation */}
-      <nav className="relative z-50 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white">KAI Platform</span>
-          </div>
-          <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-300 hover:text-white transition-colors">Features</a>
-            <a href="#demo" className="text-gray-300 hover:text-white transition-colors">Demo</a>
-            <a href="#enterprise" className="text-gray-300 hover:text-white transition-colors">Enterprise</a>
-            <Button variant="outline" className="text-white border-white hover:bg-white hover:text-slate-900">
-              Sign In
-            </Button>
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
-              Get Started
-            </Button>
-          </div>
-        </div>
-      </nav>
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [searchQuery, setSearchQuery] = useState('');
 
-      {/* Hero Section */}
-      <section className="relative px-6 py-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-3xl"></div>
-        <div className="relative max-w-7xl mx-auto text-center">
-          <div className="inline-flex items-center px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-sm text-white mb-8">
-            <Sparkles className="w-4 h-4 mr-2" />
-            Next-generation material recognition platform
-          </div>
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-            Enterprise-Grade
-            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent block">
-              Material Intelligence
-            </span>
-          </h1>
-          <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto leading-relaxed">
-            Combine ML-powered material recognition, 3D visualization, AI agent orchestration, 
-            and comprehensive catalog management in one sophisticated platform.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button 
-              size="lg" 
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-lg px-8 py-6"
-            >
-              Start Free Trial
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              className="text-white border-white hover:bg-white hover:text-slate-900 text-lg px-8 py-6"
-            >
-              <Play className="mr-2 w-5 h-5" />
-              Watch Demo
-            </Button>
+  const mockMaterials = [
+    { id: 1, name: 'Marble White', category: 'Stone', confidence: 0.94, image: '/placeholder.svg' },
+    { id: 2, name: 'Oak Wood', category: 'Wood', confidence: 0.89, image: '/placeholder.svg' },
+    { id: 3, name: 'Steel Brushed', category: 'Metal', confidence: 0.96, image: '/placeholder.svg' },
+    { id: 4, name: 'Ceramic Blue', category: 'Ceramic', confidence: 0.91, image: '/placeholder.svg' },
+  ];
+
+  const mockRecognitionHistory = [
+    { id: 1, material: 'Granite Black', timestamp: '2 hours ago', confidence: 0.92 },
+    { id: 2, material: 'Pine Wood', timestamp: '4 hours ago', confidence: 0.88 },
+    { id: 3, material: 'Aluminum Matte', timestamp: '6 hours ago', confidence: 0.95 },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card">
+        <div className="flex h-16 items-center px-6">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <Zap className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold">KAI Platform</span>
           </div>
           
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 text-center">
-            <div>
-              <div className="text-3xl font-bold text-white mb-2">94%+</div>
-              <div className="text-gray-400">Recognition Accuracy</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white mb-2">&lt;2s</div>
-              <div className="text-gray-400">Processing Time</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white mb-2">1M+</div>
-              <div className="text-gray-400">Materials Cataloged</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white mb-2">99.9%</div>
-              <div className="text-gray-400">Uptime SLA</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="px-6 py-20 bg-white/5 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">Comprehensive Platform Capabilities</h2>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Eight integrated packages delivering enterprise-grade material intelligence
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300 group">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Eye className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">ML-Powered Recognition</h3>
-                <p className="text-gray-300 mb-4">
-                  Advanced MaterialNet models with 94%+ accuracy, confidence scoring, and real-time processing.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Multiple model architectures</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Vector similarity search</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />SVBRDF property extraction</li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300 group">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Box className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">3D Visualization</h3>
-                <p className="text-gray-300 mb-4">
-                  Advanced scene reconstruction with NeRF, Three.js integration, and interactive material previews.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />COLMAP integration</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Real-time PBR rendering</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Interactive scene exploration</li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300 group">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-teal-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">AI Agent System</h3>
-                <p className="text-gray-300 mb-4">
-                  CrewAI-powered agents for recognition assistance, 3D design, and material expertise.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Recognition Assistant</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />3D Designer Agent</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Material Expert</li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300 group">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Layers className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Catalog Management</h3>
-                <p className="text-gray-300 mb-4">
-                  Comprehensive material catalog with MoodBoard functionality and design workflows.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Advanced search & filtering</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Collaborative MoodBoards</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Design template system</li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300 group">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Shield className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Enterprise Security</h3>
-                <p className="text-gray-300 mb-4">
-                  Network access control, role-based permissions, and enterprise-grade security features.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Network access control</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Role-based permissions</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Audit logging</li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300 group">
-              <CardContent className="p-8">
-                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Analytics & Monitoring</h3>
-                <p className="text-gray-300 mb-4">
-                  Comprehensive monitoring, analytics, and performance optimization with real-time insights.
-                </p>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Real-time monitoring</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Performance analytics</li>
-                  <li className="flex items-center"><CheckCircle className="w-4 h-4 mr-2 text-green-400" />Custom dashboards</li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Demo Section */}
-      <section id="demo" className="px-6 py-20">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">See KAI Platform In Action</h2>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Experience the power of intelligent material recognition and 3D visualization
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-6">Material Recognition Workflow</h3>
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-white mb-2">Upload Material Image</h4>
-                    <p className="text-gray-300">Drag and drop or upload images of materials for instant recognition</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-white mb-2">AI Processing</h4>
-                    <p className="text-gray-300">Multiple ML models analyze the material with confidence scoring</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-white mb-2">3D Visualization</h4>
-                    <p className="text-gray-300">View materials in 3D with accurate SVBRDF properties</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-white mb-2">Smart Recommendations</h4>
-                    <p className="text-gray-300">AI agents provide expert recommendations and design suggestions</p>
-                  </div>
-                </div>
-              </div>
-              <Button 
-                size="lg" 
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 mt-8"
-              >
-                Try Interactive Demo
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </div>
-            
+          <div className="ml-8 flex-1 max-w-md">
             <div className="relative">
-              <div className="bg-gradient-to-r from-blue-500/20 to-purple-600/20 rounded-2xl p-8 backdrop-blur-sm border border-white/20">
-                <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl flex items-center justify-center">
-                  <div className="text-center">
-                    <Play className="w-16 h-16 text-white mx-auto mb-4 opacity-70" />
-                    <p className="text-gray-300">Interactive Demo</p>
-                    <p className="text-sm text-gray-500">Click to experience the platform</p>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input 
+                placeholder="Search materials, projects, or settings..." 
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="ml-auto flex items-center space-x-4">
+            <Button variant="ghost" size="icon">
+              <Bell className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon">
+              <Settings className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon">
+              <User className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-64 border-r bg-card min-h-screen">
+          <nav className="p-4 space-y-2">
+            <Button 
+              variant={activeTab === 'dashboard' ? 'default' : 'ghost'} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Dashboard
+            </Button>
+            <Button 
+              variant={activeTab === 'recognition' ? 'default' : 'ghost'} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab('recognition')}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Recognition
+            </Button>
+            <Button 
+              variant={activeTab === 'catalog' ? 'default' : 'ghost'} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab('catalog')}
+            >
+              <Archive className="w-4 h-4 mr-2" />
+              Material Catalog
+            </Button>
+            <Button 
+              variant={activeTab === 'moodboard' ? 'default' : 'ghost'} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab('moodboard')}
+            >
+              <Palette className="w-4 h-4 mr-2" />
+              MoodBoards
+            </Button>
+            <Button 
+              variant={activeTab === '3d' ? 'default' : 'ghost'} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab('3d')}
+            >
+              <Grid3X3 className="w-4 h-4 mr-2" />
+              3D Visualization
+            </Button>
+            <Button 
+              variant={activeTab === 'agents' ? 'default' : 'ghost'} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab('agents')}
+            >
+              <Brain className="w-4 h-4 mr-2" />
+              AI Agents
+            </Button>
+            <Button 
+              variant={activeTab === 'analytics' ? 'default' : 'ghost'} 
+              className="w-full justify-start"
+              onClick={() => setActiveTab('analytics')}
+            >
+              <Activity className="w-4 h-4 mr-2" />
+              Analytics
+            </Button>
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6">
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold">Dashboard</h1>
+                <p className="text-muted-foreground">Welcome to KAI Platform - Your material intelligence hub</p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Materials Recognized</CardTitle>
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">1,247</div>
+                    <p className="text-xs text-muted-foreground">+12% from last month</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Catalog Items</CardTitle>
+                    <Database className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">8,432</div>
+                    <p className="text-xs text-muted-foreground">+248 this week</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Average Confidence</CardTitle>
+                    <Brain className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">94.2%</div>
+                    <p className="text-xs text-muted-foreground">+2.1% improvement</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+                    <Grid3X3 className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">23</div>
+                    <p className="text-xs text-muted-foreground">5 completed this week</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Button className="h-24 flex flex-col items-center justify-center space-y-2">
+                      <Upload className="w-6 h-6" />
+                      <span>Upload & Recognize</span>
+                    </Button>
+                    <Button variant="outline" className="h-24 flex flex-col items-center justify-center space-y-2">
+                      <Plus className="w-6 h-6" />
+                      <span>New MoodBoard</span>
+                    </Button>
+                    <Button variant="outline" className="h-24 flex flex-col items-center justify-center space-y-2">
+                      <Grid3X3 className="w-6 h-6" />
+                      <span>3D Scene Viewer</span>
+                    </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Recognition History */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Recognition Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {mockRecognitionHistory.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                            <Eye className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{item.material}</p>
+                            <p className="text-sm text-muted-foreground">{item.timestamp}</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">
+                          {Math.round(item.confidence * 100)}% confidence
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeTab === 'recognition' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold">Material Recognition</h1>
+                <p className="text-muted-foreground">Upload images for AI-powered material identification</p>
+              </div>
+
+              {/* Upload Area */}
+              <Card>
+                <CardContent className="p-8">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-12 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer">
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-2">Upload Material Images</h3>
+                    <p className="text-muted-foreground mb-4">Drag and drop your images here, or click to select files</p>
+                    <Button>Select Files</Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recognition Results */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recognition Results</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {mockMaterials.map((material) => (
+                      <div key={material.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="aspect-square bg-muted rounded-lg mb-3 flex items-center justify-center">
+                          <Camera className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <h4 className="font-medium">{material.name}</h4>
+                        <p className="text-sm text-muted-foreground">{material.category}</p>
+                        <Badge className="mt-2">
+                          {Math.round(material.confidence * 100)}% match
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeTab === 'catalog' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold">Material Catalog</h1>
+                  <p className="text-muted-foreground">Browse and manage your material library</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="icon">
+                    <Filter className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="icon">
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Material
+                  </Button>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Enterprise Section */}
-      <section id="enterprise" className="px-6 py-20 bg-white/5 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">Built for Enterprise</h2>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Scalable, secure, and reliable platform designed for enterprise workloads
-            </p>
-          </div>
+              {/* Filter Tabs */}
+              <Tabs defaultValue="all" className="w-full">
+                <TabsList>
+                  <TabsTrigger value="all">All Materials</TabsTrigger>
+                  <TabsTrigger value="stone">Stone</TabsTrigger>
+                  <TabsTrigger value="wood">Wood</TabsTrigger>
+                  <TabsTrigger value="metal">Metal</TabsTrigger>
+                  <TabsTrigger value="ceramic">Ceramic</TabsTrigger>
+                </TabsList>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">Scalable Architecture</h3>
-              <p className="text-gray-300">Kubernetes-based deployment handling 1000+ concurrent users with auto-scaling</p>
+                <TabsContent value="all" className="mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {mockMaterials.map((material) => (
+                      <Card key={material.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                        <CardContent className="p-4">
+                          <div className="aspect-square bg-muted rounded-lg mb-3 flex items-center justify-center">
+                            <Camera className="w-8 h-8 text-muted-foreground" />
+                          </div>
+                          <h4 className="font-medium">{material.name}</h4>
+                          <p className="text-sm text-muted-foreground">{material.category}</p>
+                          <div className="flex items-center justify-between mt-3">
+                            <Badge variant="outline">{material.category}</Badge>
+                            <div className="flex space-x-1">
+                              <Button variant="ghost" size="icon">
+                                <Heart className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon">
+                                <Share2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">Enterprise Security</h3>
-              <p className="text-gray-300">Network access control, role-based permissions, and comprehensive audit logging</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <TrendingUp className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-3">99.9% Uptime</h3>
-              <p className="text-gray-300">Production-ready with comprehensive monitoring, alerting, and disaster recovery</p>
-            </div>
-          </div>
+          )}
 
-          <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl p-12 text-center backdrop-blur-sm border border-white/20">
-            <h3 className="text-3xl font-bold text-white mb-4">Ready to Transform Your Material Workflow?</h3>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Join leading enterprises using KAI Platform for intelligent material recognition and design workflows
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg" 
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-lg px-8 py-6"
-              >
-                Schedule Enterprise Demo
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="text-white border-white hover:bg-white hover:text-slate-900 text-lg px-8 py-6"
-              >
-                Contact Sales
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="px-6 py-16 border-t border-white/10">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-12">
-            <div>
-              <div className="flex items-center space-x-2 mb-6">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+          {activeTab === 'moodboard' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold">MoodBoards</h1>
+                  <p className="text-muted-foreground">Create and manage design inspiration boards</p>
                 </div>
-                <span className="text-xl font-bold text-white">KAI Platform</span>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New MoodBoard
+                </Button>
               </div>
-              <p className="text-gray-400 mb-6">
-                Enterprise-grade material recognition and catalog management with ML-powered intelligence.
-              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Card key={i} className="hover:shadow-md transition-shadow cursor-pointer">
+                    <CardContent className="p-4">
+                      <div className="aspect-video bg-muted rounded-lg mb-3 flex items-center justify-center">
+                        <Palette className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                      <h4 className="font-medium">Modern Kitchen Design</h4>
+                      <p className="text-sm text-muted-foreground">12 materials • Updated 2 days ago</p>
+                      <div className="flex items-center justify-between mt-3">
+                        <Badge variant="outline">Kitchen</Badge>
+                        <div className="flex space-x-1">
+                          <Button variant="ghost" size="icon">
+                            <Star className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon">
+                            <Share2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-              </ul>
+          )}
+
+          {activeTab === '3d' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold">3D Visualization</h1>
+                <p className="text-muted-foreground">Interactive 3D material preview and scene reconstruction</p>
+              </div>
+
+              <Card>
+                <CardContent className="p-8">
+                  <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                    <div className="text-center">
+                      <Grid3X3 className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="text-lg font-semibold mb-2">3D Scene Viewer</h3>
+                      <p className="text-muted-foreground mb-4">Upload images for 3D scene reconstruction</p>
+                      <Button>Load 3D Scene</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-              </ul>
+          )}
+
+          {activeTab === 'agents' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold">AI Agents</h1>
+                <p className="text-muted-foreground">Intelligent assistants for material recognition and design</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Eye className="w-5 h-5 mr-2" />
+                      Recognition Assistant
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-4">AI agent specialized in material identification and classification</p>
+                    <Badge className="mb-4">Active</Badge>
+                    <Button className="w-full">Chat with Agent</Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Grid3X3 className="w-5 h-5 mr-2" />
+                      3D Designer
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-4">Spatial reasoning agent for room layout and furniture placement</p>
+                    <Badge className="mb-4">Active</Badge>
+                    <Button className="w-full">Chat with Agent</Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Brain className="w-5 h-5 mr-2" />
+                      Material Expert
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-4">Domain expert providing material knowledge and recommendations</p>
+                    <Badge className="mb-4">Active</Badge>
+                    <Button className="w-full">Chat with Agent</Button>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Community</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
-              </ul>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold">Analytics</h1>
+                <p className="text-muted-foreground">Performance metrics and insights</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Recognition Accuracy</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">94.2%</div>
+                    <p className="text-xs text-muted-foreground">+2.1% from last week</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Processing Time</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">1.8s</div>
+                    <p className="text-xs text-muted-foreground">-0.3s improvement</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Daily Recognitions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">347</div>
+                    <p className="text-xs text-muted-foreground">+12% from yesterday</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Agent Interactions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">156</div>
+                    <p className="text-xs text-muted-foreground">+8% from last week</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recognition Performance Over Time</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
+                    <p className="text-muted-foreground">Chart visualization would go here</p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </div>
-          <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center text-gray-400">
-            <p>&copy; 2024 KAI Platform. All rights reserved.</p>
-            <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms</a>
-              <a href="#" className="hover:text-white transition-colors">Cookies</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+          )}
+        </main>
+      </div>
     </div>
   );
 };
