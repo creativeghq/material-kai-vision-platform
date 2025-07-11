@@ -228,32 +228,39 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate image using HF Inference Client with fal-ai provider and optimized parameters
-    const imageBlob = await hf.textToImage({
-      provider: "fal-ai",
-      model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
-      inputs: finalPrompt,
-      parameters: { 
-        num_inference_steps: 20,        // Increased for better quality
-        guidance_scale: 7.5,            // Optimal for following prompts closely
-        sync_mode: true,
-        width: 1024,                    // High resolution
-        height: 1024,
-        seed: Math.floor(Math.random() * 999999), // Random seed for variety
-        negative_prompt: negativePrompt  // Improved negative prompting
-      }
-    });
+    // Generate image using HF Inference Client with better error handling
+    let imageBlob;
+    try {
+      console.log('Attempting generation with fal-ai provider...');
+      imageBlob = await hf.textToImage({
+        provider: "fal-ai",
+        model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
+        inputs: finalPrompt,
+        parameters: { 
+          num_inference_steps: 20,
+          guidance_scale: 7.5,
+          sync_mode: true,
+          width: 1024,
+          height: 1024,
+          seed: Math.floor(Math.random() * 999999),
+          negative_prompt: negativePrompt
+        }
+      });
+    } catch (faliError) {
+      console.error('fal-ai provider failed, trying fallback model:', faliError);
+      // Fallback to a known working model
+      imageBlob = await hf.textToImage({
+        model: 'black-forest-labs/FLUX.1-schnell',
+        inputs: finalPrompt
+      });
+    }
     
     console.log('HF response blob size:', imageBlob.size);
     
     // Convert blob to base64 safely for large images
-    const reader = new FileReader();
-    const base64Promise = new Promise<string>((resolve, reject) => {
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-    });
-    reader.readAsDataURL(imageBlob);
-    return await base64Promise;
+    const arrayBuffer = await imageBlob.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    return `data:image/png;base64,${base64}`;
     
   } catch (error) {
     console.error('3D generation error:', error);
