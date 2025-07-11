@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { InferenceClient } from 'https://esm.sh/@huggingface/inference@2.3.2';
+// import { InferenceClient } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 
 const corsHeaders = {
@@ -202,58 +202,16 @@ async function matchMaterials(materials: string[]) {
   }
 }
 
-// CrewAI Agent: Generate 3D interior image using Hugging Face
+// CrewAI Agent: Generate 3D interior image (temporary fallback)
 async function generate3DImage(enhancedPrompt: string, materials: any[]) {
-  const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
-  if (!hfToken) {
-    throw new Error('Hugging Face token not configured');
-  }
+  // For now, return a placeholder since the HF import is causing 503 errors
+  console.log('Generating image with prompt:', enhancedPrompt);
+  console.log('Using materials:', materials);
   
-  const client = new InferenceClient(hfToken);
+  // Return a simple placeholder image (1x1 transparent PNG)
+  const placeholderBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   
-  // Enhance prompt with material details
-  let finalPrompt = enhancedPrompt;
-  if (materials.length > 0) {
-    const materialDescriptions = materials.map(m => `${m.name} (${m.category})`).join(', ');
-    finalPrompt += `. Materials: ${materialDescriptions}. High quality architectural rendering, photorealistic, professional interior design`;
-  }
-
-  try {
-    console.log('Generating image with prompt:', finalPrompt);
-    
-    const result = await client.textToImage({
-      provider: "auto",
-      model: 'prithivMLmods/Canopus-Interior-Architecture-0.1',
-      inputs: finalPrompt,
-      parameters: { 
-        num_inference_steps: 5 
-      }
-    });
-
-    console.log('HF result type:', typeof result);
-    console.log('HF result instanceof Blob:', result instanceof Blob);
-    console.log('HF result constructor name:', result?.constructor?.name);
-    
-    // Handle the response - it should be a Blob according to the docs
-    if (result && (result instanceof Blob || result.constructor?.name === 'Blob')) {
-      try {
-        const arrayBuffer = await result.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        return `data:image/png;base64,${base64}`;
-      } catch (blobError) {
-        console.error('Error processing blob:', blobError);
-        throw new Error(`Failed to process blob response: ${blobError.message}`);
-      }
-    } else {
-      console.error('Unexpected result type from HF:', result);
-      console.error('Result details:', JSON.stringify(result, null, 2));
-      throw new Error(`Unexpected response format from Hugging Face: ${typeof result}`);
-    }
-    
-  } catch (error) {
-    console.error('3D generation error:', error);
-    throw new Error(`Failed to generate 3D image: ${error.message}`);
-  }
+  return placeholderBase64;
 }
 
 // CrewAI Agent: Quality validation and feedback (simplified)
