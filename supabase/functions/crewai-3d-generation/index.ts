@@ -222,16 +222,10 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate image using the Canopus Interior Architecture model
+    // Generate image using FLUX model (known to work with HF Inference API)
     const imageBlob = await hf.textToImage({
-      model: 'Shekswess/Canopus-Interior-Architecture-0.1-Neuron',
-      inputs: finalPrompt,
-      parameters: {
-        num_inference_steps: 10,
-        guidance_scale: 7.5,
-        width: 768,
-        height: 768
-      }
+      model: 'black-forest-labs/FLUX.1-schnell',
+      inputs: finalPrompt
     });
     
     console.log('HF response blob size:', imageBlob.size);
