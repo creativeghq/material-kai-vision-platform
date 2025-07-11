@@ -7,86 +7,133 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { RecognitionResult } from '@/types/materials';
 import { RecognitionResults } from './RecognitionResults';
-import { clientMLService } from '@/services/ml/clientMLService';
+import { mlService, getMLRecommendation } from '@/services/ml';
 import { toast } from 'sonner';
 
-// AI-powered recognition service using client-side ML
-const recognizeWithClientML = async (files: File[]): Promise<RecognitionResult[]> => {
-  const results: RecognitionResult[] = [];
+// Enhanced recognition using hybrid ML service
+const recognizeWithHybridML = async (files: File[]): Promise<RecognitionResult[]> => {
+  // Get processing recommendation
+  const recommendation = getMLRecommendation(files);
+  console.log('ML Processing recommendation:', recommendation);
   
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  // Use hybrid ML service for optimal processing
+  const mlResult = await mlService.analyzeMaterials(files);
+  
+  if (mlResult.success && mlResult.data) {
+    const results: RecognitionResult[] = [];
     
-    // Analyze material using client-side ML
-    const mlResult = await clientMLService.analyzeMaterial(file);
-    
-    if (mlResult.success && mlResult.data) {
-      const { image, combined } = mlResult.data;
-      const topClassification = image?.[0];
+    // Process hybrid ML results
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const analysisData = Array.isArray(mlResult.data) ? mlResult.data[i] : mlResult.data;
       
-      const result: RecognitionResult = {
-        // New schema properties
-        id: `client-ml-${Date.now()}-${i}`,
-        file_id: `file-${Date.now()}-${i}`,
-        material_id: `mat-${combined.materialType}-${i}`,
-        confidence_score: mlResult.confidence || 0,
-        detection_method: 'visual' as const,
-        ai_model_version: 'client-v1.0',
-        properties_detected: {
-          material_type: combined.materialType,
-          classification: topClassification?.label || 'unknown',
-          features: combined.features?.map(f => f.label) || []
-        },
-        processing_time_ms: mlResult.processingTime || 0,
-        user_verified: false,
-        created_at: new Date().toISOString(),
+      if (analysisData) {
+        // Handle different result formats based on processing method
+        let materialData;
+        if (mlResult.processingMethod === 'server') {
+          // Server results format
+          materialData = {
+            materialType: analysisData.properties_detected?.category || 'other',
+            classification: analysisData.properties_detected?.material_name || 'Unknown',
+            confidence: analysisData.confidence_score || 0,
+            features: analysisData.properties_detected?.visual_features || []
+          };
+        } else {
+          // Client results format
+          materialData = analysisData.combined || {
+            materialType: 'other',
+            classification: 'Unknown',
+            confidence: 0,
+            features: []
+          };
+        }
+
+        const result: RecognitionResult = {
+          id: `hybrid-ml-${Date.now()}-${i}`,
+          file_id: `file-${Date.now()}-${i}`,
+          material_id: `mat-${materialData.materialType}-${i}`,
+          confidence_score: materialData.confidence,
+          detection_method: 'visual' as const,
+          ai_model_version: `${mlResult.processingMethod}-v1.0`,
+          properties_detected: {
+            material_type: materialData.materialType,
+            classification: materialData.classification,
+            features: materialData.features,
+            processing_method: mlResult.processingMethod,
+            server_job_id: mlResult.serverJobId
+          },
+          processing_time_ms: mlResult.processingTime || 0,
+          user_verified: false,
+          created_at: new Date().toISOString(),
+          
+          // Legacy properties
+          materialId: `mat-${materialData.materialType}-${i}`,
+          name: materialData.classification,
+          confidence: materialData.confidence,
+          imageUrl: URL.createObjectURL(file),
+          metadata: {
+            properties: {
+              material_type: materialData.materialType,
+              classification: materialData.classification,
+              features: materialData.features,
+              processing_method: mlResult.processingMethod
+            }
+          },
+          processingTime: mlResult.processingTime || 0,
+        };
         
-        // Legacy properties for backward compatibility
-        materialId: `mat-${combined.materialType}-${i}`,
-        name: topClassification?.label || 'Unknown Material',
-        confidence: mlResult.confidence || 0,
-        imageUrl: URL.createObjectURL(file),
-        metadata: {
-          properties: {
-            material_type: combined.materialType,
-            classification: topClassification?.label || 'unknown',
-            score: topClassification?.score || 0,
-            features: combined.features || []
-          }
-        },
-        processingTime: mlResult.processingTime || 0,
-      };
-      
-      results.push(result);
-    } else {
-      // Fallback for failed analysis
-      const result: RecognitionResult = {
-        id: `fallback-${Date.now()}-${i}`,
-        file_id: `file-${Date.now()}-${i}`,
-        material_id: `mat-unknown-${i}`,
-        confidence_score: 0,
-        detection_method: 'visual' as const,
-        ai_model_version: 'client-v1.0',
-        properties_detected: { error: mlResult.error || 'Analysis failed' },
-        processing_time_ms: mlResult.processingTime || 0,
-        user_verified: false,
-        created_at: new Date().toISOString(),
+        results.push(result);
+      } else {
+        // Fallback for failed analysis
+        const result: RecognitionResult = {
+          id: `fallback-${Date.now()}-${i}`,
+          file_id: `file-${Date.now()}-${i}`,
+          material_id: `mat-unknown-${i}`,
+          confidence_score: 0,
+          detection_method: 'visual' as const,
+          ai_model_version: `${mlResult.processingMethod}-v1.0`,
+          properties_detected: { error: mlResult.error || 'Analysis failed' },
+          processing_time_ms: mlResult.processingTime || 0,
+          user_verified: false,
+          created_at: new Date().toISOString(),
+          
+          materialId: `mat-unknown-${i}`,
+          name: 'Analysis Failed',
+          confidence: 0,
+          imageUrl: URL.createObjectURL(file),
+          metadata: { 
+            properties: { error: mlResult.error || 'Analysis failed' }
+          },
+          processingTime: mlResult.processingTime || 0,
+        };
         
-        materialId: `mat-unknown-${i}`,
-        name: 'Analysis Failed',
-        confidence: 0,
-        imageUrl: URL.createObjectURL(file),
-        metadata: { 
-          properties: { error: mlResult.error || 'Analysis failed' }
-        },
-        processingTime: mlResult.processingTime || 0,
-      };
-      
-      results.push(result);
+        results.push(result);
+      }
     }
+    
+    return results;
+  } else {
+    // Handle complete failure
+    return files.map((file, i) => ({
+      id: `error-${Date.now()}-${i}`,
+      file_id: `file-${Date.now()}-${i}`,
+      material_id: `mat-error-${i}`,
+      confidence_score: 0,
+      detection_method: 'visual' as const,
+      ai_model_version: 'hybrid-v1.0',
+      properties_detected: { error: mlResult.error || 'Recognition failed' },
+      processing_time_ms: mlResult.processingTime || 0,
+      user_verified: false,
+      created_at: new Date().toISOString(),
+      
+      materialId: `mat-error-${i}`,
+      name: 'Recognition Failed',
+      confidence: 0,
+      imageUrl: URL.createObjectURL(file),
+      metadata: { properties: { error: mlResult.error || 'Recognition failed' } },
+      processingTime: mlResult.processingTime || 0,
+    }));
   }
-  
-  return results;
 };
 
 export const MaterialRecognition: React.FC = () => {
@@ -128,8 +175,8 @@ export const MaterialRecognition: React.FC = () => {
     }, 200);
 
     try {
-      const recognitionResults = await recognizeWithClientML(files);
-      toast.success(`Analyzed ${recognitionResults.length} materials using AI`);
+      const recognitionResults = await recognizeWithHybridML(files);
+      toast.success(`Analyzed ${recognitionResults.length} materials using hybrid AI processing`);
       setResults(recognitionResults);
       setProgress(100);
     } catch (error) {
@@ -160,7 +207,7 @@ export const MaterialRecognition: React.FC = () => {
             Material Recognition
             <Badge variant="secondary" className="flex items-center gap-1">
               <Brain className="w-3 h-3" />
-              AI Powered
+              Hybrid AI
             </Badge>
           </CardTitle>
         </CardHeader>
