@@ -10,7 +10,7 @@ export interface Generation3DRequest {
 export interface Generation3DResult {
   success: boolean;
   generation_id: string;
-  image_url: string;
+  image_urls: string[];
   parsed_request: {
     room_type: string;
     style: string;

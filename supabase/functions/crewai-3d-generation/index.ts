@@ -228,44 +228,60 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate image using HF Inference Client with better error handling
-    let imageBlob;
-    try {
-      console.log('Attempting generation with fal-ai provider...');
-      imageBlob = await hf.textToImage({
-        provider: "fal-ai",
-        model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
-        inputs: finalPrompt,
-        parameters: { 
-          num_inference_steps: 20,
-          guidance_scale: 7.5,
-          sync_mode: true,
-          width: 1024,
-          height: 1024,
-          seed: Math.floor(Math.random() * 999999),
-          negative_prompt: negativePrompt
+    // Generate 2 images instead of 1
+    const imagePromises = [];
+    for (let i = 0; i < 2; i++) {
+      const imagePromise = (async () => {
+        try {
+          console.log(`Attempting generation ${i + 1} with fal-ai provider...`);
+          const imageBlob = await hf.textToImage({
+            provider: "fal-ai",
+            model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
+            inputs: finalPrompt,
+            parameters: { 
+              num_inference_steps: 20,
+              guidance_scale: 7.5,
+              sync_mode: true,
+              width: 1024,
+              height: 1024,
+              seed: Math.floor(Math.random() * 999999),
+              negative_prompt: negativePrompt
+            }
+          });
+          console.log(`HF response blob ${i + 1} size:`, imageBlob.size);
+          return imageBlob;
+        } catch (faliError) {
+          console.error(`fal-ai provider failed for image ${i + 1}, trying fallback model:`, faliError);
+          // Fallback to Stable Diffusion XL
+          const imageBlob = await hf.textToImage({
+            model: 'stabilityai/stable-diffusion-xl-base-1.0',
+            inputs: finalPrompt,
+            parameters: {
+              negative_prompt: negativePrompt,
+              num_inference_steps: 20,
+              guidance_scale: 7.5
+            }
+          });
+          console.log(`Fallback response blob ${i + 1} size:`, imageBlob.size);
+          return imageBlob;
         }
-      });
-    } catch (faliError) {
-      console.error('fal-ai provider failed, trying fallback model:', faliError);
-      // Fallback to Stable Diffusion XL
-      imageBlob = await hf.textToImage({
-        model: 'stabilityai/stable-diffusion-xl-base-1.0',
-        inputs: finalPrompt,
-        parameters: {
-          negative_prompt: negativePrompt,
-          num_inference_steps: 20,
-          guidance_scale: 7.5
-        }
-      });
+      })();
+      imagePromises.push(imagePromise);
     }
+
+    // Wait for both images to be generated
+    const imageBlobs = await Promise.all(imagePromises);
     
-    console.log('HF response blob size:', imageBlob.size);
+    // Convert both blobs to base64 safely for large images
+    const base64Images = await Promise.all(
+      imageBlobs.map(async (blob, index) => {
+        const arrayBuffer = await blob.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        return `data:image/png;base64,${base64}`;
+      })
+    );
     
-    // Convert blob to base64 safely for large images
-    const arrayBuffer = await imageBlob.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    return `data:image/png;base64,${base64}`;
+    return base64Images;
     
   } catch (error) {
     console.error('3D generation error:', error);
@@ -323,12 +339,12 @@ async function processGeneration(request: GenerationRequest) {
     ]);
     console.log('Matched materials:', matchedMaterials);
 
-    // CrewAI Agent 3: Generate 3D image
-    const imageBase64 = await generate3DImage(parsed.enhanced_prompt, matchedMaterials);
-    console.log('Generated 3D image');
+    // CrewAI Agent 3: Generate 2 3D images
+    const imageBase64Array = await generate3DImage(parsed.enhanced_prompt, matchedMaterials);
+    console.log('Generated 2 3D images');
 
-    // CrewAI Agent 4: Quality validation
-    const qualityCheck = await validateQuality(imageBase64, request.prompt);
+    // CrewAI Agent 4: Quality validation (validate first image)
+    const qualityCheck = await validateQuality(imageBase64Array[0], request.prompt);
     console.log('Quality validation:', qualityCheck);
 
     // Update record with results
@@ -342,7 +358,7 @@ async function processGeneration(request: GenerationRequest) {
           quality_score: qualityCheck.score,
           quality_feedback: qualityCheck.feedback
         },
-        image_urls: [imageBase64],
+        image_urls: imageBase64Array,
         material_ids: matchedMaterials.map(m => m.id),
         materials_used: matchedMaterials.map(m => m.name),
         processing_time_ms: Date.now() - startTime,
@@ -373,7 +389,7 @@ async function processGeneration(request: GenerationRequest) {
     return {
       success: true,
       generation_id: generationRecord.id,
-      image_url: imageBase64,
+      image_urls: imageBase64Array,
       parsed_request: parsed,
       matched_materials: matchedMaterials,
       quality_assessment: qualityCheck,

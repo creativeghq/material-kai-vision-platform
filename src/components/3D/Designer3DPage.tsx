@@ -15,7 +15,7 @@ export const Designer3DPage: React.FC = () => {
   const [roomType, setRoomType] = useState('');
   const [style, setStyle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [generationData, setGenerationData] = useState<any>(null);
 
   const roomTypes = [
@@ -46,7 +46,7 @@ export const Designer3DPage: React.FC = () => {
         style: style || undefined
       });
 
-      setGeneratedImage(result.image_url);
+      setGeneratedImages(result.image_urls || []);
       setGenerationData(result);
       
       toast({
@@ -66,12 +66,12 @@ export const Designer3DPage: React.FC = () => {
     }
   };
 
-  const handleDownload = () => {
-    if (!generatedImage) return;
+  const handleDownload = (imageIndex = 0) => {
+    if (!generatedImages.length || !generatedImages[imageIndex]) return;
     
     const link = document.createElement('a');
-    link.href = generatedImage;
-    link.download = `3d-design-${Date.now()}.png`;
+    link.href = generatedImages[imageIndex];
+    link.download = `3d-design-${imageIndex + 1}-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -161,13 +161,19 @@ export const Designer3DPage: React.FC = () => {
               )}
             </Button>
 
-            {generatedImage && (
-              <div className="flex gap-2">
-                <Button onClick={handleDownload} variant="outline" className="flex-1">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                <Button variant="outline" className="flex-1">
+            {generatedImages.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button onClick={() => handleDownload(0)} variant="outline" className="flex-1">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Top
+                  </Button>
+                  <Button onClick={() => handleDownload(1)} variant="outline" className="flex-1">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Bottom
+                  </Button>
+                </div>
+                <Button variant="outline" className="w-full">
                   <Share2 className="h-4 w-4 mr-2" />
                   Share
                 </Button>
@@ -179,19 +185,39 @@ export const Designer3DPage: React.FC = () => {
         {/* Preview Panel */}
         <Card>
           <CardHeader>
-            <CardTitle>3D Preview</CardTitle>
+            <CardTitle>3D Preview - Two Generated Images</CardTitle>
           </CardHeader>
           <CardContent>
-            {generatedImage ? (
+            {generatedImages.length > 0 ? (
               <div className="space-y-4">
-                <div className="aspect-square w-full overflow-hidden rounded-lg border">
-                  <img 
-                    src={generatedImage} 
-                    alt="Generated interior design"
-                    className="w-full h-full object-cover"
-                  />
+                {/* First Image - Top */}
+                <div>
+                  <h4 className="font-medium mb-2">Design Variation 1</h4>
+                  <div className="aspect-square w-full overflow-hidden rounded-lg border">
+                    <img 
+                      src={generatedImages[0]} 
+                      alt="Generated interior design - variation 1"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
-                <ThreeJsViewer imageUrl={generatedImage} className="h-64" />
+                
+                {/* Second Image - Bottom */}
+                {generatedImages[1] && (
+                  <div>
+                    <h4 className="font-medium mb-2">Design Variation 2</h4>
+                    <div className="aspect-square w-full overflow-hidden rounded-lg border">
+                      <img 
+                        src={generatedImages[1]} 
+                        alt="Generated interior design - variation 2"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* 3D Viewer for first image */}
+                <ThreeJsViewer imageUrl={generatedImages[0]} className="h-64" />
               </div>
             ) : (
               <div className="aspect-square w-full border border-dashed border-muted-foreground/25 rounded-lg flex items-center justify-center">
