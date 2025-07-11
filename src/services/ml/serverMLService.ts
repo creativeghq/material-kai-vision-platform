@@ -375,6 +375,49 @@ export class ServerMLService {
   }
 
   /**
+   * Analyze advanced material properties using server-side AI
+   */
+  async analyzeAdvancedMaterialProperties(
+    imageFile: File,
+    options: any = {}
+  ): Promise<any> {
+    try {
+      console.log('ServerML: Starting advanced material properties analysis');
+      
+      const { imageUrl } = await ServerMLService.uploadImage(imageFile);
+      
+      const response = await supabase.functions.invoke('material-properties-analysis', {
+        body: {
+          imageUrl,
+          options,
+          userId: (await supabase.auth.getUser()).data.user?.id
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Material properties analysis failed');
+      }
+
+      return {
+        success: true,
+        data: response.data,
+        processingTime: response.data?.processingTime || 0,
+        provider: 'supabase-edge',
+        modelVersion: 'gpt-4o-mini'
+      };
+
+    } catch (error) {
+      console.error('ServerML: Material properties analysis failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Material properties analysis failed',
+        processingTime: 0,
+        provider: 'supabase-edge'
+      };
+    }
+  }
+
+  /**
    * Generate embeddings for text using the server
    */
   async generateTextEmbedding(text: string): Promise<{ embedding: number[] | null; error?: string }> {
