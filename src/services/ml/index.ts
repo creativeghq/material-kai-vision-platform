@@ -7,6 +7,12 @@ export { hybridMLService, HybridMLService } from './hybridMLService';
 export { styleAnalysisService, StyleAnalysisService } from './styleAnalysisService';
 export { hybridStyleAnalysisService, HybridStyleAnalysisService } from './hybridStyleAnalysisService';
 
+// OCR services
+export { ocrService, OCRService } from './ocrService';
+export type { OCRResult, OCROptions } from './ocrService';
+export { hybridOCRService, HybridOCRService } from './hybridOCRService';
+export type { HybridOCROptions, HybridOCRResult } from './hybridOCRService';
+
 // Individual service components
 export { ImageClassifierService } from './imageClassifier';
 export { TextEmbedderService } from './textEmbedder';

@@ -18,6 +18,10 @@ export interface ServerMLResult {
   results?: any[];
   processing_time_ms?: number;
   error?: string;
+  data?: any;
+  processingTime?: number;
+  provider?: string;
+  modelVersion?: string;
 }
 
 /**
@@ -276,6 +280,98 @@ export class ServerMLService {
 
       poll();
     });
+  }
+
+  /**
+   * Process OCR on an image file
+   */
+  static async processOCR(
+    imageFile: File,
+    options: {
+      language?: string;
+      extractStructuredData?: boolean;
+      documentType?: 'certificate' | 'label' | 'specification' | 'general';
+      materialContext?: string;
+    } = {}
+  ): Promise<ServerMLResult> {
+    try {
+      console.log('ServerML: Starting OCR processing');
+      
+      const { imageUrl } = await this.uploadImage(imageFile);
+      
+      const response = await supabase.functions.invoke('ocr-processing', {
+        body: {
+          imageUrl,
+          options,
+          userId: (await supabase.auth.getUser()).data.user?.id
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'OCR processing failed');
+      }
+
+      return {
+        success: true,
+        data: response.data,
+        processingTime: response.data?.processingTime || 0,
+        provider: 'supabase-edge',
+        modelVersion: 'gpt-4o-mini'
+      };
+
+    } catch (error) {
+      console.error('ServerML: OCR processing failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'OCR processing failed',
+        processingTime: 0,
+        provider: 'supabase-edge'
+      };
+    }
+  }
+
+  /**
+   * Upload image and get public URL
+   */
+  private static async uploadImage(file: File): Promise<{ imageUrl: string }> {
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2);
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `ocr_${timestamp}_${randomId}.${fileExtension}`;
+    const filePath = `ocr/${fileName}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('material-images')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw new Error(`Upload failed: ${uploadError.message}`);
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('material-images')
+      .getPublicUrl(uploadData.path);
+
+    return { imageUrl: publicUrl };
+  }
+
+  /**
+   * Get service status
+   */
+  static getStatus(): { available: boolean; features: string[] } {
+    return {
+      available: true,
+      features: [
+        'Material Recognition',
+        'OCR Processing',
+        'AI-Powered Analysis',
+        'Structured Data Extraction',
+        'Embedding Generation'
+      ]
+    };
   }
 
   /**
