@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Layout } from '@/components/Layout/Layout';
 import { Dashboard } from '@/components/Dashboard/Dashboard';
+import { MaterialRecognition } from '@/components/Recognition/MaterialRecognition';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -9,6 +10,8 @@ const Index = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'recognition':
+        return <MaterialRecognition />;
       default:
         return (
           <div className="flex items-center justify-center h-64">
