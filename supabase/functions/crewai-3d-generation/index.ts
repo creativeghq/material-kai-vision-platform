@@ -294,10 +294,11 @@ async function validateQuality(imageBase64: string, originalPrompt: string) {
 
 async function processGeneration(request: GenerationRequest) {
   const startTime = Date.now();
+  let generationRecord: any = null;
   
   try {
     // Create initial record
-    const { data: generationRecord, error: createError } = await supabase
+    const { data: recordData, error: createError } = await supabase
       .from('generation_3d')
       .insert({
         user_id: request.user_id,
@@ -312,6 +313,8 @@ async function processGeneration(request: GenerationRequest) {
     if (createError) {
       throw new Error(`Failed to create generation record: ${createError.message}`);
     }
+    
+    generationRecord = recordData;
 
     console.log(`Starting 3D generation for record: ${generationRecord.id}`);
 
