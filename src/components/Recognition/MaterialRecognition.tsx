@@ -1,61 +1,92 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileImage, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileImage, Loader2, CheckCircle, AlertCircle, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { RecognitionResult } from '@/types/materials';
 import { RecognitionResults } from './RecognitionResults';
+import { clientMLService } from '@/services/clientMLService';
+import { toast } from 'sonner';
 
-// Mock recognition service with proper types
-const mockRecognitionService = (files: File[]): Promise<RecognitionResult[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const results: RecognitionResult[] = files.map((file, index) => {
-        const materials = [
-          { name: 'Marble White Carrara', confidence: 0.94, color: 'white', finish: 'polished', brand: 'Premium Stone Co.' },
-          { name: 'Oak Wood Natural', confidence: 0.89, color: 'brown', finish: 'matte', brand: 'WoodCraft Ltd.' },
-          { name: 'Steel Brushed Finish', confidence: 0.96, color: 'silver', finish: 'brushed', brand: 'MetalWorks Pro' },
-          { name: 'Ceramic Tile Blue', confidence: 0.91, color: 'blue', finish: 'glossy', brand: 'CeramicArt' },
-          { name: 'Granite Black Absolute', confidence: 0.87, color: 'black', finish: 'honed', brand: 'Stone Masters' },
-        ];
+// AI-powered recognition service using client-side ML
+const recognizeWithClientML = async (files: File[]): Promise<RecognitionResult[]> => {
+  const results: RecognitionResult[] = [];
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    
+    // Analyze material using client-side ML
+    const mlResult = await clientMLService.analyzeMaterial(file);
+    
+    if (mlResult.success && mlResult.data) {
+      const { image, combined } = mlResult.data;
+      const topClassification = image?.[0];
+      
+      const result: RecognitionResult = {
+        // New schema properties
+        id: `client-ml-${Date.now()}-${i}`,
+        file_id: `file-${Date.now()}-${i}`,
+        material_id: `mat-${combined.materialType}-${i}`,
+        confidence_score: mlResult.confidence || 0,
+        detection_method: 'visual' as const,
+        ai_model_version: 'client-v1.0',
+        properties_detected: {
+          material_type: combined.materialType,
+          classification: topClassification?.label || 'unknown',
+          features: combined.features?.map(f => f.label) || []
+        },
+        processing_time_ms: mlResult.processingTime || 0,
+        user_verified: false,
+        created_at: new Date().toISOString(),
         
-        const material = materials[index % materials.length];
+        // Legacy properties for backward compatibility
+        materialId: `mat-${combined.materialType}-${i}`,
+        name: topClassification?.label || 'Unknown Material',
+        confidence: mlResult.confidence || 0,
+        imageUrl: URL.createObjectURL(file),
+        metadata: {
+          properties: {
+            material_type: combined.materialType,
+            classification: topClassification?.label || 'unknown',
+            score: topClassification?.score || 0,
+            features: combined.features || []
+          }
+        },
+        processingTime: mlResult.processingTime || 0,
+      };
+      
+      results.push(result);
+    } else {
+      // Fallback for failed analysis
+      const result: RecognitionResult = {
+        id: `fallback-${Date.now()}-${i}`,
+        file_id: `file-${Date.now()}-${i}`,
+        material_id: `mat-unknown-${i}`,
+        confidence_score: 0,
+        detection_method: 'visual' as const,
+        ai_model_version: 'client-v1.0',
+        properties_detected: { error: mlResult.error || 'Analysis failed' },
+        processing_time_ms: mlResult.processingTime || 0,
+        user_verified: false,
+        created_at: new Date().toISOString(),
         
-        return {
-          // New schema properties
-          id: `result-${index + 1}`,
-          file_id: `file-${index + 1}`,
-          material_id: `mat-${index + 1}`,
-          confidence_score: material.confidence,
-          detection_method: 'visual' as const,
-          ai_model_version: 'v1.0',
-          properties_detected: {
-            color: material.color,
-            finish: material.finish,
-            brand: material.brand
-          },
-          processing_time_ms: 1500 + Math.random() * 1000,
-          user_verified: false,
-          created_at: new Date().toISOString(),
-          
-          // Legacy properties for backward compatibility
-          materialId: `mat-${index + 1}`,
-          name: material.name,
-          confidence: material.confidence,
-          imageUrl: URL.createObjectURL(file),
-          metadata: {
-            color: material.color,
-            finish: material.finish,
-            brand: material.brand,
-          },
-          processingTime: 1500 + Math.random() * 1000,
-        };
-      });
-      resolve(results);
-    }, 2000 + Math.random() * 1000);
-  });
+        materialId: `mat-unknown-${i}`,
+        name: 'Analysis Failed',
+        confidence: 0,
+        imageUrl: URL.createObjectURL(file),
+        metadata: { 
+          properties: { error: mlResult.error || 'Analysis failed' }
+        },
+        processingTime: mlResult.processingTime || 0,
+      };
+      
+      results.push(result);
+    }
+  }
+  
+  return results;
 };
 
 export const MaterialRecognition: React.FC = () => {
@@ -97,11 +128,13 @@ export const MaterialRecognition: React.FC = () => {
     }, 200);
 
     try {
-      const recognitionResults = await mockRecognitionService(files);
+      const recognitionResults = await recognizeWithClientML(files);
+      toast.success(`Analyzed ${recognitionResults.length} materials using AI`);
       setResults(recognitionResults);
       setProgress(100);
     } catch (error) {
       console.error('Recognition failed:', error);
+      toast.error('Material recognition failed. Please try again.');
     } finally {
       setIsProcessing(false);
       clearInterval(progressInterval);
@@ -125,6 +158,10 @@ export const MaterialRecognition: React.FC = () => {
           <CardTitle className="flex items-center gap-2">
             <FileImage className="w-5 h-5" />
             Material Recognition
+            <Badge variant="secondary" className="flex items-center gap-1">
+              <Brain className="w-3 h-3" />
+              AI Powered
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
