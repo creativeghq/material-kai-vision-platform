@@ -194,5 +194,35 @@ export const materialCatalogAPI = {
   getMaterialById: async (id: string): Promise<Material | null> => {
     await new Promise(resolve => setTimeout(resolve, 200));
     return mockMaterials.find(material => material.id === id) || null;
+  },
+
+  deleteMaterial: async (id: string): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const index = mockMaterials.findIndex(material => material.id === id);
+    if (index > -1) {
+      mockMaterials.splice(index, 1);
+    }
+  },
+
+  updateMaterial: async (id: string, updates: Partial<Material>): Promise<Material | null> => {
+    await new Promise(resolve => setTimeout(resolve, 400));
+    const index = mockMaterials.findIndex(material => material.id === id);
+    if (index > -1) {
+      mockMaterials[index] = { ...mockMaterials[index], ...updates, updatedAt: new Date() };
+      return mockMaterials[index];
+    }
+    return null;
+  },
+
+  createMaterial: async (materialData: Omit<Material, 'id' | 'createdAt' | 'updatedAt'>): Promise<Material> => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const newMaterial: Material = {
+      ...materialData,
+      id: Math.random().toString(36).substr(2, 9),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    mockMaterials.push(newMaterial);
+    return newMaterial;
   }
 };

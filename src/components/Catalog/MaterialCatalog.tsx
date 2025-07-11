@@ -124,8 +124,27 @@ export const MaterialCatalog: React.FC = () => {
   };
 
   const handleEditMaterial = (material: Material) => {
-    // TODO: Implement edit functionality
+    // TODO: Open edit modal/form
     console.log('Edit material:', material);
+    // You can implement an edit modal here
+  };
+
+  const handleDeleteMaterial = async (material: Material) => {
+    try {
+      // TODO: Implement actual delete API call
+      console.log('Deleting material:', material);
+      
+      // For now, just remove from local state
+      setMaterials(prev => prev.filter(m => m.id !== material.id));
+      
+      // TODO: Replace with actual API call
+      // await materialCatalogAPI.deleteMaterial(material.id);
+      // loadMaterials(); // Reload from server
+      
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      // TODO: Show error toast
+    }
   };
 
   const handleFavoriteMaterial = (material: Material) => {
@@ -260,6 +279,7 @@ export const MaterialCatalog: React.FC = () => {
               material={material}
               onView={handleViewMaterial}
               onEdit={handleEditMaterial}
+              onDelete={handleDeleteMaterial}
               onFavorite={handleFavoriteMaterial}
             />
           ))}

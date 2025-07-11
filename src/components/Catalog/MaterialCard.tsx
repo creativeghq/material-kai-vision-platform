@@ -3,13 +3,31 @@ import { Material } from '@/types/materials';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Heart, Share2, Eye, Edit, Camera, Plus } from 'lucide-react';
+import { Heart, Share2, Eye, Edit, Camera, Plus, Trash2, MoreVertical } from 'lucide-react';
 import { AddToBoardModal } from '@/components/MoodBoard/AddToBoardModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MaterialCardProps {
   material: Material;
   onView?: (material: Material) => void;
   onEdit?: (material: Material) => void;
+  onDelete?: (material: Material) => void;
   onFavorite?: (material: Material) => void;
   onAddToBoard?: (material: Material) => void;
   showActions?: boolean;
@@ -19,11 +37,13 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
   material,
   onView,
   onEdit,
+  onDelete,
   onFavorite,
   onAddToBoard,
   showActions = true
 }) => {
   const [showAddToBoardModal, setShowAddToBoardModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleCardClick = () => {
     onView?.(material);
@@ -103,19 +123,9 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
                     e.stopPropagation();
                     onView?.(material);
                   }}
+                  title="View Details"
                 >
                   <Eye className="w-3 h-3" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit?.(material);
-                  }}
-                >
-                  <Edit className="w-3 h-3" />
                 </Button>
                 <Button 
                   variant="ghost" 
@@ -126,8 +136,6 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
                 >
                   <Plus className="w-3 h-3" />
                 </Button>
-              </div>
-              <div className="flex space-x-1">
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -136,20 +144,55 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
                     e.stopPropagation();
                     onFavorite?.(material);
                   }}
+                  title="Add to Favorites"
                 >
                   <Heart className="w-3 h-3" />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Handle share action
-                  }}
-                >
-                  <Share2 className="w-3 h-3" />
-                </Button>
+              </div>
+              <div className="flex space-x-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit?.(material);
+                      }}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Material
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Handle share action
+                      }}
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share Material
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDeleteDialog(true);
+                      }}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Material
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )}
@@ -161,6 +204,30 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
           onOpenChange={setShowAddToBoardModal}
           material={material}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Material</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{material.name}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  onDelete?.(material);
+                  setShowDeleteDialog(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
