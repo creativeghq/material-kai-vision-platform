@@ -293,10 +293,12 @@ async function validateQuality(imageBase64: string, originalPrompt: string) {
 }
 
 async function processGeneration(request: GenerationRequest) {
+  console.log('processGeneration started');
   const startTime = Date.now();
   let generationRecord: any = null;
   
   try {
+    console.log('About to create initial record');
     // Create initial record
     const { data: recordData, error: createError } = await supabase
       .from('generation_3d')
@@ -311,10 +313,12 @@ async function processGeneration(request: GenerationRequest) {
       .single();
 
     if (createError) {
+      console.error('Database insert error:', createError);
       throw new Error(`Failed to create generation record: ${createError.message}`);
     }
     
     generationRecord = recordData;
+    console.log(`Record created successfully: ${generationRecord?.id}`);
 
     console.log(`Starting 3D generation for record: ${generationRecord.id}`);
 
@@ -387,18 +391,27 @@ async function processGeneration(request: GenerationRequest) {
     };
 
   } catch (error) {
-    console.error('3D generation error:', error);
+    console.error('3D generation error in processGeneration:', error);
+    console.log('generationRecord at error time:', generationRecord);
     
     // Update record with error
     if (generationRecord?.id) {
-      await supabase
-        .from('generation_3d')
-        .update({
-          generation_status: 'failed',
-          error_message: error.message,
-          processing_time_ms: Date.now() - startTime
-        })
-        .eq('id', generationRecord.id);
+      console.log('Attempting to update record with error');
+      try {
+        await supabase
+          .from('generation_3d')
+          .update({
+            generation_status: 'failed',
+            error_message: error.message,
+            processing_time_ms: Date.now() - startTime
+          })
+          .eq('id', generationRecord.id);
+        console.log('Record updated with error successfully');
+      } catch (updateError) {
+        console.error('Failed to update record with error:', updateError);
+      }
+    } else {
+      console.log('No generationRecord found, cannot update with error');
     }
 
     throw error;
@@ -411,12 +424,14 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Received 3D generation request');
     const request: GenerationRequest = await req.json();
     
-    console.log('Processing 3D generation request:', request);
+    console.log('Processing 3D generation request:', JSON.stringify(request));
 
     // Validate request
     if (!request.user_id || !request.prompt) {
+      console.error('Validation failed: missing user_id or prompt');
       return new Response(
         JSON.stringify({ error: 'user_id and prompt are required' }),
         { 
@@ -426,6 +441,7 @@ serve(async (req) => {
       );
     }
 
+    console.log('Request validation passed, calling processGeneration');
     const result = await processGeneration(request);
 
     return new Response(
