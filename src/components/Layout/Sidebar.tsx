@@ -6,7 +6,8 @@ import {
   Palette, 
   Grid3X3, 
   Brain, 
-  Activity 
+  Activity,
+  Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -23,6 +24,7 @@ const navigationItems = [
   { id: '3d', label: '3D Visualization', icon: Grid3X3 },
   { id: 'agents', label: 'AI Agents', icon: Brain },
   { id: 'analytics', label: 'Analytics', icon: Activity },
+  { id: 'admin', label: 'Admin Panel', icon: Settings },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
