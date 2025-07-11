@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_tasks: {
+        Row: {
+          assigned_agents: string[] | null
+          coordination_plan: Json | null
+          created_at: string
+          error_message: string | null
+          execution_timeline: Json | null
+          id: string
+          input_data: Json
+          priority: number | null
+          processing_time_ms: number | null
+          result_data: Json | null
+          status: string | null
+          task_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_agents?: string[] | null
+          coordination_plan?: Json | null
+          created_at?: string
+          error_message?: string | null
+          execution_timeline?: Json | null
+          id?: string
+          input_data: Json
+          priority?: number | null
+          processing_time_ms?: number | null
+          result_data?: Json | null
+          status?: string | null
+          task_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_agents?: string[] | null
+          coordination_plan?: Json | null
+          created_at?: string
+          error_message?: string | null
+          execution_timeline?: Json | null
+          id?: string
+          input_data?: Json
+          priority?: number | null
+          processing_time_ms?: number | null
+          result_data?: Json | null
+          status?: string | null
+          task_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       analytics_events: {
         Row: {
           created_at: string | null
@@ -38,6 +89,48 @@ export type Database = {
           id?: string
           session_id?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      crewai_agents: {
+        Row: {
+          agent_name: string
+          agent_type: string
+          capabilities: Json | null
+          created_at: string
+          id: string
+          learning_progress: Json | null
+          memory_data: Json | null
+          performance_metrics: Json | null
+          specialization: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_name: string
+          agent_type: string
+          capabilities?: Json | null
+          created_at?: string
+          id?: string
+          learning_progress?: Json | null
+          memory_data?: Json | null
+          performance_metrics?: Json | null
+          specialization: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_name?: string
+          agent_type?: string
+          capabilities?: Json | null
+          created_at?: string
+          id?: string
+          learning_progress?: Json | null
+          memory_data?: Json | null
+          performance_metrics?: Json | null
+          specialization?: string
+          status?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -591,6 +684,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      spatial_analysis: {
+        Row: {
+          accessibility_analysis: Json | null
+          confidence_score: number | null
+          created_at: string
+          error_message: string | null
+          flow_optimization: Json | null
+          id: string
+          layout_suggestions: Json | null
+          material_placements: Json | null
+          nerf_reconstruction_id: string | null
+          processing_time_ms: number | null
+          reasoning_explanation: string | null
+          room_dimensions: Json | null
+          room_type: string
+          spatial_features: Json | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accessibility_analysis?: Json | null
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          flow_optimization?: Json | null
+          id?: string
+          layout_suggestions?: Json | null
+          material_placements?: Json | null
+          nerf_reconstruction_id?: string | null
+          processing_time_ms?: number | null
+          reasoning_explanation?: string | null
+          room_dimensions?: Json | null
+          room_type: string
+          spatial_features?: Json | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accessibility_analysis?: Json | null
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          flow_optimization?: Json | null
+          id?: string
+          layout_suggestions?: Json | null
+          material_placements?: Json | null
+          nerf_reconstruction_id?: string | null
+          processing_time_ms?: number | null
+          reasoning_explanation?: string | null
+          room_dimensions?: Json | null
+          room_type?: string
+          spatial_features?: Json | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       svbrdf_extractions: {
         Row: {
