@@ -95,6 +95,101 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_base_entries: {
+        Row: {
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string | null
+          embedding: string | null
+          id: string
+          material_ids: string[] | null
+          metadata: Json | null
+          relevance_score: number | null
+          source_url: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          content_type: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          id?: string
+          material_ids?: string[] | null
+          metadata?: Json | null
+          relevance_score?: number | null
+          source_url?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          id?: string
+          material_ids?: string[] | null
+          metadata?: Json | null
+          relevance_score?: number | null
+          source_url?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      material_embeddings: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          embedding: string
+          embedding_type: string
+          id: string
+          material_id: string
+          metadata: Json | null
+          model_version: string
+          updated_at: string
+          vector_dimension: number
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          embedding: string
+          embedding_type: string
+          id?: string
+          material_id: string
+          metadata?: Json | null
+          model_version: string
+          updated_at?: string
+          vector_dimension?: number
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          embedding?: string
+          embedding_type?: string
+          id?: string
+          material_id?: string
+          metadata?: Json | null
+          model_version?: string
+          updated_at?: string
+          vector_dimension?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_embeddings_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       material_knowledge: {
         Row: {
           content: string
@@ -518,6 +613,23 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
+      }
+      enhanced_vector_search: {
+        Args: {
+          query_embedding: string
+          search_type?: string
+          embedding_types?: string[]
+          match_threshold?: number
+          match_count?: number
+        }
+        Returns: {
+          result_type: string
+          id: string
+          similarity_score: number
+          title: string
+          content: string
+          metadata: Json
+        }[]
       }
       get_current_user_roles: {
         Args: Record<PropertyKey, never>
