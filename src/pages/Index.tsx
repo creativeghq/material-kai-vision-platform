@@ -4,6 +4,7 @@ import { Dashboard } from '@/components/Dashboard/Dashboard';
 import { MaterialRecognition } from '@/components/Recognition/MaterialRecognition';
 import { MaterialCatalog } from '@/components/Catalog/MaterialCatalog';
 import { MoodBoardPage } from '@/components/MoodBoard/MoodBoardPage';
+import { Designer3DPage } from '@/components/3D/Designer3DPage';
 import { AdminPanel } from '@/components/Admin/AdminPanel';
 
 const Index = () => {
@@ -19,6 +20,8 @@ const Index = () => {
         return <MaterialCatalog />;
       case 'moodboard':
         return <MoodBoardPage />;
+      case '3d':
+        return <Designer3DPage />;
       case 'admin':
         return <AdminPanel />;
       default:
