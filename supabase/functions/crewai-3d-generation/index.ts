@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
+import { InferenceClient } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 
 const corsHeaders = {
@@ -209,7 +209,7 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     throw new Error('Hugging Face token not configured');
   }
   
-  const hf = new HfInference(hfToken);
+  const client = new InferenceClient(hfToken);
   
   // Enhance prompt with material details
   let finalPrompt = enhancedPrompt;
@@ -221,13 +221,12 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   try {
     console.log('Generating image with prompt:', finalPrompt);
     
-    const result = await hf.textToImage({
-      inputs: finalPrompt,
+    const result = await client.textToImage({
+      provider: "auto",
       model: 'prithivMLmods/Canopus-Interior-Architecture-0.1',
-      parameters: {
-        negative_prompt: 'blurry, low quality, distorted, unrealistic, cartoon',
-        num_inference_steps: 30,
-        guidance_scale: 7.5
+      inputs: finalPrompt,
+      parameters: { 
+        num_inference_steps: 5 
       }
     });
 
