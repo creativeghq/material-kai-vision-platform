@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-// Using fetch directly instead of InferenceClient to avoid import issues
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.8.0';
 
 
 const corsHeaders = {
@@ -219,29 +219,21 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   try {
     console.log('Generating image with prompt:', finalPrompt);
     
-    // Use direct fetch to Hugging Face API with Canopus Interior Architecture model
-    const response = await fetch(`https://api-inference.huggingface.co/models/Shekswess/Canopus-Interior-Architecture-0.1-Neuron`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${hfToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        inputs: finalPrompt,
-        parameters: {
-          num_inference_steps: 5
-        }
-      })
+    // Use the official Hugging Face Inference client
+    const hf = new HfInference(hfToken);
+    
+    // Generate image using the Canopus Interior Architecture model
+    const imageBlob = await hf.textToImage({
+      model: 'Shekswess/Canopus-Interior-Architecture-0.1-Neuron',
+      inputs: finalPrompt,
+      parameters: {
+        num_inference_steps: 10,
+        guidance_scale: 7.5,
+        width: 768,
+        height: 768
+      }
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('HF API error:', response.status, errorText);
-      throw new Error(`Hugging Face API error: ${response.status} ${errorText}`);
-    }
-
-    // Get the image blob directly
-    const imageBlob = await response.blob();
+    
     console.log('HF response blob size:', imageBlob.size);
     
     // Convert blob to base64 safely for large images
