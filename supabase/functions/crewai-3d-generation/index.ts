@@ -248,10 +248,15 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
       });
     } catch (faliError) {
       console.error('fal-ai provider failed, trying fallback model:', faliError);
-      // Fallback to a known working model
+      // Fallback to Stable Diffusion XL
       imageBlob = await hf.textToImage({
-        model: 'black-forest-labs/FLUX.1-schnell',
-        inputs: finalPrompt
+        model: 'stabilityai/stable-diffusion-xl-base-1.0',
+        inputs: finalPrompt,
+        parameters: {
+          negative_prompt: negativePrompt,
+          num_inference_steps: 20,
+          guidance_scale: 7.5
+        }
       });
     }
     
