@@ -409,6 +409,54 @@ export type Database = {
         }
         Relationships: []
       }
+      nerf_reconstructions: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          mesh_file_url: string | null
+          metadata: Json | null
+          model_file_url: string | null
+          point_cloud_url: string | null
+          processing_time_ms: number | null
+          quality_score: number | null
+          reconstruction_status: string | null
+          source_image_urls: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          mesh_file_url?: string | null
+          metadata?: Json | null
+          model_file_url?: string | null
+          point_cloud_url?: string | null
+          processing_time_ms?: number | null
+          quality_score?: number | null
+          reconstruction_status?: string | null
+          source_image_urls: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          mesh_file_url?: string | null
+          metadata?: Json | null
+          model_file_url?: string | null
+          point_cloud_url?: string | null
+          processing_time_ms?: number | null
+          quality_score?: number | null
+          reconstruction_status?: string | null
+          source_image_urls?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       processing_queue: {
         Row: {
           completed_at: string | null
