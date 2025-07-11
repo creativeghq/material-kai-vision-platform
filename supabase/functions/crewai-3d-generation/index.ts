@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { InferenceClient } from 'https://esm.sh/@huggingface/inference@2.6.1';
+// Using fetch directly instead of InferenceClient to avoid import issues
 
 
 const corsHeaders = {
@@ -219,28 +219,35 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   try {
     console.log('Generating image with prompt:', finalPrompt);
     
-    const client = new InferenceClient(hfToken);
-    
-    const result = await client.textToImage({
-      model: 'prithivMLmods/Canopus-Interior-Architecture-0.1',
-      inputs: finalPrompt,
-      parameters: { 
-        num_inference_steps: 5 
-      }
+    // Use direct fetch to Hugging Face API instead of InferenceClient
+    const response = await fetch(`https://api-inference.huggingface.co/models/prithivMLmods/Canopus-Interior-Architecture-0.1`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${hfToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: finalPrompt,
+        parameters: {
+          num_inference_steps: 5
+        }
+      })
     });
 
-    console.log('HF result type:', typeof result);
-    console.log('HF result instanceof Blob:', result instanceof Blob);
-    
-    // Handle the response - it should be a Blob
-    if (result instanceof Blob) {
-      const arrayBuffer = await result.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      return `data:image/png;base64,${base64}`;
-    } else {
-      console.error('Unexpected result type from HF:', result);
-      throw new Error(`Unexpected response format from Hugging Face: ${typeof result}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('HF API error:', response.status, errorText);
+      throw new Error(`Hugging Face API error: ${response.status} ${errorText}`);
     }
+
+    // Get the image blob directly
+    const imageBlob = await response.blob();
+    console.log('HF response blob size:', imageBlob.size);
+    
+    // Convert blob to base64
+    const arrayBuffer = await imageBlob.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    return `data:image/png;base64,${base64}`;
     
   } catch (error) {
     console.error('3D generation error:', error);
