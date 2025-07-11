@@ -29,13 +29,57 @@ interface MaterialAnalysis {
   embedding: number[];
 }
 
+async function analyzeWithHybridAI(imageUrl: string, analysisType: string): Promise<MaterialAnalysis> {
+  // Try OpenAI first
+  try {
+    const openaiResult = await analyzeWithOpenAI(imageUrl, analysisType);
+    const validation = validateResult(openaiResult);
+    
+    if (validation.score >= 0.7) {
+      console.log(`OpenAI analysis successful with score: ${validation.score}`);
+      return openaiResult;
+    }
+    
+    console.log(`OpenAI score ${validation.score} below threshold, trying Claude...`);
+  } catch (error) {
+    console.log(`OpenAI failed: ${error.message}, trying Claude...`);
+  }
+
+  // Try Claude as fallback
+  try {
+    const claudeResult = await analyzeWithClaude(imageUrl, analysisType);
+    const validation = validateResult(claudeResult);
+    
+    console.log(`Claude analysis completed with score: ${validation.score}`);
+    return claudeResult;
+  } catch (error) {
+    console.error(`Claude also failed: ${error.message}`);
+    throw new Error('Both AI providers failed to analyze the material');
+  }
+}
+
+function validateResult(result: MaterialAnalysis): { score: number } {
+  let score = 1.0;
+  
+  if (!result.material_name || result.material_name.trim().length < 2) score -= 0.3;
+  if (!result.category) score -= 0.2;
+  if (result.confidence < 0.6) score -= 0.2;
+  if (!result.properties || Object.keys(result.properties).length < 2) score -= 0.2;
+  
+  const genericTerms = ['unknown', 'generic', 'standard', 'typical'];
+  const responseText = JSON.stringify(result).toLowerCase();
+  const genericCount = genericTerms.filter(term => responseText.includes(term)).length;
+  if (genericCount > 2) score -= 0.1;
+  
+  return { score: Math.max(0, Math.min(1, score)) };
+}
+
 async function analyzeWithOpenAI(imageUrl: string, analysisType: string): Promise<MaterialAnalysis> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured');
   }
 
-  // Comprehensive analysis prompt based on type
   const prompts = {
     comprehensive: `Analyze this material image comprehensively. Provide:
     1. Material identification with confidence score (0-1)
@@ -121,6 +165,69 @@ async function analyzeWithOpenAI(imageUrl: string, analysisType: string): Promis
   }
 }
 
+async function analyzeWithClaude(imageUrl: string, analysisType: string): Promise<MaterialAnalysis> {
+  const claudeKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!claudeKey) {
+    throw new Error('Claude API key not configured');
+  }
+
+  const prompts = {
+    comprehensive: `Analyze this material image comprehensively. Provide detailed material identification, category, properties, chemical composition, safety considerations, and standards in JSON format.`,
+    quick: `Quickly identify this material with basic properties in JSON format.`,
+    properties_only: `Focus on material properties and characteristics in JSON format.`
+  };
+
+  // Download and convert image to base64 for Claude
+  const imageResponse = await fetch(imageUrl);
+  const imageBuffer = await imageResponse.arrayBuffer();
+  const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${claudeKey}`,
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompts[analysisType] || prompts.comprehensive },
+            { 
+              type: 'image', 
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: base64Image
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 1500,
+      system: 'You are an expert materials scientist. Respond with valid JSON containing: material_name, category (metals/plastics/ceramics/composites/textiles/wood/glass/rubber/concrete/other), confidence (0-1), properties, chemical_composition, safety_considerations, standards.'
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Claude API error: ${error.error?.message || 'Unknown error'}`);
+  }
+
+  const data = await response.json();
+  const analysisText = data.content[0].text;
+  
+  try {
+    return JSON.parse(analysisText);
+  } catch (error) {
+    console.error('Failed to parse Claude response:', analysisText);
+    throw new Error('Invalid JSON response from Claude');
+  }
+}
+
 async function findSimilarMaterials(embedding: number[], limit = 5) {
   const { data, error } = await supabase.rpc('vector_similarity_search', {
     query_embedding: `[${embedding.join(',')}]`,
@@ -158,8 +265,8 @@ async function processAnalysis(request: AnalysisRequest) {
 
     console.log(`Analyzing image with OpenAI: ${urlData.publicUrl}`);
     
-    // Analyze with OpenAI
-    const analysis = await analyzeWithOpenAI(urlData.publicUrl, request.analysis_type);
+    // Analyze with Hybrid AI (OpenAI + Claude with fallback)
+    const analysis = await analyzeWithHybridAI(urlData.publicUrl, request.analysis_type);
     
     // Find similar materials if requested
     let similarMaterials = [];
@@ -211,7 +318,7 @@ async function processAnalysis(request: AnalysisRequest) {
         material_id: materialId,
         confidence_score: analysis.confidence,
         detection_method: 'visual',
-        ai_model_version: 'gpt-4o-vision',
+        ai_model_version: 'hybrid-gpt4o-claude-sonnet4',
         properties_detected: analysis.properties || {},
         processing_time_ms: Date.now() - startTime,
         user_verified: false,
@@ -230,7 +337,7 @@ async function processAnalysis(request: AnalysisRequest) {
       .from('analytics_events')
       .insert({
         user_id: file.user_id,
-        event_type: 'ai_material_analysis',
+        event_type: 'hybrid_ai_material_analysis',
         event_data: {
           file_id: request.file_id,
           result_id: result.id,

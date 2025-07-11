@@ -21,8 +21,57 @@ interface GenerationRequest {
   specific_materials?: string[];
 }
 
-// CrewAI Agent: Parse user request and extract room details
-async function parseUserRequest(prompt: string) {
+// CrewAI Agent: Parse user request with hybrid AI approach
+async function parseUserRequestHybrid(prompt: string) {
+  // Try OpenAI first
+  try {
+    const openaiResult = await parseWithOpenAI(prompt);
+    const validation = validateParseResult(openaiResult);
+    
+    if (validation.score >= 0.7) {
+      console.log(`OpenAI parsing successful with score: ${validation.score}`);
+      return openaiResult;
+    }
+    
+    console.log(`OpenAI parsing score ${validation.score} below threshold, trying Claude...`);
+  } catch (error) {
+    console.log(`OpenAI parsing failed: ${error.message}, trying Claude...`);
+  }
+
+  // Try Claude as fallback
+  try {
+    const claudeResult = await parseWithClaude(prompt);
+    const validation = validateParseResult(claudeResult);
+    
+    console.log(`Claude parsing completed with score: ${validation.score}`);
+    return claudeResult;
+  } catch (error) {
+    console.error(`Claude parsing also failed: ${error.message}`);
+    // Return basic fallback
+    return {
+      room_type: 'living room',
+      style: 'modern',
+      materials: [],
+      features: [],
+      layout: '',
+      enhanced_prompt: prompt
+    };
+  }
+}
+
+function validateParseResult(result: any): { score: number } {
+  let score = 1.0;
+  
+  if (!result.room_type) score -= 0.3;
+  if (!result.style) score -= 0.3;
+  if (!result.enhanced_prompt || result.enhanced_prompt === result.original_prompt) score -= 0.2;
+  if (!result.materials || result.materials.length === 0) score -= 0.1;
+  if (!result.features || result.features.length === 0) score -= 0.1;
+  
+  return { score: Math.max(0, Math.min(1, score)) };
+}
+
+async function parseWithOpenAI(prompt: string) {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured');
@@ -65,6 +114,55 @@ async function parseUserRequest(prompt: string) {
   const data = await response.json();
   try {
     return JSON.parse(data.choices[0].message.content);
+  } catch {
+    return {
+      room_type: 'living room',
+      style: 'modern',
+      materials: [],
+      features: [],
+      layout: '',
+      enhanced_prompt: prompt
+    };
+  }
+}
+
+async function parseWithClaude(prompt: string) {
+  const claudeKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!claudeKey) {
+    throw new Error('Claude API key not configured');
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${claudeKey}`,
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      messages: [
+        {
+          role: 'user',
+          content: `Parse this interior design request and extract room type, style, materials, features, and layout. Create an enhanced prompt for image generation.
+
+Request: "${prompt}"
+
+Respond in JSON format with: room_type, style, materials, features, layout, enhanced_prompt`
+        }
+      ],
+      max_tokens: 500,
+      system: 'You are an interior design expert. Parse requests accurately and enhance prompts for better image generation.'
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Claude API error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  try {
+    return JSON.parse(data.content[0].text);
   } catch {
     return {
       room_type: 'living room',
@@ -217,8 +315,8 @@ async function processGeneration(request: GenerationRequest) {
 
     console.log(`Starting 3D generation for record: ${generationRecord.id}`);
 
-    // CrewAI Agent 1: Parse request
-    const parsed = await parseUserRequest(request.prompt);
+    // CrewAI Agent 1: Parse request with hybrid approach
+    const parsed = await parseUserRequestHybrid(request.prompt);
     console.log('Parsed request:', parsed);
 
     // CrewAI Agent 2: Match materials
@@ -264,7 +362,7 @@ async function processGeneration(request: GenerationRequest) {
       .from('analytics_events')
       .insert({
         user_id: request.user_id,
-        event_type: '3d_generation_completed',
+        event_type: 'hybrid_3d_generation_completed',
         event_data: {
           generation_id: generationRecord.id,
           room_type: parsed.room_type,

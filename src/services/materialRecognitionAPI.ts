@@ -135,18 +135,20 @@ export class MaterialRecognitionAPI {
         throw new Error(`Failed to create recognition job: ${error.message}`);
       }
 
-      // Trigger recognition process via edge function
+      // Trigger hybrid recognition process via edge function
       const { data: processResult, error: processError } = await supabase.functions
-        .invoke('material-recognition', {
+        .invoke('hybrid-material-analysis', {
           body: {
-            job_id: job.id,
-            file_ids: uploadedFiles.map(f => f.id),
-            options: request.options
+            file_id: uploadedFiles[0].id, // Use first file for single analysis
+            analysis_type: request.options?.extract_properties ? 'properties_only' : 'comprehensive',
+            include_similar: request.options?.include_similar_materials || false,
+            minimum_score: 0.7,
+            max_retries: 2
           }
         });
 
       if (processError) {
-        console.error('Recognition process error:', processError);
+        console.error('Hybrid recognition process error:', processError);
         // Update job status to failed
         await supabase
           .from('processing_queue')
@@ -157,7 +159,7 @@ export class MaterialRecognitionAPI {
           })
           .eq('id', job.id);
         
-        throw new Error(`Recognition failed: ${processError.message}`);
+        throw new Error(`Hybrid recognition failed: ${processError.message}`);
       }
 
       return mapToProcessingJob(job);
