@@ -592,6 +592,66 @@ export type Database = {
           },
         ]
       }
+      svbrdf_extractions: {
+        Row: {
+          albedo_map_url: string | null
+          confidence_score: number | null
+          created_at: string
+          error_message: string | null
+          extracted_properties: Json | null
+          extraction_status: string | null
+          height_map_url: string | null
+          id: string
+          material_id: string | null
+          metadata: Json | null
+          metallic_map_url: string | null
+          normal_map_url: string | null
+          processing_time_ms: number | null
+          roughness_map_url: string | null
+          source_image_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          albedo_map_url?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          extracted_properties?: Json | null
+          extraction_status?: string | null
+          height_map_url?: string | null
+          id?: string
+          material_id?: string | null
+          metadata?: Json | null
+          metallic_map_url?: string | null
+          normal_map_url?: string | null
+          processing_time_ms?: number | null
+          roughness_map_url?: string | null
+          source_image_url: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          albedo_map_url?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          extracted_properties?: Json | null
+          extraction_status?: string | null
+          height_map_url?: string | null
+          id?: string
+          material_id?: string | null
+          metadata?: Json | null
+          metallic_map_url?: string | null
+          normal_map_url?: string | null
+          processing_time_ms?: number | null
+          roughness_map_url?: string | null
+          source_image_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       uploaded_files: {
         Row: {
           created_at: string | null
