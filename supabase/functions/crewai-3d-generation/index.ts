@@ -202,34 +202,45 @@ async function matchMaterials(materials: string[]) {
   }
 }
 
-// CrewAI Agent: Generate 3D interior image using Hugging Face
+// CrewAI Agent: Generate 3D interior image using Hugging Face with enhanced parameters
 async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
   if (!hfToken) {
     throw new Error('Hugging Face token not configured');
   }
   
-  // Enhance prompt with material details
-  let finalPrompt = enhancedPrompt;
+  // Enhanced prompt engineering with trigger words and quality modifiers
+  const triggerWords = "Interior Architecture, Interior Design, Modern Design";
+  const qualityModifiers = "high quality, professional, detailed, contemporary design, photorealistic, professional interior design";
+  const negativePrompt = "blurry, low quality, distorted, deformed, ugly, bad anatomy, bad proportions, dark, poor lighting";
+  
+  // Enhance prompt with material details and trigger words
+  let finalPrompt = `${triggerWords}, ${enhancedPrompt}`;
   if (materials.length > 0) {
     const materialDescriptions = materials.map(m => `${m.name} (${m.category})`).join(', ');
-    finalPrompt += `. Materials: ${materialDescriptions}. High quality architectural rendering, photorealistic, professional interior design`;
+    finalPrompt += `. Materials: ${materialDescriptions}`;
   }
+  finalPrompt += `. ${qualityModifiers}`;
 
   try {
-    console.log('Generating image with prompt:', finalPrompt);
+    console.log('Generating image with enhanced prompt:', finalPrompt);
     
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate image using HF Inference Client with fal-ai provider
+    // Generate image using HF Inference Client with fal-ai provider and optimized parameters
     const imageBlob = await hf.textToImage({
       provider: "fal-ai",
       model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
       inputs: finalPrompt,
       parameters: { 
-        num_inference_steps: 5,
-        sync_mode: true
+        num_inference_steps: 20,        // Increased for better quality
+        guidance_scale: 7.5,            // Optimal for following prompts closely
+        sync_mode: true,
+        width: 1024,                    // High resolution
+        height: 1024,
+        seed: Math.floor(Math.random() * 999999), // Random seed for variety
+        negative_prompt: negativePrompt  // Improved negative prompting
       }
     });
     
