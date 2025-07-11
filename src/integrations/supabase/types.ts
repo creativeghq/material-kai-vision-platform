@@ -134,6 +134,102 @@ export type Database = {
         }
         Relationships: []
       }
+      enhanced_knowledge_base: {
+        Row: {
+          accuracy_score: number | null
+          approved_at: string | null
+          approved_by: string | null
+          confidence_scores: Json | null
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string | null
+          custom_embedding: string | null
+          freshness_score: number | null
+          huggingface_embedding: string | null
+          id: string
+          language: string | null
+          last_modified_by: string | null
+          material_categories: string[] | null
+          material_ids: string[] | null
+          metadata: Json | null
+          openai_embedding: string | null
+          reading_level: number | null
+          relevance_score: number | null
+          search_keywords: string[] | null
+          search_vector: unknown | null
+          semantic_tags: string[] | null
+          source_url: string | null
+          status: string | null
+          technical_complexity: number | null
+          title: string
+          updated_at: string
+          version: number | null
+        }
+        Insert: {
+          accuracy_score?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          confidence_scores?: Json | null
+          content: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          custom_embedding?: string | null
+          freshness_score?: number | null
+          huggingface_embedding?: string | null
+          id?: string
+          language?: string | null
+          last_modified_by?: string | null
+          material_categories?: string[] | null
+          material_ids?: string[] | null
+          metadata?: Json | null
+          openai_embedding?: string | null
+          reading_level?: number | null
+          relevance_score?: number | null
+          search_keywords?: string[] | null
+          search_vector?: unknown | null
+          semantic_tags?: string[] | null
+          source_url?: string | null
+          status?: string | null
+          technical_complexity?: number | null
+          title: string
+          updated_at?: string
+          version?: number | null
+        }
+        Update: {
+          accuracy_score?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          confidence_scores?: Json | null
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          custom_embedding?: string | null
+          freshness_score?: number | null
+          huggingface_embedding?: string | null
+          id?: string
+          language?: string | null
+          last_modified_by?: string | null
+          material_categories?: string[] | null
+          material_ids?: string[] | null
+          metadata?: Json | null
+          openai_embedding?: string | null
+          reading_level?: number | null
+          relevance_score?: number | null
+          search_keywords?: string[] | null
+          search_vector?: unknown | null
+          semantic_tags?: string[] | null
+          source_url?: string | null
+          status?: string | null
+          technical_complexity?: number | null
+          title?: string
+          updated_at?: string
+          version?: number | null
+        }
+        Relationships: []
+      }
       generation_3d: {
         Row: {
           created_at: string
@@ -236,6 +332,54 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_relationships: {
+        Row: {
+          bidirectional: boolean | null
+          confidence_score: number | null
+          created_at: string
+          id: string
+          relationship_context: string | null
+          relationship_strength: number | null
+          relationship_type: string
+          source_id: string
+          source_type: string | null
+          target_id: string
+          updated_at: string
+          validated_by: string | null
+          validation_status: string | null
+        }
+        Insert: {
+          bidirectional?: boolean | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          relationship_context?: string | null
+          relationship_strength?: number | null
+          relationship_type: string
+          source_id: string
+          source_type?: string | null
+          target_id: string
+          updated_at?: string
+          validated_by?: string | null
+          validation_status?: string | null
+        }
+        Update: {
+          bidirectional?: boolean | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          relationship_context?: string | null
+          relationship_strength?: number | null
+          relationship_type?: string
+          source_id?: string
+          source_type?: string | null
+          target_id?: string
+          updated_at?: string
+          validated_by?: string | null
+          validation_status?: string | null
+        }
+        Relationships: []
+      }
       material_embeddings: {
         Row: {
           confidence_score: number | null
@@ -321,6 +465,62 @@ export type Database = {
           title?: string
         }
         Relationships: []
+      }
+      material_knowledge_extraction: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          embedding: string | null
+          extracted_knowledge: string
+          extraction_context: Json | null
+          extraction_type: string
+          id: string
+          material_id: string | null
+          source_fields: string[] | null
+          updated_at: string
+          validated_by: string | null
+          validation_notes: string | null
+          validation_status: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          embedding?: string | null
+          extracted_knowledge: string
+          extraction_context?: Json | null
+          extraction_type: string
+          id?: string
+          material_id?: string | null
+          source_fields?: string[] | null
+          updated_at?: string
+          validated_by?: string | null
+          validation_notes?: string | null
+          validation_status?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          embedding?: string | null
+          extracted_knowledge?: string
+          extraction_context?: Json | null
+          extraction_type?: string
+          id?: string
+          material_id?: string | null
+          source_fields?: string[] | null
+          updated_at?: string
+          validated_by?: string | null
+          validation_notes?: string | null
+          validation_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_knowledge_extraction_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       material_metadata_fields: {
         Row: {
@@ -622,6 +822,60 @@ export type Database = {
         }
         Relationships: []
       }
+      query_intelligence: {
+        Row: {
+          clicked_results: string[] | null
+          created_at: string
+          entities_detected: Json | null
+          id: string
+          original_query: string
+          processed_query: string
+          project_context: Json | null
+          query_embedding: string | null
+          query_intent: string | null
+          query_type: string | null
+          results_returned: number | null
+          session_context: Json | null
+          user_context: Json | null
+          user_id: string | null
+          user_satisfaction: number | null
+        }
+        Insert: {
+          clicked_results?: string[] | null
+          created_at?: string
+          entities_detected?: Json | null
+          id?: string
+          original_query: string
+          processed_query: string
+          project_context?: Json | null
+          query_embedding?: string | null
+          query_intent?: string | null
+          query_type?: string | null
+          results_returned?: number | null
+          session_context?: Json | null
+          user_context?: Json | null
+          user_id?: string | null
+          user_satisfaction?: number | null
+        }
+        Update: {
+          clicked_results?: string[] | null
+          created_at?: string
+          entities_detected?: Json | null
+          id?: string
+          original_query?: string
+          processed_query?: string
+          project_context?: Json | null
+          query_embedding?: string | null
+          query_intent?: string | null
+          query_type?: string | null
+          results_returned?: number | null
+          session_context?: Json | null
+          user_context?: Json | null
+          user_id?: string | null
+          user_satisfaction?: number | null
+        }
+        Relationships: []
+      }
       recognition_results: {
         Row: {
           ai_model_version: string | null
@@ -684,6 +938,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      search_analytics: {
+        Row: {
+          avg_relevance_score: number | null
+          clicks_count: number | null
+          created_at: string
+          follow_up_queries: string[] | null
+          id: string
+          query_embedding: string | null
+          query_processing_time_ms: number | null
+          query_text: string
+          refinements_count: number | null
+          response_time_ms: number | null
+          results_shown: number | null
+          satisfaction_rating: number | null
+          session_id: string | null
+          time_on_results: number | null
+          total_results: number | null
+          user_id: string | null
+        }
+        Insert: {
+          avg_relevance_score?: number | null
+          clicks_count?: number | null
+          created_at?: string
+          follow_up_queries?: string[] | null
+          id?: string
+          query_embedding?: string | null
+          query_processing_time_ms?: number | null
+          query_text: string
+          refinements_count?: number | null
+          response_time_ms?: number | null
+          results_shown?: number | null
+          satisfaction_rating?: number | null
+          session_id?: string | null
+          time_on_results?: number | null
+          total_results?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          avg_relevance_score?: number | null
+          clicks_count?: number | null
+          created_at?: string
+          follow_up_queries?: string[] | null
+          id?: string
+          query_embedding?: string | null
+          query_processing_time_ms?: number | null
+          query_text?: string
+          refinements_count?: number | null
+          response_time_ms?: number | null
+          results_shown?: number | null
+          satisfaction_rating?: number | null
+          session_id?: string | null
+          time_on_results?: number | null
+          total_results?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      semantic_similarity_cache: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          hit_count: number | null
+          id: string
+          last_accessed: string | null
+          query_embedding: string | null
+          query_hash: string
+          results: Json
+          similarity_threshold: number | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          hit_count?: number | null
+          id?: string
+          last_accessed?: string | null
+          query_embedding?: string | null
+          query_hash: string
+          results: Json
+          similarity_threshold?: number | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          hit_count?: number | null
+          id?: string
+          last_accessed?: string | null
+          query_embedding?: string | null
+          query_hash?: string
+          results?: Json
+          similarity_threshold?: number | null
+        }
+        Relationships: []
       }
       spatial_analysis: {
         Row: {
