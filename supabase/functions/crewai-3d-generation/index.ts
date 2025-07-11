@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
+import { InferenceClient } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -203,7 +203,7 @@ async function matchMaterials(materials: string[]) {
 
 // CrewAI Agent: Generate 3D interior image
 async function generate3DImage(enhancedPrompt: string, materials: any[]) {
-  const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'));
+  const client = new InferenceClient(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'));
   
   // Enhance prompt with material details
   let finalPrompt = enhancedPrompt;
@@ -213,11 +213,11 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   }
 
   try {
-    const image = await hf.textToImage({
+    const image = await client.textToImage({
+      provider: "auto",
+      model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
       inputs: finalPrompt,
-      model: 'prithivMLmods/Canopus-Interior-Architecture-0.1',
-      parameters: {
-        negative_prompt: 'blurry, low quality, distorted, unrealistic, cartoon',
+      parameters: { 
         num_inference_steps: 30,
         guidance_scale: 7.5
       }
