@@ -41,6 +41,60 @@ export type Database = {
         }
         Relationships: []
       }
+      generation_3d: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          generation_status: string | null
+          id: string
+          image_urls: string[] | null
+          material_ids: string[] | null
+          materials_used: string[] | null
+          model_used: string | null
+          processing_time_ms: number | null
+          prompt: string
+          result_data: Json | null
+          room_type: string | null
+          style: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          generation_status?: string | null
+          id?: string
+          image_urls?: string[] | null
+          material_ids?: string[] | null
+          materials_used?: string[] | null
+          model_used?: string | null
+          processing_time_ms?: number | null
+          prompt: string
+          result_data?: Json | null
+          room_type?: string | null
+          style?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          generation_status?: string | null
+          id?: string
+          image_urls?: string[] | null
+          material_ids?: string[] | null
+          materials_used?: string[] | null
+          model_used?: string | null
+          processing_time_ms?: number | null
+          prompt?: string
+          result_data?: Json | null
+          room_type?: string | null
+          style?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       material_knowledge: {
         Row: {
           content: string
