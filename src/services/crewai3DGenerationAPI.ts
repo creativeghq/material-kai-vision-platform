@@ -59,6 +59,14 @@ export class CrewAI3DGenerationAPI {
         throw new Error('User not authenticated');
       }
 
+      console.log('Calling edge function with request:', {
+        user_id: user.id,
+        prompt: request.prompt,
+        room_type: request.room_type,
+        style: request.style,
+        specific_materials: request.specific_materials
+      });
+
       const { data, error } = await supabase.functions.invoke('crewai-3d-generation', {
         body: {
           user_id: user.id,
@@ -69,8 +77,16 @@ export class CrewAI3DGenerationAPI {
         }
       });
 
+      console.log('Edge function response:', { data, error });
+
       if (error) {
-        throw new Error(`3D generation failed: ${error.message}`);
+        console.error('Supabase functions error:', error);
+        throw new Error(`Failed to send a request to the Edge Function: ${error.message}`);
+      }
+
+      // Check if the response indicates an error
+      if (data && !data.success && data.error) {
+        throw new Error(`${data.error}: ${data.details || 'Unknown error'}`);
       }
 
       return data;

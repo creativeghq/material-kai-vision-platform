@@ -442,21 +442,40 @@ serve(async (req) => {
     }
 
     console.log('Request validation passed, calling processGeneration');
-    const result = await processGeneration(request);
-
-    return new Response(
-      JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    
+    try {
+      const result = await processGeneration(request);
+      
+      return new Response(
+        JSON.stringify(result),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    } catch (processError) {
+      console.error('Process generation failed:', processError);
+      
+      // Return a proper error response instead of throwing
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: '3D generation failed', 
+          details: processError.message 
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
   } catch (error) {
     console.error('CrewAI 3D generation error:', error);
     
     return new Response(
       JSON.stringify({ 
-        error: '3D generation failed', 
+        success: false,
+        error: 'Request processing failed', 
         details: error.message 
       }),
       { 
