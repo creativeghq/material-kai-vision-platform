@@ -228,30 +228,36 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate 2 images instead of 1
-    const imagePromises = [];
+    // Generate 2 images sequentially to avoid stack overflow
+    const imageBase64Array = [];
+    
     for (let i = 0; i < 2; i++) {
-      const imagePromise = (async () => {
+      try {
+        console.log(`Attempting generation ${i + 1} with fal-ai provider...`);
+        const imageBlob = await hf.textToImage({
+          provider: "fal-ai", 
+          model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
+          inputs: finalPrompt,
+          parameters: { 
+            num_inference_steps: 20,
+            guidance_scale: 7.5,
+            sync_mode: true,
+            width: 1024,
+            height: 1024,
+            seed: Math.floor(Math.random() * 999999),
+            negative_prompt: negativePrompt
+          }
+        });
+        console.log(`HF response blob ${i + 1} size:`, imageBlob.size);
+        
+        // Convert blob to base64
+        const arrayBuffer = await imageBlob.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        imageBase64Array.push(`data:image/png;base64,${base64}`);
+        
+      } catch (faliError) {
+        console.error(`fal-ai provider failed for image ${i + 1}, trying fallback model:`, faliError);
         try {
-          console.log(`Attempting generation ${i + 1} with fal-ai provider...`);
-          const imageBlob = await hf.textToImage({
-            provider: "fal-ai",
-            model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
-            inputs: finalPrompt,
-            parameters: { 
-              num_inference_steps: 20,
-              guidance_scale: 7.5,
-              sync_mode: true,
-              width: 1024,
-              height: 1024,
-              seed: Math.floor(Math.random() * 999999),
-              negative_prompt: negativePrompt
-            }
-          });
-          console.log(`HF response blob ${i + 1} size:`, imageBlob.size);
-          return imageBlob;
-        } catch (faliError) {
-          console.error(`fal-ai provider failed for image ${i + 1}, trying fallback model:`, faliError);
           // Fallback to Stable Diffusion XL
           const imageBlob = await hf.textToImage({
             model: 'stabilityai/stable-diffusion-xl-base-1.0',
@@ -263,25 +269,27 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
             }
           });
           console.log(`Fallback response blob ${i + 1} size:`, imageBlob.size);
-          return imageBlob;
+          
+          // Convert blob to base64
+          const arrayBuffer = await imageBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          imageBase64Array.push(`data:image/png;base64,${base64}`);
+          
+        } catch (fallbackError) {
+          console.error(`Both providers failed for image ${i + 1}:`, fallbackError);
+          // For now, add a placeholder or skip this image
+          if (i === 0) {
+            // First image is required, so throw error
+            throw new Error(`Failed to generate first image: ${fallbackError.message}`);
+          }
+          // Second image is optional, just log and continue
+          console.log(`Skipping second image due to error`);
+          break;
         }
-      })();
-      imagePromises.push(imagePromise);
+      }
     }
-
-    // Wait for both images to be generated
-    const imageBlobs = await Promise.all(imagePromises);
     
-    // Convert both blobs to base64 safely for large images
-    const base64Images = await Promise.all(
-      imageBlobs.map(async (blob, index) => {
-        const arrayBuffer = await blob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        return `data:image/png;base64,${base64}`;
-      })
-    );
-    
-    return base64Images;
+    return imageBase64Array;
     
   } catch (error) {
     console.error('3D generation error:', error);
