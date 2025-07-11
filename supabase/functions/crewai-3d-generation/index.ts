@@ -244,10 +244,14 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     const imageBlob = await response.blob();
     console.log('HF response blob size:', imageBlob.size);
     
-    // Convert blob to base64
-    const arrayBuffer = await imageBlob.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    return `data:image/png;base64,${base64}`;
+    // Convert blob to base64 safely for large images
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+    });
+    reader.readAsDataURL(imageBlob);
+    return await base64Promise;
     
   } catch (error) {
     console.error('3D generation error:', error);
