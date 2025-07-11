@@ -222,10 +222,15 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate image using FLUX model (known to work with HF Inference API)
+    // Generate image using HF Inference Client with fal-ai provider
     const imageBlob = await hf.textToImage({
-      model: 'black-forest-labs/FLUX.1-schnell',
-      inputs: finalPrompt
+      provider: "fal-ai",
+      model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
+      inputs: finalPrompt,
+      parameters: { 
+        num_inference_steps: 5,
+        sync_mode: true
+      }
     });
     
     console.log('HF response blob size:', imageBlob.size);
