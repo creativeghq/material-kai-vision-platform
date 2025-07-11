@@ -219,8 +219,8 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   try {
     console.log('Generating image with prompt:', finalPrompt);
     
-    // Use direct fetch to Hugging Face API instead of InferenceClient
-    const response = await fetch(`https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell`, {
+    // Use direct fetch to Hugging Face API with Canopus Interior Architecture model
+    const response = await fetch(`https://api-inference.huggingface.co/models/Shekswess/Canopus-Interior-Architecture-0.1-Neuron`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${hfToken}`,
