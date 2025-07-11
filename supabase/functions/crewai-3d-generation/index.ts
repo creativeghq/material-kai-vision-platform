@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -201,31 +201,60 @@ async function matchMaterials(materials: string[]) {
   }
 }
 
-// CrewAI Agent: Generate 3D interior image
+// CrewAI Agent: Generate 3D interior image using OpenAI
 async function generate3DImage(enhancedPrompt: string, materials: any[]) {
-  const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'));
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
   
-  // Enhance prompt with material details
+  // Enhance prompt with material details and 3D styling
   let finalPrompt = enhancedPrompt;
   if (materials.length > 0) {
     const materialDescriptions = materials.map(m => `${m.name} (${m.category})`).join(', ');
-    finalPrompt += `. Materials: ${materialDescriptions}. High quality architectural rendering, photorealistic, professional interior design`;
+    finalPrompt += `. Materials: ${materialDescriptions}.`;
   }
+  
+  // Add specific 3D interior design styling
+  finalPrompt += ' Professional interior design photography, photorealistic, high quality, architectural visualization, well-lit, modern composition, 8K resolution, award-winning interior design';
 
   try {
-    const image = await hf.textToImage({
-      inputs: finalPrompt,
-      model: 'prithivMLmods/Canopus-Interior-Architecture-0.1',
-      parameters: {
-        negative_prompt: 'blurry, low quality, distorted, unrealistic, cartoon',
-        num_inference_steps: 30,
-        guidance_scale: 7.5
-      }
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: finalPrompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'high'
+      }),
     });
 
-    const arrayBuffer = await image.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`OpenAI API error: ${response.statusText} - ${errorData}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.data || !data.data[0] || !data.data[0].url) {
+      throw new Error('Invalid response from OpenAI image generation');
+    }
+
+    // Download the image and convert to base64
+    const imageResponse = await fetch(data.data[0].url);
+    if (!imageResponse.ok) {
+      throw new Error('Failed to fetch generated image');
+    }
+    
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
     return `data:image/png;base64,${base64}`;
+    
   } catch (error) {
     console.error('3D generation error:', error);
     throw new Error(`Failed to generate 3D image: ${error.message}`);
