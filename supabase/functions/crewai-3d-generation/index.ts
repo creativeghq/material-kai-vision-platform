@@ -250,9 +250,18 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
         });
         console.log(`HF response blob ${i + 1} size:`, imageBlob.size);
         
-        // Convert blob to base64
+        // Convert blob to base64 safely to avoid stack overflow
         const arrayBuffer = await imageBlob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // Use a safe base64 conversion method for large images
+        let binary = '';
+        const chunkSize = 0x8000; // 32KB chunks
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+          const chunk = uint8Array.subarray(i, i + chunkSize);
+          binary += String.fromCharCode.apply(null, Array.from(chunk));
+        }
+        const base64 = btoa(binary);
         imageBase64Array.push(`data:image/png;base64,${base64}`);
         
       } catch (faliError) {
@@ -270,9 +279,18 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
           });
           console.log(`Fallback response blob ${i + 1} size:`, imageBlob.size);
           
-          // Convert blob to base64
+          // Convert blob to base64 safely to avoid stack overflow
           const arrayBuffer = await imageBlob.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Use a safe base64 conversion method for large images
+          let binary = '';
+          const chunkSize = 0x8000; // 32KB chunks
+          for (let j = 0; j < uint8Array.length; j += chunkSize) {
+            const chunk = uint8Array.subarray(j, j + chunkSize);
+            binary += String.fromCharCode.apply(null, Array.from(chunk));
+          }
+          const base64 = btoa(binary);
           imageBase64Array.push(`data:image/png;base64,${base64}`);
           
         } catch (fallbackError) {
