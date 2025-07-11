@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AITestingPanel } from './AITestingPanel';
+import { MetadataFieldsManagement } from './MetadataFieldsManagement';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,9 @@ import {
   Clock,
   Zap,
   Star,
-  BarChart3
+  BarChart3,
+  Database,
+  TestTube
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -220,10 +223,11 @@ export const AdminPanel: React.FC = () => {
       </div>
 
       <Tabs defaultValue="recent" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="recent">Recent Activity</TabsTrigger>
           <TabsTrigger value="scores">Score Analysis</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="metadata">Metadata Fields</TabsTrigger>
           <TabsTrigger value="testing">AI Testing</TabsTrigger>
         </TabsList>
 
@@ -375,6 +379,10 @@ export const AdminPanel: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="metadata" className="space-y-4">
+          <MetadataFieldsManagement />
         </TabsContent>
 
         <TabsContent value="testing" className="space-y-4">

@@ -4,6 +4,7 @@ import { materialCatalogAPI } from '@/services/materialCatalogAPI';
 import { CatalogFilters, FilterOptions } from './CatalogFilters';
 import { MaterialCard } from './MaterialCard';
 import { MaterialDetailModal } from './MaterialDetailModal';
+import { MaterialFormModal } from '@/components/Materials/MaterialFormModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ export const MaterialCatalog: React.FC = () => {
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   const [filters, setFilters] = useState<FilterOptions>({
@@ -177,7 +179,7 @@ export const MaterialCatalog: React.FC = () => {
           <Button variant="outline" size="icon" onClick={refreshCatalog}>
             <RefreshCw className="w-4 h-4" />
           </Button>
-          <Button>
+          <Button onClick={() => setIsFormModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Material
           </Button>
@@ -261,7 +263,7 @@ export const MaterialCatalog: React.FC = () => {
                 : 'Try adjusting your search or filter criteria.'
               }
             </p>
-            <Button>
+            <Button onClick={() => setIsFormModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add First Material
             </Button>
@@ -295,6 +297,17 @@ export const MaterialCatalog: React.FC = () => {
           setSelectedMaterial(null);
         }}
         onEdit={handleEditMaterial}
+      />
+
+      {/* Material Form Modal */}
+      <MaterialFormModal
+        open={isFormModalOpen}
+        onOpenChange={setIsFormModalOpen}
+        onSave={async (materialData) => {
+          // TODO: Implement actual save to database
+          console.log('Saving material:', materialData);
+          loadMaterials(); // Reload the catalog
+        }}
       />
     </div>
   );

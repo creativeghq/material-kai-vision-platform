@@ -134,6 +134,63 @@ export type Database = {
         }
         Relationships: []
       }
+      material_metadata_fields: {
+        Row: {
+          applies_to_categories:
+            | Database["public"]["Enums"]["material_category"][]
+            | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          display_name: string
+          dropdown_options: string[] | null
+          extraction_hints: string | null
+          field_name: string
+          field_type: string
+          id: string
+          is_global: boolean | null
+          is_required: boolean | null
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to_categories?:
+            | Database["public"]["Enums"]["material_category"][]
+            | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          display_name: string
+          dropdown_options?: string[] | null
+          extraction_hints?: string | null
+          field_name: string
+          field_type: string
+          id?: string
+          is_global?: boolean | null
+          is_required?: boolean | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to_categories?:
+            | Database["public"]["Enums"]["material_category"][]
+            | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          display_name?: string
+          dropdown_options?: string[] | null
+          extraction_hints?: string | null
+          field_name?: string
+          field_type?: string
+          id?: string
+          is_global?: boolean | null
+          is_required?: boolean | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       materials_catalog: {
         Row: {
           category: Database["public"]["Enums"]["material_category"]
