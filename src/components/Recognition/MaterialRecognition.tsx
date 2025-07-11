@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { RecognitionResult } from '@/types/materials';
 import { RecognitionResults } from './RecognitionResults';
-import { clientMLService } from '@/services/clientMLService';
+import { clientMLService } from '@/services/ml/clientMLService';
 import { toast } from 'sonner';
 
 // AI-powered recognition service using client-side ML
