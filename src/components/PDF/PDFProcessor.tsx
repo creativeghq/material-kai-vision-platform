@@ -121,7 +121,7 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
-      // Call Azure PDF processor edge function
+      // Call Azure PDF processor edge function (with fallback)
       const { data: processingResult, error: processingError } = await supabase.functions.invoke('azure-pdf-processor', {
         body: {
           fileUrl: publicUrl,
@@ -131,6 +131,43 @@ export const PDFProcessor: React.FC = () => {
           extractionOptions: options
         }
       });
+
+      // If Azure processing fails, fallback to regular PDF processor
+      if (processingError) {
+        console.warn('Azure processing failed, falling back to standard processor:', processingError);
+        
+        const { data: fallbackResult, error: fallbackError } = await supabase.functions.invoke('pdf-processor', {
+          body: {
+            fileUrl: publicUrl,
+            originalFilename: file.name,
+            fileSize: file.size,
+            userId: user.id,
+            extractionOptions: options
+          }
+        });
+
+        if (fallbackError) {
+          throw new Error(`Both Azure and fallback processing failed: ${fallbackError.message}`);
+        }
+        
+        // Use fallback result
+        setProcessing(prev => prev.map(p => 
+          p.id === processingId 
+            ? { 
+                ...p, 
+                status: 'completed', 
+                progress: 100,
+                result: fallbackResult
+              }
+            : p
+        ));
+
+        toast({
+          title: "PDF Processing Complete (Standard Mode)",
+          description: `Successfully processed ${file.name} using standard processing. Found ${fallbackResult.summary.materialsIdentified} materials.`,
+        });
+        return;
+      }
 
       if (processingError) {
         throw new Error(`Processing failed: ${processingError.message}`);

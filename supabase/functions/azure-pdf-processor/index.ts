@@ -13,7 +13,7 @@ const supabase = createClient(
 );
 
 const azureApiKey = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
-const azureEndpoint = 'https://eastus.api.cognitive.microsoft.com'; // Update with your endpoint
+const azureEndpoint = Deno.env.get('AZURE_ENDPOINT') || 'https://eastus.api.cognitive.microsoft.com';
 
 interface AzureProcessingRequest {
   fileUrl: string;
@@ -242,10 +242,12 @@ function extractStructuredDataFromAzure(analyzeResult: any): any {
 // Process PDF using Azure Document Intelligence
 async function processWithAzureDocumentIntelligence(fileUrl: string): Promise<AzureDocumentResult> {
   if (!azureApiKey) {
-    throw new Error('Azure Document Intelligence API key not configured');
+    throw new Error('Azure Document Intelligence API key not configured. Please add AZURE_DOCUMENT_INTELLIGENCE_KEY to your Supabase secrets.');
   }
 
   console.log('Starting Azure Document Intelligence analysis...');
+  console.log('Azure endpoint:', azureEndpoint);
+  console.log('File URL:', fileUrl);
 
   // Start the analysis
   const analyzeResponse = await fetch(`${azureEndpoint}/formrecognizer/documentModels/prebuilt-layout:analyze?api-version=2023-07-31`, {
@@ -261,6 +263,12 @@ async function processWithAzureDocumentIntelligence(fileUrl: string): Promise<Az
 
   if (!analyzeResponse.ok) {
     const errorText = await analyzeResponse.text();
+    console.error('Azure API Error:', {
+      status: analyzeResponse.status,
+      statusText: analyzeResponse.statusText,
+      body: errorText,
+      headers: Object.fromEntries(analyzeResponse.headers.entries())
+    });
     throw new Error(`Azure analysis failed: ${analyzeResponse.status} - ${errorText}`);
   }
 
@@ -311,7 +319,10 @@ serve(async (req) => {
     const requestData: AzureProcessingRequest = await req.json();
     const { fileUrl, originalFilename, fileSize, userId, extractionOptions = {} } = requestData;
 
+    console.log('Request received:', { originalFilename, fileSize, userId, hasApiKey: !!azureApiKey });
+
     if (!fileUrl || !originalFilename || !userId) {
+      console.error('Missing required fields:', { fileUrl: !!fileUrl, originalFilename: !!originalFilename, userId: !!userId });
       return new Response(
         JSON.stringify({ error: 'Missing required fields: fileUrl, originalFilename, userId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -542,10 +553,16 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Azure PDF processing error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Final error message:', errorMessage);
+    
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: 'Failed to process PDF with Azure Document Intelligence'
+        error: errorMessage,
+        details: 'Failed to process PDF with Azure Document Intelligence',
+        timestamp: new Date().toISOString()
       }),
       { 
         status: 500, 
