@@ -23,6 +23,7 @@ interface ScrapedMaterial {
 
 interface ScrapingOptions {
   service: 'firecrawl' | 'jina';
+  sitemapMode?: boolean; // New option for sitemap processing
   crawlMode?: boolean; // New option for multi-page crawling
   maxPages?: number;
   includePatterns?: string[];
@@ -46,6 +47,7 @@ export const MaterialScraperPage = () => {
   const [progress, setProgress] = useState(0);
   const [options, setOptions] = useState<ScrapingOptions>({
     service: 'firecrawl',
+    sitemapMode: false,
     crawlMode: false,
     maxPages: 10,
     includePatterns: ['/product', '/item', '/material'],
@@ -89,10 +91,14 @@ Return a list of materials found on the page.`,
       }, 2000);
 
       const { data, error } = await supabase.functions.invoke('material-scraper', {
-        body: {
-          url,
+        body: { 
+          url, 
           service: options.service,
-          options
+          sitemapMode: options.sitemapMode,
+          options: {
+            ...options,
+            service: options.service
+          }
         }
       });
 
@@ -173,100 +179,119 @@ Return a list of materials found on the page.`,
                   />
                 </div>
 
-                <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                  <h3 className="font-medium text-sm">Service Selection</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="flex items-center space-x-2 p-3 border rounded cursor-pointer hover:bg-muted/50">
+                <div className="space-y-4">
+                  <div className="flex space-x-4">
+                    <label className="flex items-center space-x-2">
                       <input
                         type="radio"
-                        name="service"
-                        value="firecrawl"
-                        checked={options.service === 'firecrawl'}
-                        onChange={(e) => setOptions(prev => ({ ...prev, service: e.target.value as 'firecrawl' | 'jina' }))}
+                        value="single"
+                        checked={!options.sitemapMode && !options.crawlMode}
+                        onChange={() => setOptions(prev => ({ ...prev, sitemapMode: false, crawlMode: false }))}
                         disabled={isLoading}
                       />
-                      <div>
-                        <span className="font-medium">Firecrawl</span>
-                        <p className="text-xs text-muted-foreground">Structured extraction with prompts</p>
-                      </div>
+                      <span className="text-sm">Single Page</span>
                     </label>
-                    <label className="flex items-center space-x-2 p-3 border rounded cursor-pointer hover:bg-muted/50">
+                    
+                    <label className="flex items-center space-x-2">
                       <input
                         type="radio"
-                        name="service"
-                        value="jina"
-                        checked={options.service === 'jina'}
-                        onChange={(e) => setOptions(prev => ({ ...prev, service: e.target.value as 'firecrawl' | 'jina' }))}
+                        value="sitemap"
+                        checked={options.sitemapMode}
+                        onChange={() => setOptions(prev => ({ ...prev, sitemapMode: true, crawlMode: false }))}
                         disabled={isLoading}
                       />
-                      <div>
-                        <span className="font-medium">Jina AI</span>
-                        <p className="text-xs text-muted-foreground">Advanced AI with classification</p>
-                      </div>
+                      <span className="text-sm">XML Sitemap</span>
+                    </label>
+                    
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        value="crawl"
+                        checked={options.crawlMode && !options.sitemapMode}
+                        onChange={() => setOptions(prev => ({ ...prev, sitemapMode: false, crawlMode: true }))}
+                        disabled={isLoading}
+                      />
+                      <span className="text-sm">Auto Crawl</span>
                     </label>
                   </div>
-                </div>
-
-                {options.service === 'firecrawl' ? (
-                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="font-medium text-sm">Firecrawl Configuration</h3>
-                    
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="crawlMode"
-                        checked={options.crawlMode || false}
-                        onChange={(e) => setOptions(prev => ({ ...prev, crawlMode: e.target.checked }))}
-                        disabled={isLoading}
-                      />
-                      <Label htmlFor="crawlMode" className="text-sm">Multi-page crawl mode (for pagination)</Label>
+                  
+                  {options.sitemapMode && (
+                    <div className="p-3 border rounded bg-blue-50 dark:bg-blue-950/30">
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        📄 <strong>Sitemap Mode:</strong> Enter the URL of an XML sitemap (e.g., https://example.com/sitemap.xml) 
+                        to automatically discover and scrape all product pages listed in the sitemap.
+                      </p>
                     </div>
+                  )}
+                </div>
+                
+                {(options.sitemapMode || options.crawlMode) && (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-medium text-sm">
+                      {options.sitemapMode ? 'Sitemap Configuration' : 'Multi-page Configuration'}
+                    </h3>
                     
-                    {options.crawlMode && (
-                      <div className="space-y-4 p-3 border rounded bg-background/50">
-                        <div className="space-y-2">
-                          <Label htmlFor="maxPages">Maximum pages to crawl</Label>
-                          <Input
-                            id="maxPages"
-                            type="number"
-                            value={options.maxPages || 10}
-                            onChange={(e) => setOptions(prev => ({ ...prev, maxPages: parseInt(e.target.value) || 10 }))}
-                            min="1"
-                            max="50"
-                            disabled={isLoading}
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="includePatterns">Include URL patterns (comma-separated)</Label>
-                          <Input
-                            id="includePatterns"
-                            value={options.includePatterns?.join(', ') || ''}
-                            onChange={(e) => setOptions(prev => ({ 
-                              ...prev, 
-                              includePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                            }))}
-                            placeholder="/product, /item, /material"
-                            disabled={isLoading}
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="excludePatterns">Exclude URL patterns (comma-separated)</Label>
-                          <Input
-                            id="excludePatterns"
-                            value={options.excludePatterns?.join(', ') || ''}
-                            onChange={(e) => setOptions(prev => ({ 
-                              ...prev, 
-                              excludePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                            }))}
-                            placeholder="/cart, /checkout, /account"
-                            disabled={isLoading}
-                          />
-                        </div>
+                    {!options.sitemapMode && (
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="crawlMode"
+                          checked={options.crawlMode || false}
+                          onChange={(e) => setOptions(prev => ({ ...prev, crawlMode: e.target.checked }))}
+                          disabled={isLoading}
+                        />
+                        <Label htmlFor="crawlMode" className="text-sm">Multi-page crawl mode (for pagination)</Label>
                       </div>
                     )}
                     
+                    
+                    <div className="space-y-4 p-3 border rounded bg-background/50">
+                      <div className="space-y-2">
+                        <Label htmlFor="maxPages">Maximum pages to process</Label>
+                        <Input
+                          id="maxPages"
+                          type="number"
+                          value={options.maxPages || 10}
+                          onChange={(e) => setOptions(prev => ({ ...prev, maxPages: parseInt(e.target.value) || 10 }))}
+                          min="1"
+                          max="100"
+                          disabled={isLoading}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="includePatterns">Include URL patterns (comma-separated)</Label>
+                        <Input
+                          id="includePatterns"
+                          value={options.includePatterns?.join(', ') || ''}
+                          onChange={(e) => setOptions(prev => ({ 
+                            ...prev, 
+                            includePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                          }))}
+                          placeholder="/product, /item, /material"
+                          disabled={isLoading}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="excludePatterns">Exclude URL patterns (comma-separated)</Label>
+                        <Input
+                          id="excludePatterns"
+                          value={options.excludePatterns?.join(', ') || ''}
+                          onChange={(e) => setOptions(prev => ({ 
+                            ...prev, 
+                            excludePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                          }))}
+                          placeholder="/cart, /checkout, /account"
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+                )}
+                
+                {options.service === 'firecrawl' && !options.sitemapMode && (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-medium text-sm">Firecrawl Extraction Prompt</h3>
                     <div className="space-y-2">
                       <Label htmlFor="prompt">Extraction Instructions</Label>
                       <textarea
@@ -321,7 +346,9 @@ Return a list of materials found on the page.`,
                       </Button>
                     </div>
                   </div>
-                ) : (
+                )}
+                
+                {options.service === 'jina' && (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                     <h3 className="font-medium text-sm">Jina AI Configuration</h3>
                     

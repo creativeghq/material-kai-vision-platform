@@ -9,14 +9,15 @@ const corsHeaders = {
 interface JinaExtractRequest {
   url: string;
   service: 'firecrawl' | 'jina';
+  sitemapMode?: boolean; // New option for sitemap processing
   options?: {
     // Firecrawl options
     prompt?: string;
     schema?: Record<string, any>;
-    crawlMode?: boolean; // New option for crawling vs single page scraping
-    maxPages?: number; // Limit for crawling
-    includePatterns?: string[]; // URL patterns to include
-    excludePatterns?: string[]; // URL patterns to exclude
+    crawlMode?: boolean;
+    maxPages?: number;
+    includePatterns?: string[];
+    excludePatterns?: string[];
     
     // Jina AI options
     extractionPrompt?: string;
@@ -46,14 +47,16 @@ serve(async (req) => {
   }
 
   try {
-    const { url, service, options = {} }: JinaExtractRequest = await req.json();
+    const { url, service, sitemapMode = false, options = {} }: JinaExtractRequest = await req.json();
     
-    console.log('Starting material extraction:', { url, service, options });
+    console.log('Starting material extraction:', { url, service, sitemapMode, options });
     
     let materials: MaterialData[] = [];
     let processingTime = Date.now();
     
-    if (service === 'jina') {
+    if (sitemapMode) {
+      materials = await extractFromSitemap(url, service, options);
+    } else if (service === 'jina') {
       materials = await extractWithJinaAI(url, options);
     } else {
       // Check if crawling is requested
@@ -90,6 +93,116 @@ serve(async (req) => {
     });
   }
 });
+
+async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'jina', options: any): Promise<MaterialData[]> {
+  console.log('Processing sitemap:', sitemapUrl);
+  
+  // Fetch and parse the sitemap
+  const urls = await parseSitemap(sitemapUrl, options);
+  console.log(`Found ${urls.length} URLs in sitemap after filtering`);
+  
+  if (urls.length === 0) {
+    throw new Error('No URLs found in sitemap matching the include patterns');
+  }
+  
+  const allMaterials: MaterialData[] = [];
+  const maxPages = Math.min(urls.length, options.maxPages || 50);
+  
+  console.log(`Processing ${maxPages} URLs from sitemap`);
+  
+  // Process URLs in batches to avoid overwhelming the APIs
+  const batchSize = 5;
+  for (let i = 0; i < maxPages; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    console.log(`Processing batch ${Math.floor(i/batchSize) + 1} (${batch.length} URLs)`);
+    
+    const batchPromises = batch.map(async (url) => {
+      try {
+        if (service === 'jina') {
+          const results = await extractWithJinaAI(url, options);
+          return results;
+        } else {
+          const results = await extractWithFirecrawl(url, options);
+          return results;
+        }
+      } catch (error) {
+        console.error(`Failed to process URL ${url}:`, error);
+        return []; // Return empty array on error
+      }
+    });
+    
+    const batchResults = await Promise.all(batchPromises);
+    
+    // Flatten and add to results
+    for (const pageResults of batchResults) {
+      allMaterials.push(...pageResults);
+    }
+    
+    // Add delay between batches to be respectful to the APIs
+    if (i + batchSize < maxPages) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    }
+  }
+  
+  console.log(`Sitemap processing complete: ${allMaterials.length} materials from ${maxPages} pages`);
+  return allMaterials;
+}
+
+async function parseSitemap(sitemapUrl: string, options: any): Promise<string[]> {
+  console.log('Fetching sitemap:', sitemapUrl);
+  
+  const response = await fetch(sitemapUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sitemap: ${response.status} ${response.statusText}`);
+  }
+  
+  const xmlText = await response.text();
+  console.log('Sitemap content length:', xmlText.length);
+  
+  // Parse XML to extract URLs
+  const urls: string[] = [];
+  
+  // Handle both sitemap and sitemap index formats
+  const urlMatches = xmlText.match(/<loc[^>]*>([^<]+)<\/loc>/g);
+  if (urlMatches) {
+    for (const match of urlMatches) {
+      const url = match.replace(/<loc[^>]*>/, '').replace(/<\/loc>/, '').trim();
+      
+      // If this is a sitemap index (contains other sitemaps), recursively parse them
+      if (url.includes('sitemap') && url.endsWith('.xml')) {
+        try {
+          const subUrls = await parseSitemap(url, options);
+          urls.push(...subUrls);
+        } catch (error) {
+          console.error(`Failed to parse sub-sitemap ${url}:`, error);
+        }
+      } else {
+        urls.push(url);
+      }
+    }
+  }
+  
+  console.log(`Extracted ${urls.length} URLs from sitemap`);
+  
+  // Filter URLs based on include/exclude patterns
+  const includePatterns = options.includePatterns || ['/product', '/item', '/material'];
+  const excludePatterns = options.excludePatterns || ['/cart', '/checkout', '/account', '/login'];
+  
+  const filteredUrls = urls.filter(url => {
+    // Check include patterns
+    const includesMatch = includePatterns.length === 0 || 
+                         includePatterns.some(pattern => url.toLowerCase().includes(pattern.toLowerCase()));
+    
+    // Check exclude patterns  
+    const excludesMatch = excludePatterns.some(pattern => url.toLowerCase().includes(pattern.toLowerCase()));
+    
+    return includesMatch && !excludesMatch;
+  });
+  
+  console.log(`Filtered to ${filteredUrls.length} URLs matching patterns`);
+  return filteredUrls;
+}
+
 
 async function extractWithJinaAI(url: string, options: any): Promise<MaterialData[]> {
   const JINA_API_KEY = Deno.env.get('JINA_API_KEY');
