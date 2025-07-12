@@ -43,59 +43,14 @@ serve(async (req) => {
     console.log('Starting material scraping for URL:', url);
     console.log('Options:', options);
     
-    // Use Firecrawl v1 API scrape endpoint (simpler and more reliable)
+    // Use Firecrawl v1 API scrape endpoint with correct structure
     const scrapeBody = {
       url: url,
-      formats: ['markdown', 'html'],
+      formats: ['markdown'],
       onlyMainContent: true,
       includeTags: ['img', 'picture', 'figure', 'div', 'span', 'p', 'h1', 'h2', 'h3'],
       excludeTags: ['nav', 'footer', 'header', 'aside', 'script'],
-      waitFor: 3000,
-      extract: {
-        schema: {
-          type: "object",
-          properties: {
-            materials: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  description: { type: "string" },
-                  category: { type: "string" },
-                  price: { type: "string" },
-                  images: { 
-                    type: "array",
-                    items: { type: "string" }
-                  },
-                  properties: {
-                    type: "object",
-                    properties: {
-                      dimensions: { type: "string" },
-                      finish: { type: "string" },
-                      material: { type: "string" },
-                      color: { type: "string" },
-                      thickness: { type: "string" }
-                    }
-                  },
-                  supplier: { type: "string" }
-                }
-              }
-            }
-          }
-        },
-        systemPrompt: "You are an expert at extracting material and product information from websites.",
-        prompt: `Extract all material and product information from this page. Look for:
-- Product names and titles
-- Material categories (tiles, flooring, stone, wood, metal, fabric, etc.)
-- Product descriptions and specifications
-- Prices and pricing information
-- Technical properties (dimensions, finish, color, material type, thickness)
-- Product images (extract URLs)
-- Brand/supplier information
-
-Focus on construction materials, interior design materials, flooring, tiles, fabrics, metals, wood, stone, and similar products. Return as many materials as you can find on the page.`
-      }
+      waitFor: 3000
     };
 
     console.log('Calling Firecrawl v1 scrape API...');
