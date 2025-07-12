@@ -90,15 +90,20 @@ serve(async (req) => {
     const materials: MaterialData[] = [];
     
     if (data.data && Array.isArray(data.data)) {
+      console.log(`Processing ${data.data.length} pages from crawl`);
       for (const page of data.data) {
         if (page.markdown) {
-          console.log(`Processing page: ${page.url}`);
+          console.log(`Processing page: ${page.url} - Content length: ${page.markdown.length}`);
+          console.log(`First 200 chars: ${page.markdown.substring(0, 200)}`);
           const extractedMaterials = extractMaterialsFromMarkdown(page.markdown, page.url || url);
+          console.log(`Extracted ${extractedMaterials.length} materials from this page`);
           materials.push(...extractedMaterials);
           
           if (materials.length >= 100) break; // Limit total results
         }
       }
+    } else {
+      console.log('No data.data found or not an array:', typeof data.data);
     }
 
     console.log(`Successfully processed ${materials.length} materials from ${data.data?.length || 0} pages`);
@@ -128,14 +133,18 @@ function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): Materi
   const materials: MaterialData[] = [];
   const lines = markdown.split('\n');
   
-  // Material indicators
+  console.log(`Extracting from markdown with ${lines.length} lines`);
+  
+  // Material indicators - more comprehensive
   const materialKeywords = [
     'tile', 'tiles', 'ceramic', 'porcelain', 'stone', 'marble', 'granite',
-    'wood', 'timber', 'oak', 'pine', 'mahogany', 'bamboo',
-    'fabric', 'textile', 'cotton', 'linen', 'wool', 'silk',
-    'metal', 'steel', 'aluminum', 'brass', 'copper', 'iron',
-    'glass', 'acrylic', 'plastic', 'vinyl', 'leather',
-    'concrete', 'brick', 'laminate', 'veneer', 'composite'
+    'wood', 'timber', 'oak', 'pine', 'mahogany', 'bamboo', 'hardwood', 'plywood',
+    'fabric', 'textile', 'cotton', 'linen', 'wool', 'silk', 'canvas',
+    'metal', 'steel', 'aluminum', 'brass', 'copper', 'iron', 'zinc',
+    'glass', 'acrylic', 'plastic', 'vinyl', 'leather', 'pvc',
+    'concrete', 'brick', 'laminate', 'veneer', 'composite', 'mdf',
+    'flooring', 'wallpaper', 'paint', 'coating', 'panel', 'board',
+    'carpet', 'rug', 'mat', 'covering', 'surface', 'material'
   ];
   
   // Price patterns
@@ -175,17 +184,36 @@ function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): Materi
       continue;
     }
     
-    // Detect product names in regular text
-    if (!currentProduct && materialKeywords.some(keyword => lowerLine.includes(keyword))) {
-      // Look for potential product names
-      if (line.length > 5 && line.length < 150 && 
-          !lowerLine.includes('http') && !lowerLine.includes('www.')) {
+    // Detect product names in regular text - be more flexible
+    if (!currentProduct) {
+      // Check for material keywords in the line
+      const foundKeywords = materialKeywords.filter(keyword => lowerLine.includes(keyword));
+      if (foundKeywords.length > 0) {
+        // Look for potential product names
+        if (line.length > 5 && line.length < 200 && 
+            !lowerLine.includes('http') && !lowerLine.includes('www.') &&
+            !lowerLine.includes('menu') && !lowerLine.includes('nav')) {
+          currentProduct = {
+            name: line.trim(),
+            properties: { keywords: foundKeywords },
+            images: []
+          };
+          isInProductSection = true;
+          console.log(`Found potential material: ${line.trim()}`);
+          continue;
+        }
+      }
+      
+      // Also look for lines that might be product titles (even without keywords)
+      if ((line.startsWith('*') || line.includes('**') || line.length < 80) && 
+          line.length > 10 && !lowerLine.includes('http')) {
         currentProduct = {
-          name: line.trim(),
+          name: line.replace(/[\*\#]/g, '').trim(),
           properties: {},
           images: []
         };
         isInProductSection = true;
+        console.log(`Found potential product title: ${line.trim()}`);
         continue;
       }
     }
