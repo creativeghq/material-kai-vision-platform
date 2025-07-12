@@ -509,13 +509,26 @@ Return a list of materials found on the page.`,
       
       if (statusData.status === 'completed') {
         console.log('Crawl completed successfully');
+        console.log('Crawl status data structure:', JSON.stringify(statusData, null, 2));
         
         // Process all crawled pages
         const allMaterials: MaterialData[] = [];
         
         if (statusData.data && Array.isArray(statusData.data)) {
-          for (const pageData of statusData.data) {
+          console.log(`Processing ${statusData.data.length} crawled pages`);
+          
+          for (let i = 0; i < statusData.data.length; i++) {
+            const pageData = statusData.data[i];
+            console.log(`Page ${i + 1} structure:`, {
+              hasExtract: !!pageData.extract,
+              hasMaterials: !!(pageData.extract && pageData.extract.materials),
+              materialsCount: pageData.extract?.materials?.length || 0,
+              sourceURL: pageData.metadata?.sourceURL
+            });
+            
             if (pageData.extract && pageData.extract.materials && Array.isArray(pageData.extract.materials)) {
+              console.log(`Found ${pageData.extract.materials.length} materials on page ${i + 1}`);
+              
               for (const material of pageData.extract.materials) {
                 if (material.name) {
                   const processedMaterial: MaterialData = {
@@ -538,8 +551,12 @@ Return a list of materials found on the page.`,
                   allMaterials.push(processedMaterial);
                 }
               }
+            } else {
+              console.log(`Page ${i + 1} has no materials in expected structure. Full extract:`, JSON.stringify(pageData.extract, null, 2));
             }
           }
+        } else {
+          console.log('No data array found in crawl results. Status data:', JSON.stringify(statusData, null, 2));
         }
         
         console.log(`Crawl extracted ${allMaterials.length} materials from ${statusData.completed} pages`);
