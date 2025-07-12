@@ -200,7 +200,15 @@
 - ✅ Enhanced NeRF Processor
 - ✅ Spatial Material Mapper
 
-### **Pending Tasks (8/10):**
+### **Pending Tasks (9/10):**
+#### 18. NeRF Integration into Main Workflows
+**File:** `src/services/integratedWorkflowService.ts` + workflow components
+- Integrate NeRF reconstruction into Designer3D generation workflow
+- Add NeRF processing to Agent AI workflows when processing 2D images  
+- Ensure NeRF triggers automatically during 3D model generation
+- Add options to enable/disable NeRF reconstruction in workflows
+- Test integration with existing 3D generation pipeline
+
 #### 19. Gaussian Splatting Implementation
 **File:** `src/services/3d/gaussianSplattingService.ts`
 - Real-time 3D scene reconstruction
