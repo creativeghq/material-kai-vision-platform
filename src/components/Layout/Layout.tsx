@@ -4,11 +4,9 @@ import { Sidebar } from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: string;
-  onTabChange: (tab: string) => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
@@ -18,10 +16,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         onSearchChange={setSearchQuery} 
       />
       <div className="flex">
-        <Sidebar 
-          activeTab={activeTab} 
-          onTabChange={onTabChange} 
-        />
+        <Sidebar />
         <main className="flex-1 p-6">
           {children}
         </main>

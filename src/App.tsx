@@ -49,6 +49,31 @@ const App = () => (
                 <AgentMLCoordination />
               </AuthGuard>
             } />
+            <Route path="/admin/material-analysis" element={
+              <AuthGuard>
+                <AdminPanel />
+              </AuthGuard>
+            } />
+            <Route path="/admin/training-models" element={
+              <AuthGuard>
+                <AdminPanel />
+              </AuthGuard>
+            } />
+            <Route path="/admin/performance" element={
+              <AuthGuard>
+                <AdminPanel />
+              </AuthGuard>
+            } />
+            <Route path="/admin/rag" element={
+              <AuthGuard>
+                <AdminPanel />
+              </AuthGuard>
+            } />
+            <Route path="/admin/metadata" element={
+              <AuthGuard>
+                <AdminPanel />
+              </AuthGuard>
+            } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
