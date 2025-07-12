@@ -136,6 +136,178 @@ export type Database = {
         }
         Relationships: []
       }
+      api_access_control: {
+        Row: {
+          created_at: string
+          endpoint_id: string | null
+          id: string
+          is_enabled: boolean
+          network_type: string
+          rate_limit_override: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint_id?: string | null
+          id?: string
+          is_enabled?: boolean
+          network_type: string
+          rate_limit_override?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint_id?: string | null
+          id?: string
+          is_enabled?: boolean
+          network_type?: string
+          rate_limit_override?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_access_control_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "api_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_endpoints: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_internal: boolean
+          is_public: boolean
+          method: string
+          path: string
+          rate_limit_per_minute: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_internal?: boolean
+          is_public?: boolean
+          method: string
+          path: string
+          rate_limit_per_minute?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_internal?: boolean
+          is_public?: boolean
+          method?: string
+          path?: string
+          rate_limit_per_minute?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_keys: {
+        Row: {
+          allowed_endpoints: string[] | null
+          api_key: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key_name: string
+          last_used_at: string | null
+          rate_limit_override: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          allowed_endpoints?: string[] | null
+          api_key: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_name: string
+          last_used_at?: string | null
+          rate_limit_override?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          allowed_endpoints?: string[] | null
+          api_key?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_name?: string
+          last_used_at?: string | null
+          rate_limit_override?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      api_usage_logs: {
+        Row: {
+          created_at: string
+          endpoint_id: string | null
+          id: string
+          ip_address: unknown
+          is_internal_request: boolean
+          rate_limit_exceeded: boolean
+          request_method: string
+          request_path: string
+          response_status: number | null
+          response_time_ms: number | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          endpoint_id?: string | null
+          id?: string
+          ip_address: unknown
+          is_internal_request?: boolean
+          rate_limit_exceeded?: boolean
+          request_method: string
+          request_path: string
+          response_status?: number | null
+          response_time_ms?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          endpoint_id?: string | null
+          id?: string
+          ip_address?: unknown
+          is_internal_request?: boolean
+          rate_limit_exceeded?: boolean
+          request_method?: string
+          request_path?: string
+          response_status?: number | null
+          response_time_ms?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_logs_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "api_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crewai_agents: {
         Row: {
           agent_name: string
@@ -325,6 +497,36 @@ export type Database = {
           style?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      internal_networks: {
+        Row: {
+          cidr_range: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          cidr_range: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          cidr_range?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1113,6 +1315,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_rules: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          requests_per_minute: number
+          target_type: string
+          target_value: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          requests_per_minute: number
+          target_type: string
+          target_value: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          requests_per_minute?: number
+          target_type?: string
+          target_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       recognition_results: {
         Row: {
           ai_model_version: string | null
@@ -1480,6 +1715,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"][]
       }
+      get_rate_limit: {
+        Args: {
+          endpoint_path: string
+          ip_addr: unknown
+          user_id_param?: string
+        }
+        Returns: number
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
@@ -1518,6 +1761,10 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      is_internal_ip: {
+        Args: { ip_addr: unknown }
+        Returns: boolean
       }
       ivfflat_bit_support: {
         Args: { "": unknown }

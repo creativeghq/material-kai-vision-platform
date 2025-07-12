@@ -11,11 +11,20 @@ import {
   Settings, 
   Activity,
   Search,
-  Tags
+  Tags,
+  Shield
 } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
   const adminSections = [
+    {
+      title: "API Gateway",
+      description: "Manage API endpoints, access control, and rate limiting",
+      icon: Shield,
+      path: "/admin/api-gateway",
+      status: "active",
+      count: "24 endpoints"
+    },
     {
       title: "Analytics Dashboard",
       description: "AI performance metrics and system analytics",
