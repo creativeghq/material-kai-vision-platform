@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,12 +25,16 @@ import {
   CheckCircle,
   XCircle,
   Globe,
-  Lock
+  Lock,
+  ArrowLeft,
+  Home
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey, type RateLimitRule } from '@/services/apiGateway/apiGatewayService';
 import { toast } from 'sonner';
 
 export const ApiGatewayAdmin: React.FC = () => {
+  const navigate = useNavigate();
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
   const [internalNetworks, setInternalNetworks] = useState<InternalNetwork[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -151,378 +156,407 @@ export const ApiGatewayAdmin: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">API Gateway Management</h1>
-          <p className="text-muted-foreground">
-            Manage API endpoints, access control, rate limiting, and analytics
-          </p>
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Back to Main
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/admin')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Admin
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">API Gateway Management</h1>
+              <p className="text-sm text-muted-foreground">
+                Manage API endpoints, access control, rate limiting, and analytics
+              </p>
+            </div>
+          </div>
+          <Button onClick={seedDefaultEndpoints} variant="outline">
+            <Plus className="mr-2 h-4 w-4" />
+            Seed Default Endpoints
+          </Button>
         </div>
-        <Button onClick={seedDefaultEndpoints} variant="outline">
-          <Plus className="mr-2 h-4 w-4" />
-          Seed Default Endpoints
-        </Button>
       </div>
 
-      <Tabs defaultValue="endpoints" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="endpoints" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Endpoints
-          </TabsTrigger>
-          <TabsTrigger value="networks" className="flex items-center gap-2">
-            <Network className="h-4 w-4" />
-            Networks
-          </TabsTrigger>
-          <TabsTrigger value="api-keys" className="flex items-center gap-2">
-            <Key className="h-4 w-4" />
-            API Keys
-          </TabsTrigger>
-          <TabsTrigger value="rate-limits" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Rate Limits
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Analytics
-          </TabsTrigger>
-        </TabsList>
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
+        <Tabs defaultValue="endpoints" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="endpoints" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Endpoints
+            </TabsTrigger>
+            <TabsTrigger value="networks" className="flex items-center gap-2">
+              <Network className="h-4 w-4" />
+              Networks
+            </TabsTrigger>
+            <TabsTrigger value="api-keys" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              API Keys
+            </TabsTrigger>
+            <TabsTrigger value="rate-limits" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Rate Limits
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Endpoints Tab */}
-        <TabsContent value="endpoints" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>API Endpoints</CardTitle>
-              <CardDescription>
-                Configure public and internal access for API endpoints
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Search and Filter Controls */}
-              <div className="flex gap-4 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search endpoints..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Filter by category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Endpoints Table */}
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Endpoint</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Rate Limit</TableHead>
-                      <TableHead>Public Access</TableHead>
-                      <TableHead>Internal Access</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEndpoints.map((endpoint) => (
-                      <TableRow key={endpoint.id}>
-                        <TableCell className="font-mono text-sm">
-                          {endpoint.path}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{endpoint.method}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{endpoint.category}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {endpoint.description || 'No description'}
-                        </TableCell>
-                        <TableCell>
-                          {endpoint.rate_limit_per_minute} req/min
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              checked={endpoint.is_public}
-                              onCheckedChange={() => 
-                                toggleEndpointPublicAccess(endpoint.id, endpoint.is_public)
-                              }
-                            />
-                            {endpoint.is_public ? (
-                              <Globe className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Lock className="h-4 w-4 text-gray-500" />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              checked={endpoint.is_internal}
-                              onCheckedChange={() => 
-                                toggleEndpointInternalAccess(endpoint.id, endpoint.is_internal)
-                              }
-                            />
-                            {endpoint.is_internal ? (
-                              <CheckCircle className="h-4 w-4 text-blue-500" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-gray-500" />
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Internal Networks Tab */}
-        <TabsContent value="networks" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Internal Networks</CardTitle>
+          {/* Endpoints Tab */}
+          <TabsContent value="endpoints" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>API Endpoints</CardTitle>
                 <CardDescription>
-                  Define CIDR ranges that should be considered internal networks
+                  Configure public and internal access for API endpoints
                 </CardDescription>
-              </div>
-              <Dialog open={createNetworkOpen} onOpenChange={setCreateNetworkOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Network
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add Internal Network</DialogTitle>
-                    <DialogDescription>
-                      Define a new internal network CIDR range
-                    </DialogDescription>
-                  </DialogHeader>
-                  <CreateNetworkForm 
-                    onSuccess={() => {
-                      setCreateNetworkOpen(false);
-                      loadData();
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {internalNetworks.map((network) => (
-                  <div key={network.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{network.name}</h4>
-                      <p className="text-sm text-muted-foreground">{network.cidr_range}</p>
-                      {network.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{network.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={network.is_active ? "default" : "secondary"}>
-                        {network.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => apiGatewayService.deleteInternalNetwork(network.id).then(loadData)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              </CardHeader>
+              <CardContent>
+                {/* Search and Filter Controls */}
+                <div className="flex gap-4 mb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search endpoints..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filter by category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories.map(category => (
+                        <SelectItem key={category} value={category}>
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        {/* API Keys Tab */}
-        <TabsContent value="api-keys" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>API Keys</CardTitle>
-                <CardDescription>
-                  Manage API keys for external access
-                </CardDescription>
-              </div>
-              <Dialog open={createApiKeyOpen} onOpenChange={setCreateApiKeyOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Generate API Key
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Generate API Key</DialogTitle>
-                    <DialogDescription>
-                      Create a new API key for external access
-                    </DialogDescription>
-                  </DialogHeader>
-                  <CreateApiKeyForm 
-                    onSuccess={() => {
-                      setCreateApiKeyOpen(false);
-                      loadData();
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {apiKeys.map((apiKey) => (
-                  <div key={apiKey.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{apiKey.key_name}</h4>
-                      <p className="text-sm text-muted-foreground font-mono">
-                        {apiKey.api_key.substring(0, 20)}...
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant={apiKey.is_active ? "default" : "secondary"}>
-                          {apiKey.is_active ? "Active" : "Revoked"}
-                        </Badge>
-                        {apiKey.rate_limit_override && (
-                          <Badge variant="outline">
-                            {apiKey.rate_limit_override} req/min
-                          </Badge>
+                {/* Endpoints Table */}
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Endpoint</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Rate Limit</TableHead>
+                        <TableHead>Public Access</TableHead>
+                        <TableHead>Internal Access</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredEndpoints.map((endpoint) => (
+                        <TableRow key={endpoint.id}>
+                          <TableCell className="font-mono text-sm">
+                            {endpoint.path}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{endpoint.method}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{endpoint.category}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {endpoint.description || 'No description'}
+                          </TableCell>
+                          <TableCell>
+                            {endpoint.rate_limit_per_minute} req/min
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                checked={endpoint.is_public}
+                                onCheckedChange={() => 
+                                  toggleEndpointPublicAccess(endpoint.id, endpoint.is_public)
+                                }
+                              />
+                              {endpoint.is_public ? (
+                                <Globe className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <Lock className="h-4 w-4 text-gray-500" />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                checked={endpoint.is_internal}
+                                onCheckedChange={() => 
+                                  toggleEndpointInternalAccess(endpoint.id, endpoint.is_internal)
+                                }
+                              />
+                              {endpoint.is_internal ? (
+                                <CheckCircle className="h-4 w-4 text-blue-500" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-gray-500" />
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Internal Networks Tab */}
+          <TabsContent value="networks" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Internal Networks</CardTitle>
+                  <CardDescription>
+                    Define CIDR ranges that should be considered internal networks
+                  </CardDescription>
+                </div>
+                <Dialog open={createNetworkOpen} onOpenChange={setCreateNetworkOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Network
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Internal Network</DialogTitle>
+                      <DialogDescription>
+                        Define a new internal network CIDR range
+                      </DialogDescription>
+                    </DialogHeader>
+                    <CreateNetworkForm 
+                      onSuccess={() => {
+                        setCreateNetworkOpen(false);
+                        loadData();
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {internalNetworks.map((network) => (
+                    <div key={network.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{network.name}</h4>
+                        <p className="text-sm text-muted-foreground">{network.cidr_range}</p>
+                        {network.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{network.description}</p>
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyApiKey(apiKey.api_key)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      {apiKey.is_active && (
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={network.is_active ? "default" : "secondary"}>
+                          {network.is_active ? "Active" : "Inactive"}
+                        </Badge>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => revokeApiKey(apiKey.id)}
+                          onClick={() => apiGatewayService.deleteInternalNetwork(network.id).then(loadData)}
                         >
-                          <XCircle className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Rate Limits Tab */}
-        <TabsContent value="rate-limits" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Rate Limit Rules</CardTitle>
+          {/* API Keys Tab */}
+          <TabsContent value="api-keys" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>API Keys</CardTitle>
+                  <CardDescription>
+                    Manage API keys for external access
+                  </CardDescription>
+                </div>
+                <Dialog open={createApiKeyOpen} onOpenChange={setCreateApiKeyOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Generate API Key
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Generate API Key</DialogTitle>
+                      <DialogDescription>
+                        Create a new API key for external access
+                      </DialogDescription>
+                    </DialogHeader>
+                    <CreateApiKeyForm 
+                      onSuccess={() => {
+                        setCreateApiKeyOpen(false);
+                        loadData();
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {apiKeys.map((apiKey) => (
+                    <div key={apiKey.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{apiKey.key_name}</h4>
+                        <p className="text-sm text-muted-foreground font-mono">
+                          {apiKey.api_key.substring(0, 20)}...
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant={apiKey.is_active ? "default" : "secondary"}>
+                            {apiKey.is_active ? "Active" : "Revoked"}
+                          </Badge>
+                          {apiKey.rate_limit_override && (
+                            <Badge variant="outline">
+                              {apiKey.rate_limit_override} req/min
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyApiKey(apiKey.api_key)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        {apiKey.is_active && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => revokeApiKey(apiKey.id)}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Rate Limits Tab */}
+          <TabsContent value="rate-limits" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Rate Limit Rules</CardTitle>
+                  <CardDescription>
+                    Configure custom rate limits for specific IPs, CIDRs, or users
+                  </CardDescription>
+                </div>
+                <Dialog open={createRuleOpen} onOpenChange={setCreateRuleOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Rule
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Rate Limit Rule</DialogTitle>
+                      <DialogDescription>
+                        Define a custom rate limit rule
+                      </DialogDescription>
+                    </DialogHeader>
+                    <CreateRateLimitForm 
+                      onSuccess={() => {
+                        setCreateRuleOpen(false);
+                        loadData();
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {rateLimitRules.map((rule) => (
+                    <div key={rule.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{rule.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {rule.target_type}: {rule.target_value}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {rule.requests_per_minute} requests per minute
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={rule.is_active ? "default" : "secondary"}>
+                          {rule.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => apiGatewayService.deleteRateLimitRule(rule.id).then(loadData)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>API Analytics</CardTitle>
                 <CardDescription>
-                  Configure custom rate limits for specific IPs, CIDRs, or users
+                  Monitor API usage, rate limiting, and performance metrics
                 </CardDescription>
-              </div>
-              <Dialog open={createRuleOpen} onOpenChange={setCreateRuleOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Rule
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create Rate Limit Rule</DialogTitle>
-                    <DialogDescription>
-                      Define a custom rate limit rule
-                    </DialogDescription>
-                  </DialogHeader>
-                  <CreateRateLimitForm 
-                    onSuccess={() => {
-                      setCreateRuleOpen(false);
-                      loadData();
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {rateLimitRules.map((rule) => (
-                  <div key={rule.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{rule.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {rule.target_type}: {rule.target_value}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {rule.requests_per_minute} requests per minute
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={rule.is_active ? "default" : "secondary"}>
-                        {rule.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => apiGatewayService.deleteRateLimitRule(rule.id).then(loadData)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Analytics Tab */}
-        <TabsContent value="analytics" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>API Analytics</CardTitle>
-              <CardDescription>
-                Monitor API usage, rate limiting, and performance metrics
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Activity className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">Analytics Dashboard</h3>
-                <p className="text-muted-foreground">
-                  Coming soon - Real-time API usage analytics and monitoring
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Activity className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">Analytics Dashboard</h3>
+                  <p className="text-muted-foreground">
+                    Coming soon - Real-time API usage analytics and monitoring
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 };
