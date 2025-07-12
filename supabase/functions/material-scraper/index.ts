@@ -320,9 +320,11 @@ Return a list of materials found on the page.`;
   }
 
   const data = await response.json();
+  console.log('Firecrawl response data:', JSON.stringify(data, null, 2));
   
   if (!data.success) {
-    throw new Error('Firecrawl extraction failed: ' + (data.error || 'Unknown error'));
+    console.error('Firecrawl extraction failed - full response:', data);
+    throw new Error('Firecrawl extraction failed: ' + JSON.stringify(data));
   }
 
   const materials: MaterialData[] = [];
