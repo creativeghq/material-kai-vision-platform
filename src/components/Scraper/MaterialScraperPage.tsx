@@ -22,17 +22,8 @@ interface ScrapedMaterial {
 }
 
 interface ScrapingOptions {
-  limit: number;
-  maxDepth: number;
-  includePaths: string[];
-  excludePaths: string[];
-  searchCriteria: {
-    materialTypes: string[];
-    targetSelectors: string[];
-    keywordFilters: string[];
-    priceRequired: boolean;
-    imageRequired: boolean;
-  };
+  prompt: string;
+  schema?: Record<string, any>;
 }
 
 export const MaterialScraperPage = () => {
@@ -42,17 +33,14 @@ export const MaterialScraperPage = () => {
   const [scrapedMaterials, setScrapedMaterials] = useState<ScrapedMaterial[]>([]);
   const [progress, setProgress] = useState(0);
   const [options, setOptions] = useState<ScrapingOptions>({
-    limit: 10,
-    maxDepth: 1,
-    includePaths: [],
-    excludePaths: [],
-    searchCriteria: {
-      materialTypes: ['tiles', 'flooring', 'stone'],
-      targetSelectors: [],
-      keywordFilters: [],
-      priceRequired: false,
-      imageRequired: true
-    }
+    prompt: `Extract material information from this page. Look for:
+- Material name
+- Price (if available)
+- Description
+- Images
+- Properties like dimensions, color, finish
+- Category (tiles, stone, wood, etc.)
+Return a list of materials found on the page.`
   });
 
   const handleScrape = async (e: React.FormEvent) => {
@@ -163,115 +151,64 @@ export const MaterialScraperPage = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="limit">Page Limit</Label>
-                    <Input
-                      id="limit"
-                      type="number"
-                      value={options.limit}
-                      onChange={(e) => setOptions(prev => ({ ...prev, limit: parseInt(e.target.value) || 10 }))}
-                      min="1"
-                      max="50"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="depth">Max Depth</Label>
-                    <Input
-                      id="depth"
-                      type="number"
-                      value={options.maxDepth}
-                      onChange={(e) => setOptions(prev => ({ ...prev, maxDepth: parseInt(e.target.value) || 1 }))}
-                      min="0"
-                      max="3"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                  <h3 className="font-medium text-sm">Search Configuration</h3>
+                  <h3 className="font-medium text-sm">Extraction Prompt</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Customize what information to extract from the website
+                  </p>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="materialTypes">Material Types (comma-separated)</Label>
-                    <Input
-                      id="materialTypes"
-                      value={options.searchCriteria.materialTypes.join(', ')}
-                      onChange={(e) => setOptions(prev => ({
-                        ...prev,
-                        searchCriteria: {
-                          ...prev.searchCriteria,
-                          materialTypes: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                        }
-                      }))}
-                      placeholder="tiles, stone, wood, ceramic, marble"
+                    <Label htmlFor="prompt">Extraction Instructions</Label>
+                    <textarea
+                      id="prompt"
+                      value={options.prompt}
+                      onChange={(e) => setOptions(prev => ({ ...prev, prompt: e.target.value }))}
+                      placeholder="Tell the AI what to extract from the page..."
                       disabled={isLoading}
+                      rows={6}
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="keywords">Additional Keywords (comma-separated)</Label>
-                    <Input
-                      id="keywords"
-                      value={options.searchCriteria.keywordFilters.join(', ')}
-                      onChange={(e) => setOptions(prev => ({
-                        ...prev,
-                        searchCriteria: {
-                          ...prev.searchCriteria,
-                          keywordFilters: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                        }
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOptions(prev => ({ 
+                        ...prev, 
+                        prompt: `Extract building materials from this page including:
+- Product name
+- Price (with currency)
+- Material type (tiles, stone, wood, etc.)
+- Dimensions and specifications
+- Color and finish
+- Images
+- Availability and stock status` 
                       }))}
-                      placeholder="flooring, wall, bathroom, kitchen"
                       disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="includePaths">Include URL Paths (comma-separated)</Label>
-                    <Input
-                      id="includePaths"
-                      value={options.includePaths.join(', ')}
-                      onChange={(e) => setOptions(prev => ({
-                        ...prev,
-                        includePaths: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                    >
+                      Building Materials
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOptions(prev => ({ 
+                        ...prev, 
+                        prompt: `Extract product catalog information:
+- Product name and model
+- Price and pricing tiers
+- Technical specifications
+- Images and gallery
+- Category and subcategory
+- Brand and manufacturer
+- Product description` 
                       }))}
-                      placeholder="/products, /catalog, /materials"
                       disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="flex gap-4">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={options.searchCriteria.priceRequired}
-                        onChange={(e) => setOptions(prev => ({
-                          ...prev,
-                          searchCriteria: {
-                            ...prev.searchCriteria,
-                            priceRequired: e.target.checked
-                          }
-                        }))}
-                        disabled={isLoading}
-                      />
-                      <span className="text-sm">Require Price</span>
-                    </label>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={options.searchCriteria.imageRequired}
-                        onChange={(e) => setOptions(prev => ({
-                          ...prev,
-                          searchCriteria: {
-                            ...prev.searchCriteria,
-                            imageRequired: e.target.checked
-                          }
-                        }))}
-                        disabled={isLoading}
-                      />
-                      <span className="text-sm">Require Images</span>
-                    </label>
+                    >
+                      Product Catalog
+                    </Button>
                   </div>
                 </div>
 

@@ -5,20 +5,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface CrawlRequest {
+interface ExtractRequest {
   url: string;
   options?: {
-    limit?: number;
-    includePaths?: string[];
-    excludePaths?: string[];
-    maxDepth?: number;
-    searchCriteria?: {
-      materialTypes?: string[];
-      targetSelectors?: string[];
-      keywordFilters?: string[];
-      priceRequired?: boolean;
-      imageRequired?: boolean;
-    };
+    prompt?: string;
+    schema?: Record<string, any>;
   };
 }
 
@@ -45,148 +36,122 @@ serve(async (req) => {
       throw new Error('FIRECRAWL_API_KEY not configured');
     }
 
-    const { url, options = {} }: CrawlRequest = await req.json();
+    const { url, options = {} }: ExtractRequest = await req.json();
     
-    console.log('Starting material scraping for URL:', url);
+    console.log('Starting material extraction for URL:', url);
     console.log('Options:', JSON.stringify(options, null, 2));
     
-    // Determine if we should crawl multiple pages or scrape a single page
-    const shouldCrawl = (options.maxDepth && options.maxDepth > 0) || (options.includePaths && options.includePaths.length > 0);
-    
-    let apiResult: any;
-    
-    if (shouldCrawl) {
-      // Use crawl for multiple pages
-      const crawlBody = {
-        url: url,
-        limit: options.limit || 10,
-        scrapeOptions: {
-          formats: ['markdown'],
-          onlyMainContent: false,
-          includeTags: ['img', 'picture', 'figure', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-          excludeTags: ['nav', 'footer', 'header', 'aside', 'script', 'style'],
-          waitFor: 2000
+    const extractPrompt = options.prompt || `Extract material information from this page. Look for:
+- Material name
+- Price (if available)
+- Description
+- Images
+- Properties like dimensions, color, finish
+- Category (tiles, stone, wood, etc.)
+Return a list of materials found on the page.`;
+
+    // Use Firecrawl's extract API
+    const extractBody = {
+      url: url,
+      prompt: extractPrompt,
+      schema: options.schema || {
+        type: "object",
+        properties: {
+          materials: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Product/material name" },
+                description: { type: "string", description: "Product description" },
+                price: { type: "string", description: "Price with currency" },
+                category: { type: "string", description: "Material category" },
+                images: { 
+                  type: "array", 
+                  items: { type: "string" },
+                  description: "Image URLs" 
+                },
+                properties: {
+                  type: "object",
+                  description: "Additional properties like dimensions, color, finish"
+                }
+              },
+              required: ["name"]
+            }
+          }
         },
-        includePaths: options.includePaths || [],
-        excludePaths: options.excludePaths || [],
-        maxDepth: options.maxDepth || 1
-      };
-
-      console.log('Using Firecrawl CRAWL API with config:', JSON.stringify(crawlBody, null, 2));
-
-      const response = await fetch('https://api.firecrawl.dev/v1/crawl', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(crawlBody),
-      });
-
-      console.log('Firecrawl crawl response status:', response.status);
-      const data = await response.json();
-      console.log('Firecrawl crawl response:', JSON.stringify(data, null, 2));
-
-      if (!response.ok) {
-        throw new Error(`Firecrawl crawl API error: ${response.status} - ${JSON.stringify(data)}`);
+        required: ["materials"]
       }
+    };
 
-      if (!data.success) {
-        throw new Error('Firecrawl crawling failed: ' + (data.error || 'Unknown error'));
-      }
+    console.log('Using Firecrawl EXTRACT API with config:', JSON.stringify(extractBody, null, 2));
 
-      apiResult = { type: 'crawl', data };
-    } else {
-      // Use scrape for single page
-      const scrapeBody = {
-        url: url,
-        formats: ['markdown'],
-        onlyMainContent: false,
-        includeTags: ['img', 'picture', 'figure', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-        excludeTags: ['nav', 'footer', 'header', 'aside', 'script', 'style'],
-        waitFor: 2000
-      };
+    const response = await fetch('https://api.firecrawl.dev/v1/extract', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(extractBody),
+    });
 
-      console.log('Using Firecrawl SCRAPE API with config:', JSON.stringify(scrapeBody, null, 2));
+    console.log('Firecrawl extract response status:', response.status);
+    const data = await response.json();
+    console.log('Firecrawl extract response:', JSON.stringify(data, null, 2));
 
-      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(scrapeBody),
-      });
-
-      console.log('Firecrawl scrape response status:', response.status);
-      const data = await response.json();
-      console.log('Firecrawl scrape response:', JSON.stringify(data, null, 2));
-
-      if (!response.ok) {
-        throw new Error(`Firecrawl scrape API error: ${response.status} - ${JSON.stringify(data)}`);
-      }
-
-      if (!data.success) {
-        throw new Error('Firecrawl scraping failed: ' + (data.error || 'Unknown error'));
-      }
-
-      apiResult = { type: 'scrape', data };
+    if (!response.ok) {
+      throw new Error(`Firecrawl extract API error: ${response.status} - ${JSON.stringify(data)}`);
     }
-    
-    // Process the results based on API type
+
+    if (!data.success) {
+      throw new Error('Firecrawl extraction failed: ' + (data.error || 'Unknown error'));
+    }
+
+    // Process the extracted data
     const materials: MaterialData[] = [];
     
-    if (apiResult.type === 'scrape') {
-      // Handle single page scrape result
-      if (apiResult.data.data && apiResult.data.data.markdown) {
-        console.log(`Processing single page scrape result - Content length: ${apiResult.data.data.markdown.length}`);
-        console.log(`First 200 chars: ${apiResult.data.data.markdown.substring(0, 200)}`);
-        const extractedMaterials = extractMaterialsFromMarkdown(
-          apiResult.data.data.markdown, 
-          url, 
-          options.searchCriteria || {}
-        );
-        console.log(`Extracted ${extractedMaterials.length} materials from single page`);
-        materials.push(...extractedMaterials);
+    if (data.data && data.data.materials && Array.isArray(data.data.materials)) {
+      console.log(`Processing ${data.data.materials.length} extracted materials`);
+      
+      for (const material of data.data.materials) {
+        if (material.name) {
+          const processedMaterial: MaterialData = {
+            name: material.name,
+            description: material.description || '',
+            category: material.category || categorizeFromName(material.name),
+            price: material.price || '',
+            images: Array.isArray(material.images) ? material.images : [],
+            properties: {
+              ...material.properties,
+              sourceUrl: url,
+              extractedAt: new Date().toISOString()
+            },
+            sourceUrl: url,
+            supplier: extractSupplierFromUrl(url)
+          };
+          
+          materials.push(processedMaterial);
+          console.log(`Processed material: ${processedMaterial.name}`);
+        }
       }
     } else {
-      // Handle crawl result (multiple pages)
-      if (apiResult.data.data && Array.isArray(apiResult.data.data)) {
-        console.log(`Processing ${apiResult.data.data.length} pages from crawl`);
-        for (const page of apiResult.data.data) {
-          if (page.markdown) {
-            console.log(`Processing page: ${page.url} - Content length: ${page.markdown.length}`);
-            console.log(`First 200 chars: ${page.markdown.substring(0, 200)}`);
-            const extractedMaterials = extractMaterialsFromMarkdown(
-              page.markdown, 
-              page.url || url, 
-              options.searchCriteria || {}
-            );
-            console.log(`Extracted ${extractedMaterials.length} materials from this page`);
-            materials.push(...extractedMaterials);
-            
-            if (materials.length >= 100) break; // Limit total results
-          }
-        }
-      } else {
-        console.log('No data.data found or not an array:', typeof apiResult.data.data);
-      }
+      console.log('No materials found in extraction result');
     }
 
-    console.log(`Successfully processed ${materials.length} materials from ${apiResult.type === 'scrape' ? '1 page' : apiResult.data.data?.length || 0} pages`);
+    console.log(`Successfully extracted ${materials.length} materials from ${url}`);
 
     return new Response(JSON.stringify({
       success: true,
       materials,
-      totalPages: apiResult.type === 'scrape' ? 1 : apiResult.data.data?.length || 0,
+      totalPages: 1,
       processingTime: Date.now(),
-      apiType: apiResult.type
+      extractedCount: materials.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Material scraper error:', error);
+    console.error('Material extractor error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
@@ -197,226 +162,38 @@ serve(async (req) => {
   }
 });
 
-function extractMaterialsFromMarkdown(
-  markdown: string, 
-  pageUrl: string,
-  searchCriteria: any = {}
-): MaterialData[] {
-  const materials: MaterialData[] = [];
-  const lines = markdown.split('\n');
+function categorizeFromName(name: string): string {
+  const lowerName = name.toLowerCase();
   
-  console.log(`Extracting from markdown with ${lines.length} lines`);
-  console.log(`Search criteria:`, searchCriteria);
-  
-  // Combine default keywords with user-specified material types and filters
-  const defaultKeywords = [
-    'tile', 'tiles', 'ceramic', 'porcelain', 'stone', 'marble', 'granite',
-    'wood', 'timber', 'oak', 'pine', 'mahogany', 'bamboo', 'hardwood', 'plywood',
-    'fabric', 'textile', 'cotton', 'linen', 'wool', 'silk', 'canvas',
-    'metal', 'steel', 'aluminum', 'brass', 'copper', 'iron', 'zinc',
-    'glass', 'acrylic', 'plastic', 'vinyl', 'leather', 'pvc',
-    'concrete', 'brick', 'laminate', 'veneer', 'composite', 'mdf',
-    'flooring', 'wallpaper', 'paint', 'coating', 'panel', 'board',
-    'carpet', 'rug', 'mat', 'covering', 'surface', 'material'
-  ];
-  
-  const materialKeywords = [
-    ...defaultKeywords,
-    ...(searchCriteria.materialTypes || []),
-    ...(searchCriteria.keywordFilters || [])
-  ];
-  
-  // Price patterns
-  const priceRegex = /[\$£€¥]\s*\d+(?:[.,]\d{2})?(?:\s*-\s*[\$£€¥]\s*\d+(?:[.,]\d{2})?)?/;
-  const priceRegex2 = /\d+(?:[.,]\d{2})?\s*(?:USD|EUR|GBP|dollars?|euros?|pounds?)/i;
-  
-  // Dimension patterns
-  const dimensionRegex = /\d+\s*(?:x|×)\s*\d+(?:\s*(?:x|×)\s*\d+)?\s*(?:mm|cm|m|inch|in|ft|feet)(?:es)?/i;
-  
-  let currentProduct: Partial<MaterialData> | null = null;
-  let isInProductSection = false;
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    const lowerLine = line.toLowerCase();
-    
-    // Skip empty lines and navigation
-    if (!line || lowerLine.includes('menu') || lowerLine.includes('navigation') || 
-        lowerLine.includes('footer') || lowerLine.includes('header')) {
-      continue;
-    }
-    
-    // Detect product headings (usually with # or ##)
-    if (line.startsWith('#') && materialKeywords.some(keyword => lowerLine.includes(keyword))) {
-      // Save previous product if exists
-      if (currentProduct && currentProduct.name) {
-        const material = createMaterialFromPartial(currentProduct, pageUrl, searchCriteria);
-        if (material) materials.push(material);
-      }
-      
-      // Start new product
-      currentProduct = {
-        name: line.replace(/^#+\s*/, '').trim(),
-        properties: {},
-        images: []
-      };
-      isInProductSection = true;
-      continue;
-    }
-    
-    // Detect product names in regular text - be more flexible
-    if (!currentProduct) {
-      // Check for material keywords in the line
-      const foundKeywords = materialKeywords.filter(keyword => lowerLine.includes(keyword));
-      if (foundKeywords.length > 0) {
-        // Look for potential product names
-        if (line.length > 5 && line.length < 200 && 
-            !lowerLine.includes('http') && !lowerLine.includes('www.') &&
-            !lowerLine.includes('menu') && !lowerLine.includes('nav')) {
-          currentProduct = {
-            name: line.trim(),
-            properties: { keywords: foundKeywords },
-            images: []
-          };
-          isInProductSection = true;
-          console.log(`Found potential material: ${line.trim()}`);
-          continue;
-        }
-      }
-      
-      // Also look for lines that might be product titles (even without keywords)
-      if ((line.startsWith('*') || line.includes('**') || line.length < 80) && 
-          line.length > 10 && !lowerLine.includes('http')) {
-        currentProduct = {
-          name: line.replace(/[\*\#]/g, '').trim(),
-          properties: {},
-          images: []
-        };
-        isInProductSection = true;
-        console.log(`Found potential product title: ${line.trim()}`);
-        continue;
-      }
-    }
-    
-    if (currentProduct && isInProductSection) {
-      // Extract price
-      if (priceRegex.test(line) || priceRegex2.test(line)) {
-        const priceMatch = line.match(priceRegex) || line.match(priceRegex2);
-        if (priceMatch) {
-          currentProduct.price = priceMatch[0];
-        }
-      }
-      
-      // Extract dimensions
-      if (dimensionRegex.test(line)) {
-        const dimMatch = line.match(dimensionRegex);
-        if (dimMatch && currentProduct.properties) {
-          currentProduct.properties.dimensions = dimMatch[0];
-        }
-      }
-      
-      // Extract color information
-      const colorKeywords = ['white', 'black', 'brown', 'grey', 'gray', 'beige', 'cream', 'natural', 'dark', 'light'];
-      if (colorKeywords.some(color => lowerLine.includes(color))) {
-        const colorMatch = colorKeywords.find(color => lowerLine.includes(color));
-        if (colorMatch && currentProduct.properties) {
-          currentProduct.properties.color = colorMatch;
-        }
-      }
-      
-      // Extract finish information
-      const finishKeywords = ['matte', 'gloss', 'satin', 'polished', 'textured', 'smooth', 'rough', 'brushed'];
-      if (finishKeywords.some(finish => lowerLine.includes(finish))) {
-        const finishMatch = finishKeywords.find(finish => lowerLine.includes(finish));
-        if (finishMatch && currentProduct.properties) {
-          currentProduct.properties.finish = finishMatch;
-        }
-      }
-      
-      // Look for description
-      if (!currentProduct.description && line.length > 20 && line.length < 300 &&
-          !priceRegex.test(line) && !dimensionRegex.test(line)) {
-        currentProduct.description = line;
-      }
-      
-      // Look for image URLs
-      if (line.includes('.jpg') || line.includes('.png') || line.includes('.jpeg') || line.includes('.webp')) {
-        const imageMatch = line.match(/https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp)/i);
-        if (imageMatch && currentProduct.images) {
-          currentProduct.images.push(imageMatch[0]);
-        }
-      }
-      
-      // End product section if we hit another heading or empty lines
-      if (line.startsWith('#') || (line === '' && lines[i + 1] === '')) {
-        if (currentProduct.name) {
-          const material = createMaterialFromPartial(currentProduct, pageUrl, searchCriteria);
-          if (material) materials.push(material);
-        }
-        currentProduct = null;
-        isInProductSection = false;
-      }
-    }
-  }
-  
-  // Save last product
-  if (currentProduct && currentProduct.name) {
-    const material = createMaterialFromPartial(currentProduct, pageUrl, searchCriteria);
-    if (material) materials.push(material);
-  }
-  
-  console.log(`Extracted ${materials.length} materials from page: ${pageUrl}`);
-  return materials;
-}
-
-function createMaterialFromPartial(partial: Partial<MaterialData>, pageUrl: string, searchCriteria: any = {}): MaterialData | null {
-  // Apply search criteria filters
-  if (searchCriteria.priceRequired && !partial.price) {
-    return null; // Skip materials without price if required
-  }
-  
-  if (searchCriteria.imageRequired && (!partial.images || partial.images.length === 0)) {
-    return null; // Skip materials without images if required
-  }
-  
-  return {
-    name: partial.name || 'Unknown Material',
-    description: partial.description || '',
-    category: categorizeEffect(partial.name?.toLowerCase() || ''),
-    price: partial.price || '',
-    images: partial.images || [],
-    properties: {
-      ...partial.properties,
-      sourceUrl: pageUrl,
-      extractedAt: new Date().toISOString()
-    },
-    sourceUrl: pageUrl,
-    supplier: extractSupplierFromUrl(pageUrl)
-  };
-}
-
-function categorizeEffect(category: string): string {
   const categoryMap: Record<string, string> = {
     'wood': 'Wood',
-    'stone': 'Stone & marble',
-    'marble': 'Stone & marble',
+    'timber': 'Wood',
+    'oak': 'Wood',
+    'pine': 'Wood',
+    'stone': 'Stone',
+    'marble': 'Stone',
+    'granite': 'Stone',
     'concrete': 'Concrete',
     'brick': 'Brick',
     'metal': 'Metal',
-    'fabric': 'Fabric',
+    'steel': 'Metal',
+    'fabric': 'Textiles',
+    'textile': 'Textiles',
     'leather': 'Leather',
     'resin': 'Resin',
-    'terracotta': 'Terracotta',
-    'terrazzo': 'Terrazzo',
-    'tile': 'Encaustic',
-    'tiles': 'Encaustic',
-    'ceramic': 'Encaustic',
-    'porcelain': 'Encaustic'
+    'terracotta': 'Ceramics',
+    'terrazzo': 'Ceramics',
+    'tile': 'Ceramics',
+    'tiles': 'Ceramics',
+    'ceramic': 'Ceramics',
+    'porcelain': 'Ceramics',
+    'glass': 'Glass',
+    'plastic': 'Plastics',
+    'vinyl': 'Plastics'
   };
   
-  const lowerCategory = category.toLowerCase();
   for (const [key, value] of Object.entries(categoryMap)) {
-    if (lowerCategory.includes(key)) {
+    if (lowerName.includes(key)) {
       return value;
     }
   }
