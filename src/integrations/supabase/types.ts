@@ -1191,16 +1191,21 @@ export type Database = {
       }
       pdf_processing_results: {
         Row: {
+          azure_confidence_score: number | null
+          azure_model_used: string | null
           confidence_score_avg: number | null
           created_at: string
           document_author: string | null
+          document_classification: Json | null
           document_keywords: string | null
           document_subject: string | null
           document_title: string | null
           error_message: string | null
+          extracted_tables: Json | null
           extraction_options: Json | null
           file_size: number | null
           file_url: string
+          form_fields: Json | null
           id: string
           material_recognition_model_version: string | null
           materials_identified_count: number | null
@@ -1218,16 +1223,21 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          azure_confidence_score?: number | null
+          azure_model_used?: string | null
           confidence_score_avg?: number | null
           created_at?: string
           document_author?: string | null
+          document_classification?: Json | null
           document_keywords?: string | null
           document_subject?: string | null
           document_title?: string | null
           error_message?: string | null
+          extracted_tables?: Json | null
           extraction_options?: Json | null
           file_size?: number | null
           file_url: string
+          form_fields?: Json | null
           id?: string
           material_recognition_model_version?: string | null
           materials_identified_count?: number | null
@@ -1245,16 +1255,21 @@ export type Database = {
           user_id: string
         }
         Update: {
+          azure_confidence_score?: number | null
+          azure_model_used?: string | null
           confidence_score_avg?: number | null
           created_at?: string
           document_author?: string | null
+          document_classification?: Json | null
           document_keywords?: string | null
           document_subject?: string | null
           document_title?: string | null
           error_message?: string | null
+          extracted_tables?: Json | null
           extraction_options?: Json | null
           file_size?: number | null
           file_url?: string
+          form_fields?: Json | null
           id?: string
           material_recognition_model_version?: string | null
           materials_identified_count?: number | null
@@ -1275,8 +1290,12 @@ export type Database = {
       }
       pdf_processing_tiles: {
         Row: {
+          azure_confidence: number | null
+          azure_element_type: string | null
+          bounding_polygon: Json | null
           created_at: string
           extracted_text: string | null
+          form_field_info: Json | null
           height: number
           id: string
           image_embedding: string | null
@@ -1290,6 +1309,7 @@ export type Database = {
           pdf_processing_id: string
           related_material_id: string | null
           structured_data: Json | null
+          table_cell_info: Json | null
           text_embedding: string | null
           tile_index: number
           updated_at: string
@@ -1298,8 +1318,12 @@ export type Database = {
           y_coordinate: number
         }
         Insert: {
+          azure_confidence?: number | null
+          azure_element_type?: string | null
+          bounding_polygon?: Json | null
           created_at?: string
           extracted_text?: string | null
+          form_field_info?: Json | null
           height: number
           id?: string
           image_embedding?: string | null
@@ -1313,6 +1337,7 @@ export type Database = {
           pdf_processing_id: string
           related_material_id?: string | null
           structured_data?: Json | null
+          table_cell_info?: Json | null
           text_embedding?: string | null
           tile_index: number
           updated_at?: string
@@ -1321,8 +1346,12 @@ export type Database = {
           y_coordinate: number
         }
         Update: {
+          azure_confidence?: number | null
+          azure_element_type?: string | null
+          bounding_polygon?: Json | null
           created_at?: string
           extracted_text?: string | null
+          form_field_info?: Json | null
           height?: number
           id?: string
           image_embedding?: string | null
@@ -1336,6 +1365,7 @@ export type Database = {
           pdf_processing_id?: string
           related_material_id?: string | null
           structured_data?: Json | null
+          table_cell_info?: Json | null
           text_embedding?: string | null
           tile_index?: number
           updated_at?: string
