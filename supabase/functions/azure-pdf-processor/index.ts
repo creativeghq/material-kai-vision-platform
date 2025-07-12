@@ -13,7 +13,7 @@ const supabase = createClient(
 );
 
 const azureApiKey = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY');
-const azureEndpoint = Deno.env.get('AZURE_ENDPOINT') || 'https://eastus.api.cognitive.microsoft.com';
+const azureEndpoint = 'https://kai-documents.cognitiveservices.azure.com';
 
 interface AzureProcessingRequest {
   fileUrl: string;
