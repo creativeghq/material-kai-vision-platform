@@ -9,7 +9,8 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye, Zap, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PDFResultsViewer } from './PDFResultsViewer';
@@ -19,6 +20,7 @@ interface ProcessingOptions {
   overlapPercentage: number;
   extractStructuredData: boolean;
   detectMaterials: boolean;
+  processingMethod: 'azure' | 'standard';
 }
 
 interface ProcessingResult {
@@ -54,6 +56,7 @@ export const PDFProcessor: React.FC = () => {
     overlapPercentage: 10,
     extractStructuredData: true,
     detectMaterials: true,
+    processingMethod: 'azure',
   });
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -121,22 +124,12 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
-      // Call Azure PDF processor edge function (with fallback)
-      const { data: processingResult, error: processingError } = await supabase.functions.invoke('azure-pdf-processor', {
-        body: {
-          fileUrl: publicUrl,
-          originalFilename: file.name,
-          fileSize: file.size,
-          userId: user.id,
-          extractionOptions: options
-        }
-      });
-
-      // If Azure processing fails, fallback to regular PDF processor
-      if (processingError) {
-        console.warn('Azure processing failed, falling back to standard processor:', processingError);
-        
-        const { data: fallbackResult, error: fallbackError } = await supabase.functions.invoke('pdf-processor', {
+      // Call the selected PDF processor
+      let processingResult, processingError;
+      
+      if (options.processingMethod === 'azure') {
+        console.log('Using Azure Document Intelligence processing...');
+        const azureResponse = await supabase.functions.invoke('azure-pdf-processor', {
           body: {
             fileUrl: publicUrl,
             originalFilename: file.name,
@@ -145,32 +138,56 @@ export const PDFProcessor: React.FC = () => {
             extractionOptions: options
           }
         });
-
-        if (fallbackError) {
-          throw new Error(`Both Azure and fallback processing failed: ${fallbackError.message}`);
-        }
         
-        // Use fallback result
-        setProcessing(prev => prev.map(p => 
-          p.id === processingId 
-            ? { 
-                ...p, 
-                status: 'completed', 
-                progress: 100,
-                result: fallbackResult
-              }
-            : p
-        ));
-
-        toast({
-          title: "PDF Processing Complete (Standard Mode)",
-          description: `Successfully processed ${file.name} using standard processing. Found ${fallbackResult.summary.materialsIdentified} materials.`,
+        processingResult = azureResponse.data;
+        processingError = azureResponse.error;
+        
+        // If Azure fails due to size or configuration, automatically fallback
+        if (processingError && (
+          processingError.message?.includes('exceeds Azure Document Intelligence limit') ||
+          processingError.message?.includes('API key not configured')
+        )) {
+          console.warn('Azure processing failed, falling back to standard processor:', processingError.message);
+          
+          const fallbackResponse = await supabase.functions.invoke('pdf-processor', {
+            body: {
+              fileUrl: publicUrl,
+              originalFilename: file.name,
+              fileSize: file.size,
+              userId: user.id,
+              extractionOptions: options
+            }
+          });
+          
+          processingResult = fallbackResponse.data;
+          processingError = fallbackResponse.error;
+          
+          if (!fallbackResponse.error) {
+            toast({
+              title: "Processing Complete (Standard Mode)",
+              description: `Azure processing unavailable, completed with standard processing. Found ${fallbackResponse.data.summary.materialsIdentified} materials.`,
+              variant: "default",
+            });
+          }
+        }
+      } else {
+        console.log('Using standard PDF processing...');
+        const standardResponse = await supabase.functions.invoke('pdf-processor', {
+          body: {
+            fileUrl: publicUrl,
+            originalFilename: file.name,
+            fileSize: file.size,
+            userId: user.id,
+            extractionOptions: options
+          }
         });
-        return;
+        
+        processingResult = standardResponse.data;
+        processingError = standardResponse.error;
       }
 
       if (processingError) {
-        throw new Error(`Processing failed: ${processingError.message}`);
+        throw new Error(`${options.processingMethod === 'azure' ? 'Azure' : 'Standard'} processing failed: ${processingError.message}`);
       }
 
       // Update with successful result
@@ -185,9 +202,14 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
+      const isAzureProcessing = options.processingMethod === 'azure' && 
+        (processingResult.summary.extractedTables !== undefined || processingResult.summary.keyValuePairs !== undefined);
+      
       toast({
-        title: "Azure AI Processing Complete",
-        description: `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials, ${processingResult.summary.extractedTables || 0} tables, and ${processingResult.summary.keyValuePairs || 0} key-value pairs.`,
+        title: `${options.processingMethod === 'azure' ? 'Azure AI' : 'Standard'} Processing Complete`,
+        description: isAzureProcessing 
+          ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials, ${processingResult.summary.extractedTables || 0} tables, and ${processingResult.summary.keyValuePairs || 0} key-value pairs.`
+          : `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials using ${options.processingMethod} processing.`,
       });
 
     } catch (error) {
@@ -257,13 +279,67 @@ export const PDFProcessor: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            AI-Powered PDF Material Catalog Processor
+            Intelligent PDF Material Catalog Processor
           </CardTitle>
           <CardDescription>
-            Upload PDF documents for advanced analysis using Azure AI Document Intelligence. Extracts material specifications, technical data, tables, and structured information with high accuracy.
+            Upload PDF documents for intelligent analysis. Choose between Azure AI Document Intelligence for advanced structured data extraction or Standard processing for reliable material detection across all file sizes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Processing Method Selection */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              <Label className="text-base font-medium">Processing Method</Label>
+            </div>
+            <Select 
+              value={options.processingMethod} 
+              onValueChange={(value: 'azure' | 'standard') => setOptions(prev => ({ ...prev, processingMethod: value }))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select processing method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="azure">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-blue-500" />
+                    <div>
+                      <div className="font-medium">Azure AI Document Intelligence</div>
+                      <div className="text-xs text-muted-foreground">Advanced AI processing with table extraction, form recognition, and enhanced material detection</div>
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="standard">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-green-500" />
+                    <div>
+                      <div className="font-medium">Standard Processing</div>
+                      <div className="text-xs text-muted-foreground">Reliable OCR and material detection for large files and basic extraction needs</div>
+                    </div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {options.processingMethod === 'azure' && (
+              <Alert>
+                <Zap className="h-4 w-4" />
+                <AlertDescription>
+                  Azure AI provides superior accuracy for structured documents, tables, and forms. File size limit: 50MB.
+                </AlertDescription>
+              </Alert>
+            )}
+            {options.processingMethod === 'standard' && (
+              <Alert>
+                <FileText className="h-4 w-4" />
+                <AlertDescription>
+                  Standard processing supports larger files and provides consistent material detection for all document types.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <Separator />
+
           {/* Processing Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -326,7 +402,12 @@ export const PDFProcessor: React.FC = () => {
             ) : (
               <div>
                 <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
-                <p className="text-sm text-muted-foreground">Supports multiple PDFs up to 50MB each</p>
+                <p className="text-sm text-muted-foreground">
+                  {options.processingMethod === 'azure' 
+                    ? 'Azure AI: Up to 50MB per file for advanced analysis'
+                    : 'Standard: Supports large files up to 50MB with reliable processing'
+                  }
+                </p>
               </div>
             )}
           </div>
