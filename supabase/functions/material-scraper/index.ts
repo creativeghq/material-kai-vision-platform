@@ -5,11 +5,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ExtractRequest {
+// Get your Jina AI API key for free: https://jina.ai/?sui=apikey
+interface JinaExtractRequest {
   url: string;
+  service: 'firecrawl' | 'jina';
   options?: {
+    // Firecrawl options
     prompt?: string;
     schema?: Record<string, any>;
+    
+    // Jina AI options
+    extractionPrompt?: string;
+    classificationLabels?: string[];
+    useSearch?: boolean;
+    searchQuery?: string;
+    rerank?: boolean;
   };
 }
 
@@ -22,6 +32,7 @@ interface MaterialData {
   properties: Record<string, any>;
   sourceUrl: string;
   supplier?: string;
+  confidence?: number;
 }
 
 serve(async (req) => {
@@ -31,127 +42,36 @@ serve(async (req) => {
   }
 
   try {
-    const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!FIRECRAWL_API_KEY) {
-      throw new Error('FIRECRAWL_API_KEY not configured');
-    }
-
-    const { url, options = {} }: ExtractRequest = await req.json();
+    const { url, service, options = {} }: JinaExtractRequest = await req.json();
     
-    console.log('Starting material extraction for URL:', url);
-    console.log('Options:', JSON.stringify(options, null, 2));
+    console.log('Starting material extraction:', { url, service, options });
     
-    const extractPrompt = options.prompt || `Extract material information from this page. Look for:
-- Material name
-- Price (if available)
-- Description
-- Images
-- Properties like dimensions, color, finish
-- Category (tiles, stone, wood, etc.)
-Return a list of materials found on the page.`;
-
-    // Use Firecrawl's extract API
-    const extractBody = {
-      url: url,
-      prompt: extractPrompt,
-      schema: options.schema || {
-        type: "object",
-        properties: {
-          materials: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                name: { type: "string", description: "Product/material name" },
-                description: { type: "string", description: "Product description" },
-                price: { type: "string", description: "Price with currency" },
-                category: { type: "string", description: "Material category" },
-                images: { 
-                  type: "array", 
-                  items: { type: "string" },
-                  description: "Image URLs" 
-                },
-                properties: {
-                  type: "object",
-                  description: "Additional properties like dimensions, color, finish"
-                }
-              },
-              required: ["name"]
-            }
-          }
-        },
-        required: ["materials"]
-      }
-    };
-
-    console.log('Using Firecrawl EXTRACT API with config:', JSON.stringify(extractBody, null, 2));
-
-    const response = await fetch('https://api.firecrawl.dev/v1/extract', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(extractBody),
-    });
-
-    console.log('Firecrawl extract response status:', response.status);
-    const data = await response.json();
-    console.log('Firecrawl extract response:', JSON.stringify(data, null, 2));
-
-    if (!response.ok) {
-      throw new Error(`Firecrawl extract API error: ${response.status} - ${JSON.stringify(data)}`);
-    }
-
-    if (!data.success) {
-      throw new Error('Firecrawl extraction failed: ' + (data.error || 'Unknown error'));
-    }
-
-    // Process the extracted data
-    const materials: MaterialData[] = [];
+    let materials: MaterialData[] = [];
+    let processingTime = Date.now();
     
-    if (data.data && data.data.materials && Array.isArray(data.data.materials)) {
-      console.log(`Processing ${data.data.materials.length} extracted materials`);
-      
-      for (const material of data.data.materials) {
-        if (material.name) {
-          const processedMaterial: MaterialData = {
-            name: material.name,
-            description: material.description || '',
-            category: material.category || categorizeFromName(material.name),
-            price: material.price || '',
-            images: Array.isArray(material.images) ? material.images : [],
-            properties: {
-              ...material.properties,
-              sourceUrl: url,
-              extractedAt: new Date().toISOString()
-            },
-            sourceUrl: url,
-            supplier: extractSupplierFromUrl(url)
-          };
-          
-          materials.push(processedMaterial);
-          console.log(`Processed material: ${processedMaterial.name}`);
-        }
-      }
+    if (service === 'jina') {
+      materials = await extractWithJinaAI(url, options);
     } else {
-      console.log('No materials found in extraction result');
+      materials = await extractWithFirecrawl(url, options);
     }
-
-    console.log(`Successfully extracted ${materials.length} materials from ${url}`);
+    
+    processingTime = Date.now() - processingTime;
+    
+    console.log(`Successfully extracted ${materials.length} materials using ${service}`);
 
     return new Response(JSON.stringify({
       success: true,
       materials,
       totalPages: 1,
-      processingTime: Date.now(),
+      processingTime,
+      service,
       extractedCount: materials.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Material extractor error:', error);
+    console.error('Material extraction error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
@@ -162,12 +82,389 @@ Return a list of materials found on the page.`;
   }
 });
 
-function categorizeFromName(name: string): string {
-  const lowerName = name.toLowerCase();
+async function extractWithJinaAI(url: string, options: any): Promise<MaterialData[]> {
+  const JINA_API_KEY = Deno.env.get('JINA_API_KEY');
+  if (!JINA_API_KEY) {
+    throw new Error('JINA_API_KEY not configured');
+  }
+
+  console.log('Using Jina AI for extraction');
   
+  const materials: MaterialData[] = [];
+  let content = '';
+  let pageTitle = '';
+  let images: string[] = [];
+  
+  try {
+    if (options.useSearch && options.searchQuery) {
+      // Use Jina Search API
+      console.log('Using Jina Search API with query:', options.searchQuery);
+      
+      const searchResponse = await fetch('https://s.jina.ai/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${JINA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-With-Images-Summary': 'true',
+          'X-With-Links-Summary': 'true',
+          'X-Site': new URL(url).hostname
+        },
+        body: JSON.stringify({
+          q: options.searchQuery,
+          num: 5
+        })
+      });
+      
+      if (!searchResponse.ok) {
+        throw new Error(`Jina Search API error: ${searchResponse.status}`);
+      }
+      
+      const searchData = await searchResponse.json();
+      console.log('Jina search results:', searchData.data?.length || 0, 'pages');
+      
+      // Process each search result
+      for (const result of searchData.data || []) {
+        const extractedMaterials = extractMaterialsFromContent(
+          result.content,
+          result.url,
+          result.title,
+          []
+        );
+        materials.push(...extractedMaterials);
+      }
+      
+    } else {
+      // Use Jina Reader API
+      console.log('Using Jina Reader API for:', url);
+      
+      const readerResponse = await fetch('https://r.jina.ai/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${JINA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-With-Images-Summary': 'true',
+          'X-With-Links-Summary': 'true',
+          'X-Return-Format': 'markdown',
+          'X-Timeout': '30'
+        },
+        body: JSON.stringify({ url })
+      });
+      
+      if (!readerResponse.ok) {
+        throw new Error(`Jina Reader API error: ${readerResponse.status}`);
+      }
+      
+      const readerData = await readerResponse.json();
+      console.log('Jina reader response:', readerData.code, readerData.status);
+      
+      if (readerData.success !== false && readerData.data) {
+        content = readerData.data.content || '';
+        pageTitle = readerData.data.title || '';
+        images = Object.values(readerData.data.images || {});
+        
+        console.log(`Retrieved content: ${content.length} characters, ${images.length} images`);
+        
+        const extractedMaterials = extractMaterialsFromContent(content, url, pageTitle, images);
+        materials.push(...extractedMaterials);
+      }
+    }
+    
+    // Classify materials if labels provided
+    if (options.classificationLabels && materials.length > 0) {
+      console.log('Classifying materials with labels:', options.classificationLabels);
+      
+      const materialNames = materials.map(m => m.name);
+      const classificationResponse = await fetch('https://api.jina.ai/v1/classify', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${JINA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'jina-embeddings-v3',
+          input: materialNames,
+          labels: options.classificationLabels
+        })
+      });
+      
+      if (classificationResponse.ok) {
+        const classificationData = await classificationResponse.json();
+        
+        // Update materials with classification results
+        classificationData.data?.forEach((result: any, index: number) => {
+          if (materials[index]) {
+            materials[index].category = result.prediction;
+            materials[index].confidence = result.score;
+          }
+        });
+      }
+    }
+    
+    // Rerank results if requested
+    if (options.rerank && materials.length > 1 && options.searchQuery) {
+      console.log('Reranking materials based on query:', options.searchQuery);
+      
+      const documents = materials.map(m => `${m.name} - ${m.description || ''}`);
+      const rerankResponse = await fetch('https://api.jina.ai/v1/rerank', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${JINA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'jina-reranker-v2-base-multilingual',
+          query: options.searchQuery,
+          documents,
+          return_documents: false
+        })
+      });
+      
+      if (rerankResponse.ok) {
+        const rerankData = await rerankResponse.json();
+        
+        // Reorder materials based on relevance scores
+        const rerankedMaterials = rerankData.results
+          ?.sort((a: any, b: any) => b.relevance_score - a.relevance_score)
+          .map((result: any) => {
+            const material = materials[result.index];
+            material.confidence = result.relevance_score;
+            return material;
+          });
+        
+        return rerankedMaterials || materials;
+      }
+    }
+    
+    return materials;
+    
+  } catch (error) {
+    console.error('Jina AI extraction error:', error);
+    throw error;
+  }
+}
+
+async function extractWithFirecrawl(url: string, options: any): Promise<MaterialData[]> {
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!FIRECRAWL_API_KEY) {
+    throw new Error('FIRECRAWL_API_KEY not configured');
+  }
+
+  console.log('Using Firecrawl for extraction');
+
+  const extractPrompt = options.prompt || `Extract material information from this page. Look for:
+- Material name
+- Price (if available)
+- Description
+- Images
+- Properties like dimensions, color, finish
+- Category (tiles, stone, wood, etc.)
+Return a list of materials found on the page.`;
+
+  const extractBody = {
+    url: url,
+    prompt: extractPrompt,
+    schema: options.schema || {
+      type: "object",
+      properties: {
+        materials: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Product/material name" },
+              description: { type: "string", description: "Product description" },
+              price: { type: "string", description: "Price with currency" },
+              category: { type: "string", description: "Material category" },
+              images: { 
+                type: "array", 
+                items: { type: "string" },
+                description: "Image URLs" 
+              },
+              properties: {
+                type: "object",
+                description: "Additional properties like dimensions, color, finish"
+              }
+            },
+            required: ["name"]
+          }
+        }
+      },
+      required: ["materials"]
+    }
+  };
+
+  const response = await fetch('https://api.firecrawl.dev/v1/extract', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(extractBody),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Firecrawl extract API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  if (!data.success) {
+    throw new Error('Firecrawl extraction failed: ' + (data.error || 'Unknown error'));
+  }
+
+  const materials: MaterialData[] = [];
+  
+  if (data.data && data.data.materials && Array.isArray(data.data.materials)) {
+    for (const material of data.data.materials) {
+      if (material.name) {
+        const processedMaterial: MaterialData = {
+          name: material.name,
+          description: material.description || '',
+          category: material.category || categorizeFromName(material.name),
+          price: material.price || '',
+          images: Array.isArray(material.images) ? material.images : [],
+          properties: {
+            ...material.properties,
+            sourceUrl: url,
+            extractedAt: new Date().toISOString(),
+            extractedBy: 'firecrawl'
+          },
+          sourceUrl: url,
+          supplier: extractSupplierFromUrl(url)
+        };
+        
+        materials.push(processedMaterial);
+      }
+    }
+  }
+
+  return materials;
+}
+
+function extractMaterialsFromContent(
+  content: string,
+  sourceUrl: string,
+  pageTitle: string,
+  images: string[]
+): MaterialData[] {
+  const materials: MaterialData[] = [];
+  
+  // Material keywords for detection
+  const materialKeywords = [
+    'tile', 'tiles', 'ceramic', 'porcelain', 'stone', 'marble', 'granite',
+    'wood', 'timber', 'oak', 'pine', 'mahogany', 'bamboo', 'hardwood',
+    'fabric', 'textile', 'cotton', 'linen', 'wool', 'silk',
+    'metal', 'steel', 'aluminum', 'brass', 'copper', 'iron',
+    'glass', 'acrylic', 'plastic', 'vinyl', 'leather',
+    'concrete', 'brick', 'laminate', 'veneer', 'composite'
+  ];
+  
+  // Price patterns
+  const priceRegex = /[\$£€¥]\s*\d+(?:[.,]\d{2})?(?:\s*-\s*[\$£€¥]\s*\d+(?:[.,]\d{2})?)?/g;
+  const dimensionRegex = /\d+\s*(?:x|×)\s*\d+(?:\s*(?:x|×)\s*\d+)?\s*(?:mm|cm|m|inch|in|ft)(?:es)?/gi;
+  
+  const lines = content.split('\n');
+  let currentMaterial: Partial<MaterialData> | null = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const lowerLine = line.toLowerCase();
+    
+    if (!line) continue;
+    
+    // Detect potential material names
+    const hasKeyword = materialKeywords.some(keyword => lowerLine.includes(keyword));
+    const isHeading = line.startsWith('#') || line.includes('**') || (line.length < 100 && line.length > 5);
+    
+    if (hasKeyword && isHeading) {
+      // Save previous material
+      if (currentMaterial && currentMaterial.name) {
+        materials.push(createMaterialFromPartial(currentMaterial, sourceUrl));
+      }
+      
+      // Start new material
+      currentMaterial = {
+        name: line.replace(/[#*]/g, '').trim(),
+        properties: {},
+        images: []
+      };
+      continue;
+    }
+    
+    if (currentMaterial) {
+      // Extract price
+      const priceMatch = line.match(priceRegex);
+      if (priceMatch && !currentMaterial.price) {
+        currentMaterial.price = priceMatch[0];
+      }
+      
+      // Extract dimensions
+      const dimMatch = line.match(dimensionRegex);
+      if (dimMatch && currentMaterial.properties) {
+        currentMaterial.properties.dimensions = dimMatch[0];
+      }
+      
+      // Extract description
+      if (!currentMaterial.description && line.length > 20 && line.length < 300 && 
+          !priceRegex.test(line) && !dimensionRegex.test(line)) {
+        currentMaterial.description = line;
+      }
+      
+      // Look for images
+      if (line.includes('http') && (line.includes('.jpg') || line.includes('.png') || 
+          line.includes('.jpeg') || line.includes('.webp'))) {
+        const imageMatch = line.match(/https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp)/i);
+        if (imageMatch && currentMaterial.images) {
+          currentMaterial.images.push(imageMatch[0]);
+        }
+      }
+    }
+  }
+  
+  // Save last material
+  if (currentMaterial && currentMaterial.name) {
+    materials.push(createMaterialFromPartial(currentMaterial, sourceUrl));
+  }
+  
+  // Add page images to materials without images
+  if (images.length > 0) {
+    materials.forEach(material => {
+      if (material.images.length === 0) {
+        material.images.push(images[0]);
+      }
+    });
+  }
+  
+  return materials;
+}
+
+function createMaterialFromPartial(partial: Partial<MaterialData>, sourceUrl: string): MaterialData {
+  return {
+    name: partial.name || 'Unknown Material',
+    description: partial.description || '',
+    category: categorizeFromName(partial.name?.toLowerCase() || ''),
+    price: partial.price || '',
+    images: partial.images || [],
+    properties: {
+      ...partial.properties,
+      sourceUrl,
+      extractedAt: new Date().toISOString(),
+      extractedBy: 'jina-ai'
+    },
+    sourceUrl,
+    supplier: extractSupplierFromUrl(sourceUrl),
+    confidence: 0.8
+  };
+}
+
+function categorizeFromName(name: string): string {
   const categoryMap: Record<string, string> = {
     'wood': 'Wood',
-    'timber': 'Wood',
+    'timber': 'Wood', 
     'oak': 'Wood',
     'pine': 'Wood',
     'stone': 'Stone',
@@ -180,9 +477,6 @@ function categorizeFromName(name: string): string {
     'fabric': 'Textiles',
     'textile': 'Textiles',
     'leather': 'Leather',
-    'resin': 'Resin',
-    'terracotta': 'Ceramics',
-    'terrazzo': 'Ceramics',
     'tile': 'Ceramics',
     'tiles': 'Ceramics',
     'ceramic': 'Ceramics',
@@ -193,7 +487,7 @@ function categorizeFromName(name: string): string {
   };
   
   for (const [key, value] of Object.entries(categoryMap)) {
-    if (lowerName.includes(key)) {
+    if (name.includes(key)) {
       return value;
     }
   }

@@ -22,8 +22,16 @@ interface ScrapedMaterial {
 }
 
 interface ScrapingOptions {
-  prompt: string;
+  service: 'firecrawl' | 'jina';
+  // Firecrawl options
+  prompt?: string;
   schema?: Record<string, any>;
+  // Jina AI options
+  extractionPrompt?: string;
+  classificationLabels?: string[];
+  useSearch?: boolean;
+  searchQuery?: string;
+  rerank?: boolean;
 }
 
 export const MaterialScraperPage = () => {
@@ -33,6 +41,7 @@ export const MaterialScraperPage = () => {
   const [scrapedMaterials, setScrapedMaterials] = useState<ScrapedMaterial[]>([]);
   const [progress, setProgress] = useState(0);
   const [options, setOptions] = useState<ScrapingOptions>({
+    service: 'firecrawl',
     prompt: `Extract material information from this page. Look for:
 - Material name
 - Price (if available)
@@ -40,7 +49,11 @@ export const MaterialScraperPage = () => {
 - Images
 - Properties like dimensions, color, finish
 - Category (tiles, stone, wood, etc.)
-Return a list of materials found on the page.`
+Return a list of materials found on the page.`,
+    classificationLabels: ['Tiles', 'Stone', 'Wood', 'Metal', 'Fabric', 'Glass', 'Plastic', 'Concrete'],
+    useSearch: false,
+    searchQuery: '',
+    rerank: true
   });
 
   const handleScrape = async (e: React.FormEvent) => {
@@ -70,6 +83,7 @@ Return a list of materials found on the page.`
       const { data, error } = await supabase.functions.invoke('material-scraper', {
         body: {
           url,
+          service: options.service,
           options
         }
       });
@@ -91,7 +105,7 @@ Return a list of materials found on the page.`
       
       toast({
         title: "Success",
-        description: `Found ${data.materials?.length || 0} materials from ${data.totalPages || 0} pages`,
+        description: `Found ${data.materials?.length || 0} materials using ${data.service || options.service}`,
       });
 
     } catch (error) {
@@ -152,32 +166,63 @@ Return a list of materials found on the page.`
                 </div>
 
                 <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                  <h3 className="font-medium text-sm">Extraction Prompt</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Customize what information to extract from the website
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="prompt">Extraction Instructions</Label>
-                    <textarea
-                      id="prompt"
-                      value={options.prompt}
-                      onChange={(e) => setOptions(prev => ({ ...prev, prompt: e.target.value }))}
-                      placeholder="Tell the AI what to extract from the page..."
-                      disabled={isLoading}
-                      rows={6}
-                      className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  
+                  <h3 className="font-medium text-sm">Service Selection</h3>
                   <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setOptions(prev => ({ 
-                        ...prev, 
-                        prompt: `Extract building materials from this page including:
+                    <label className="flex items-center space-x-2 p-3 border rounded cursor-pointer hover:bg-muted/50">
+                      <input
+                        type="radio"
+                        name="service"
+                        value="firecrawl"
+                        checked={options.service === 'firecrawl'}
+                        onChange={(e) => setOptions(prev => ({ ...prev, service: e.target.value as 'firecrawl' | 'jina' }))}
+                        disabled={isLoading}
+                      />
+                      <div>
+                        <span className="font-medium">Firecrawl</span>
+                        <p className="text-xs text-muted-foreground">Structured extraction with prompts</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center space-x-2 p-3 border rounded cursor-pointer hover:bg-muted/50">
+                      <input
+                        type="radio"
+                        name="service"
+                        value="jina"
+                        checked={options.service === 'jina'}
+                        onChange={(e) => setOptions(prev => ({ ...prev, service: e.target.value as 'firecrawl' | 'jina' }))}
+                        disabled={isLoading}
+                      />
+                      <div>
+                        <span className="font-medium">Jina AI</span>
+                        <p className="text-xs text-muted-foreground">Advanced AI with classification</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {options.service === 'firecrawl' ? (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-medium text-sm">Firecrawl Extraction Prompt</h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="prompt">Extraction Instructions</Label>
+                      <textarea
+                        id="prompt"
+                        value={options.prompt}
+                        onChange={(e) => setOptions(prev => ({ ...prev, prompt: e.target.value }))}
+                        placeholder="Tell the AI what to extract from the page..."
+                        disabled={isLoading}
+                        rows={6}
+                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOptions(prev => ({ 
+                          ...prev, 
+                          prompt: `Extract building materials from this page including:
 - Product name
 - Price (with currency)
 - Material type (tiles, stone, wood, etc.)
@@ -185,18 +230,18 @@ Return a list of materials found on the page.`
 - Color and finish
 - Images
 - Availability and stock status` 
-                      }))}
-                      disabled={isLoading}
-                    >
-                      Building Materials
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setOptions(prev => ({ 
-                        ...prev, 
-                        prompt: `Extract product catalog information:
+                        }))}
+                        disabled={isLoading}
+                      >
+                        Building Materials
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOptions(prev => ({ 
+                          ...prev, 
+                          prompt: `Extract product catalog information:
 - Product name and model
 - Price and pricing tiers
 - Technical specifications
@@ -204,13 +249,102 @@ Return a list of materials found on the page.`
 - Category and subcategory
 - Brand and manufacturer
 - Product description` 
-                      }))}
-                      disabled={isLoading}
-                    >
-                      Product Catalog
-                    </Button>
+                        }))}
+                        disabled={isLoading}
+                      >
+                        Product Catalog
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-medium text-sm">Jina AI Configuration</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="useSearch"
+                          checked={options.useSearch || false}
+                          onChange={(e) => setOptions(prev => ({ ...prev, useSearch: e.target.checked }))}
+                          disabled={isLoading}
+                        />
+                        <Label htmlFor="useSearch" className="text-sm">Use web search instead of single page</Label>
+                      </div>
+                      
+                      {options.useSearch && (
+                        <div className="space-y-2">
+                          <Label htmlFor="searchQuery">Search Query</Label>
+                          <Input
+                            id="searchQuery"
+                            value={options.searchQuery || ''}
+                            onChange={(e) => setOptions(prev => ({ ...prev, searchQuery: e.target.value }))}
+                            placeholder="e.g., ceramic tiles, marble flooring, wood materials"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="classificationLabels">Classification Labels (comma-separated)</Label>
+                        <Input
+                          id="classificationLabels"
+                          value={options.classificationLabels?.join(', ') || ''}
+                          onChange={(e) => setOptions(prev => ({ 
+                            ...prev, 
+                            classificationLabels: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                          }))}
+                          placeholder="Tiles, Stone, Wood, Metal, Fabric, Glass"
+                          disabled={isLoading}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="rerank"
+                          checked={options.rerank || false}
+                          onChange={(e) => setOptions(prev => ({ ...prev, rerank: e.target.checked }))}
+                          disabled={isLoading}
+                        />
+                        <Label htmlFor="rerank" className="text-sm">Rerank results by relevance</Label>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setOptions(prev => ({ 
+                            ...prev,
+                            classificationLabels: ['Ceramic Tiles', 'Natural Stone', 'Hardwood', 'Laminate', 'Vinyl', 'Carpet'],
+                            searchQuery: 'flooring materials tiles wood stone',
+                            useSearch: false,
+                            rerank: true
+                          }))}
+                          disabled={isLoading}
+                        >
+                          Flooring Focus
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setOptions(prev => ({ 
+                            ...prev,
+                            classificationLabels: ['Wall Tiles', 'Backsplash', 'Countertops', 'Fixtures', 'Hardware'],
+                            searchQuery: 'kitchen bathroom materials tiles countertops',
+                            useSearch: false,
+                            rerank: true
+                          }))}
+                          disabled={isLoading}
+                        >
+                          Kitchen & Bath
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {progress > 0 && (
                   <div className="space-y-2">
@@ -266,10 +400,10 @@ Return a list of materials found on the page.`
                   <div className="text-sm text-muted-foreground">
                     <p className="font-medium mb-1">Scraping Tips:</p>
                     <ul className="space-y-1 text-xs">
-                      <li>• Works best with material supplier websites and catalogs</li>
-                      <li>• Automatically extracts product images, names, and specifications</li>
-                      <li>• Respects robots.txt and rate limits</li>
-                      <li>• Processing time depends on site size and complexity</li>
+                      <li>• Choose between Firecrawl (structured) or Jina AI (intelligent classification)</li>
+                      <li>• Jina AI offers advanced search, classification, and relevance ranking</li>
+                      <li>• Firecrawl provides precise prompt-based extraction</li>
+                      <li>• Both services respect robots.txt and rate limits</li>
                     </ul>
                   </div>
                 </div>
