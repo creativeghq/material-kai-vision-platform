@@ -26,6 +26,13 @@ interface ScrapingOptions {
   maxDepth: number;
   includePaths: string[];
   excludePaths: string[];
+  searchCriteria: {
+    materialTypes: string[];
+    targetSelectors: string[];
+    keywordFilters: string[];
+    priceRequired: boolean;
+    imageRequired: boolean;
+  };
 }
 
 export const MaterialScraperPage = () => {
@@ -35,10 +42,17 @@ export const MaterialScraperPage = () => {
   const [scrapedMaterials, setScrapedMaterials] = useState<ScrapedMaterial[]>([]);
   const [progress, setProgress] = useState(0);
   const [options, setOptions] = useState<ScrapingOptions>({
-    limit: 50,
-    maxDepth: 2,
+    limit: 10,
+    maxDepth: 1,
     includePaths: [],
-    excludePaths: []
+    excludePaths: [],
+    searchCriteria: {
+      materialTypes: ['tiles', 'flooring', 'stone'],
+      targetSelectors: [],
+      keywordFilters: [],
+      priceRequired: false,
+      imageRequired: true
+    }
   });
 
   const handleScrape = async (e: React.FormEvent) => {
@@ -156,9 +170,9 @@ export const MaterialScraperPage = () => {
                       id="limit"
                       type="number"
                       value={options.limit}
-                      onChange={(e) => setOptions(prev => ({ ...prev, limit: parseInt(e.target.value) || 50 }))}
+                      onChange={(e) => setOptions(prev => ({ ...prev, limit: parseInt(e.target.value) || 10 }))}
                       min="1"
-                      max="100"
+                      max="50"
                       disabled={isLoading}
                     />
                   </div>
@@ -168,11 +182,96 @@ export const MaterialScraperPage = () => {
                       id="depth"
                       type="number"
                       value={options.maxDepth}
-                      onChange={(e) => setOptions(prev => ({ ...prev, maxDepth: parseInt(e.target.value) || 2 }))}
-                      min="1"
-                      max="5"
+                      onChange={(e) => setOptions(prev => ({ ...prev, maxDepth: parseInt(e.target.value) || 1 }))}
+                      min="0"
+                      max="3"
                       disabled={isLoading}
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                  <h3 className="font-medium text-sm">Search Configuration</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="materialTypes">Material Types (comma-separated)</Label>
+                    <Input
+                      id="materialTypes"
+                      value={options.searchCriteria.materialTypes.join(', ')}
+                      onChange={(e) => setOptions(prev => ({
+                        ...prev,
+                        searchCriteria: {
+                          ...prev.searchCriteria,
+                          materialTypes: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                        }
+                      }))}
+                      placeholder="tiles, stone, wood, ceramic, marble"
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="keywords">Additional Keywords (comma-separated)</Label>
+                    <Input
+                      id="keywords"
+                      value={options.searchCriteria.keywordFilters.join(', ')}
+                      onChange={(e) => setOptions(prev => ({
+                        ...prev,
+                        searchCriteria: {
+                          ...prev.searchCriteria,
+                          keywordFilters: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                        }
+                      }))}
+                      placeholder="flooring, wall, bathroom, kitchen"
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="includePaths">Include URL Paths (comma-separated)</Label>
+                    <Input
+                      id="includePaths"
+                      value={options.includePaths.join(', ')}
+                      onChange={(e) => setOptions(prev => ({
+                        ...prev,
+                        includePaths: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                      }))}
+                      placeholder="/products, /catalog, /materials"
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="flex gap-4">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={options.searchCriteria.priceRequired}
+                        onChange={(e) => setOptions(prev => ({
+                          ...prev,
+                          searchCriteria: {
+                            ...prev.searchCriteria,
+                            priceRequired: e.target.checked
+                          }
+                        }))}
+                        disabled={isLoading}
+                      />
+                      <span className="text-sm">Require Price</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={options.searchCriteria.imageRequired}
+                        onChange={(e) => setOptions(prev => ({
+                          ...prev,
+                          searchCriteria: {
+                            ...prev.searchCriteria,
+                            imageRequired: e.target.checked
+                          }
+                        }))}
+                        disabled={isLoading}
+                      />
+                      <span className="text-sm">Require Images</span>
+                    </label>
                   </div>
                 </div>
 

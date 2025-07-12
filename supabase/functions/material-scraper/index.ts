@@ -12,6 +12,13 @@ interface CrawlRequest {
     includePaths?: string[];
     excludePaths?: string[];
     maxDepth?: number;
+    searchCriteria?: {
+      materialTypes?: string[];
+      targetSelectors?: string[];
+      keywordFilters?: string[];
+      priceRequired?: boolean;
+      imageRequired?: boolean;
+    };
   };
 }
 
@@ -95,7 +102,11 @@ serve(async (req) => {
         if (page.markdown) {
           console.log(`Processing page: ${page.url} - Content length: ${page.markdown.length}`);
           console.log(`First 200 chars: ${page.markdown.substring(0, 200)}`);
-          const extractedMaterials = extractMaterialsFromMarkdown(page.markdown, page.url || url);
+          const extractedMaterials = extractMaterialsFromMarkdown(
+            page.markdown, 
+            page.url || url, 
+            options.searchCriteria || {}
+          );
           console.log(`Extracted ${extractedMaterials.length} materials from this page`);
           materials.push(...extractedMaterials);
           
@@ -129,14 +140,19 @@ serve(async (req) => {
   }
 });
 
-function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): MaterialData[] {
+function extractMaterialsFromMarkdown(
+  markdown: string, 
+  pageUrl: string,
+  searchCriteria: any = {}
+): MaterialData[] {
   const materials: MaterialData[] = [];
   const lines = markdown.split('\n');
   
   console.log(`Extracting from markdown with ${lines.length} lines`);
+  console.log(`Search criteria:`, searchCriteria);
   
-  // Material indicators - more comprehensive
-  const materialKeywords = [
+  // Combine default keywords with user-specified material types and filters
+  const defaultKeywords = [
     'tile', 'tiles', 'ceramic', 'porcelain', 'stone', 'marble', 'granite',
     'wood', 'timber', 'oak', 'pine', 'mahogany', 'bamboo', 'hardwood', 'plywood',
     'fabric', 'textile', 'cotton', 'linen', 'wool', 'silk', 'canvas',
@@ -145,6 +161,12 @@ function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): Materi
     'concrete', 'brick', 'laminate', 'veneer', 'composite', 'mdf',
     'flooring', 'wallpaper', 'paint', 'coating', 'panel', 'board',
     'carpet', 'rug', 'mat', 'covering', 'surface', 'material'
+  ];
+  
+  const materialKeywords = [
+    ...defaultKeywords,
+    ...(searchCriteria.materialTypes || []),
+    ...(searchCriteria.keywordFilters || [])
   ];
   
   // Price patterns
@@ -171,7 +193,8 @@ function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): Materi
     if (line.startsWith('#') && materialKeywords.some(keyword => lowerLine.includes(keyword))) {
       // Save previous product if exists
       if (currentProduct && currentProduct.name) {
-        materials.push(createMaterialFromPartial(currentProduct, pageUrl));
+        const material = createMaterialFromPartial(currentProduct, pageUrl, searchCriteria);
+        if (material) materials.push(material);
       }
       
       // Start new product
@@ -270,7 +293,8 @@ function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): Materi
       // End product section if we hit another heading or empty lines
       if (line.startsWith('#') || (line === '' && lines[i + 1] === '')) {
         if (currentProduct.name) {
-          materials.push(createMaterialFromPartial(currentProduct, pageUrl));
+          const material = createMaterialFromPartial(currentProduct, pageUrl, searchCriteria);
+          if (material) materials.push(material);
         }
         currentProduct = null;
         isInProductSection = false;
@@ -280,14 +304,24 @@ function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): Materi
   
   // Save last product
   if (currentProduct && currentProduct.name) {
-    materials.push(createMaterialFromPartial(currentProduct, pageUrl));
+    const material = createMaterialFromPartial(currentProduct, pageUrl, searchCriteria);
+    if (material) materials.push(material);
   }
   
   console.log(`Extracted ${materials.length} materials from page: ${pageUrl}`);
   return materials;
 }
 
-function createMaterialFromPartial(partial: Partial<MaterialData>, pageUrl: string): MaterialData {
+function createMaterialFromPartial(partial: Partial<MaterialData>, pageUrl: string, searchCriteria: any = {}): MaterialData | null {
+  // Apply search criteria filters
+  if (searchCriteria.priceRequired && !partial.price) {
+    return null; // Skip materials without price if required
+  }
+  
+  if (searchCriteria.imageRequired && (!partial.images || partial.images.length === 0)) {
+    return null; // Skip materials without images if required
+  }
+  
   return {
     name: partial.name || 'Unknown Material',
     description: partial.description || '',
@@ -302,6 +336,11 @@ function createMaterialFromPartial(partial: Partial<MaterialData>, pageUrl: stri
     sourceUrl: pageUrl,
     supplier: extractSupplierFromUrl(pageUrl)
   };
+}
+
+function createMaterialFromPartialWithFilter(partial: Partial<MaterialData>, pageUrl: string, searchCriteria: any): MaterialData | null {
+  const material = createMaterialFromPartial(partial, pageUrl, searchCriteria);
+  return material; // createMaterialFromPartial now handles filtering
 }
 
 function categorizeEffect(category: string): string {
