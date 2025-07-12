@@ -13,6 +13,9 @@ import KnowledgeBaseManagement from "./components/Admin/KnowledgeBaseManagement"
 import AgentMLCoordination from "./components/Admin/AgentMLCoordination";
 import { AdminPanel } from "./components/Admin/AdminPanel";
 import { ApiGatewayAdmin } from "./components/Admin/ApiGatewayAdmin";
+import { MetadataFieldsManagement } from "./components/Admin/MetadataFieldsManagement";
+import { RAGManagementPanel } from "./components/Admin/RAGManagementPanel";
+import { AITestingPanel } from "./components/Admin/AITestingPanel";
 
 const queryClient = new QueryClient();
 
@@ -52,7 +55,7 @@ const App = () => (
             } />
             <Route path="/admin/material-analysis" element={
               <AuthGuard>
-                <AdminPanel />
+                <AITestingPanel />
               </AuthGuard>
             } />
             <Route path="/admin/training-models" element={
@@ -67,12 +70,12 @@ const App = () => (
             } />
             <Route path="/admin/rag" element={
               <AuthGuard>
-                <AdminPanel />
+                <RAGManagementPanel />
               </AuthGuard>
             } />
             <Route path="/admin/metadata" element={
               <AuthGuard>
-                <AdminPanel />
+                <MetadataFieldsManagement />
               </AuthGuard>
             } />
             <Route path="/admin/api-gateway" element={
