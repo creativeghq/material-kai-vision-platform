@@ -56,7 +56,7 @@ interface ReviewedTile extends PDFTile {
 
 interface WorkflowAction {
   id: string;
-  type: 'knowledge_base' | 'rag_embedding' | 'ai_analysis' | 'material_catalog' | 'image_generation';
+  type: 'ai_analysis' | 'material_catalog' | 'image_generation';
   label: string;
   description: string;
   icon: React.ReactNode;
@@ -84,18 +84,11 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
   const availableWorkflows: WorkflowAction[] = [
     {
-      id: 'knowledge_base',
-      type: 'knowledge_base',
-      label: 'Knowledge Base',
-      description: 'Add to enhanced knowledge base for future reference',
+      id: 'material_catalog',
+      type: 'material_catalog',
+      label: 'Material Catalog + RAG',
+      description: 'Add to materials catalog with automatic embedding generation',
       icon: <Database className="h-4 w-4" />
-    },
-    {
-      id: 'rag_embedding',
-      type: 'rag_embedding',
-      label: 'RAG Embedding',
-      description: 'Generate embeddings for semantic search',
-      icon: <Search className="h-4 w-4" />
     },
     {
       id: 'ai_analysis',
@@ -103,13 +96,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
       label: 'AI Analysis',
       description: 'Deep analysis with AI models',
       icon: <Brain className="h-4 w-4" />
-    },
-    {
-      id: 'material_catalog',
-      type: 'material_catalog',
-      label: 'Material Catalog',
-      description: 'Add to official materials catalog',
-      icon: <CheckCircle className="h-4 w-4" />
     },
     {
       id: 'image_generation',
@@ -188,20 +174,12 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         
         try {
           switch (action.type) {
-            case 'knowledge_base':
-              workflowResults.knowledge_base = await addToKnowledgeBase(selectedTileData);
-              break;
-              
-            case 'rag_embedding':
-              workflowResults.rag_embedding = await generateRAGEmbeddings(selectedTileData);
-              break;
-              
             case 'ai_analysis':
               workflowResults.ai_analysis = await performAIAnalysis(selectedTileData);
               break;
               
             case 'material_catalog':
-              workflowResults.material_catalog = await addToMaterialCatalog(selectedTileData);
+              workflowResults.material_catalog = await addToMaterialCatalogWithEmbeddings(selectedTileData);
               break;
               
             case 'image_generation':
@@ -237,52 +215,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
     }
   };
 
-  const addToKnowledgeBase = async (tiles: ReviewedTile[]) => {
-    const entries = tiles.map(tile => ({
-      title: `Material: ${tile.corrected_material_type || tile.material_type}`,
-      content: tile.corrected_text || tile.extracted_text,
-      content_type: 'pdf_extraction',
-      source_url: `processing://${processingId}/${tile.id}`,
-      material_categories: [tile.corrected_material_type || tile.material_type],
-      metadata: {
-        extraction_confidence: tile.material_confidence,
-        ocr_confidence: tile.ocr_confidence,
-        reviewed: tile.reviewed,
-        approved: tile.approved,
-        structured_data: tile.structured_data,
-        tile_position: { x: tile.x_coordinate, y: tile.y_coordinate },
-        page_number: tile.page_number
-      }
-    }));
-
-    const { data, error } = await supabase
-      .from('enhanced_knowledge_base')
-      .insert(entries)
-      .select();
-
-    if (error) throw error;
-    return { added: entries.length, data };
-  };
-
-  const generateRAGEmbeddings = async (tiles: ReviewedTile[]) => {
-    const { data, error } = await supabase.functions.invoke('enhanced-rag-search', {
-      body: {
-        action: 'bulk_embed',
-        documents: tiles.map(tile => ({
-          id: tile.id,
-          content: tile.corrected_text || tile.extracted_text,
-          metadata: {
-            material_type: tile.corrected_material_type || tile.material_type,
-            confidence: tile.material_confidence,
-            source: 'pdf_extraction'
-          }
-        }))
-      }
-    });
-
-    if (error) throw error;
-    return data;
-  };
 
   const performAIAnalysis = async (tiles: ReviewedTile[]) => {
     const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
@@ -301,7 +233,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
     return data;
   };
 
-  const addToMaterialCatalog = async (tiles: ReviewedTile[]) => {
+  const addToMaterialCatalogWithEmbeddings = async (tiles: ReviewedTile[]) => {
     const materials = tiles.map(tile => ({
       name: `${tile.corrected_material_type || tile.material_type} - ${tile.page_number}-${tile.tile_index}`,
       category: tile.corrected_material_type || tile.material_type,
@@ -316,7 +248,8 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
       }
     }));
 
-    const { data, error } = await supabase
+    // Insert materials into catalog
+    const { data: catalogData, error: catalogError } = await supabase
       .from('materials_catalog')
       .insert(materials.map(m => ({ 
         ...m, 
@@ -324,8 +257,46 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
       })))
       .select();
 
-    if (error) throw error;
-    return { added: materials.length, data };
+    if (catalogError) throw catalogError;
+
+    // Generate embeddings for each material
+    const embeddingResults = [];
+    for (let i = 0; i < catalogData.length; i++) {
+      const material = catalogData[i];
+      const tile = tiles[i];
+      
+      try {
+        // Create embeddings for the material
+        const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('enhanced-rag-search', {
+          body: {
+            action: 'embed_material',
+            material_id: material.id,
+            content: material.description,
+            metadata: {
+              material_type: material.category,
+              confidence: tile.material_confidence,
+              source: 'pdf_extraction',
+              properties: material.properties
+            }
+          }
+        });
+
+        if (embeddingError) {
+          console.error(`Embedding failed for material ${material.id}:`, embeddingError);
+        } else {
+          embeddingResults.push({ material_id: material.id, embedding_data: embeddingData });
+        }
+      } catch (error) {
+        console.error(`Embedding error for material ${material.id}:`, error);
+      }
+    }
+
+    return { 
+      added: materials.length, 
+      catalog_data: catalogData,
+      embeddings_generated: embeddingResults.length,
+      embedding_results: embeddingResults
+    };
   };
 
   const generateMaterialImages = async (tiles: ReviewedTile[]) => {
