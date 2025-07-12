@@ -349,6 +349,47 @@ export class HybridMLService {
   }
 
   /**
+   * Analyze a single image using optimal processing method
+   */
+  async analyzeImage(file: File, options: any = {}): Promise<HybridMLResult> {
+    const opts = { ...this.DEFAULT_OPTIONS, ...options };
+    const processingDecision = this.determineProcessingMethod([file], opts);
+
+    try {
+      switch (processingDecision.method) {
+        case 'server':
+          return await this.processOnServer([file], [], opts);
+        case 'client':
+        default:
+          return await this.processOnClient([file], [], opts);
+      }
+    } catch (error) {
+      console.error('Image analysis failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Image analysis failed',
+        processingMethod: processingDecision.method
+      };
+    }
+  }
+
+  /**
+   * Analyze image style
+   */
+  async analyzeImageStyle(file: File, options: any = {}): Promise<HybridMLResult> {
+    // For now, delegate to general image analysis
+    return await this.analyzeImage(file, { ...options, analysisType: 'style' });
+  }
+
+  /**
+   * Classify image
+   */
+  async classifyImage(file: File, options: any = {}): Promise<HybridMLResult> {
+    // For now, delegate to general image analysis
+    return await this.analyzeImage(file, { ...options, analysisType: 'classification' });
+  }
+
+  /**
    * Get service status
    */
   getStatus(): {

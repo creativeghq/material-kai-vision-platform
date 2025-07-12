@@ -4,6 +4,8 @@ export interface MLResult {
   error?: string;
   confidence?: number;
   processingTime?: number;
+  modelVersion?: string;
+  provider?: string;
 }
 
 export interface ImageClassificationResult {
@@ -32,3 +34,11 @@ export interface MaterialAnalysisResult {
 }
 
 export type DeviceType = 'webgpu' | 'cpu';
+
+export interface MaterialAnalysisOptions {
+  analysisDepth?: 'basic' | 'standard' | 'comprehensive';
+  focusAreas?: string[];
+  includeChemical?: boolean;
+  includeMechanical?: boolean;
+  includeEnvironmental?: boolean;
+}
