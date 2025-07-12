@@ -111,43 +111,62 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
   console.log(`Processing ALL ${totalPages} URLs from sitemap (no page limit)`);
   
   // Process URLs in batches to avoid overwhelming the APIs
-  const batchSize = 3; // Smaller batches for better stability
+  const batchSize = 2; // Even smaller batches for sitemap processing
+  const totalBatches = Math.ceil(totalPages / batchSize);
   for (let i = 0; i < totalPages; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
-    console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(totalPages/batchSize)} (${batch.length} URLs)`);
+    const currentBatch = Math.floor(i / batchSize) + 1;
+    console.log(`Processing batch ${currentBatch}/${totalBatches} (${batch.length} URLs)`);
     
-    const batchPromises = batch.map(async (url) => {
-      try {
-        if (service === 'jina') {
-          const results = await extractWithJinaAI(url, options);
-          return results;
-        } else {
-          const results = await extractWithFirecrawl(url, options);
-          return results;
-        }
-      } catch (error) {
-        console.error(`Failed to process URL ${url}:`, error);
-        return []; // Return empty array on error
+    // Add timeout for each batch to prevent edge function timeout
+    const batchPromise = Promise.race([
+      processBatch(batch, service, options),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Batch timeout')), 30000) // 30 second timeout per batch
+      )
+    ]);
+    
+    try {
+      const batchResults = await batchPromise as MaterialData[][];
+      
+      // Flatten and add to results
+      for (const pageResults of batchResults) {
+        allMaterials.push(...pageResults);
       }
-    });
-    
-    const batchResults = await Promise.all(batchPromises);
-    
-    // Flatten and add to results
-    for (const pageResults of batchResults) {
-      allMaterials.push(...pageResults);
+      
+      console.log(`Batch ${currentBatch} complete: ${allMaterials.length} total materials so far`);
+      
+    } catch (error) {
+      console.error(`Batch ${currentBatch} failed:`, error);
+      // Continue with next batch even if this one fails
     }
-    
-    console.log(`Batch ${Math.floor(i/batchSize) + 1} complete: ${allMaterials.length} total materials so far`);
     
     // Add delay between batches to be respectful to the APIs and prevent timeouts
     if (i + batchSize < totalPages) {
-      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
     }
   }
-  
   console.log(`Sitemap processing complete: ${allMaterials.length} materials from ${totalPages} pages`);
   return allMaterials;
+}
+
+async function processBatch(urls: string[], service: 'firecrawl' | 'jina', options: any): Promise<MaterialData[][]> {
+  const batchPromises = urls.map(async (url) => {
+    try {
+      if (service === 'jina') {
+        const results = await extractWithJinaAI(url, options);
+        return results;
+      } else {
+        const results = await extractWithFirecrawl(url, options);
+        return results;
+      }
+    } catch (error) {
+      console.error(`Failed to process URL ${url}:`, error);
+      return []; // Return empty array on error
+    }
+  });
+  
+  return await Promise.all(batchPromises);
 }
 
 async function parseSitemap(sitemapUrl: string, options: any): Promise<string[]> {
@@ -385,10 +404,10 @@ async function extractWithFirecrawl(url: string, options: any): Promise<Material
   console.log('Using Firecrawl for extraction');
 
   // Use scrape endpoint with extract format
-  const scrapeBody = {
+  const scrapeBody: any = {
     url: url,
     formats: ["extract"],
-    timeout: 60000, // 60 seconds timeout
+    timeout: 90000, // 90 seconds timeout for complex pages
     extract: {
       prompt: options.prompt || `Extract material information from this page. Look for:
 - Material name
@@ -429,7 +448,32 @@ Return a list of materials found on the page.`,
     }
   };
 
-  console.log('Firecrawl scrape request:', JSON.stringify(scrapeBody, null, 2));
+  // Add CSS selectors if provided
+  if (options.cssSelectors && options.cssSelectors.length > 0) {
+    scrapeBody.include = options.cssSelectors;
+    console.log('Using CSS selectors:', options.cssSelectors);
+  }
+
+  // Add wait time if specified
+  if (options.waitFor && options.waitFor > 0) {
+    scrapeBody.waitFor = options.waitFor;
+    console.log('Waiting for:', options.waitFor, 'ms');
+  }
+
+  // Extract only main content if requested
+  if (options.onlyMainContent) {
+    scrapeBody.onlyMainContent = true;
+    console.log('Extracting only main content');
+  }
+
+  console.log('Firecrawl scrape request:', {
+    url: scrapeBody.url,
+    formats: scrapeBody.formats,
+    timeout: scrapeBody.timeout,
+    hasSelectors: !!scrapeBody.include,
+    waitFor: scrapeBody.waitFor,
+    onlyMainContent: scrapeBody.onlyMainContent
+  });
   
   try {
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {

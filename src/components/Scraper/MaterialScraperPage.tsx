@@ -23,14 +23,17 @@ interface ScrapedMaterial {
 
 interface ScrapingOptions {
   service: 'firecrawl' | 'jina';
-  sitemapMode?: boolean; // New option for sitemap processing
-  crawlMode?: boolean; // New option for multi-page crawling
+  sitemapMode?: boolean;
+  crawlMode?: boolean;
   maxPages?: number;
   includePatterns?: string[];
   excludePatterns?: string[];
   // Firecrawl options
   prompt?: string;
   schema?: Record<string, any>;
+  cssSelectors?: string[]; // New CSS selector support
+  onlyMainContent?: boolean; // Extract only main content
+  waitFor?: number; // Wait time in milliseconds
   // Jina AI options
   extractionPrompt?: string;
   classificationLabels?: string[];
@@ -378,7 +381,55 @@ Return a list of materials found on the page.`,
                 
                 {options.service === 'firecrawl' && !options.sitemapMode && (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="font-medium text-sm">Firecrawl Extraction Prompt</h3>
+                    <h3 className="font-medium text-sm">Firecrawl Configuration</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cssSelectors">CSS Selectors (comma-separated) - Target specific elements</Label>
+                        <Input
+                          id="cssSelectors"
+                          value={options.cssSelectors?.join(', ') || ''}
+                          onChange={(e) => setOptions(prev => ({ 
+                            ...prev, 
+                            cssSelectors: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                          }))}
+                          placeholder=".product-card, .item-details, #main-content"
+                          disabled={isLoading}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Specify CSS selectors to extract content from specific page elements only
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="onlyMainContent"
+                          checked={options.onlyMainContent || false}
+                          onChange={(e) => setOptions(prev => ({ ...prev, onlyMainContent: e.target.checked }))}
+                          disabled={isLoading}
+                        />
+                        <Label htmlFor="onlyMainContent" className="text-sm">Extract only main content (skip headers, footers, navigation)</Label>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="waitFor">Wait time (milliseconds) - For dynamic content</Label>
+                        <Input
+                          id="waitFor"
+                          type="number"
+                          value={options.waitFor || 0}
+                          onChange={(e) => setOptions(prev => ({ ...prev, waitFor: parseInt(e.target.value) || 0 }))}
+                          min="0"
+                          max="10000"
+                          placeholder="0"
+                          disabled={isLoading}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Wait for dynamic content to load before extraction
+                        </p>
+                      </div>
+                    </div>
+                    
                     <div className="space-y-2">
                       <Label htmlFor="prompt">Extraction Instructions</Label>
                       <textarea
@@ -406,7 +457,8 @@ Return a list of materials found on the page.`,
 - Dimensions and specifications
 - Color and finish
 - Images
-- Availability and stock status` 
+- Availability and stock status`,
+                          cssSelectors: ['.product-item', '.product-card', '.material-card']
                         }))}
                         disabled={isLoading}
                       >
@@ -425,7 +477,8 @@ Return a list of materials found on the page.`,
 - Images and gallery
 - Category and subcategory
 - Brand and manufacturer
-- Product description` 
+- Product description`,
+                          cssSelectors: ['.product-list-item', '.catalog-item', '#product-details']
                         }))}
                         disabled={isLoading}
                       >
