@@ -297,6 +297,8 @@ Return a list of materials found on the page.`;
     }
   };
 
+  console.log('Firecrawl extract request body:', JSON.stringify(extractBody, null, 2));
+  
   const response = await fetch('https://api.firecrawl.dev/v1/extract', {
     method: 'POST',
     headers: {
@@ -306,8 +308,12 @@ Return a list of materials found on the page.`;
     body: JSON.stringify(extractBody),
   });
 
+  console.log('Firecrawl response status:', response.status);
+  
   if (!response.ok) {
-    throw new Error(`Firecrawl extract API error: ${response.status}`);
+    const errorText = await response.text();
+    console.error('Firecrawl error response:', errorText);
+    throw new Error(`Firecrawl extract API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
