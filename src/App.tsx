@@ -24,6 +24,10 @@ import { MoodBoardPage } from "./components/MoodBoard/MoodBoardPage";
 import { Designer3DPage } from "./components/3D/Designer3DPage";
 import { AIStudioPage } from "./components/AI/AIStudioPage";
 import { Layout } from "./components/Layout/Layout";
+import { SVBRDFExtractionPage } from "./components/SVBRDF/SVBRDFExtractionPage";
+import { NeRFReconstructionPage } from "./components/NeRF/NeRFReconstructionPage";
+import { OCRProcessor } from "./components/OCR/OCRProcessor";
+import { EnhancedRAGInterface } from "./components/RAG/EnhancedRAGInterface";
 
 const queryClient = new QueryClient();
 
@@ -131,6 +135,34 @@ const App = () => (
             <Route path="/admin/api-gateway" element={
               <AuthGuard>
                 <ApiGatewayAdmin />
+              </AuthGuard>
+            } />
+            <Route path="/svbrdf" element={
+              <AuthGuard>
+                <Layout>
+                  <SVBRDFExtractionPage />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/nerf" element={
+              <AuthGuard>
+                <Layout>
+                  <NeRFReconstructionPage />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/ocr" element={
+              <AuthGuard>
+                <Layout>
+                  <OCRProcessor />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/rag" element={
+              <AuthGuard>
+                <Layout>
+                  <EnhancedRAGInterface />
+                </Layout>
               </AuthGuard>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
