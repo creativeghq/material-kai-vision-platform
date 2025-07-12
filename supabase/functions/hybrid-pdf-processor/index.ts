@@ -205,12 +205,22 @@ async function processPDFWithPyMuPDF(fileUrl: string): Promise<PyMuPDFResponse> 
 async function detectMaterialsWithCorrelation(textBlocks: PyMuPDFResponse['text_blocks'], images: PyMuPDFResponse['extracted_images']): Promise<any[]> {
   const detectedMaterials = [];
   const materialPatterns = {
-    ceramics: /ceramic|porcelain|tile|glazed|vitrified|pei rating|slip resistance/i,
-    metals: /steel|aluminum|copper|brass|iron|alloy|galvanized|stainless/i,
-    concrete: /concrete|cement|aggregate|compressive|reinforced|precast/i,
-    wood: /wood|timber|lumber|hardwood|softwood|plywood|veneer|janka/i,
-    glass: /glass|tempered|laminated|float|thermal|safety glass/i,
-    textiles: /fabric|textile|fiber|yarn|weave|cotton|polyester/i
+    wood: /wood|timber|lumber|hardwood|softwood|plywood|veneer|oak|pine|maple|birch|walnut|janka|grain|stained|polished/i,
+    'stone & marble': /stone|marble|granite|limestone|travertine|slate|quartzite|onyx|sandstone|basalt|veining|honed|brushed|tumbled/i,
+    concrete: /concrete|cement|aggregate|compressive|reinforced|precast|admixture|cured|exposed aggregate|stamped/i,
+    brick: /brick|masonry|clay brick|fire brick|engineering brick|weathered|aged/i,
+    metal: /steel|aluminum|copper|brass|iron|alloy|galvanized|stainless|carbon steel|bronze|brushed|polished|oxidized|patina/i,
+    'mother-of-pearl': /mother-of-pearl|nacre|pearl|abalone|shell|iridescent|lustrous/i,
+    terracotta: /terracotta|terra cotta|clay|earthenware|fired clay|unglazed/i,
+    fabric: /fabric|textile|fiber|yarn|weave|cotton|polyester|nylon|silk|wool|linen|woven texture|pile/i,
+    leather: /leather|hide|skin|cowhide|sheepskin|genuine leather|full grain|top grain|embossed|distressed/i,
+    encaustic: /encaustic|wax|beeswax|pigment|heated wax|encaustic tile|cement tile|translucent|layered/i,
+    resin: /resin|epoxy|polyester resin|acrylic resin|synthetic resin|polymer|glossy|matte|clear|tinted/i,
+    'gold and precious metals': /gold|silver|platinum|precious metal|karat|sterling|fine gold|white gold|hammered|antiqued/i,
+    terrazzo: /terrazzo|aggregate|marble chips|granite chips|cement matrix|epoxy terrazzo|ground|exposed/i,
+    'crackle glaze': /crackle|crackled|crazing|craquelure|glazed|ceramic glaze|fired glaze|fine cracks|aged appearance/i,
+    ceramics: /ceramic|porcelain|tile|glazed|unglazed|vitrified|pei rating|slip resistance|frost resistant/i,
+    glass: /glass|tempered|laminated|float|thermal|safety glass|annealed|frosted|clear|textured|tinted|reflective/i
   };
   
   for (const block of textBlocks) {

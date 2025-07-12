@@ -20,6 +20,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PDFReviewWorkflow } from './PDFReviewWorkflow';
+import { MaterialsListViewer } from './MaterialsListViewer';
 
 interface PDFProcessingResult {
   id: string;
@@ -50,6 +51,7 @@ interface PDFTile {
   y_coordinate: number;
   width: number;
   height: number;
+  image_url?: string;
 }
 
 interface PDFResultsViewerProps {
@@ -263,13 +265,21 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
       )}
 
       {/* Main Content */}
-      <Tabs defaultValue="tiles" className="space-y-4">
+      <Tabs defaultValue="materials" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="materials">Materials Catalog</TabsTrigger>
           <TabsTrigger value="tiles">Tile Analysis</TabsTrigger>
-          <TabsTrigger value="materials">Material Details</TabsTrigger>
+          <TabsTrigger value="images">Extracted Images</TabsTrigger>
           <TabsTrigger value="review">Review & Workflow</TabsTrigger>
           <TabsTrigger value="metadata">Document Info</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="materials" className="space-y-4">
+          <MaterialsListViewer 
+            processingId={processingId}
+            tiles={tiles}
+          />
+        </TabsContent>
 
         <TabsContent value="tiles" className="space-y-4">
           {/* Page Navigation */}
@@ -354,49 +364,34 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
           )}
         </TabsContent>
 
-        <TabsContent value="materials" className="space-y-4">
+        <TabsContent value="images" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Detected Materials</CardTitle>
-              <CardDescription>Detailed analysis of materials found in the document</CardDescription>
+              <CardTitle>Extracted Images</CardTitle>
+              <CardDescription>Images and visual elements extracted from the PDF</CardDescription>
             </CardHeader>
             <CardContent>
-              {tiles.filter(t => t.material_detected).length === 0 ? (
+              {tiles.filter(t => t.image_url).length === 0 ? (
                 <Alert>
-                  <AlertDescription>No materials were detected in this document.</AlertDescription>
+                  <AlertDescription>No images were extracted from this document.</AlertDescription>
                 </Alert>
               ) : (
-                <div className="space-y-4">
-                  {tiles.filter(t => t.material_detected).map((tile) => (
-                    <div key={tile.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline">Page {tile.page_number}</Badge>
-                          <Badge variant="outline">Tile {tile.tile_index + 1}</Badge>
-                          <Badge className="bg-green-100 text-green-800">{tile.material_type}</Badge>
-                        </div>
-                        <span className="text-sm text-muted-foreground">
-                          {formatConfidence(tile.material_confidence || 0)} confidence
-                        </span>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {tiles.filter(t => t.image_url).map((tile) => (
+                    <div key={tile.id} className="border rounded-lg p-2">
+                      <img 
+                        src={tile.image_url} 
+                        alt={`Extracted from page ${tile.page_number}`}
+                        className="w-full h-32 object-cover rounded mb-2"
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        <p>Page {tile.page_number}, Tile {tile.tile_index + 1}</p>
+                        {tile.material_detected && (
+                          <Badge variant="secondary" className="mt-1 text-xs">
+                            {tile.material_type}
+                          </Badge>
+                        )}
                       </div>
-                      
-                      {tile.extracted_text && (
-                        <div className="mb-3">
-                          <p className="text-sm font-medium mb-1">Extracted Text:</p>
-                          <div className="text-sm bg-muted p-2 rounded">
-                            {tile.extracted_text}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {tile.structured_data && Object.keys(tile.structured_data).length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium mb-1">Structured Data:</p>
-                          <pre className="text-xs bg-muted p-2 rounded overflow-auto">
-                            {JSON.stringify(tile.structured_data, null, 2)}
-                          </pre>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>

@@ -113,33 +113,85 @@ async function detectMaterialsFromAzureContent(content: string, confidence: numb
   properties: any;
 }> {
   const materialPatterns = {
-    ceramics: {
-      keywords: ['ceramic', 'porcelain', 'tile', 'glazed', 'unglazed', 'vitrified', 'pei rating', 'slip resistance', 'frost resistant'],
-      properties: ['water absorption', 'thermal expansion', 'breaking strength', 'modulus of rupture']
+    wood: {
+      keywords: ['wood', 'timber', 'lumber', 'hardwood', 'softwood', 'plywood', 'veneer', 'oak', 'pine', 'maple', 'birch', 'walnut'],
+      properties: ['janka hardness', 'specific gravity', 'moisture content', 'modulus of elasticity', 'grain density'],
+      effects: ['natural grain', 'knots', 'weathered', 'stained', 'polished']
     },
-    metals: {
-      keywords: ['steel', 'aluminum', 'copper', 'brass', 'iron', 'alloy', 'galvanized', 'stainless', 'carbon steel'],
-      properties: ['tensile strength', 'yield strength', 'hardness', 'elastic modulus', 'thermal conductivity']
+    'stone & marble': {
+      keywords: ['stone', 'marble', 'granite', 'limestone', 'travertine', 'slate', 'quartzite', 'onyx', 'sandstone', 'basalt'],
+      properties: ['compressive strength', 'density', 'porosity', 'absorption rate', 'hardness scale'],
+      effects: ['veining', 'natural texture', 'polished', 'honed', 'brushed', 'tumbled']
     },
     concrete: {
-      keywords: ['concrete', 'cement', 'aggregate', 'compressive', 'reinforced', 'precast', 'admixture'],
-      properties: ['compressive strength', 'density', 'slump', 'air content', 'workability']
+      keywords: ['concrete', 'cement', 'aggregate', 'compressive', 'reinforced', 'precast', 'admixture', 'cured'],
+      properties: ['compressive strength', 'density', 'slump', 'air content', 'workability', 'psi rating'],
+      effects: ['smooth finish', 'exposed aggregate', 'textured', 'stamped', 'brushed']
     },
-    wood: {
-      keywords: ['wood', 'timber', 'lumber', 'hardwood', 'softwood', 'plywood', 'veneer', 'moisture content'],
-      properties: ['janka hardness', 'specific gravity', 'moisture content', 'modulus of elasticity']
+    brick: {
+      keywords: ['brick', 'masonry', 'clay brick', 'fire brick', 'common brick', 'face brick', 'engineering brick'],
+      properties: ['compressive strength', 'water absorption', 'frost resistance', 'thermal conductivity'],
+      effects: ['rough texture', 'smooth finish', 'weathered', 'aged', 'painted']
     },
-    plastics: {
-      keywords: ['plastic', 'polymer', 'pvc', 'hdpe', 'ldpe', 'polystyrene', 'acrylic', 'polyethylene'],
-      properties: ['tensile strength', 'impact strength', 'flexural modulus', 'heat deflection']
+    metal: {
+      keywords: ['steel', 'aluminum', 'copper', 'brass', 'iron', 'alloy', 'galvanized', 'stainless', 'carbon steel', 'bronze'],
+      properties: ['tensile strength', 'yield strength', 'hardness', 'elastic modulus', 'thermal conductivity', 'corrosion resistance'],
+      effects: ['brushed', 'polished', 'oxidized', 'patina', 'painted', 'powder coated']
+    },
+    'mother-of-pearl': {
+      keywords: ['mother-of-pearl', 'nacre', 'pearl', 'abalone', 'shell', 'iridescent', 'lustrous'],
+      properties: ['thickness', 'luster grade', 'surface quality', 'color variation'],
+      effects: ['iridescent', 'lustrous', 'natural patterns', 'polished']
+    },
+    terracotta: {
+      keywords: ['terracotta', 'terra cotta', 'clay', 'earthenware', 'ceramic', 'fired clay', 'unglazed'],
+      properties: ['firing temperature', 'porosity', 'thermal expansion', 'compressive strength'],
+      effects: ['natural clay color', 'glazed', 'textured', 'smooth', 'weathered']
+    },
+    fabric: {
+      keywords: ['fabric', 'textile', 'fiber', 'yarn', 'weave', 'cotton', 'polyester', 'nylon', 'silk', 'wool', 'linen'],
+      properties: ['thread count', 'weight', 'tensile strength', 'abrasion resistance', 'shrinkage'],
+      effects: ['woven texture', 'pile', 'smooth', 'textured', 'patterned']
+    },
+    leather: {
+      keywords: ['leather', 'hide', 'skin', 'cowhide', 'sheepskin', 'genuine leather', 'full grain', 'top grain'],
+      properties: ['thickness', 'tensile strength', 'tear resistance', 'flexibility', 'grain pattern'],
+      effects: ['natural grain', 'embossed', 'smooth', 'textured', 'distressed', 'aged']
+    },
+    encaustic: {
+      keywords: ['encaustic', 'wax', 'beeswax', 'pigment', 'heated wax', 'encaustic tile', 'cement tile'],
+      properties: ['wax content', 'pigment ratio', 'melting point', 'hardness', 'translucency'],
+      effects: ['translucent', 'layered', 'textured', 'smooth', 'patterned']
+    },
+    resin: {
+      keywords: ['resin', 'epoxy', 'polyester resin', 'acrylic resin', 'synthetic resin', 'polymer'],
+      properties: ['viscosity', 'curing time', 'hardness', 'chemical resistance', 'uv resistance'],
+      effects: ['glossy', 'matte', 'clear', 'tinted', 'textured', 'smooth']
+    },
+    'gold and precious metals': {
+      keywords: ['gold', 'silver', 'platinum', 'precious metal', 'karat', 'sterling', 'fine gold', 'white gold'],
+      properties: ['purity', 'karat rating', 'density', 'conductivity', 'corrosion resistance'],
+      effects: ['polished', 'brushed', 'hammered', 'antiqued', 'matte', 'high gloss']
+    },
+    terrazzo: {
+      keywords: ['terrazzo', 'aggregate', 'marble chips', 'granite chips', 'cement matrix', 'epoxy terrazzo'],
+      properties: ['aggregate size', 'matrix type', 'compressive strength', 'slip resistance', 'porosity'],
+      effects: ['polished', 'ground', 'exposed aggregate', 'smooth', 'textured']
+    },
+    'crackle glaze': {
+      keywords: ['crackle', 'crackled', 'crazing', 'craquelure', 'glazed', 'ceramic glaze', 'fired glaze'],
+      properties: ['glaze thickness', 'firing temperature', 'thermal expansion', 'crack density'],
+      effects: ['fine cracks', 'large cracks', 'random pattern', 'aged appearance', 'weathered']
+    },
+    ceramics: {
+      keywords: ['ceramic', 'porcelain', 'tile', 'glazed', 'unglazed', 'vitrified', 'pei rating', 'slip resistance', 'frost resistant'],
+      properties: ['water absorption', 'thermal expansion', 'breaking strength', 'modulus of rupture', 'pei rating'],
+      effects: ['glazed', 'matte', 'textured', 'smooth', 'patterned']
     },
     glass: {
-      keywords: ['glass', 'tempered', 'laminated', 'float', 'thermal', 'safety glass', 'annealed'],
-      properties: ['thickness', 'thermal stress', 'impact resistance', 'visible light transmittance']
-    },
-    textiles: {
-      keywords: ['fabric', 'textile', 'fiber', 'yarn', 'weave', 'cotton', 'polyester', 'nylon'],
-      properties: ['thread count', 'weight', 'tensile strength', 'abrasion resistance']
+      keywords: ['glass', 'tempered', 'laminated', 'float', 'thermal', 'safety glass', 'annealed', 'frosted'],
+      properties: ['thickness', 'thermal stress', 'impact resistance', 'visible light transmittance', 'u-value'],
+      effects: ['clear', 'frosted', 'textured', 'tinted', 'reflective', 'patterned']
     }
   };
 
@@ -173,14 +225,32 @@ async function detectMaterialsFromAzureContent(content: string, confidence: numb
       }
     });
 
-    const totalScore = (keywordScore * 2 + propertyScore) / (patterns.keywords.length + patterns.properties.length);
+    // Detect effects and finishes
+    let effectsScore = 0;
+    const detectedEffects: string[] = [];
+    if (patterns.effects) {
+      patterns.effects.forEach(effect => {
+        if (lowercaseContent.includes(effect)) {
+          effectsScore += 1;
+          detectedEffects.push(effect);
+        }
+      });
+    }
+
+    const totalScore = (keywordScore * 3 + propertyScore * 2 + effectsScore) / 
+                      (patterns.keywords.length * 3 + patterns.properties.length * 2 + (patterns.effects?.length || 0));
     const adjustedConfidence = Math.min(totalScore * confidence, 1);
 
     if (adjustedConfidence > bestMatch.confidence) {
       bestMatch = {
         type: materialType,
         confidence: adjustedConfidence,
-        properties: detectedProperties
+        properties: {
+          ...detectedProperties,
+          effects: detectedEffects,
+          category: materialType,
+          extracted_from: 'azure_analysis'
+        }
       };
     }
   }
