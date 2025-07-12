@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Settings, Database, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Settings, Database, Info, ArrowLeft, Home } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,6 +44,7 @@ const fieldTypes = [
 ];
 
 export const MetadataFieldsManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [fields, setFields] = useState<MetadataField[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -227,24 +229,46 @@ export const MetadataFieldsManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Database className="w-6 h-6" />
-            Metadata Fields Management
-          </h2>
-          <p className="text-muted-foreground">
-            Configure standardized metadata fields for material categories
-          </p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => openDialog()}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Field
-            </Button>
-          </DialogTrigger>
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Back to Main
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/admin')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Admin
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Metadata Fields Management</h1>
+              <p className="text-sm text-muted-foreground">
+                Configure standardized metadata fields for material categories
+              </p>
+            </div>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => openDialog()}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Field
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -412,6 +436,9 @@ export const MetadataFieldsManagement: React.FC = () => {
         </Dialog>
       </div>
 
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -499,6 +526,8 @@ export const MetadataFieldsManagement: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      </div>
+      </div>
     </div>
   );
 };

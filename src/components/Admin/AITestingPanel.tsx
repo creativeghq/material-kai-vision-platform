@@ -12,8 +12,11 @@ import {
   CheckCircle, 
   XCircle,
   Activity,
-  Upload
+  Upload,
+  ArrowLeft,
+  Home
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +29,7 @@ interface TestResult {
 }
 
 export const AITestingPanel: React.FC = () => {
+  const navigate = useNavigate();
   const [testPrompt, setTestPrompt] = useState('Analyze this modern kitchen with marble countertops and stainless steel appliances');
   const [testImageUrl, setTestImageUrl] = useState('');
   const [testing, setTesting] = useState(false);
@@ -162,13 +166,44 @@ export const AITestingPanel: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">AI Testing Panel</h2>
-        <p className="text-muted-foreground">
-          Test the hybrid AI system to generate analytics data and validate scoring
-        </p>
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Back to Main
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/admin')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Admin
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">AI Testing Panel</h1>
+              <p className="text-sm text-muted-foreground">
+                Test the hybrid AI system to generate analytics data and validate scoring
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Material Analysis Test */}
@@ -316,7 +351,8 @@ export const AITestingPanel: React.FC = () => {
             <p>• The system will automatically score responses and choose the best AI provider</p>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -12,10 +12,14 @@ import {
   Activity,
   Search,
   Tags,
-  Shield
+  Shield,
+  ArrowLeft,
+  Home
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const adminSections = [
     {
       title: "API Gateway",
@@ -101,104 +105,126 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Manage AI systems, agents, and knowledge base</p>
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Back to Main
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
+              <p className="text-sm text-muted-foreground">
+                System administration and management tools
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-sm">
+            Administrator Access
+          </Badge>
         </div>
-        <Badge variant="outline" className="text-sm">
-          Administrator Access
-        </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {adminSections.map((section) => {
-          const Icon = section.icon;
-          return (
-            <Card key={section.path} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <Icon className="h-8 w-8 text-primary" />
-                  <Badge className={getStatusColor(section.status)}>
-                    {section.status}
-                  </Badge>
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {adminSections.map((section) => {
+            const Icon = section.icon;
+            return (
+              <Card key={section.path} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <Icon className="h-8 w-8 text-primary" />
+                    <Badge className={getStatusColor(section.status)}>
+                      {section.status}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-lg">{section.title}</CardTitle>
+                  <CardDescription className="text-sm">
+                    {section.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      {section.count}
+                    </span>
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={section.path}>
+                        Manage
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">System Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>AI Models</span>
+                  <Badge variant="outline">15 Active</Badge>
                 </div>
-                <CardTitle className="text-lg">{section.title}</CardTitle>
-                <CardDescription className="text-sm">
-                  {section.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {section.count}
-                  </span>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={section.path}>
-                      Manage
-                    </Link>
-                  </Button>
+                <div className="flex justify-between">
+                  <span>Processing Queue</span>
+                  <Badge variant="outline">8 Tasks</Badge>
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">System Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>AI Models</span>
-                <Badge variant="outline">15 Active</Badge>
+                <div className="flex justify-between">
+                  <span>Knowledge Entries</span>
+                  <Badge variant="outline">1,247</Badge>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Processing Queue</span>
-                <Badge variant="outline">8 Tasks</Badge>
-              </div>
-              <div className="flex justify-between">
-                <span>Knowledge Entries</span>
-                <Badge variant="outline">1,247</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div>Material analysis completed</div>
-              <div>CLIP training started</div>
-              <div>New knowledge entry added</div>
-              <div>Agent specialization updated</div>
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
+                <div>Material analysis completed</div>
+                <div>CLIP training started</div>
+                <div>New knowledge entry added</div>
+                <div>Agent specialization updated</div>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button asChild variant="outline" size="sm" className="w-full">
-              <Link to="/admin/training-models">Start New Training</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="w-full">
-              <Link to="/admin/knowledge-base">Add Knowledge Entry</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="w-full">
-              <Link to="/admin/agent-ml">Monitor Agents</Link>
-            </Button>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <Link to="/admin/training-models">Start New Training</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <Link to="/admin/knowledge-base">Add Knowledge Entry</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <Link to="/admin/agent-ml">Monitor Agents</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

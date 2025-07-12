@@ -6,11 +6,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Database, Brain, Zap, Upload, Settings, Rocket } from 'lucide-react';
+import { Loader2, Database, Brain, Zap, Upload, Settings, Rocket, ArrowLeft, Home } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { ragService, TrainingRequest } from '@/services/ragService';
 
 export const RAGManagementPanel: React.FC = () => {
+  const navigate = useNavigate();
   const [isTraining, setIsTraining] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState<any[]>([]);
   const [newKnowledgeEntry, setNewKnowledgeEntry] = useState({
@@ -147,7 +149,44 @@ export const RAGManagementPanel: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Back to Main
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/admin')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Admin
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">RAG System Management</h1>
+              <p className="text-sm text-muted-foreground">
+                Manage knowledge base, model training, and embedding systems
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -444,6 +483,7 @@ export const RAGManagementPanel: React.FC = () => {
           </Tabs>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
