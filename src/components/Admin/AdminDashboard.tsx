@@ -15,7 +15,8 @@ import {
   Shield,
   ArrowLeft,
   Home,
-  FileText
+  FileText,
+  Globe
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -125,6 +126,14 @@ const AdminDashboard: React.FC = () => {
       path: "/admin/pdf-processing",
       status: "active",
       count: "Batch processing"
+    },
+    {
+      title: "Material Scraper",
+      description: "Web scraping for material supplier websites and catalogs",
+      icon: Globe,
+      path: "/scraper",
+      status: "active",
+      count: "Firecrawl powered"
     },
   ];
 
