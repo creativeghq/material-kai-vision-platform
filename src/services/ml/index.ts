@@ -18,6 +18,7 @@ export { ImageClassifierService } from './imageClassifier';
 export { TextEmbedderService } from './textEmbedder';
 export { MaterialAnalyzerService } from './materialAnalyzer';
 export { DeviceDetector } from './deviceDetector';
+export { huggingFaceService, HuggingFaceService } from './huggingFaceService';
 
 // Types
 export type * from './types';

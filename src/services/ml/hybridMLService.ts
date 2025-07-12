@@ -2,6 +2,7 @@ import { clientMLService, MLResult } from './clientMLService';
 import { serverMLService, ServerMLResult } from './serverMLService';
 import { DeviceDetector } from './deviceDetector';
 import { supabase } from '@/integrations/supabase/client';
+import { huggingFaceService } from './huggingFaceService';
 
 export interface HybridMLOptions {
   preferServerSide?: boolean;
@@ -193,8 +194,49 @@ export class HybridMLService {
       const file = files[i];
       const description = descriptions?.[i];
       
-      const result = await clientMLService.analyzeMaterial(file, description);
-      results.push(result);
+      try {
+        // Try client-side first
+        const result = await clientMLService.analyzeMaterial(file, description);
+        
+        if (result.success && (result.confidence || 0) > 0.7) {
+          results.push(result);
+          continue;
+        }
+        
+        // Fallback to HuggingFace if client confidence is low
+        console.log('Client confidence low, trying HuggingFace...');
+        await huggingFaceService.initialize();
+        
+        const [materialResults, styleResults] = await Promise.all([
+          huggingFaceService.classifyMaterial(file),
+          huggingFaceService.analyzeImageStyle(file)
+        ]);
+        
+        if (materialResults.length > 0) {
+          const topResult = materialResults[0];
+          results.push({
+            success: true,
+            data: {
+              materialType: topResult.label,
+              confidence: topResult.score,
+              properties: {
+                style: styleResults[0]?.label || 'unknown',
+                processing_method: 'huggingface'
+              }
+            },
+            confidence: topResult.score
+          });
+        } else {
+          results.push(result); // Use client result even if low confidence
+        }
+        
+      } catch (error) {
+        console.error('Processing failed for file:', file.name, error);
+        results.push({
+          success: false,
+          error: error instanceof Error ? error.message : 'Processing failed'
+        });
+      }
     }
 
     const processingTime = performance.now() - startTime;
@@ -206,7 +248,7 @@ export class HybridMLService {
       confidence: this.calculateAverageConfidence(successfulResults),
       processingTime: Math.round(processingTime),
       processingMethod: 'client',
-      error: successfulResults.length === 0 ? 'All client-side analyses failed' : undefined
+      error: successfulResults.length === 0 ? 'All processing methods failed' : undefined
     };
   }
 

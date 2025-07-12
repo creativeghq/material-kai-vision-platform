@@ -2,6 +2,7 @@ import { OCRService, OCRResult, OCROptions } from './ocrService';
 import { ServerMLService } from './serverMLService';
 import { MLResult } from './types';
 import { DeviceDetector } from './deviceDetector';
+import { huggingFaceService } from './huggingFaceService';
 
 export interface HybridOCROptions extends OCROptions {
   forceServerProcessing?: boolean;
@@ -152,18 +153,44 @@ export class HybridOCRService {
     console.log('HybridOCR: Processing on client...');
     
     try {
+      // Try client-side OCR first
       const result = await OCRService.extractText(file, options);
       
-      if (!result.success || !result.data?.text) {
-        console.log('HybridOCR: Client processing failed, falling back to server');
-        const serverResult = await this.processOnServer(file, options);
-        if (serverResult.success && serverResult.data) {
-          (serverResult.data as HybridOCRResult).fallbackUsed = true;
-        }
-        return serverResult;
+      if (result.success && result.data?.text && (result.data.confidence || 0) > 0.7) {
+        return result;
       }
-
-      return result;
+      
+      console.log('HybridOCR: Client confidence low, trying HuggingFace...');
+      
+      // Try HuggingFace OCR as fallback
+      try {
+        await huggingFaceService.initialize();
+        const text = await huggingFaceService.processOCR(file);
+        
+        if (text && text.length > 0) {
+          return {
+            success: true,
+            data: {
+              text,
+              confidence: 0.8, // HuggingFace models are generally reliable
+              language: 'auto',
+              boundingBoxes: [],
+              processingMethod: 'huggingface',
+              fallbackUsed: true
+            }
+          };
+        }
+      } catch (hfError) {
+        console.log('HybridOCR: HuggingFace failed, falling back to server:', hfError);
+      }
+      
+      // Final fallback to server
+      console.log('HybridOCR: All client methods failed, falling back to server');
+      const serverResult = await this.processOnServer(file, options);
+      if (serverResult.success && serverResult.data) {
+        (serverResult.data as HybridOCRResult).fallbackUsed = true;
+      }
+      return serverResult;
       
     } catch (error) {
       console.log('HybridOCR: Client processing error, falling back to server:', error);

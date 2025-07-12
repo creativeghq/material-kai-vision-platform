@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { styleAnalysisService, StyleAnalysisResult, StyleAnalysisOptions } from './styleAnalysisService';
+import { huggingFaceService } from './huggingFaceService';
 
 export interface HybridStyleAnalysisOptions extends StyleAnalysisOptions {
   preferServerAnalysis?: boolean;
@@ -143,18 +144,62 @@ export class HybridStyleAnalysisService {
     const startTime = performance.now();
 
     try {
+      // Try client-side analysis first
       const result = await styleAnalysisService.analyzeStyle(imageSource, options);
-      const processingTime = performance.now() - startTime;
-
-      if (!result.success) {
-        throw new Error(result.error || 'Client analysis failed');
+      
+      if (result.success && (result.confidence || 0) > 0.7) {
+        const processingTime = performance.now() - startTime;
+        return {
+          success: true,
+          analysis: result.data,
+          processingMethod: 'client',
+          processingTime: Math.round(processingTime)
+        };
       }
-
+      
+      console.log('Client style analysis confidence low, trying HuggingFace...');
+      
+      // Try HuggingFace style analysis as fallback
+      try {
+        await huggingFaceService.initialize();
+        const styleResults = await huggingFaceService.analyzeImageStyle(imageSource as string | File);
+        
+        if (styleResults.length > 0) {
+          const topResult = styleResults[0];
+          const processingTime = performance.now() - startTime;
+          
+          return {
+            success: true,
+            analysis: {
+              primaryStyle: topResult.label,
+              styleConfidence: topResult.score,
+              colorPalette: { dominantColors: [], colorHarmony: 'unknown', warmthScore: 0 },
+              roomSuitability: {},
+              aestheticProperties: { 
+                texture: 'smooth' as const, 
+                finish: 'matte' as const, 
+                pattern: 'solid' as const, 
+                modernityScore: 0.5 
+              },
+              trendScore: topResult.score,
+              designTags: [topResult.label]
+            },
+            processingMethod: 'client',
+            processingTime: Math.round(processingTime)
+          };
+        }
+      } catch (hfError) {
+        console.log('HuggingFace style analysis failed:', hfError);
+      }
+      
+      // Return original client result even if confidence is low
+      const processingTime = performance.now() - startTime;
       return {
-        success: true,
+        success: result.success,
         analysis: result.data,
-        processingMethod: 'client',
-        processingTime: Math.round(processingTime)
+        processingMethod: 'client', 
+        processingTime: Math.round(processingTime),
+        error: result.error
       };
 
     } catch (error) {
