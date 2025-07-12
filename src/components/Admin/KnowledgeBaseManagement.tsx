@@ -176,23 +176,54 @@ const KnowledgeBaseManagement: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Knowledge Base Management</h1>
-          <p className="text-muted-foreground">Manage knowledge base entries and data</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={fetchEntries} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button variant="default" size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Entry
-          </Button>
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/'}
+                className="flex items-center gap-2"
+              >
+                <Search className="h-4 w-4" />
+                Back to Main
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/admin'}
+                className="flex items-center gap-2"
+              >
+                <Filter className="h-4 w-4" />
+                Back to Admin
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Knowledge Base Management</h1>
+              <p className="text-sm text-muted-foreground">
+                Manage knowledge base entries and data
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={fetchEntries} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button variant="default" size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Entry
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
 
       {/* Filters */}
       <Card>
@@ -393,6 +424,7 @@ const KnowledgeBaseManagement: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };

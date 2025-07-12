@@ -132,23 +132,54 @@ const AgentMLCoordination: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Agent ML Coordination</h1>
-          <p className="text-muted-foreground">Monitor agent assignments and ML task distribution</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={fetchData} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button variant="default" size="sm">
-            <Play className="h-4 w-4 mr-2" />
-            Start New Task
-          </Button>
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/'}
+                className="flex items-center gap-2"
+              >
+                <Brain className="h-4 w-4" />
+                Back to Main
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/admin'}
+                className="flex items-center gap-2"
+              >
+                <Activity className="h-4 w-4" />
+                Back to Admin
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Agent ML Coordination</h1>
+              <p className="text-sm text-muted-foreground">
+                Monitor agent assignments and ML task distribution
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={fetchData} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button variant="default" size="sm">
+              <Play className="h-4 w-4 mr-2" />
+              Start New Task
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -330,6 +361,7 @@ const AgentMLCoordination: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

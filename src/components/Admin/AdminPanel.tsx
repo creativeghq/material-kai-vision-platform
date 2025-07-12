@@ -175,19 +175,48 @@ export const AdminPanel: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Panel</h1>
-          <p className="text-muted-foreground">
-            AI Performance Analytics & System Overview
-          </p>
+    <div className="min-h-screen bg-background">
+      {/* Header with Navigation */}
+      <div className="border-b bg-card px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/'}
+                className="flex items-center gap-2"
+              >
+                <Activity className="h-4 w-4" />
+                Back to Main
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/admin'}
+                className="flex items-center gap-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Back to Admin
+              </Button>
+            </div>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
+              <p className="text-sm text-muted-foreground">
+                AI Performance Analytics & System Overview
+              </p>
+            </div>
+          </div>
+          <Button onClick={fetchAnalyticsData} disabled={loading}>
+            <Activity className="h-4 w-4 mr-2" />
+            Refresh Data
+          </Button>
         </div>
-        <Button onClick={fetchAnalyticsData} disabled={loading}>
-          <Activity className="h-4 w-4 mr-2" />
-          Refresh Data
-        </Button>
       </div>
+
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
 
       {/* Stats Overview */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -395,6 +424,7 @@ export const AdminPanel: React.FC = () => {
           <AITestingPanel />
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };
