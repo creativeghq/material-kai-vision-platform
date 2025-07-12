@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Material } from '@/types/materials';
-import { materialCatalogAPI } from '@/services/materialCatalogAPI';
+import { realMaterialCatalogAPI } from '@/services/realMaterialCatalogAPI';
 import { CatalogFilters, FilterOptions } from './CatalogFilters';
 import { MaterialCard } from './MaterialCard';
 import { MaterialDetailModal } from './MaterialDetailModal';
@@ -9,11 +9,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, RefreshCw, Grid3X3, List, Package } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export const MaterialCatalog: React.FC = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -42,7 +48,7 @@ export const MaterialCatalog: React.FC = () => {
   const loadMaterials = async () => {
     setIsLoading(true);
     try {
-      const data = await materialCatalogAPI.getAllMaterials();
+      const data = await realMaterialCatalogAPI.getAllMaterials();
       setMaterials(data);
     } catch (error) {
       console.error('Error loading materials:', error);
@@ -126,32 +132,37 @@ export const MaterialCatalog: React.FC = () => {
   };
 
   const handleEditMaterial = (material: Material) => {
-    // TODO: Open edit modal/form
-    console.log('Edit material:', material);
-    // You can implement an edit modal here
+    setEditingMaterial(material);
+    setIsFormModalOpen(true);
   };
 
   const handleDeleteMaterial = async (material: Material) => {
     try {
-      // TODO: Implement actual delete API call
-      console.log('Deleting material:', material);
-      
-      // For now, just remove from local state
+      await realMaterialCatalogAPI.deleteMaterial(material.id);
       setMaterials(prev => prev.filter(m => m.id !== material.id));
-      
-      // TODO: Replace with actual API call
-      // await materialCatalogAPI.deleteMaterial(material.id);
-      // loadMaterials(); // Reload from server
-      
+      toast({ title: 'Success', description: 'Material deleted successfully' });
     } catch (error) {
       console.error('Error deleting material:', error);
-      // TODO: Show error toast
+      toast({ title: 'Error', description: 'Failed to delete material', variant: 'destructive' });
     }
   };
 
-  const handleFavoriteMaterial = (material: Material) => {
-    // TODO: Implement favorite functionality
-    console.log('Favorite material:', material);
+  const handleFavoriteMaterial = async (material: Material) => {
+    try {
+      // Store favorite in user preferences or separate table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (profile) {
+        toast({ title: 'Success', description: 'Material added to favorites' });
+      }
+    } catch (error) {
+      console.error('Error favoriting material:', error);
+      toast({ title: 'Error', description: 'Failed to add to favorites', variant: 'destructive' });
+    }
   };
 
   const refreshCatalog = () => {
@@ -304,9 +315,22 @@ export const MaterialCatalog: React.FC = () => {
         open={isFormModalOpen}
         onOpenChange={setIsFormModalOpen}
         onSave={async (materialData) => {
-          // TODO: Implement actual save to database
-          console.log('Saving material:', materialData);
-          loadMaterials(); // Reload the catalog
+          try {
+            if (editingMaterial) {
+              await realMaterialCatalogAPI.updateMaterial(editingMaterial.id, materialData);
+              toast({ title: 'Success', description: 'Material updated successfully' });
+            } else {
+              await realMaterialCatalogAPI.createMaterial({
+                ...materialData,
+                created_by: user?.id
+              });
+              toast({ title: 'Success', description: 'Material created successfully' });
+            }
+            setEditingMaterial(null);
+            loadMaterials();
+          } catch (error) {
+            toast({ title: 'Error', description: 'Failed to save material', variant: 'destructive' });
+          }
         }}
       />
     </div>

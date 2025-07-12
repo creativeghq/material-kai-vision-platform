@@ -35,7 +35,7 @@ export class AgentCollaborationWorkflows {
     taskType: string, 
     inputData: any, 
     priority: number = 5,
-    userId: string = 'system'
+    userId: string
   ): Promise<string | null> {
     try {
       // Analyze task complexity and determine collaboration needs
@@ -587,7 +587,7 @@ export class AgentCollaborationWorkflows {
     return results;
   }
 
-  private async createSimpleTask(taskType: string, inputData: any, priority: number, userId: string = 'system'): Promise<string> {
+  private async createSimpleTask(taskType: string, inputData: any, priority: number, userId: string): Promise<string> {
     const { data: task, error } = await supabase
       .from('agent_tasks')
       .insert({
