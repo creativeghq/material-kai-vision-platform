@@ -341,23 +341,32 @@ Return a list of materials found on the page.`,
     }
 
     const data = await response.json();
-    console.log('Firecrawl response data keys:', Object.keys(data));
+    console.log('Firecrawl response data structure:', JSON.stringify(data, null, 2));
     
     if (!data.success) {
       console.error('Firecrawl scraping failed - full response:', data);
       
       // Handle timeout in response data
-      if (data.error && data.error.includes('timed out')) {
+      if (data.error && (data.error.includes('timed out') || data.error.includes('timeout'))) {
         throw new Error('Page processing timed out. This usually happens with large product listing pages. Try a specific product page instead.');
       }
       
-      throw new Error('Firecrawl scraping failed: ' + JSON.stringify(data));
+      throw new Error('Firecrawl scraping failed: ' + (data.error || JSON.stringify(data)));
     }
 
     const materials: MaterialData[] = [];
     
+    console.log('Checking data structure:', {
+      hasData: !!data.data,
+      hasExtract: !!(data.data && data.data.extract),
+      hasMaterials: !!(data.data && data.data.extract && data.data.extract.materials),
+      isArray: Array.isArray(data.data?.extract?.materials)
+    });
+    
     // Check if extraction data exists
     if (data.data && data.data.extract && data.data.extract.materials && Array.isArray(data.data.extract.materials)) {
+      console.log('Found materials array with length:', data.data.extract.materials.length);
+      
       for (const material of data.data.extract.materials) {
         if (material.name) {
           const processedMaterial: MaterialData = {
@@ -379,8 +388,11 @@ Return a list of materials found on the page.`,
           materials.push(processedMaterial);
         }
       }
+    } else {
+      console.log('No materials found in expected structure. Full data.data:', JSON.stringify(data.data, null, 2));
     }
 
+    console.log(`Processed ${materials.length} materials from Firecrawl`);
     return materials;
     
   } catch (error) {
