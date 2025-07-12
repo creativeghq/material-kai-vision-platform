@@ -13,6 +13,10 @@ interface JinaExtractRequest {
     // Firecrawl options
     prompt?: string;
     schema?: Record<string, any>;
+    crawlMode?: boolean; // New option for crawling vs single page scraping
+    maxPages?: number; // Limit for crawling
+    includePatterns?: string[]; // URL patterns to include
+    excludePatterns?: string[]; // URL patterns to exclude
     
     // Jina AI options
     extractionPrompt?: string;
@@ -52,7 +56,12 @@ serve(async (req) => {
     if (service === 'jina') {
       materials = await extractWithJinaAI(url, options);
     } else {
-      materials = await extractWithFirecrawl(url, options);
+      // Check if crawling is requested
+      if (options.crawlMode) {
+        materials = await crawlWithFirecrawl(url, options);
+      } else {
+        materials = await extractWithFirecrawl(url, options);
+      }
     }
     
     processingTime = Date.now() - processingTime;
@@ -378,6 +387,166 @@ Return a list of materials found on the page.`,
     console.error('Firecrawl processing error:', error);
     throw error;
   }
+}
+
+async function crawlWithFirecrawl(url: string, options: any): Promise<MaterialData[]> {
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!FIRECRAWL_API_KEY) {
+    throw new Error('FIRECRAWL_API_KEY not configured');
+  }
+
+  console.log('Using Firecrawl crawl mode for multiple pages');
+
+  const crawlBody = {
+    url: url,
+    limit: options.maxPages || 10, // Default to 10 pages max
+    scrapeOptions: {
+      formats: ["extract"],
+      extract: {
+        prompt: options.prompt || `Extract material information from this page. Look for:
+- Material name
+- Price (if available)  
+- Description
+- Images
+- Properties like dimensions, color, finish
+- Category (tiles, stone, wood, etc.)
+Return a list of materials found on the page.`,
+        schema: options.schema || {
+          type: "object",
+          properties: {
+            materials: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string", description: "Product/material name" },
+                  description: { type: "string", description: "Product description" },
+                  price: { type: "string", description: "Price with currency" },
+                  category: { type: "string", description: "Material category" },
+                  images: { 
+                    type: "array", 
+                    items: { type: "string" },
+                    description: "Image URLs" 
+                  },
+                  properties: {
+                    type: "object",
+                    description: "Additional properties like dimensions, color, finish"
+                  }
+                },
+                required: ["name"]
+              }
+            }
+          },
+          required: ["materials"]
+        }
+      }
+    },
+    // Include/exclude patterns for URL filtering
+    includePaths: options.includePatterns || ["/product", "/item", "/material"],
+    excludePaths: options.excludePatterns || ["/cart", "/checkout", "/account", "/login"]
+  };
+
+  console.log('Firecrawl crawl request:', JSON.stringify(crawlBody, null, 2));
+  
+  try {
+    // Start the crawl
+    const crawlResponse = await fetch('https://api.firecrawl.dev/v1/crawl', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(crawlBody),
+    });
+
+    console.log('Firecrawl crawl response status:', crawlResponse.status);
+    
+    if (!crawlResponse.ok) {
+      const errorText = await crawlResponse.text();
+      console.error('Firecrawl crawl error:', errorText);
+      throw new Error(`Firecrawl crawl API error: ${crawlResponse.status} - ${errorText}`);
+    }
+
+    const crawlData = await crawlResponse.json();
+    console.log('Firecrawl crawl started, job ID:', crawlData.id);
+    
+    if (!crawlData.success) {
+      throw new Error('Failed to start Firecrawl crawl: ' + JSON.stringify(crawlData));
+    }
+
+    // Poll for crawl completion
+    const jobId = crawlData.id;
+    let attempts = 0;
+    const maxAttempts = 30; // 5 minutes max wait time
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+      
+      const statusResponse = await fetch(`https://api.firecrawl.dev/v1/crawl/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        },
+      });
+      
+      if (!statusResponse.ok) {
+        throw new Error(`Failed to check crawl status: ${statusResponse.status}`);
+      }
+      
+      const statusData = await statusResponse.json();
+      console.log('Crawl status:', statusData.status, `(${statusData.completed}/${statusData.total} pages)`);
+      
+      if (statusData.status === 'completed') {
+        console.log('Crawl completed successfully');
+        
+        // Process all crawled pages
+        const allMaterials: MaterialData[] = [];
+        
+        if (statusData.data && Array.isArray(statusData.data)) {
+          for (const pageData of statusData.data) {
+            if (pageData.extract && pageData.extract.materials && Array.isArray(pageData.extract.materials)) {
+              for (const material of pageData.extract.materials) {
+                if (material.name) {
+                  const processedMaterial: MaterialData = {
+                    name: material.name,
+                    description: material.description || '',
+                    category: material.category || categorizeFromName(material.name),
+                    price: material.price || '',
+                    images: Array.isArray(material.images) ? material.images : [],
+                    properties: {
+                      ...material.properties,
+                      sourceUrl: pageData.metadata?.sourceURL || url,
+                      pageUrl: pageData.metadata?.sourceURL,
+                      extractedAt: new Date().toISOString(),
+                      extractedBy: 'firecrawl-crawl'
+                    },
+                    sourceUrl: pageData.metadata?.sourceURL || url,
+                    supplier: extractSupplierFromUrl(url)
+                  };
+                  
+                  allMaterials.push(processedMaterial);
+                }
+              }
+            }
+          }
+        }
+        
+        console.log(`Crawl extracted ${allMaterials.length} materials from ${statusData.completed} pages`);
+        return allMaterials;
+        
+      } else if (statusData.status === 'failed') {
+        throw new Error('Firecrawl crawl failed: ' + (statusData.error || 'Unknown error'));
+      }
+      
+      attempts++;
+    }
+    
+    throw new Error('Crawl timed out after 5 minutes');
+    
+  } catch (error) {
+    console.error('Firecrawl crawl error:', error);
+    throw error;
+  }
+
 }
 
 function extractMaterialsFromContent(

@@ -23,6 +23,10 @@ interface ScrapedMaterial {
 
 interface ScrapingOptions {
   service: 'firecrawl' | 'jina';
+  crawlMode?: boolean; // New option for multi-page crawling
+  maxPages?: number;
+  includePatterns?: string[];
+  excludePatterns?: string[];
   // Firecrawl options
   prompt?: string;
   schema?: Record<string, any>;
@@ -42,6 +46,10 @@ export const MaterialScraperPage = () => {
   const [progress, setProgress] = useState(0);
   const [options, setOptions] = useState<ScrapingOptions>({
     service: 'firecrawl',
+    crawlMode: false,
+    maxPages: 10,
+    includePatterns: ['/product', '/item', '/material'],
+    excludePatterns: ['/cart', '/checkout', '/account', '/login'],
     prompt: `Extract material information from this page. Look for:
 - Material name
 - Price (if available)
@@ -201,7 +209,64 @@ Return a list of materials found on the page.`,
 
                 {options.service === 'firecrawl' ? (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="font-medium text-sm">Firecrawl Extraction Prompt</h3>
+                    <h3 className="font-medium text-sm">Firecrawl Configuration</h3>
+                    
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="crawlMode"
+                        checked={options.crawlMode || false}
+                        onChange={(e) => setOptions(prev => ({ ...prev, crawlMode: e.target.checked }))}
+                        disabled={isLoading}
+                      />
+                      <Label htmlFor="crawlMode" className="text-sm">Multi-page crawl mode (for pagination)</Label>
+                    </div>
+                    
+                    {options.crawlMode && (
+                      <div className="space-y-4 p-3 border rounded bg-background/50">
+                        <div className="space-y-2">
+                          <Label htmlFor="maxPages">Maximum pages to crawl</Label>
+                          <Input
+                            id="maxPages"
+                            type="number"
+                            value={options.maxPages || 10}
+                            onChange={(e) => setOptions(prev => ({ ...prev, maxPages: parseInt(e.target.value) || 10 }))}
+                            min="1"
+                            max="50"
+                            disabled={isLoading}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="includePatterns">Include URL patterns (comma-separated)</Label>
+                          <Input
+                            id="includePatterns"
+                            value={options.includePatterns?.join(', ') || ''}
+                            onChange={(e) => setOptions(prev => ({ 
+                              ...prev, 
+                              includePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                            }))}
+                            placeholder="/product, /item, /material"
+                            disabled={isLoading}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="excludePatterns">Exclude URL patterns (comma-separated)</Label>
+                          <Input
+                            id="excludePatterns"
+                            value={options.excludePatterns?.join(', ') || ''}
+                            onChange={(e) => setOptions(prev => ({ 
+                              ...prev, 
+                              excludePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                            }))}
+                            placeholder="/cart, /checkout, /account"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="space-y-2">
                       <Label htmlFor="prompt">Extraction Instructions</Label>
                       <textarea
@@ -401,8 +466,8 @@ Return a list of materials found on the page.`,
                     <p className="font-medium mb-1">Scraping Tips:</p>
                     <ul className="space-y-1 text-xs">
                       <li>• Choose between Firecrawl (structured) or Jina AI (intelligent classification)</li>
+                      <li>• Firecrawl can crawl multiple pages with pagination support</li>
                       <li>• Jina AI offers advanced search, classification, and relevance ranking</li>
-                      <li>• Firecrawl provides precise prompt-based extraction</li>
                       <li>• Both services respect robots.txt and rate limits</li>
                     </ul>
                   </div>
