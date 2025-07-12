@@ -276,6 +276,10 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
       // Use Jina Search API
       console.log('Using Jina Search API with query:', options.searchQuery);
       
+      // Add timeout to Jina Search API call
+      const searchController = new AbortController();
+      const searchTimeout = setTimeout(() => searchController.abort(), 20000); // 20 second timeout
+      
       const searchResponse = await fetch('https://s.jina.ai/', {
         method: 'POST',
         headers: {
@@ -286,11 +290,14 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
           'X-With-Links-Summary': 'true',
           'X-Site': new URL(url).hostname
         },
+        signal: searchController.signal,
         body: JSON.stringify({
           q: options.searchQuery,
           num: 5
         })
       });
+      
+      clearTimeout(searchTimeout);
       
       if (!searchResponse.ok) {
         throw new Error(`Jina Search API error: ${searchResponse.status}`);
@@ -316,6 +323,10 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
       // Use Jina Reader API
       console.log('Using Jina Reader API for:', url);
       
+      // Add timeout to Jina Reader API call
+      const readerController = new AbortController();
+      const readerTimeout = setTimeout(() => readerController.abort(), 20000); // 20 second timeout
+      
       const readerResponse = await fetch('https://r.jina.ai/', {
         method: 'POST',
         headers: {
@@ -325,10 +336,13 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
           'X-With-Images-Summary': 'true',
           'X-With-Links-Summary': 'true',
           'X-Return-Format': 'markdown',
-          'X-Timeout': '30'
+          'X-Timeout': '15' // Reduce Jina timeout to 15 seconds
         },
+        signal: readerController.signal,
         body: JSON.stringify({ url })
       });
+      
+      clearTimeout(readerTimeout);
       
       if (!readerResponse.ok) {
         throw new Error(`Jina Reader API error: ${readerResponse.status}`);
@@ -357,6 +371,11 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
       console.log('Classifying materials with labels:', options.classificationLabels);
       
       const materialNames = materials.map(m => m.name);
+      
+      // Add timeout to classification API call
+      const classController = new AbortController();
+      const classTimeout = setTimeout(() => classController.abort(), 15000); // 15 second timeout
+      
       const classificationResponse = await fetch('https://api.jina.ai/v1/classify', {
         method: 'POST',
         headers: {
@@ -364,12 +383,15 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
+        signal: classController.signal,
         body: JSON.stringify({
           model: 'jina-embeddings-v3',
           input: materialNames,
           labels: options.classificationLabels
         })
       });
+      
+      clearTimeout(classTimeout);
       
       if (classificationResponse.ok) {
         const classificationData = await classificationResponse.json();
