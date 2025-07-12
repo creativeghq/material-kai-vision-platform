@@ -29,6 +29,9 @@ interface ProcessingResult {
     materialsIdentified: number;
     averageConfidence: number;
     processingTimeMs: number;
+    azureModel?: string;
+    extractedTables?: number;
+    keyValuePairs?: number;
   };
 }
 
@@ -118,8 +121,8 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
-      // Call PDF processor edge function
-      const { data: processingResult, error: processingError } = await supabase.functions.invoke('pdf-processor', {
+      // Call Azure PDF processor edge function
+      const { data: processingResult, error: processingError } = await supabase.functions.invoke('azure-pdf-processor', {
         body: {
           fileUrl: publicUrl,
           originalFilename: file.name,
@@ -146,8 +149,8 @@ export const PDFProcessor: React.FC = () => {
       ));
 
       toast({
-        title: "PDF Processing Complete",
-        description: `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials.`,
+        title: "Azure AI Processing Complete",
+        description: `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials, ${processingResult.summary.extractedTables || 0} tables, and ${processingResult.summary.keyValuePairs || 0} key-value pairs.`,
       });
 
     } catch (error) {
@@ -217,10 +220,10 @@ export const PDFProcessor: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            PDF Material Catalog Processor
+            AI-Powered PDF Material Catalog Processor
           </CardTitle>
           <CardDescription>
-            Upload PDF documents containing material specifications, catalogs, or technical sheets for automated processing and material extraction.
+            Upload PDF documents for advanced analysis using Azure AI Document Intelligence. Extracts material specifications, technical data, tables, and structured information with high accuracy.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -330,12 +333,18 @@ export const PDFProcessor: React.FC = () => {
                       
                       {item.result && (
                         <div className="text-sm text-muted-foreground mt-2">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <span>Pages: {item.result.summary.totalPages}</span>
-                            <span>Tiles: {item.result.summary.tilesExtracted}</span>
-                            <span>Materials: {item.result.summary.materialsIdentified}</span>
-                            <span>Confidence: {Math.round(item.result.summary.averageConfidence * 100)}%</span>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          <span>Pages: {item.result.summary.totalPages}</span>
+                          <span>Tiles: {item.result.summary.tilesExtracted}</span>
+                          <span>Materials: {item.result.summary.materialsIdentified}</span>
+                          <span>Confidence: {Math.round(item.result.summary.averageConfidence * 100)}%</span>
+                        </div>
+                        {item.result.summary.extractedTables !== undefined && (
+                          <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+                            <span>Tables: {item.result.summary.extractedTables}</span>
+                            <span>Key-Value Pairs: {item.result.summary.keyValuePairs}</span>
                           </div>
+                        )}
                         </div>
                       )}
                       
