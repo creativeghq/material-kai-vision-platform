@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye, Zap, Settings } from 'lucide-react';
+import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye, Zap, Settings, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PDFResultsViewer } from './PDFResultsViewer';
@@ -20,7 +20,7 @@ interface ProcessingOptions {
   overlapPercentage: number;
   extractStructuredData: boolean;
   detectMaterials: boolean;
-  processingMethod: 'azure' | 'standard';
+  processingMethod: 'azure' | 'hybrid' | 'standard';
 }
 
 interface ProcessingResult {
@@ -34,6 +34,12 @@ interface ProcessingResult {
     azureModel?: string;
     extractedTables?: number;
     keyValuePairs?: number;
+    hybridFeatures?: {
+      extractedImages: number;
+      documentStructure: number;
+      materialCorrelations: number;
+      tablesExtracted: number;
+    };
   };
 }
 
@@ -46,6 +52,16 @@ interface ProcessingStatus {
   error?: string;
 }
 
+// Helper function to get processing method display name
+const getProcessingMethodName = (method: 'azure' | 'hybrid' | 'standard'): string => {
+  switch (method) {
+    case 'azure': return 'Azure AI';
+    case 'hybrid': return 'Hybrid Python';
+    case 'standard': return 'Standard';
+    default: return 'Unknown';
+  }
+};
+
 export const PDFProcessor: React.FC = () => {
   const { toast } = useToast();
   const [processing, setProcessing] = useState<ProcessingStatus[]>([]);
@@ -56,7 +72,7 @@ export const PDFProcessor: React.FC = () => {
     overlapPercentage: 10,
     extractStructuredData: true,
     detectMaterials: true,
-    processingMethod: 'azure',
+    processingMethod: 'hybrid',
   });
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -127,7 +143,22 @@ export const PDFProcessor: React.FC = () => {
       // Call the selected PDF processor
       let processingResult, processingError;
       
-      if (options.processingMethod === 'azure') {
+      if (options.processingMethod === 'hybrid') {
+        console.log('Using Hybrid Python processing...');
+        const hybridResponse = await supabase.functions.invoke('hybrid-pdf-processor', {
+          body: {
+            fileUrl: publicUrl,
+            originalFilename: file.name,
+            fileSize: file.size,
+            userId: user.id,
+            extractionOptions: options
+          }
+        });
+        
+        processingResult = hybridResponse.data;
+        processingError = hybridResponse.error;
+        
+      } else if (options.processingMethod === 'azure') {
         console.log('Using Azure Document Intelligence processing...');
         const azureResponse = await supabase.functions.invoke('azure-pdf-processor', {
           body: {
@@ -142,14 +173,14 @@ export const PDFProcessor: React.FC = () => {
         processingResult = azureResponse.data;
         processingError = azureResponse.error;
         
-        // If Azure fails due to size or configuration, automatically fallback
+        // If Azure fails due to size or configuration, fallback to hybrid
         if (processingError && (
           processingError.message?.includes('exceeds Azure Document Intelligence limit') ||
           processingError.message?.includes('API key not configured')
         )) {
-          console.warn('Azure processing failed, falling back to standard processor:', processingError.message);
+          console.warn('Azure processing failed, falling back to hybrid processor:', processingError.message);
           
-          const fallbackResponse = await supabase.functions.invoke('pdf-processor', {
+          const fallbackResponse = await supabase.functions.invoke('hybrid-pdf-processor', {
             body: {
               fileUrl: publicUrl,
               originalFilename: file.name,
@@ -164,8 +195,8 @@ export const PDFProcessor: React.FC = () => {
           
           if (!fallbackResponse.error) {
             toast({
-              title: "Processing Complete (Standard Mode)",
-              description: `Azure processing unavailable, completed with standard processing. Found ${fallbackResponse.data.summary.materialsIdentified} materials.`,
+              title: "Processing Complete (Hybrid Mode)",
+              description: `Azure unavailable, completed with hybrid processing. Found ${fallbackResponse.data.summary.materialsIdentified} materials with advanced features.`,
               variant: "default",
             });
           }
@@ -187,7 +218,7 @@ export const PDFProcessor: React.FC = () => {
       }
 
       if (processingError) {
-        throw new Error(`${options.processingMethod === 'azure' ? 'Azure' : 'Standard'} processing failed: ${processingError.message}`);
+        throw new Error(`${getProcessingMethodName(options.processingMethod)} processing failed: ${processingError.message}`);
       }
 
       // Update with successful result
@@ -202,12 +233,16 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
+      const isHybridProcessing = options.processingMethod === 'hybrid' && 
+        processingResult.summary.hybridFeatures;
       const isAzureProcessing = options.processingMethod === 'azure' && 
         (processingResult.summary.extractedTables !== undefined || processingResult.summary.keyValuePairs !== undefined);
       
       toast({
-        title: `${options.processingMethod === 'azure' ? 'Azure AI' : 'Standard'} Processing Complete`,
-        description: isAzureProcessing 
+        title: `${getProcessingMethodName(options.processingMethod)} Processing Complete`,
+        description: isHybridProcessing
+          ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials with ${processingResult.summary.hybridFeatures.extractedImages} images, ${processingResult.summary.hybridFeatures.materialCorrelations} correlations, and ${processingResult.summary.hybridFeatures.documentStructure} structure elements.`
+          : isAzureProcessing 
           ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials, ${processingResult.summary.extractedTables || 0} tables, and ${processingResult.summary.keyValuePairs || 0} key-value pairs.`
           : `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials using ${options.processingMethod} processing.`,
       });
@@ -294,18 +329,27 @@ export const PDFProcessor: React.FC = () => {
             </div>
             <Select 
               value={options.processingMethod} 
-              onValueChange={(value: 'azure' | 'standard') => setOptions(prev => ({ ...prev, processingMethod: value }))}
+              onValueChange={(value: 'azure' | 'hybrid' | 'standard') => setOptions(prev => ({ ...prev, processingMethod: value }))}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select processing method" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="hybrid">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-purple-500" />
+                    <div>
+                      <div className="font-medium">Hybrid Python Processing (Recommended)</div>
+                      <div className="text-xs text-muted-foreground">PyMuPDF + AI with image extraction, cross-page correlations, and professional-grade analysis</div>
+                    </div>
+                  </div>
+                </SelectItem>
                 <SelectItem value="azure">
                   <div className="flex items-center gap-2">
                     <Zap className="h-4 w-4 text-blue-500" />
                     <div>
                       <div className="font-medium">Azure AI Document Intelligence</div>
-                      <div className="text-xs text-muted-foreground">Advanced AI processing with table extraction, form recognition, and enhanced material detection</div>
+                      <div className="text-xs text-muted-foreground">Cloud-based processing with table extraction and form recognition (50MB limit)</div>
                     </div>
                   </div>
                 </SelectItem>
@@ -314,17 +358,25 @@ export const PDFProcessor: React.FC = () => {
                     <FileText className="h-4 w-4 text-green-500" />
                     <div>
                       <div className="font-medium">Standard Processing</div>
-                      <div className="text-xs text-muted-foreground">Reliable OCR and material detection for large files and basic extraction needs</div>
+                      <div className="text-xs text-muted-foreground">Basic OCR and material detection for large files and simple extraction needs</div>
                     </div>
                   </div>
                 </SelectItem>
               </SelectContent>
             </Select>
+            {options.processingMethod === 'hybrid' && (
+              <Alert>
+                <Brain className="h-4 w-4" />
+                <AlertDescription>
+                  Hybrid processing combines PyMuPDF professional extraction with AI analysis. Features include image extraction, cross-page material correlations, and document structure analysis for superior material catalog processing.
+                </AlertDescription>
+              </Alert>
+            )}
             {options.processingMethod === 'azure' && (
               <Alert>
                 <Zap className="h-4 w-4" />
                 <AlertDescription>
-                  Azure AI provides superior accuracy for structured documents, tables, and forms. File size limit: 50MB.
+                  Azure AI provides cloud-based document intelligence with advanced table and form recognition. File size limit: 50MB.
                 </AlertDescription>
               </Alert>
             )}
@@ -332,7 +384,7 @@ export const PDFProcessor: React.FC = () => {
               <Alert>
                 <FileText className="h-4 w-4" />
                 <AlertDescription>
-                  Standard processing supports larger files and provides consistent material detection for all document types.
+                  Standard processing provides reliable OCR and basic material detection for large files and simple extraction needs.
                 </AlertDescription>
               </Alert>
             )}
@@ -403,8 +455,10 @@ export const PDFProcessor: React.FC = () => {
               <div>
                 <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
                 <p className="text-sm text-muted-foreground">
-                  {options.processingMethod === 'azure' 
-                    ? 'Azure AI: Up to 50MB per file for advanced analysis'
+                  {options.processingMethod === 'hybrid' 
+                    ? 'Hybrid: Professional-grade extraction with image analysis and cross-page correlations'
+                    : options.processingMethod === 'azure' 
+                    ? 'Azure AI: Up to 50MB per file for advanced cloud analysis'
                     : 'Standard: Supports large files up to 50MB with reliable processing'
                   }
                 </p>
@@ -457,7 +511,15 @@ export const PDFProcessor: React.FC = () => {
                           <span>Materials: {item.result.summary.materialsIdentified}</span>
                           <span>Confidence: {Math.round(item.result.summary.averageConfidence * 100)}%</span>
                         </div>
-                        {item.result.summary.extractedTables !== undefined && (
+                        {item.result.summary.hybridFeatures && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1 text-xs">
+                            <span>Images: {item.result.summary.hybridFeatures.extractedImages}</span>
+                            <span>Correlations: {item.result.summary.hybridFeatures.materialCorrelations}</span>
+                            <span>Structure: {item.result.summary.hybridFeatures.documentStructure}</span>
+                            <span>Tables: {item.result.summary.hybridFeatures.tablesExtracted}</span>
+                          </div>
+                        )}
+                        {item.result.summary.extractedTables !== undefined && !item.result.summary.hybridFeatures && (
                           <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
                             <span>Tables: {item.result.summary.extractedTables}</span>
                             <span>Key-Value Pairs: {item.result.summary.keyValuePairs}</span>

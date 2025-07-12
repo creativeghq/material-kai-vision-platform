@@ -1189,24 +1189,212 @@ export type Database = {
         }
         Relationships: []
       }
+      pdf_document_structure: {
+        Row: {
+          bounding_box: Json | null
+          confidence_score: number | null
+          content: string | null
+          created_at: string | null
+          hierarchy_level: number | null
+          id: string
+          metadata: Json | null
+          page_number: number
+          parent_element_id: string | null
+          pdf_processing_id: string
+          structure_type: string
+        }
+        Insert: {
+          bounding_box?: Json | null
+          confidence_score?: number | null
+          content?: string | null
+          created_at?: string | null
+          hierarchy_level?: number | null
+          id?: string
+          metadata?: Json | null
+          page_number: number
+          parent_element_id?: string | null
+          pdf_processing_id: string
+          structure_type: string
+        }
+        Update: {
+          bounding_box?: Json | null
+          confidence_score?: number | null
+          content?: string | null
+          created_at?: string | null
+          hierarchy_level?: number | null
+          id?: string
+          metadata?: Json | null
+          page_number?: number
+          parent_element_id?: string | null
+          pdf_processing_id?: string
+          structure_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_document_structure_parent_element_id_fkey"
+            columns: ["parent_element_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_document_structure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_document_structure_pdf_processing_id_fkey"
+            columns: ["pdf_processing_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdf_extracted_images: {
+        Row: {
+          bounding_box: Json | null
+          created_at: string | null
+          dimensions: Json | null
+          extracted_text: string | null
+          id: string
+          image_embedding: string | null
+          image_index: number
+          image_type: string | null
+          image_url: string | null
+          material_confidence: number | null
+          material_detected: boolean | null
+          metadata: Json | null
+          page_number: number
+          pdf_processing_id: string
+          tile_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          bounding_box?: Json | null
+          created_at?: string | null
+          dimensions?: Json | null
+          extracted_text?: string | null
+          id?: string
+          image_embedding?: string | null
+          image_index: number
+          image_type?: string | null
+          image_url?: string | null
+          material_confidence?: number | null
+          material_detected?: boolean | null
+          metadata?: Json | null
+          page_number: number
+          pdf_processing_id: string
+          tile_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          bounding_box?: Json | null
+          created_at?: string | null
+          dimensions?: Json | null
+          extracted_text?: string | null
+          id?: string
+          image_embedding?: string | null
+          image_index?: number
+          image_type?: string | null
+          image_url?: string | null
+          material_confidence?: number | null
+          material_detected?: boolean | null
+          metadata?: Json | null
+          page_number?: number
+          pdf_processing_id?: string
+          tile_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_extracted_images_pdf_processing_id_fkey"
+            columns: ["pdf_processing_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_extracted_images_tile_id_fkey"
+            columns: ["tile_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_tiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdf_material_correlations: {
+        Row: {
+          confidence_score: number
+          correlation_data: Json | null
+          correlation_type: string
+          created_at: string | null
+          id: string
+          pdf_processing_id: string
+          primary_tile_id: string
+          related_tile_id: string
+        }
+        Insert: {
+          confidence_score: number
+          correlation_data?: Json | null
+          correlation_type: string
+          created_at?: string | null
+          id?: string
+          pdf_processing_id: string
+          primary_tile_id: string
+          related_tile_id: string
+        }
+        Update: {
+          confidence_score?: number
+          correlation_data?: Json | null
+          correlation_type?: string
+          created_at?: string | null
+          id?: string
+          pdf_processing_id?: string
+          primary_tile_id?: string
+          related_tile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_material_correlations_pdf_processing_id_fkey"
+            columns: ["pdf_processing_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_material_correlations_primary_tile_id_fkey"
+            columns: ["primary_tile_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_tiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_material_correlations_related_tile_id_fkey"
+            columns: ["related_tile_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_tiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pdf_processing_results: {
         Row: {
           azure_confidence_score: number | null
           azure_model_used: string | null
           confidence_score_avg: number | null
           created_at: string
+          cross_page_references: Json | null
           document_author: string | null
           document_classification: Json | null
           document_keywords: string | null
+          document_structure: Json | null
           document_subject: string | null
           document_title: string | null
           error_message: string | null
+          extracted_images: Json | null
           extracted_tables: Json | null
           extraction_options: Json | null
           file_size: number | null
           file_url: string
           form_fields: Json | null
           id: string
+          layout_analysis_version: string | null
           material_recognition_model_version: string | null
           materials_identified_count: number | null
           ocr_model_version: string | null
@@ -1216,6 +1404,7 @@ export type Database = {
           processing_started_at: string | null
           processing_status: string
           processing_time_ms: number | null
+          python_processor_version: string | null
           tile_size_pixels: number | null
           total_pages: number | null
           total_tiles_extracted: number | null
@@ -1227,18 +1416,22 @@ export type Database = {
           azure_model_used?: string | null
           confidence_score_avg?: number | null
           created_at?: string
+          cross_page_references?: Json | null
           document_author?: string | null
           document_classification?: Json | null
           document_keywords?: string | null
+          document_structure?: Json | null
           document_subject?: string | null
           document_title?: string | null
           error_message?: string | null
+          extracted_images?: Json | null
           extracted_tables?: Json | null
           extraction_options?: Json | null
           file_size?: number | null
           file_url: string
           form_fields?: Json | null
           id?: string
+          layout_analysis_version?: string | null
           material_recognition_model_version?: string | null
           materials_identified_count?: number | null
           ocr_model_version?: string | null
@@ -1248,6 +1441,7 @@ export type Database = {
           processing_started_at?: string | null
           processing_status?: string
           processing_time_ms?: number | null
+          python_processor_version?: string | null
           tile_size_pixels?: number | null
           total_pages?: number | null
           total_tiles_extracted?: number | null
@@ -1259,18 +1453,22 @@ export type Database = {
           azure_model_used?: string | null
           confidence_score_avg?: number | null
           created_at?: string
+          cross_page_references?: Json | null
           document_author?: string | null
           document_classification?: Json | null
           document_keywords?: string | null
+          document_structure?: Json | null
           document_subject?: string | null
           document_title?: string | null
           error_message?: string | null
+          extracted_images?: Json | null
           extracted_tables?: Json | null
           extraction_options?: Json | null
           file_size?: number | null
           file_url?: string
           form_fields?: Json | null
           id?: string
+          layout_analysis_version?: string | null
           material_recognition_model_version?: string | null
           materials_identified_count?: number | null
           ocr_model_version?: string | null
@@ -1280,6 +1478,7 @@ export type Database = {
           processing_started_at?: string | null
           processing_status?: string
           processing_time_ms?: number | null
+          python_processor_version?: string | null
           tile_size_pixels?: number | null
           total_pages?: number | null
           total_tiles_extracted?: number | null
@@ -1294,12 +1493,17 @@ export type Database = {
           azure_element_type: string | null
           bounding_polygon: Json | null
           created_at: string
+          cross_references: Json | null
+          document_element_type: string | null
+          extracted_images: Json | null
           extracted_text: string | null
           form_field_info: Json | null
           height: number
           id: string
           image_embedding: string | null
+          image_embeddings: Json | null
           image_url: string | null
+          layout_confidence: number | null
           material_confidence: number | null
           material_detected: boolean | null
           material_type: string | null
@@ -1307,6 +1511,7 @@ export type Database = {
           ocr_confidence: number | null
           page_number: number
           pdf_processing_id: string
+          pymupdf_data: Json | null
           related_material_id: string | null
           structured_data: Json | null
           table_cell_info: Json | null
@@ -1322,12 +1527,17 @@ export type Database = {
           azure_element_type?: string | null
           bounding_polygon?: Json | null
           created_at?: string
+          cross_references?: Json | null
+          document_element_type?: string | null
+          extracted_images?: Json | null
           extracted_text?: string | null
           form_field_info?: Json | null
           height: number
           id?: string
           image_embedding?: string | null
+          image_embeddings?: Json | null
           image_url?: string | null
+          layout_confidence?: number | null
           material_confidence?: number | null
           material_detected?: boolean | null
           material_type?: string | null
@@ -1335,6 +1545,7 @@ export type Database = {
           ocr_confidence?: number | null
           page_number: number
           pdf_processing_id: string
+          pymupdf_data?: Json | null
           related_material_id?: string | null
           structured_data?: Json | null
           table_cell_info?: Json | null
@@ -1350,12 +1561,17 @@ export type Database = {
           azure_element_type?: string | null
           bounding_polygon?: Json | null
           created_at?: string
+          cross_references?: Json | null
+          document_element_type?: string | null
+          extracted_images?: Json | null
           extracted_text?: string | null
           form_field_info?: Json | null
           height?: number
           id?: string
           image_embedding?: string | null
+          image_embeddings?: Json | null
           image_url?: string | null
+          layout_confidence?: number | null
           material_confidence?: number | null
           material_detected?: boolean | null
           material_type?: string | null
@@ -1363,6 +1579,7 @@ export type Database = {
           ocr_confidence?: number | null
           page_number?: number
           pdf_processing_id?: string
+          pymupdf_data?: Json | null
           related_material_id?: string | null
           structured_data?: Json | null
           table_cell_info?: Json | null
