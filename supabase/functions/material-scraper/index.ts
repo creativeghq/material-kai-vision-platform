@@ -106,15 +106,15 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
   }
   
   const allMaterials: MaterialData[] = [];
-  const maxPages = Math.min(urls.length, options.maxPages || 50);
+  const totalPages = urls.length;
   
-  console.log(`Processing ${maxPages} URLs from sitemap`);
+  console.log(`Processing ALL ${totalPages} URLs from sitemap (no page limit)`);
   
   // Process URLs in batches to avoid overwhelming the APIs
-  const batchSize = 5;
-  for (let i = 0; i < maxPages; i += batchSize) {
+  const batchSize = 3; // Smaller batches for better stability
+  for (let i = 0; i < totalPages; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
-    console.log(`Processing batch ${Math.floor(i/batchSize) + 1} (${batch.length} URLs)`);
+    console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(totalPages/batchSize)} (${batch.length} URLs)`);
     
     const batchPromises = batch.map(async (url) => {
       try {
@@ -138,13 +138,15 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
       allMaterials.push(...pageResults);
     }
     
-    // Add delay between batches to be respectful to the APIs
-    if (i + batchSize < maxPages) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    console.log(`Batch ${Math.floor(i/batchSize) + 1} complete: ${allMaterials.length} total materials so far`);
+    
+    // Add delay between batches to be respectful to the APIs and prevent timeouts
+    if (i + batchSize < totalPages) {
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
     }
   }
   
-  console.log(`Sitemap processing complete: ${allMaterials.length} materials from ${maxPages} pages`);
+  console.log(`Sitemap processing complete: ${allMaterials.length} materials from ${totalPages} pages`);
   return allMaterials;
 }
 
@@ -524,7 +526,7 @@ async function crawlWithFirecrawl(url: string, options: any): Promise<MaterialDa
 
   const crawlBody = {
     url: url,
-    limit: options.maxPages || 10, // Default to 10 pages max
+    limit: 1000, // Process ALL pages (no limit)
     scrapeOptions: {
       formats: ["extract"],
       extract: {

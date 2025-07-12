@@ -135,6 +135,67 @@ Return a list of materials found on the page.`,
     }
   };
 
+  const handleAddAllToCatalog = async () => {
+    if (scrapedMaterials.length === 0) return;
+    
+    setIsLoading(true);
+    
+    try {
+      // Add materials to catalog in batches
+      const batchSize = 5;
+      let addedCount = 0;
+      
+      for (let i = 0; i < scrapedMaterials.length; i += batchSize) {
+        const batch = scrapedMaterials.slice(i, i + batchSize);
+        
+        for (const material of batch) {
+          try {
+            const { error } = await supabase.from('materials_catalog').insert({
+              name: material.name,
+              description: material.description || 'Scraped material',
+              category: material.category?.toLowerCase() as any || 'other',
+              properties: {
+                ...material.properties,
+                price: material.price,
+                images: material.images,
+                sourceUrl: material.sourceUrl,
+                supplier: material.supplier,
+                scrapedAt: new Date().toISOString()
+              },
+              thumbnail_url: material.images?.[0] || null
+            });
+            
+            if (!error) {
+              addedCount++;
+            }
+          } catch (err) {
+            console.error('Failed to add material:', material.name, err);
+          }
+        }
+        
+        // Small delay between batches
+        if (i + batchSize < scrapedMaterials.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      toast({
+        title: "Success",
+        description: `Added ${addedCount} of ${scrapedMaterials.length} materials to catalog`,
+      });
+      
+    } catch (error) {
+      console.error('Bulk add error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add materials to catalog",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const popularSites = [
     { name: 'Tile Shop', url: 'https://www.tileshop.com', category: 'Tiles' },
     { name: 'Floor & Decor', url: 'https://www.flooranddecor.com', category: 'Flooring' },
@@ -180,39 +241,71 @@ Return a list of materials found on the page.`,
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex space-x-4">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        value="single"
-                        checked={!options.sitemapMode && !options.crawlMode}
-                        onChange={() => setOptions(prev => ({ ...prev, sitemapMode: false, crawlMode: false }))}
-                        disabled={isLoading}
-                      />
-                      <span className="text-sm">Single Page</span>
-                    </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Scraping Service</Label>
+                      <div className="flex space-x-4">
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            value="firecrawl"
+                            checked={options.service === 'firecrawl'}
+                            onChange={() => setOptions(prev => ({ ...prev, service: 'firecrawl' }))}
+                            disabled={isLoading}
+                          />
+                          <span className="text-sm">Firecrawl</span>
+                        </label>
+                        
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            value="jina"
+                            checked={options.service === 'jina'}
+                            onChange={() => setOptions(prev => ({ ...prev, service: 'jina' }))}
+                            disabled={isLoading}
+                          />
+                          <span className="text-sm">Jina AI</span>
+                        </label>
+                      </div>
+                    </div>
                     
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        value="sitemap"
-                        checked={options.sitemapMode}
-                        onChange={() => setOptions(prev => ({ ...prev, sitemapMode: true, crawlMode: false }))}
-                        disabled={isLoading}
-                      />
-                      <span className="text-sm">XML Sitemap</span>
-                    </label>
-                    
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        value="crawl"
-                        checked={options.crawlMode && !options.sitemapMode}
-                        onChange={() => setOptions(prev => ({ ...prev, sitemapMode: false, crawlMode: true }))}
-                        disabled={isLoading}
-                      />
-                      <span className="text-sm">Auto Crawl</span>
-                    </label>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Scraping Mode</Label>
+                      <div className="flex space-x-4">
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            value="single"
+                            checked={!options.sitemapMode && !options.crawlMode}
+                            onChange={() => setOptions(prev => ({ ...prev, sitemapMode: false, crawlMode: false }))}
+                            disabled={isLoading}
+                          />
+                          <span className="text-sm">Single Page</span>
+                        </label>
+                        
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            value="sitemap"
+                            checked={options.sitemapMode}
+                            onChange={() => setOptions(prev => ({ ...prev, sitemapMode: true, crawlMode: false }))}
+                            disabled={isLoading}
+                          />
+                          <span className="text-sm">XML Sitemap</span>
+                        </label>
+                        
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            value="crawl"
+                            checked={options.crawlMode && !options.sitemapMode}
+                            onChange={() => setOptions(prev => ({ ...prev, sitemapMode: false, crawlMode: true }))}
+                            disabled={isLoading}
+                          />
+                          <span className="text-sm">Auto Crawl</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                   
                   {options.sitemapMode && (
@@ -245,19 +338,12 @@ Return a list of materials found on the page.`,
                      )}
                      
                      
-                     <div className="space-y-4 p-3 border rounded bg-background/50">
-                       <div className="space-y-2">
-                         <Label htmlFor="maxPages">Maximum pages to process</Label>
-                         <Input
-                           id="maxPages"
-                           type="number"
-                           value={options.maxPages || 10}
-                           onChange={(e) => setOptions(prev => ({ ...prev, maxPages: parseInt(e.target.value) || 10 }))}
-                           min="1"
-                           max="100"
-                           disabled={isLoading}
-                         />
-                       </div>
+                      <div className="space-y-4 p-3 border rounded bg-background/50">
+                        <div className="p-3 border rounded bg-blue-50 dark:bg-blue-950/30">
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            ⚡ <strong>No Page Limits:</strong> Will process ALL pages found. Processing happens in batches to prevent timeouts.
+                          </p>
+                        </div>
                        
                        <div className="space-y-2">
                          <Label htmlFor="includePatterns">Include URL patterns (comma-separated)</Label>
@@ -505,11 +591,28 @@ Return a list of materials found on the page.`,
           </Card>
         </TabsContent>
 
-        <TabsContent value="results">
-          <ScrapedMaterialsViewer 
-            materials={scrapedMaterials}
-            onMaterialsUpdate={setScrapedMaterials}
-          />
+        <TabsContent value="results" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Scraped Materials ({scrapedMaterials.length})</CardTitle>
+              {scrapedMaterials.length > 0 && (
+                <Button 
+                  onClick={handleAddAllToCatalog}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Add All to Catalog
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              <ScrapedMaterialsViewer 
+                materials={scrapedMaterials}
+                onMaterialsUpdate={setScrapedMaterials}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
