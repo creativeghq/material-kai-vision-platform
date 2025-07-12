@@ -40,129 +40,161 @@ serve(async (req) => {
 
     const { url, options = {} }: CrawlRequest = await req.json();
     
-    console.log('Starting material scraping for:', url);
+    console.log('Starting material scraping for URL:', url);
+    console.log('Options:', options);
     
-    // Configure Firecrawl crawl options for v1 API
-    const crawlBody = {
-      url,
-      limit: options.limit || 50,
-      scrapeOptions: {
-        formats: ['markdown', 'html'],
-        onlyMainContent: true,
-        includeTags: ['img', 'picture', 'figure'],
-        excludeTags: ['nav', 'footer', 'header', 'aside'],
-        waitFor: 2000
-      },
-      extractorOptions: {
-        mode: 'llm-extraction',
-        extractionPrompt: `
-          Extract material/product information from this page. Look for:
-          - Product names and titles
-          - Material categories (tiles, flooring, stone, wood, etc.)
-          - Descriptions and specifications
-          - Prices and pricing information
-          - Technical properties (dimensions, finish, etc.)
-          - High-quality product images
-          - Brand/supplier information
-          
-          Return the data as a JSON array of materials with the following structure:
-          {
-            "materials": [
-              {
-                "name": "Product name",
-                "description": "Product description",
-                "category": "Material category",
-                "price": "Price if available",
-                "images": ["array of image URLs"],
-                "properties": {
-                  "dimensions": "size info",
-                  "finish": "finish type",
-                  "material": "material type",
-                  "color": "color info",
-                  "thickness": "thickness if applicable"
-                },
-                "supplier": "Brand or supplier name"
+    // Use Firecrawl v1 API scrape endpoint (simpler and more reliable)
+    const scrapeBody = {
+      url: url,
+      formats: ['markdown', 'html'],
+      onlyMainContent: true,
+      includeTags: ['img', 'picture', 'figure', 'div', 'span', 'p', 'h1', 'h2', 'h3'],
+      excludeTags: ['nav', 'footer', 'header', 'aside', 'script'],
+      waitFor: 3000,
+      extract: {
+        schema: {
+          type: "object",
+          properties: {
+            materials: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  category: { type: "string" },
+                  price: { type: "string" },
+                  images: { 
+                    type: "array",
+                    items: { type: "string" }
+                  },
+                  properties: {
+                    type: "object",
+                    properties: {
+                      dimensions: { type: "string" },
+                      finish: { type: "string" },
+                      material: { type: "string" },
+                      color: { type: "string" },
+                      thickness: { type: "string" }
+                    }
+                  },
+                  supplier: { type: "string" }
+                }
               }
-            ]
+            }
           }
-        `
+        },
+        systemPrompt: "You are an expert at extracting material and product information from websites.",
+        prompt: `Extract all material and product information from this page. Look for:
+- Product names and titles
+- Material categories (tiles, flooring, stone, wood, metal, fabric, etc.)
+- Product descriptions and specifications
+- Prices and pricing information
+- Technical properties (dimensions, finish, color, material type, thickness)
+- Product images (extract URLs)
+- Brand/supplier information
+
+Focus on construction materials, interior design materials, flooring, tiles, fabrics, metals, wood, stone, and similar products. Return as many materials as you can find on the page.`
       }
     };
 
-    console.log('Calling Firecrawl API with body:', crawlBody);
+    console.log('Calling Firecrawl v1 scrape API...');
 
-    // Call Firecrawl API
-    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/crawl', {
+    // Call Firecrawl v1 scrape API
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(crawlBody),
+      body: JSON.stringify(scrapeBody),
     });
 
-    if (!firecrawlResponse.ok) {
-      const errorText = await firecrawlResponse.text();
+    console.log('Firecrawl response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
       console.error('Firecrawl API error:', errorText);
-      throw new Error(`Firecrawl API error: ${firecrawlResponse.status} - ${errorText}`);
+      throw new Error(`Firecrawl API error: ${response.status} - ${errorText}`);
     }
 
-    const crawlData = await firecrawlResponse.json();
-    console.log('Firecrawl response:', crawlData);
+    const data = await response.json();
+    console.log('Firecrawl response received:', data.success ? 'Success' : 'Failed');
 
-    // Check if we got a jobId (async crawl) or immediate results
-    if (crawlData.jobId) {
-      console.log('Async crawl started with jobId:', crawlData.jobId);
-      
-      // Poll for results
-      let attempts = 0;
-      const maxAttempts = 30; // 5 minutes max
-      
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
-        
-        const statusResponse = await fetch(`https://api.firecrawl.dev/v1/crawl/${crawlData.jobId}`, {
-          headers: {
-            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-          },
-        });
-        
-        const statusData = await statusResponse.json();
-        console.log(`Crawl status (attempt ${attempts + 1}):`, statusData.status);
-        
-        if (statusData.status === 'completed') {
-          console.log('Crawl completed, processing results...');
-          const materials = await processCrawlResults(statusData.data, url);
+    if (!data.success) {
+      throw new Error('Firecrawl scraping failed: ' + (data.error || 'Unknown error'));
+    }
+
+    // Process the extracted materials
+    const materials: MaterialData[] = [];
+    
+    if (data.data?.extract?.materials && Array.isArray(data.data.extract.materials)) {
+      for (const material of data.data.extract.materials) {
+        if (material.name && material.name.trim().length > 2) {
+          const cleanMaterial: MaterialData = {
+            name: material.name || 'Unknown Material',
+            description: material.description || '',
+            category: categorizeEffect(material.category || material.properties?.material || 'other'),
+            price: material.price || '',
+            images: Array.isArray(material.images) ? material.images.filter(Boolean) : [],
+            properties: {
+              dimensions: material.properties?.dimensions || '',
+              finish: material.properties?.finish || '',
+              material: material.properties?.material || '',
+              color: material.properties?.color || '',
+              thickness: material.properties?.thickness || '',
+              brand: material.supplier || '',
+              ...material.properties
+            },
+            sourceUrl: url,
+            supplier: material.supplier || extractSupplierFromUrl(url)
+          };
           
-          return new Response(JSON.stringify({
-            success: true,
-            materials,
-            totalPages: statusData.data?.length || 0,
-            processingTime: Date.now() - Date.now()
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } else if (statusData.status === 'failed') {
-          throw new Error('Crawl failed: ' + statusData.error);
+          materials.push(cleanMaterial);
         }
-        
-        attempts++;
       }
-      
-      throw new Error('Crawl timeout - please try again');
-    } else {
-      // Immediate results
-      console.log('Processing immediate crawl results...');
-      const materials = await processCrawlResults(crawlData.data, url);
-      
-      return new Response(JSON.stringify({
-        success: true,
-        materials,
-        totalPages: crawlData.data?.length || 0
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
     }
+
+    // Fallback: try to extract from content if no structured data
+    if (materials.length === 0 && data.data?.content) {
+      console.log('No structured materials found, attempting content analysis...');
+      
+      // Simple fallback extraction from content
+      const content = data.data.content;
+      const lines = content.split('\n').filter(line => line.trim().length > 0);
+      
+      // Look for product-like patterns
+      for (const line of lines.slice(0, 20)) { // Limit to first 20 lines
+        if (line.length > 10 && line.length < 100 && 
+            (line.includes('tile') || line.includes('wood') || line.includes('stone') || 
+             line.includes('floor') || line.includes('material') || line.includes('finish'))) {
+          
+          materials.push({
+            name: line.trim(),
+            description: 'Extracted from page content',
+            category: 'Other',
+            price: '',
+            images: [],
+            properties: {},
+            sourceUrl: url,
+            supplier: extractSupplierFromUrl(url)
+          });
+          
+          if (materials.length >= 5) break; // Limit fallback results
+        }
+      }
+    }
+
+    console.log(`Successfully processed ${materials.length} materials`);
+
+    return new Response(JSON.stringify({
+      success: true,
+      materials,
+      totalPages: 1,
+      processingTime: Date.now()
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('Material scraper error:', error);
@@ -175,59 +207,6 @@ serve(async (req) => {
     });
   }
 });
-
-async function processCrawlResults(crawlData: any[], sourceUrl: string): Promise<MaterialData[]> {
-  const allMaterials: MaterialData[] = [];
-  
-  for (const page of crawlData || []) {
-    try {
-      // Try to parse extracted data
-      let extractedData;
-      if (page.extract) {
-        extractedData = typeof page.extract === 'string' ? JSON.parse(page.extract) : page.extract;
-      }
-      
-      if (extractedData?.materials && Array.isArray(extractedData.materials)) {
-        for (const material of extractedData.materials) {
-          // Clean and validate material data
-          const cleanMaterial: MaterialData = {
-            name: material.name || 'Unknown Material',
-            description: material.description || '',
-            category: categorizeEffect(material.category || material.material || 'other'),
-            price: material.price || '',
-            images: Array.isArray(material.images) ? material.images.filter(Boolean) : [],
-            properties: {
-              dimensions: material.properties?.dimensions || '',
-              finish: material.properties?.finish || '',
-              material: material.properties?.material || '',
-              color: material.properties?.color || '',
-              thickness: material.properties?.thickness || '',
-              brand: material.supplier || material.brand || '',
-              ...material.properties
-            },
-            sourceUrl: page.metadata?.sourceURL || sourceUrl,
-            supplier: material.supplier || material.brand || extractSupplierFromUrl(sourceUrl)
-          };
-          
-          // Only add materials with valid names
-          if (cleanMaterial.name && cleanMaterial.name.length > 2) {
-            allMaterials.push(cleanMaterial);
-          }
-        }
-      } else {
-        // Fallback: try to extract from page content
-        console.log('No structured extraction, trying content analysis for:', page.metadata?.title);
-        // This is a simplified fallback - in practice you might want more sophisticated parsing
-      }
-    } catch (error) {
-      console.error('Error processing page:', error);
-      continue;
-    }
-  }
-  
-  console.log(`Processed ${allMaterials.length} materials from crawl`);
-  return allMaterials;
-}
 
 function categorizeEffect(category: string): string {
   const categoryMap: Record<string, string> = {
