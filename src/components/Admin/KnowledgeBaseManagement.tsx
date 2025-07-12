@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ interface KnowledgeEntry {
 }
 
 const KnowledgeBaseManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<KnowledgeEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +187,7 @@ const KnowledgeBaseManagement: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.location.href = '/'}
+                onClick={() => navigate('/')}
                 className="flex items-center gap-2"
               >
                 <Search className="h-4 w-4" />
@@ -194,7 +196,7 @@ const KnowledgeBaseManagement: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.location.href = '/admin'}
+                onClick={() => navigate('/admin')}
                 className="flex items-center gap-2"
               >
                 <Filter className="h-4 w-4" />

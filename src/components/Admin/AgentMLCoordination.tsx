@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,7 @@ interface MLTask {
 }
 
 const AgentMLCoordination: React.FC = () => {
+  const navigate = useNavigate();
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [mlTasks, setMLTasks] = useState<MLTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,7 +143,7 @@ const AgentMLCoordination: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.location.href = '/'}
+                onClick={() => navigate('/')}
                 className="flex items-center gap-2"
               >
                 <Brain className="h-4 w-4" />
@@ -150,7 +152,7 @@ const AgentMLCoordination: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.location.href = '/admin'}
+                onClick={() => navigate('/admin')}
                 className="flex items-center gap-2"
               >
                 <Activity className="h-4 w-4" />

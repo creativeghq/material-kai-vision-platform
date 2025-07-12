@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AITestingPanel } from './AITestingPanel';
 import { MetadataFieldsManagement } from './MetadataFieldsManagement';
 import { RAGManagementPanel } from './RAGManagementPanel';
@@ -49,6 +50,7 @@ interface ScoreData {
 }
 
 export const AdminPanel: React.FC = () => {
+  const navigate = useNavigate();
   const [analyticsData, setAnalyticsData] = useState<AnalyticsEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -184,7 +186,7 @@ export const AdminPanel: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.location.href = '/'}
+                onClick={() => navigate('/')}
                 className="flex items-center gap-2"
               >
                 <Activity className="h-4 w-4" />
@@ -193,7 +195,7 @@ export const AdminPanel: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.location.href = '/admin'}
+                onClick={() => navigate('/admin')}
                 className="flex items-center gap-2"
               >
                 <BarChart3 className="h-4 w-4" />
