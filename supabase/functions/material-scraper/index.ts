@@ -111,18 +111,20 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
   console.log(`Processing ALL ${totalPages} URLs from sitemap (no page limit)`);
   
   // Process URLs in batches to avoid overwhelming the APIs
-  const batchSize = 2; // Even smaller batches for sitemap processing
+  const batchSize = service === 'jina' ? 1 : 2; // Single URL for Jina to avoid timeouts
   const totalBatches = Math.ceil(totalPages / batchSize);
   for (let i = 0; i < totalPages; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
     const currentBatch = Math.floor(i / batchSize) + 1;
-    console.log(`Processing batch ${currentBatch}/${totalBatches} (${batch.length} URLs)`);
+    console.log(`Processing batch ${currentBatch}/${totalBatches} (${batch.length} URLs) with ${service}`);
     
-    // Add timeout for each batch to prevent edge function timeout
+    // Shorter timeout for Jina AI to prevent edge function timeout
+    const timeoutMs = service === 'jina' ? 15000 : 25000;
+    
     const batchPromise = Promise.race([
       processBatch(batch, service, options),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Batch timeout')), 30000) // 30 second timeout per batch
+        setTimeout(() => reject(new Error(`${service} batch timeout after ${timeoutMs}ms`)), timeoutMs)
       )
     ]);
     
@@ -137,13 +139,15 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
       console.log(`Batch ${currentBatch} complete: ${allMaterials.length} total materials so far`);
       
     } catch (error) {
-      console.error(`Batch ${currentBatch} failed:`, error);
+      console.error(`Batch ${currentBatch} failed with ${service}:`, error.message);
       // Continue with next batch even if this one fails
     }
     
-    // Add delay between batches to be respectful to the APIs and prevent timeouts
+    // Longer delay for Jina AI to be more respectful
+    const delayMs = service === 'jina' ? 7000 : 3000;
     if (i + batchSize < totalPages) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
+      console.log(`Waiting ${delayMs}ms before next batch...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
   console.log(`Sitemap processing complete: ${allMaterials.length} materials from ${totalPages} pages`);
