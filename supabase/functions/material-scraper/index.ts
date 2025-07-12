@@ -266,34 +266,37 @@ Return a list of materials found on the page.`;
 
   const extractBody = {
     url: url,
-    prompt: extractPrompt,
-    schema: options.schema || {
-      type: "object",
-      properties: {
-        materials: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string", description: "Product/material name" },
-              description: { type: "string", description: "Product description" },
-              price: { type: "string", description: "Price with currency" },
-              category: { type: "string", description: "Material category" },
-              images: { 
-                type: "array", 
-                items: { type: "string" },
-                description: "Image URLs" 
-              },
+    formats: ["extract"],
+    extract: {
+      prompt: extractPrompt,
+      schema: options.schema || {
+        type: "object",
+        properties: {
+          materials: {
+            type: "array",
+            items: {
+              type: "object",
               properties: {
-                type: "object",
-                description: "Additional properties like dimensions, color, finish"
-              }
-            },
-            required: ["name"]
+                name: { type: "string", description: "Product/material name" },
+                description: { type: "string", description: "Product description" },
+                price: { type: "string", description: "Price with currency" },
+                category: { type: "string", description: "Material category" },
+                images: { 
+                  type: "array", 
+                  items: { type: "string" },
+                  description: "Image URLs" 
+                },
+                properties: {
+                  type: "object",
+                  description: "Additional properties like dimensions, color, finish"
+                }
+              },
+              required: ["name"]
+            }
           }
-        }
-      },
-      required: ["materials"]
+        },
+        required: ["materials"]
+      }
     }
   };
 
