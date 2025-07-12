@@ -18,6 +18,11 @@ import { RAGManagementPanel } from "./components/Admin/RAGManagementPanel";
 import { AITestingPanel } from "./components/Admin/AITestingPanel";
 import { AnalyticsDashboard } from "./components/Admin/AnalyticsDashboard";
 import { SystemPerformance } from "./components/Admin/SystemPerformance";
+import { MaterialRecognition } from "./components/Recognition/MaterialRecognition";
+import { MaterialCatalog } from "./components/Catalog/MaterialCatalog";
+import { MoodBoardPage } from "./components/MoodBoard/MoodBoardPage";
+import { Designer3DPage } from "./components/3D/Designer3DPage";
+import { AIStudioPage } from "./components/AI/AIStudioPage";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +38,36 @@ const App = () => (
             <Route path="/" element={
               <AuthGuard>
                 <Index />
+              </AuthGuard>
+            } />
+            <Route path="/recognition" element={
+              <AuthGuard>
+                <MaterialRecognition />
+              </AuthGuard>
+            } />
+            <Route path="/catalog" element={
+              <AuthGuard>
+                <MaterialCatalog />
+              </AuthGuard>
+            } />
+            <Route path="/moodboard" element={
+              <AuthGuard>
+                <MoodBoardPage />
+              </AuthGuard>
+            } />
+            <Route path="/3d" element={
+              <AuthGuard>
+                <Designer3DPage />
+              </AuthGuard>
+            } />
+            <Route path="/agents" element={
+              <AuthGuard>
+                <AIStudioPage />
+              </AuthGuard>
+            } />
+            <Route path="/analytics" element={
+              <AuthGuard>
+                <AnalyticsDashboard />
               </AuthGuard>
             } />
             <Route path="/admin" element={
