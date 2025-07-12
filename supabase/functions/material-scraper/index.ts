@@ -166,8 +166,11 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
         
         console.log(`Retrieved content: ${content.length} characters, ${images.length} images`);
         
-        const extractedMaterials = extractMaterialsFromContent(content, url, pageTitle, images);
-        materials.push(...extractedMaterials);
+        // For Jina AI, create a single comprehensive material entry from the entire page
+        const comprehensiveMaterial = createComprehensiveMaterial(content, url, pageTitle, images);
+        if (comprehensiveMaterial) {
+          materials.push(comprehensiveMaterial);
+        }
       }
     }
     
@@ -470,6 +473,134 @@ function createMaterialFromPartial(partial: Partial<MaterialData>, sourceUrl: st
     supplier: extractSupplierFromUrl(sourceUrl),
     confidence: 0.8
   };
+}
+
+function createComprehensiveMaterial(
+  content: string,
+  sourceUrl: string,
+  pageTitle: string,
+  images: string[]
+): MaterialData | null {
+  if (!content || !pageTitle) return null;
+
+  // Extract key information from content
+  const lines = content.split('\n').filter(line => line.trim());
+  
+  // Extract prices
+  const priceRegex = /[\$£€¥]\s*\d+(?:[.,]\d{2})?(?:\s*-\s*[\$£€¥]\s*\d+(?:[.,]\d{2})?)?/g;
+  const prices = content.match(priceRegex) || [];
+  
+  // Extract dimensions
+  const dimensionRegex = /\d+\s*(?:x|×)\s*\d+(?:\s*(?:x|×)\s*\d+)?\s*(?:mm|cm|m|inch|in|ft)(?:es)?/gi;
+  const dimensions = content.match(dimensionRegex) || [];
+  
+  // Extract specifications and properties
+  const properties: Record<string, any> = {
+    sourceUrl,
+    extractedAt: new Date().toISOString(),
+    extractedBy: 'jina-ai',
+    contentLength: content.length,
+    pageTitle
+  };
+  
+  // Add found dimensions
+  if (dimensions.length > 0) {
+    properties.dimensions = dimensions;
+  }
+  
+  // Add found prices
+  if (prices.length > 0) {
+    properties.pricesFound = prices;
+  }
+  
+  // Look for technical specs, materials, colors, etc.
+  const specPatterns = [
+    /(?:material|made of|composition):\s*([^\n.,]+)/gi,
+    /(?:color|colour):\s*([^\n.,]+)/gi,
+    /(?:finish|surface):\s*([^\n.,]+)/gi,
+    /(?:thickness|depth):\s*([^\n.,]+)/gi,
+    /(?:weight):\s*([^\n.,]+)/gi,
+    /(?:warranty):\s*([^\n.,]+)/gi
+  ];
+  
+  specPatterns.forEach(pattern => {
+    const matches = content.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        const parts = match.split(':');
+        if (parts.length === 2) {
+          const key = parts[0].trim().toLowerCase();
+          const value = parts[1].trim();
+          properties[key] = value;
+        }
+      });
+    }
+  });
+  
+  // Create description from first few meaningful paragraphs
+  const meaningfulLines = lines.filter(line => 
+    line.length > 30 && 
+    line.length < 400 && 
+    !line.startsWith('#') &&
+    !line.includes('http') &&
+    !/^\d+\.\s/.test(line) && // Skip numbered lists
+    !line.includes('©') &&
+    !line.includes('cookie') &&
+    !line.toLowerCase().includes('privacy')
+  );
+  
+  const description = meaningfulLines.slice(0, 3).join(' ').substring(0, 500);
+  
+  // Determine category from title and content
+  const category = categorizeFromContent(pageTitle + ' ' + content);
+  
+  return {
+    name: cleanTitle(pageTitle),
+    description: description || 'Material information extracted from web page',
+    category,
+    price: prices[0] || '',
+    images: images.slice(0, 10), // Limit to first 10 images
+    properties,
+    sourceUrl,
+    supplier: extractSupplierFromUrl(sourceUrl),
+    confidence: 0.9
+  };
+}
+
+function cleanTitle(title: string): string {
+  // Remove common website suffixes and clean up the title
+  return title
+    .replace(/\s*[\|\-]\s*.+$/, '') // Remove everything after | or -
+    .replace(/\s*\(\d+\).*$/, '') // Remove page numbers in parentheses
+    .replace(/\s*(Home|Shop|Store|Buy|Products?).*$/i, '') // Remove common navigation terms
+    .trim() || 'Web Page Material';
+}
+
+function categorizeFromContent(fullText: string): string {
+  const text = fullText.toLowerCase();
+  
+  const categoryKeywords = {
+    'Ceramics': ['ceramic', 'porcelain', 'tile', 'tiles', 'pottery', 'earthenware'],
+    'Stone': ['marble', 'granite', 'limestone', 'travertine', 'slate', 'quartzite', 'stone', 'natural stone'],
+    'Wood': ['wood', 'timber', 'hardwood', 'softwood', 'oak', 'pine', 'maple', 'cherry', 'walnut', 'bamboo', 'plywood', 'lumber'],
+    'Metal': ['steel', 'aluminum', 'aluminium', 'brass', 'copper', 'iron', 'stainless', 'metal', 'alloy'],
+    'Glass': ['glass', 'tempered glass', 'laminated glass', 'frosted glass', 'mirror'],
+    'Textiles': ['fabric', 'textile', 'cotton', 'linen', 'wool', 'silk', 'polyester', 'upholstery'],
+    'Plastics': ['plastic', 'vinyl', 'acrylic', 'polycarbonate', 'pvc', 'polymer'],
+    'Concrete': ['concrete', 'cement', 'mortar', 'grout'],
+    'Composites': ['composite', 'fiberglass', 'carbon fiber', 'laminate'],
+    'Rubber': ['rubber', 'silicone', 'elastomer']
+  };
+  
+  for (const [category, keywords] of Object.entries(categoryKeywords)) {
+    for (const keyword of keywords) {
+      if (text.includes(keyword)) {
+        return category;
+      }
+    }
+  }
+  
+  return 'Other';
 }
 
 function categorizeFromName(name: string): string {
