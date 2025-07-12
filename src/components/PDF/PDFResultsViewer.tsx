@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { PDFReviewWorkflow } from './PDFReviewWorkflow';
 
 interface PDFProcessingResult {
   id: string;
@@ -266,6 +267,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
         <TabsList>
           <TabsTrigger value="tiles">Tile Analysis</TabsTrigger>
           <TabsTrigger value="materials">Material Details</TabsTrigger>
+          <TabsTrigger value="review">Review & Workflow</TabsTrigger>
           <TabsTrigger value="metadata">Document Info</TabsTrigger>
         </TabsList>
 
@@ -401,6 +403,20 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="review" className="space-y-4">
+          <PDFReviewWorkflow 
+            processingId={processingId}
+            tiles={tiles}
+            onWorkflowComplete={(results) => {
+              toast({
+                title: "Workflow Complete",
+                description: "Materials have been successfully processed through the selected workflows",
+              });
+              console.log("Workflow results:", results);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="metadata" className="space-y-4">
