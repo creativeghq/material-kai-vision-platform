@@ -48,82 +48,139 @@ serve(async (req) => {
     const { url, options = {} }: CrawlRequest = await req.json();
     
     console.log('Starting material scraping for URL:', url);
-    console.log('Options:', options);
+    console.log('Options:', JSON.stringify(options, null, 2));
     
-    // Use Firecrawl v1 API crawl endpoint for multiple pages
-    const crawlBody = {
-      url: url,
-      limit: options.limit || 50,
-      scrapeOptions: {
+    // Determine if we should crawl multiple pages or scrape a single page
+    const shouldCrawl = (options.maxDepth && options.maxDepth > 0) || (options.includePaths && options.includePaths.length > 0);
+    
+    let apiResult: any;
+    
+    if (shouldCrawl) {
+      // Use crawl for multiple pages
+      const crawlBody = {
+        url: url,
+        limit: options.limit || 10,
+        scrapeOptions: {
+          formats: ['markdown'],
+          onlyMainContent: false,
+          includeTags: ['img', 'picture', 'figure', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+          excludeTags: ['nav', 'footer', 'header', 'aside', 'script', 'style'],
+          waitFor: 2000
+        },
+        includePaths: options.includePaths || [],
+        excludePaths: options.excludePaths || [],
+        maxDepth: options.maxDepth || 1
+      };
+
+      console.log('Using Firecrawl CRAWL API with config:', JSON.stringify(crawlBody, null, 2));
+
+      const response = await fetch('https://api.firecrawl.dev/v1/crawl', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(crawlBody),
+      });
+
+      console.log('Firecrawl crawl response status:', response.status);
+      const data = await response.json();
+      console.log('Firecrawl crawl response:', JSON.stringify(data, null, 2));
+
+      if (!response.ok) {
+        throw new Error(`Firecrawl crawl API error: ${response.status} - ${JSON.stringify(data)}`);
+      }
+
+      if (!data.success) {
+        throw new Error('Firecrawl crawling failed: ' + (data.error || 'Unknown error'));
+      }
+
+      apiResult = { type: 'crawl', data };
+    } else {
+      // Use scrape for single page
+      const scrapeBody = {
+        url: url,
         formats: ['markdown'],
-        onlyMainContent: true,
-        includeTags: ['img', 'picture', 'figure', 'div', 'span', 'p', 'h1', 'h2', 'h3'],
-        excludeTags: ['nav', 'footer', 'header', 'aside', 'script'],
-        waitFor: 3000
-      },
-      includePaths: options.includePaths || [],
-      excludePaths: options.excludePaths || [],
-      maxDepth: options.maxDepth || 3  // Increased default to 3
-    };
+        onlyMainContent: false,
+        includeTags: ['img', 'picture', 'figure', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+        excludeTags: ['nav', 'footer', 'header', 'aside', 'script', 'style'],
+        waitFor: 2000
+      };
 
-    console.log('Calling Firecrawl v1 crawl API...');
+      console.log('Using Firecrawl SCRAPE API with config:', JSON.stringify(scrapeBody, null, 2));
 
-    // Call Firecrawl v1 crawl API
-    const response = await fetch('https://api.firecrawl.dev/v1/crawl', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(crawlBody),
-    });
+      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(scrapeBody),
+      });
 
-    console.log('Firecrawl response status:', response.status);
+      console.log('Firecrawl scrape response status:', response.status);
+      const data = await response.json();
+      console.log('Firecrawl scrape response:', JSON.stringify(data, null, 2));
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Firecrawl API error:', errorText);
-      throw new Error(`Firecrawl API error: ${response.status} - ${errorText}`);
+      if (!response.ok) {
+        throw new Error(`Firecrawl scrape API error: ${response.status} - ${JSON.stringify(data)}`);
+      }
+
+      if (!data.success) {
+        throw new Error('Firecrawl scraping failed: ' + (data.error || 'Unknown error'));
+      }
+
+      apiResult = { type: 'scrape', data };
     }
-
-    const data = await response.json();
-    console.log('Firecrawl crawl response received:', data.success ? 'Success' : 'Failed');
-
-    if (!data.success) {
-      throw new Error('Firecrawl crawling failed: ' + (data.error || 'Unknown error'));
-    }
-
-    // Process the extracted materials
+    
+    // Process the results based on API type
     const materials: MaterialData[] = [];
     
-    if (data.data && Array.isArray(data.data)) {
-      console.log(`Processing ${data.data.length} pages from crawl`);
-      for (const page of data.data) {
-        if (page.markdown) {
-          console.log(`Processing page: ${page.url} - Content length: ${page.markdown.length}`);
-          console.log(`First 200 chars: ${page.markdown.substring(0, 200)}`);
-          const extractedMaterials = extractMaterialsFromMarkdown(
-            page.markdown, 
-            page.url || url, 
-            options.searchCriteria || {}
-          );
-          console.log(`Extracted ${extractedMaterials.length} materials from this page`);
-          materials.push(...extractedMaterials);
-          
-          if (materials.length >= 100) break; // Limit total results
-        }
+    if (apiResult.type === 'scrape') {
+      // Handle single page scrape result
+      if (apiResult.data.data && apiResult.data.data.markdown) {
+        console.log(`Processing single page scrape result - Content length: ${apiResult.data.data.markdown.length}`);
+        console.log(`First 200 chars: ${apiResult.data.data.markdown.substring(0, 200)}`);
+        const extractedMaterials = extractMaterialsFromMarkdown(
+          apiResult.data.data.markdown, 
+          url, 
+          options.searchCriteria || {}
+        );
+        console.log(`Extracted ${extractedMaterials.length} materials from single page`);
+        materials.push(...extractedMaterials);
       }
     } else {
-      console.log('No data.data found or not an array:', typeof data.data);
+      // Handle crawl result (multiple pages)
+      if (apiResult.data.data && Array.isArray(apiResult.data.data)) {
+        console.log(`Processing ${apiResult.data.data.length} pages from crawl`);
+        for (const page of apiResult.data.data) {
+          if (page.markdown) {
+            console.log(`Processing page: ${page.url} - Content length: ${page.markdown.length}`);
+            console.log(`First 200 chars: ${page.markdown.substring(0, 200)}`);
+            const extractedMaterials = extractMaterialsFromMarkdown(
+              page.markdown, 
+              page.url || url, 
+              options.searchCriteria || {}
+            );
+            console.log(`Extracted ${extractedMaterials.length} materials from this page`);
+            materials.push(...extractedMaterials);
+            
+            if (materials.length >= 100) break; // Limit total results
+          }
+        }
+      } else {
+        console.log('No data.data found or not an array:', typeof apiResult.data.data);
+      }
     }
 
-    console.log(`Successfully processed ${materials.length} materials from ${data.data?.length || 0} pages`);
+    console.log(`Successfully processed ${materials.length} materials from ${apiResult.type === 'scrape' ? '1 page' : apiResult.data.data?.length || 0} pages`);
 
     return new Response(JSON.stringify({
       success: true,
       materials,
-      totalPages: data.data?.length || 0,
-      processingTime: Date.now()
+      totalPages: apiResult.type === 'scrape' ? 1 : apiResult.data.data?.length || 0,
+      processingTime: Date.now(),
+      apiType: apiResult.type
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -336,11 +393,6 @@ function createMaterialFromPartial(partial: Partial<MaterialData>, pageUrl: stri
     sourceUrl: pageUrl,
     supplier: extractSupplierFromUrl(pageUrl)
   };
-}
-
-function createMaterialFromPartialWithFilter(partial: Partial<MaterialData>, pageUrl: string, searchCriteria: any): MaterialData | null {
-  const material = createMaterialFromPartial(partial, pageUrl, searchCriteria);
-  return material; // createMaterialFromPartial now handles filtering
 }
 
 function categorizeEffect(category: string): string {
