@@ -302,7 +302,7 @@ Return a list of materials found on the page.`;
 
   console.log('Firecrawl extract request body:', JSON.stringify(extractBody, null, 2));
   
-  const response = await fetch('https://api.firecrawl.dev/v1/extract', {
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
