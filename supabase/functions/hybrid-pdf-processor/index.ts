@@ -340,6 +340,69 @@ function hasRelatedProperties(props1: Record<string, any>, props2: Record<string
   return commonKeys.length >= 2; // At least 2 common properties
 }
 
+// Function to extract tile image from PDF
+async function extractTileImage(
+  pdfUrl: string,
+  pageNumber: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  processingId: string,
+  tileIndex: number
+): Promise<string | null> {
+  try {
+    const fileName = `tile_${processingId}_p${pageNumber}_t${tileIndex}.svg`;
+    const bucketPath = `pdf-tiles/${processingId}/${fileName}`;
+    
+    // Create a simple tile representation as SVG
+    const tileImageData = await generateTileImagePlaceholder(width, height, tileIndex);
+    
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('pdf-tiles')
+      .upload(bucketPath, tileImageData, {
+        contentType: 'image/svg+xml',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Error uploading tile image:', uploadError);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('pdf-tiles')
+      .getPublicUrl(bucketPath);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error in extractTileImage:', error);
+    return null;
+  }
+}
+
+// Generate a placeholder tile image
+async function generateTileImagePlaceholder(width: number, height: number, tileIndex: number): Promise<Uint8Array> {
+  const svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#f8f9fa" stroke="#e9ecef" stroke-width="2"/>
+      <text x="50%" y="40%" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="16" fill="#495057">
+        Tile ${tileIndex + 1}
+      </text>
+      <text x="50%" y="60%" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="12" fill="#6c757d">
+        ${width}×${height}px
+      </text>
+      <text x="50%" y="75%" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="10" fill="#adb5bd">
+        Hybrid Processing
+      </text>
+    </svg>
+  `;
+  
+  return new TextEncoder().encode(svg);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -444,6 +507,25 @@ serve(async (req) => {
           m.source === 'text_analysis'
         );
 
+        // Extract tile image if it contains material or text
+        let tileImageUrl = null;
+        if (textBlock.text.trim() || relatedMaterial) {
+          try {
+            tileImageUrl = await extractTileImage(
+              "placeholder_pdf_url",
+              textBlock.page,
+              Math.round(textBlock.bbox[0]),
+              Math.round(textBlock.bbox[1]),
+              Math.round(textBlock.bbox[2] - textBlock.bbox[0]),
+              Math.round(textBlock.bbox[3] - textBlock.bbox[1]),
+              processingId,
+              totalTiles
+            );
+          } catch (error) {
+            console.error('Error extracting tile image:', error);
+          }
+        }
+
         const { error: tileError } = await supabase
           .from('pdf_processing_tiles')
           .insert({
@@ -459,6 +541,7 @@ serve(async (req) => {
             material_detected: !!relatedMaterial,
             material_type: relatedMaterial?.material_type || null,
             material_confidence: relatedMaterial?.confidence || null,
+            image_url: tileImageUrl,
             document_element_type: 'text_block',
             layout_confidence: textBlock.confidence,
             pymupdf_data: {

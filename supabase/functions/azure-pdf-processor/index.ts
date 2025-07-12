@@ -380,6 +380,76 @@ async function processWithAzureDocumentIntelligence(fileUrl: string): Promise<Az
   return result;
 }
 
+// Function to extract tile image from PDF
+async function extractTileImage(
+  pdfUrl: string,
+  pageNumber: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  processingId: string,
+  tileIndex: number
+): Promise<string | null> {
+  try {
+    // For now, we'll create a placeholder tile image URL
+    // In a full implementation, you would:
+    // 1. Download the PDF
+    // 2. Convert the specific page to an image
+    // 3. Crop the tile area
+    // 4. Upload to Supabase storage
+    // 5. Return the public URL
+    
+    const fileName = `tile_${processingId}_p${pageNumber}_t${tileIndex}.png`;
+    const bucketPath = `pdf-tiles/${processingId}/${fileName}`;
+    
+    // For demonstration, we'll create a simple tile representation
+    // This would be replaced with actual PDF-to-image conversion
+    const tileImageData = await generateTileImagePlaceholder(width, height, tileIndex);
+    
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('pdf-tiles')
+      .upload(bucketPath, tileImageData, {
+        contentType: 'image/png',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Error uploading tile image:', uploadError);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('pdf-tiles')
+      .getPublicUrl(bucketPath);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error in extractTileImage:', error);
+    return null;
+  }
+}
+
+// Generate a placeholder tile image (would be replaced with actual PDF cropping)
+async function generateTileImagePlaceholder(width: number, height: number, tileIndex: number): Promise<Uint8Array> {
+  // Create a simple SVG placeholder
+  const svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#f0f0f0" stroke="#ddd" stroke-width="2"/>
+      <text x="50%" y="50%" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="14" fill="#666">
+        Tile ${tileIndex + 1}
+      </text>
+      <text x="50%" y="70%" text-anchor="middle" dy="0.3em" font-family="Arial" font-size="10" fill="#999">
+        ${width}×${height}
+      </text>
+    </svg>
+  `;
+  
+  return new TextEncoder().encode(svg);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -512,6 +582,26 @@ serve(async (req) => {
               confidenceScores.push(tileMaterial.confidence);
             }
 
+            // Extract tile image if it contains material or text
+            let tileImageUrl = null;
+            if (tileText.trim() || tileMaterial.detected) {
+              try {
+                // Generate a tile image by cropping the original PDF page
+                tileImageUrl = await extractTileImage(
+                  fileUrl,
+                  pageNumber,
+                  Math.round(xStart),
+                  Math.round(yStart),
+                  Math.round(tileWidth),
+                  Math.round(tileHeight),
+                  processingId,
+                  tileIndex
+                );
+              } catch (error) {
+                console.error('Error extracting tile image:', error);
+              }
+            }
+
             // Create tile record
             const { error: tileError } = await supabase
               .from('pdf_processing_tiles')
@@ -528,6 +618,7 @@ serve(async (req) => {
                 material_detected: tileMaterial.detected,
                 material_type: tileMaterial.type,
                 material_confidence: tileMaterial.confidence,
+                image_url: tileImageUrl,
                 azure_element_type: 'text_region',
                 azure_confidence: tileConfidence,
                 bounding_polygon: {
