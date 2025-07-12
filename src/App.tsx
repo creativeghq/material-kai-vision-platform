@@ -27,7 +27,7 @@ import { Layout } from "./components/Layout/Layout";
 import { SVBRDFExtractionPage } from "./components/SVBRDF/SVBRDFExtractionPage";
 import { NeRFReconstructionPage } from "./components/NeRF/NeRFReconstructionPage";
 import { OCRProcessor } from "./components/OCR/OCRProcessor";
-import { EnhancedRAGInterface } from "./components/RAG/EnhancedRAGInterface";
+import { IntegratedRAGManagement } from "./components/Admin/IntegratedRAGManagement";
 
 const queryClient = new QueryClient();
 
@@ -124,7 +124,7 @@ const App = () => (
             } />
             <Route path="/admin/rag" element={
               <AuthGuard>
-                <RAGManagementPanel />
+                <IntegratedRAGManagement />
               </AuthGuard>
             } />
             <Route path="/admin/metadata" element={
@@ -150,11 +150,6 @@ const App = () => (
             <Route path="/admin/ocr" element={
               <AuthGuard>
                 <OCRProcessor />
-              </AuthGuard>
-            } />
-            <Route path="/admin/rag-interface" element={
-              <AuthGuard>
-                <EnhancedRAGInterface />
               </AuthGuard>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
