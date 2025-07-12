@@ -226,67 +226,68 @@ Return a list of materials found on the page.`,
                 </div>
                 
                 {(options.sitemapMode || options.crawlMode) && (
-                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="font-medium text-sm">
-                      {options.sitemapMode ? 'Sitemap Configuration' : 'Multi-page Configuration'}
-                    </h3>
-                    
-                    {!options.sitemapMode && (
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="crawlMode"
-                          checked={options.crawlMode || false}
-                          onChange={(e) => setOptions(prev => ({ ...prev, crawlMode: e.target.checked }))}
-                          disabled={isLoading}
-                        />
-                        <Label htmlFor="crawlMode" className="text-sm">Multi-page crawl mode (for pagination)</Label>
-                      </div>
-                    )}
-                    
-                    
-                    <div className="space-y-4 p-3 border rounded bg-background/50">
-                      <div className="space-y-2">
-                        <Label htmlFor="maxPages">Maximum pages to process</Label>
-                        <Input
-                          id="maxPages"
-                          type="number"
-                          value={options.maxPages || 10}
-                          onChange={(e) => setOptions(prev => ({ ...prev, maxPages: parseInt(e.target.value) || 10 }))}
-                          min="1"
-                          max="100"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="includePatterns">Include URL patterns (comma-separated)</Label>
-                        <Input
-                          id="includePatterns"
-                          value={options.includePatterns?.join(', ') || ''}
-                          onChange={(e) => setOptions(prev => ({ 
-                            ...prev, 
-                            includePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                          }))}
-                          placeholder="/product, /item, /material"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="excludePatterns">Exclude URL patterns (comma-separated)</Label>
-                        <Input
-                          id="excludePatterns"
-                          value={options.excludePatterns?.join(', ') || ''}
-                          onChange={(e) => setOptions(prev => ({ 
-                            ...prev, 
-                            excludePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                          }))}
-                          placeholder="/cart, /checkout, /account"
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </div>
+                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                     <h3 className="font-medium text-sm">
+                       {options.sitemapMode ? 'Sitemap Configuration' : 'Multi-page Configuration'}
+                     </h3>
+                     
+                     {!options.sitemapMode && (
+                       <div className="flex items-center space-x-2">
+                         <input
+                           type="checkbox"
+                           id="crawlMode"
+                           checked={options.crawlMode || false}
+                           onChange={(e) => setOptions(prev => ({ ...prev, crawlMode: e.target.checked }))}
+                           disabled={isLoading}
+                         />
+                         <Label htmlFor="crawlMode" className="text-sm">Multi-page crawl mode (for pagination)</Label>
+                       </div>
+                     )}
+                     
+                     
+                     <div className="space-y-4 p-3 border rounded bg-background/50">
+                       <div className="space-y-2">
+                         <Label htmlFor="maxPages">Maximum pages to process</Label>
+                         <Input
+                           id="maxPages"
+                           type="number"
+                           value={options.maxPages || 10}
+                           onChange={(e) => setOptions(prev => ({ ...prev, maxPages: parseInt(e.target.value) || 10 }))}
+                           min="1"
+                           max="100"
+                           disabled={isLoading}
+                         />
+                       </div>
+                       
+                       <div className="space-y-2">
+                         <Label htmlFor="includePatterns">Include URL patterns (comma-separated)</Label>
+                         <Input
+                           id="includePatterns"
+                           value={options.includePatterns?.join(', ') || ''}
+                           onChange={(e) => setOptions(prev => ({ 
+                             ...prev, 
+                             includePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                           }))}
+                           placeholder="/product, /item, /material"
+                           disabled={isLoading}
+                         />
+                       </div>
+                       
+                       <div className="space-y-2">
+                         <Label htmlFor="excludePatterns">Exclude URL patterns (comma-separated)</Label>
+                         <Input
+                           id="excludePatterns"
+                           value={options.excludePatterns?.join(', ') || ''}
+                           onChange={(e) => setOptions(prev => ({ 
+                             ...prev, 
+                             excludePatterns: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                           }))}
+                           placeholder="/cart, /checkout, /account"
+                           disabled={isLoading}
+                         />
+                       </div>
+                     </div>
+                   </div>
                 )}
                 
                 {options.service === 'firecrawl' && !options.sitemapMode && (
