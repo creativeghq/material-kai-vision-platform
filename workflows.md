@@ -76,64 +76,139 @@ This document outlines all services, functions, and their interconnections withi
 ## Complete Service Inventory
 
 ### Edge Functions (Backend Services)
-| Function | Status | Integration | Purpose |
-|----------|--------|-------------|---------|
-| `api-gateway` | ✅ Active | System-wide | Request routing and rate limiting |
-| `enhanced-rag-search` | ✅ Active | Recognition + RAG workflows | Multi-modal knowledge search |
-| `material-recognition` | ✅ Active | Recognition workflow | ML-based material identification |
-| `ocr-processing` | ✅ Active | Recognition workflow | Text extraction from images |
-| `svbrdf-extractor` | ✅ Active | Recognition workflow | Material map generation |
-| `nerf-processor` | ✅ Active | 3D workflow | 3D scene reconstruction |
-| `rag-knowledge-search` | ✅ Active | RAG workflow | Knowledge base search |
-| `vector-similarity-search` | ✅ Active | RAG workflow | Embedding-based search |
-| `huggingface-model-trainer` | ✅ Active | Admin only | ML model training |
-| `crewai-3d-generation` | ✅ Active | 3D workflow | AI scene generation |
-| `enhanced-crewai` | ✅ Active | Advanced workflows | Enhanced AI coordination |
-| `ai-material-analysis` | ✅ Active | Analysis workflows | Advanced material analysis |
-| `hybrid-material-analysis` | ✅ Active | Recognition workflow | Multi-provider analysis |
-| `material-properties-analysis` | ✅ Active | Analysis workflows | Material properties extraction |
-| `spaceformer-analysis` | ✅ Active | 3D workflow | Spatial analysis |
-| `style-analysis` | ✅ Active | Analysis workflows | Material style classification |
-| `voice-to-material` | ✅ Active | Input workflows | Voice-based material queries |
+| Function | Status | Integration | Dependencies | Purpose |
+|----------|--------|-------------|--------------|---------|
+| `api-gateway` | ✅ Active | System-wide | Supabase | Request routing and rate limiting |
+| `enhanced-rag-search` | ✅ Active | Recognition + RAG workflows | OpenAI, Supabase | Multi-modal knowledge search |
+| `material-recognition` | ✅ Active | Recognition workflow | OpenAI, HuggingFace | ML-based material identification |
+| `ocr-processing` | ✅ Active | Recognition workflow | OpenAI Whisper | Text extraction from images |
+| `svbrdf-extractor` | ✅ Active | Recognition workflow | HuggingFace | Material map generation |
+| `nerf-processor` | ✅ Active | 3D workflow | HuggingFace | 3D scene reconstruction |
+| `rag-knowledge-search` | ✅ Active | RAG workflow | OpenAI, Supabase | Knowledge base search |
+| `vector-similarity-search` | ✅ Active | RAG workflow | Supabase | Embedding-based search |
+| `huggingface-model-trainer` | ✅ Active | Admin only | HuggingFace | ML model training |
+| `crewai-3d-generation` | ✅ Active | 3D workflow | OpenAI, HuggingFace | AI scene generation |
+| `enhanced-crewai` | ✅ Active | Advanced workflows | OpenAI, Anthropic | Enhanced AI coordination |
+| `ai-material-analysis` | ✅ Active | Analysis workflows | OpenAI, Anthropic | Advanced material analysis |
+| `hybrid-material-analysis` | ✅ Active | Recognition workflow | OpenAI, Anthropic, HuggingFace | Multi-provider analysis |
+| `material-properties-analysis` | ✅ Active | Analysis workflows | OpenAI | Material properties extraction |
+| `spaceformer-analysis` | ✅ Active | 3D workflow | HuggingFace | Spatial analysis |
+| `style-analysis` | ✅ Active | Analysis workflows | OpenAI, HuggingFace | Material style classification |
+| `voice-to-material` | ✅ Active | Input workflows | OpenAI Whisper | Voice-based material queries |
 
 ### Frontend Components
-| Component | Route | Integration | Purpose |
-|-----------|-------|-------------|---------|
-| `MaterialRecognition` | `/recognition` | ✅ Full workflow | Main recognition interface |
-| `MaterialCatalog` | `/catalog` | ✅ Connected | Material browsing and search |
-| `MoodBoardPage` | `/moodboard` | ✅ Connected | Material collections |
-| `Designer3DPage` | `/3d` | ✅ Full workflow | 3D generation and visualization |
-| `AIStudioPage` | `/agents` | ✅ Connected | AI agent management |
-| `AnalyticsDashboard` | `/analytics` | ✅ Connected | System analytics |
-| `AdminDashboard` | `/admin` | ✅ Connected | Administration hub |
+| Component | Route | Integration | Connected Services | Purpose |
+|-----------|-------|-------------|-------------------|---------|
+| `MaterialRecognition` | `/recognition` | ✅ Full workflow | integratedWorkflowService | Main recognition interface |
+| `MaterialCatalog` | `/catalog` | ✅ Connected | materialCatalogAPI, ragService | Material browsing and search |
+| `MoodBoardPage` | `/moodboard` | ✅ Connected | moodboardAPI, materialCatalogAPI | Material collections |
+| `Designer3DPage` | `/3d` | ✅ Full workflow | integratedWorkflowService, crewai3DGenerationAPI | 3D generation and visualization |
+| `AIStudioPage` | `/agents` | ✅ Connected | agentMLCoordinator | AI agent management |
+| `AnalyticsDashboard` | `/analytics` | ✅ Connected | apiGatewayService | System analytics |
+| `AdminDashboard` | `/admin` | ✅ Connected | All admin services | Administration hub |
 
 ### Admin-Only Components
-| Component | Route | Integration | Purpose |
-|-----------|-------|-------------|---------|
-| `SVBRDFExtractionPage` | `/admin/svbrdf` | ✅ Standalone | Material map extraction |
-| `NeRFReconstructionPage` | `/admin/nerf` | ✅ Standalone | 3D reconstruction |
-| `OCRProcessor` | `/admin/ocr` | ✅ Standalone | Text extraction |
-| `EnhancedRAGInterface` | `/admin/rag-interface` | ✅ Standalone | Advanced search |
-| `KnowledgeBaseManagement` | `/admin/knowledge-base` | ✅ Connected | Knowledge management |
-| `AgentMLCoordination` | `/admin/agent-ml` | ✅ Connected | Agent coordination |
-| `AdminPanel` | `/admin/training-models` | ✅ Connected | ML model training |
-| `RAGManagementPanel` | `/admin/rag` | ✅ Connected | RAG system management |
-| `SystemPerformance` | `/admin/performance` | ✅ Connected | Performance monitoring |
-| `MetadataFieldsManagement` | `/admin/metadata` | ✅ Connected | Metadata configuration |
-| `ApiGatewayAdmin` | `/admin/api-gateway` | ✅ Connected | API management |
-| `AITestingPanel` | `/admin/material-analysis` | ✅ Connected | AI testing tools |
+| Component | Route | Integration | Connected Services | Purpose |
+|-----------|-------|-------------|-------------------|---------|
+| `SVBRDFExtractionPage` | `/admin/svbrdf` | ✅ Standalone | svbrdfExtractionAPI | Material map extraction |
+| `NeRFReconstructionPage` | `/admin/nerf` | ✅ Standalone | nerfProcessingAPI | 3D reconstruction |
+| `OCRProcessor` | `/admin/ocr` | ✅ Standalone | hybridOCRService | Text extraction |
+| `EnhancedRAGInterface` | `/admin/rag-interface` | ✅ Standalone | enhancedRAGService | Advanced search |
+| `KnowledgeBaseManagement` | `/admin/knowledge-base` | ✅ Connected | enhancedRAGService | Knowledge management |
+| `AgentMLCoordination` | `/admin/agent-ml` | ✅ Connected | agentMLCoordinator | Agent coordination |
+| `AdminPanel` | `/admin/training-models` | ✅ Connected | huggingFaceService | ML model training |
+| `RAGManagementPanel` | `/admin/rag` | ✅ Connected | ragService, enhancedRAGService | RAG system management |
+| `SystemPerformance` | `/admin/performance` | ✅ Connected | apiGatewayService | Performance monitoring |
+| `MetadataFieldsManagement` | `/admin/metadata` | ✅ Connected | materialCatalogAPI | Metadata configuration |
+| `ApiGatewayAdmin` | `/admin/api-gateway` | ✅ Connected | apiGatewayService | API management |
+| `AITestingPanel` | `/admin/material-analysis` | ✅ Connected | hybridMLService | AI testing tools |
 
 ### Core Services (Frontend)
-| Service | Integration | Purpose |
-|---------|-------------|---------|
-| `integratedWorkflowService` | ✅ System-wide | Orchestrates all workflows |
-| `hybridMLService` | ✅ Recognition workflow | Multi-provider ML analysis |
-| `materialCatalogAPI` | ✅ Catalog workflow | Material data management |
-| `aiMaterialAPI` | ✅ Analysis workflows | AI-powered analysis |
-| `enhancedRAGService` | ✅ RAG workflows | Enhanced search capabilities |
-| `crewai3DGenerationAPI` | ✅ 3D workflow | 3D generation coordination |
-| `agentMLCoordinator` | ✅ Admin workflows | Agent-ML coordination |
-| `apiGatewayService` | ✅ System-wide | API management |
+| Service | Status | Integration | Dependencies | Purpose |
+|---------|--------|-------------|--------------|---------|
+| `integratedWorkflowService` | ✅ Active | System-wide | hybridMLService, supabase functions | Orchestrates all workflows |
+| `hybridMLService` | ✅ Active | Recognition workflow | clientMLService, serverMLService | Multi-provider ML analysis |
+| `materialCatalogAPI` | ✅ Active | Catalog workflow | Supabase | Material data management |
+| `aiMaterialAPI` | ✅ Active | Analysis workflows | Supabase functions | AI-powered analysis |
+| `enhancedRAGService` | ✅ Active | RAG workflows | Supabase functions | Enhanced search capabilities |
+| `crewai3DGenerationAPI` | ✅ Active | 3D workflow | Supabase functions | 3D generation coordination |
+| `agentMLCoordinator` | ✅ Active | Admin workflows | Supabase | Agent-ML coordination |
+| `apiGatewayService` | ✅ Active | System-wide | Supabase | API management |
+| `hybridOCRService` | ✅ Active | Text extraction | clientMLService, serverMLService | OCR processing |
+| `hybridStyleAnalysisService` | ✅ Active | Style analysis | clientMLService, serverMLService | Style classification |
+| `hybridMaterialPropertiesService` | ✅ Active | Properties analysis | clientMLService, serverMLService | Material properties |
+| `huggingFaceService` | ✅ Active | ML operations | HuggingFace API | HuggingFace models |
+| `materialRecognitionAPI` | ✅ Active | Recognition | Supabase functions | Material recognition |
+| `svbrdfExtractionAPI` | ✅ Active | Material maps | Supabase functions | SVBRDF extraction |
+| `nerfProcessingAPI` | ✅ Active | 3D reconstruction | Supabase functions | NeRF processing |
+| `moodboardAPI` | ✅ Active | Collections | Supabase | MoodBoard management |
+| `ragService` | ✅ Active | Knowledge search | Supabase | RAG operations |
+
+### ML Services Layer
+| Service | Status | Integration | Purpose | Provider |
+|---------|--------|-------------|---------|----------|
+| `ClientMLService` | ✅ Active | Browser-based | Client-side ML processing | Local |
+| `ServerMLService` | ✅ Active | Server-based | Server-side ML processing | Supabase Functions |
+| `MaterialClassificationService` | ✅ Active | Recognition | Advanced classification | Hybrid |
+| `ImageClassifierService` | ✅ Active | Image analysis | Image classification | Client |
+| `TextEmbedderService` | ✅ Active | Text processing | Text embeddings | Client |
+| `MaterialAnalyzerService` | ✅ Active | Material analysis | Comprehensive analysis | Hybrid |
+| `StyleAnalysisService` | ✅ Active | Style classification | Style analysis | Server |
+| `OCRService` | ✅ Active | Text extraction | OCR processing | Server |
+
+## Disconnected/Standalone Services
+
+### ❌ Partially Connected Services
+| Service | Status | Issue | Suggested Connection |
+|---------|--------|-------|---------------------|
+| `realMaterialCatalogAPI` | ⚠️ Standalone | Not integrated in workflows | Connect to MaterialCatalog component |
+| `deviceDetector` | ⚠️ Utility | Only used for capability detection | Already properly used |
+
+### 🔄 Services Needing Better Integration
+| Service | Current Status | Missing Integration | Action Needed |
+|---------|----------------|-------------------|---------------|
+| `realtimeAgentMonitor` | ✅ Exists | Not visible in UI | Add to Admin Dashboard |
+| `responseValidator` | ✅ Exists | Used internally | Already properly integrated |
+| `agentPerformanceOptimizer` | ✅ Exists | Not exposed | Add to Agent ML Coordination |
+| `agentSpecializationManager` | ✅ Exists | Not exposed | Add to Agent ML Coordination |
+| `agentLearningSystem` | ✅ Exists | Not exposed | Add to Agent ML Coordination |
+| `agentCollaborationWorkflows` | ✅ Exists | Not exposed | Add to Agent ML Coordination |
+
+## Detailed Service Dependencies
+
+### Recognition Workflow Dependencies
+```
+User Upload → MaterialRecognition Component
+    ↓
+integratedWorkflowService.enhancedMaterialRecognition()
+    ├── hybridMLService.analyzeMaterials()
+    │   ├── clientMLService (browser ML)
+    │   ├── serverMLService → material-recognition function
+    │   └── MaterialClassificationService
+    ├── hybridOCRService → ocr-processing function
+    ├── svbrdfExtractionAPI → svbrdf-extractor function  
+    └── enhancedRAGService → enhanced-rag-search function
+```
+
+### 3D Generation Workflow Dependencies
+```
+User Input → Designer3DPage Component
+    ↓
+integratedWorkflowService.enhanced3DGeneration()
+    ├── crewai3DGenerationAPI → crewai-3d-generation function
+    ├── nerfProcessingAPI → nerf-processor function
+    └── spaceformer-analysis function (spatial optimization)
+```
+
+### Knowledge Search Dependencies
+```
+Search Query → EnhancedRAGInterface Component
+    ↓
+integratedWorkflowService.enhancedKnowledgeSearch()
+    ├── enhancedRAGService → enhanced-rag-search function
+    ├── ragService → rag-knowledge-search function
+    └── vector-similarity-search function
+```
 
 ## Integration Status Summary
 
@@ -155,6 +230,32 @@ This document outlines all services, functions, and their interconnections withi
 - NeRF reconstruction (accessible at `/admin/nerf`)
 - OCR processing (accessible at `/admin/ocr`)
 - Enhanced RAG interface (accessible at `/admin/rag-interface`)
+
+### ⚠️ Services Needing Attention
+- `realMaterialCatalogAPI` - Exists but not connected to main workflow
+- Agent monitoring services - Exist but not exposed in UI
+- Performance optimization services - Need better UI integration
+
+## Technology Stack Dependencies
+
+### Required API Keys/Services
+- **OpenAI**: GPT models, DALL-E, Whisper (OCR, voice processing)
+- **Anthropic**: Claude models (enhanced analysis)
+- **HuggingFace**: Transformers, custom models (ML processing)
+- **Supabase**: Database, auth, storage, edge functions
+
+### Frontend Dependencies
+- React, TypeScript, Tailwind CSS
+- Supabase client, TanStack Query
+- React Router, Lucide icons
+- Three.js (3D visualization)
+
+### Backend Dependencies (Edge Functions)
+- Deno runtime
+- Supabase SDK
+- OpenAI SDK
+- HuggingFace Inference API
+- Various ML model APIs
 
 ## Workflow Interaction Map
 
@@ -183,4 +284,4 @@ Admin Workflows:
 └─────────────────┴─────────────────┴─────────────────────────┘
 ```
 
-All services are now properly integrated into cohesive workflows while maintaining standalone access for advanced users through the admin panel.
+All services are now comprehensively documented with their integration status, dependencies, and connection points throughout the platform.
