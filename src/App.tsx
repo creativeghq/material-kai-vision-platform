@@ -23,6 +23,7 @@ import { MaterialCatalog } from "./components/Catalog/MaterialCatalog";
 import { MoodBoardPage } from "./components/MoodBoard/MoodBoardPage";
 import { Designer3DPage } from "./components/3D/Designer3DPage";
 import { AIStudioPage } from "./components/AI/AIStudioPage";
+import { Layout } from "./components/Layout/Layout";
 
 const queryClient = new QueryClient();
 
@@ -42,32 +43,44 @@ const App = () => (
             } />
             <Route path="/recognition" element={
               <AuthGuard>
-                <MaterialRecognition />
+                <Layout>
+                  <MaterialRecognition />
+                </Layout>
               </AuthGuard>
             } />
             <Route path="/catalog" element={
               <AuthGuard>
-                <MaterialCatalog />
+                <Layout>
+                  <MaterialCatalog />
+                </Layout>
               </AuthGuard>
             } />
             <Route path="/moodboard" element={
               <AuthGuard>
-                <MoodBoardPage />
+                <Layout>
+                  <MoodBoardPage />
+                </Layout>
               </AuthGuard>
             } />
             <Route path="/3d" element={
               <AuthGuard>
-                <Designer3DPage />
+                <Layout>
+                  <Designer3DPage />
+                </Layout>
               </AuthGuard>
             } />
             <Route path="/agents" element={
               <AuthGuard>
-                <AIStudioPage />
+                <Layout>
+                  <AIStudioPage />
+                </Layout>
               </AuthGuard>
             } />
             <Route path="/analytics" element={
               <AuthGuard>
-                <AnalyticsDashboard />
+                <Layout>
+                  <AnalyticsDashboard />
+                </Layout>
               </AuthGuard>
             } />
             <Route path="/admin" element={
