@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -27,7 +28,8 @@ import {
   Globe,
   Lock,
   ArrowLeft,
-  Home
+  Home,
+  Edit
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey, type RateLimitRule } from '@/services/apiGateway/apiGatewayService';
@@ -199,10 +201,10 @@ export const ApiGatewayAdmin: React.FC = () => {
       {/* Main Content */}
       <div className="p-6 space-y-6">
         <Tabs defaultValue="endpoints" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="endpoints" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
-              Endpoints
+              Endpoints & Rate Limits
             </TabsTrigger>
             <TabsTrigger value="networks" className="flex items-center gap-2">
               <Network className="h-4 w-4" />
@@ -212,23 +214,93 @@ export const ApiGatewayAdmin: React.FC = () => {
               <Key className="h-4 w-4" />
               API Keys
             </TabsTrigger>
-            <TabsTrigger value="rate-limits" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Rate Limits
-            </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Analytics
             </TabsTrigger>
           </TabsList>
 
-          {/* Endpoints Tab */}
+          {/* Endpoints & Rate Limits Tab */}
           <TabsContent value="endpoints" className="space-y-4">
+            {/* Global Rate Limits */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Global Rate Limits by Category</CardTitle>
+                <CardDescription>
+                  Default rate limits applied to all endpoints by category
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-green-600">Authentication</h4>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-2xl font-bold">20 req/min</p>
+                    <p className="text-sm text-muted-foreground">Login, register, tokens</p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-blue-600">Materials</h4>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-2xl font-bold">60 req/min</p>
+                    <p className="text-sm text-muted-foreground">CRUD operations</p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-orange-600">Recognition</h4>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-2xl font-bold">20 req/min</p>
+                    <p className="text-sm text-muted-foreground">AI processing</p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-purple-600">Search</h4>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-2xl font-bold">60 req/min</p>
+                    <p className="text-sm text-muted-foreground">Vector & text search</p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-red-600">Admin</h4>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-2xl font-bold">10 req/min</p>
+                    <p className="text-sm text-muted-foreground">Administrative ops</p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-cyan-600">Analytics</h4>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-2xl font-bold">100 req/min</p>
+                    <p className="text-sm text-muted-foreground">Event tracking</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>API Endpoints</CardTitle>
                 <CardDescription>
-                  Configure public and internal access for API endpoints
+                  Configure individual endpoints, their rate limits, and public access costs
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -302,7 +374,18 @@ export const ApiGatewayAdmin: React.FC = () => {
                               {endpoint.description || 'No description'}
                             </TableCell>
                             <TableCell>
-                              {endpoint.rate_limit_per_minute} req/min
+                              <div className="flex items-center space-x-2">
+                                <Input 
+                                  type="number" 
+                                  value={endpoint.rate_limit_per_minute}
+                                  onChange={(e) => {
+                                    // Handle rate limit update
+                                    console.log('Update rate limit for', endpoint.path, 'to', e.target.value);
+                                  }}
+                                  className="w-20 h-8" 
+                                />
+                                <span className="text-xs text-muted-foreground">req/min</span>
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Input 
@@ -518,6 +601,86 @@ export const ApiGatewayAdmin: React.FC = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
+                            <Sheet>
+                              <SheetTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  <Shield className="h-4 w-4" />
+                                </Button>
+                              </SheetTrigger>
+                              <SheetContent className="w-[600px] sm:w-[800px]">
+                                <SheetHeader>
+                                  <SheetTitle>Custom Rate Limit Rules - {apiKey.key_name}</SheetTitle>
+                                  <SheetDescription>
+                                    Override default rate limits for this API key
+                                  </SheetDescription>
+                                </SheetHeader>
+                                <div className="mt-6 space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <h4 className="font-medium">Active Custom Rules</h4>
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button size="sm">
+                                          <Plus className="mr-2 h-4 w-4" />
+                                          Add Rule
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent>
+                                        <DialogHeader>
+                                          <DialogTitle>Create Custom Rate Limit Rule</DialogTitle>
+                                          <DialogDescription>
+                                            Override the default rate limit for this API key
+                                          </DialogDescription>
+                                        </DialogHeader>
+                                        <CreateRateLimitForm 
+                                          onSuccess={() => {
+                                            loadData();
+                                          }}
+                                        />
+                                      </DialogContent>
+                                    </Dialog>
+                                  </div>
+                                  
+                                  {/* Custom Rules List */}
+                                  <div className="space-y-3">
+                                    {rateLimitRules
+                                      .filter(rule => rule.target_value === apiKey.api_key)
+                                      .map((rule) => (
+                                      <div key={rule.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                        <div>
+                                          <h5 className="font-medium">{rule.name}</h5>
+                                          <p className="text-sm text-muted-foreground">
+                                            {rule.requests_per_minute} requests per minute
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                          <Badge variant={rule.is_active ? "default" : "secondary"}>
+                                            {rule.is_active ? "Active" : "Inactive"}
+                                          </Badge>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => apiGatewayService.deleteRateLimitRule(rule.id).then(loadData)}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    
+                                    {rateLimitRules.filter(rule => rule.target_value === apiKey.api_key).length === 0 && (
+                                      <div className="text-center py-8 text-muted-foreground">
+                                        <Shield className="mx-auto h-8 w-8 mb-2" />
+                                        <p>No custom rules configured</p>
+                                        <p className="text-sm">This API key uses default rate limits</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </SheetContent>
+                            </Sheet>
                             {apiKey.is_active && (
                               <Button
                                 variant="outline"
@@ -530,126 +693,6 @@ export const ApiGatewayAdmin: React.FC = () => {
                           </div>
                         </div>
                       </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Rate Limits Tab */}
-          <TabsContent value="rate-limits" className="space-y-4">
-            {/* Default Rate Limits */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Default Rate Limits</CardTitle>
-                <CardDescription>
-                  System-wide default rate limits by category
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-green-600">Authentication APIs</h4>
-                    <p className="text-2xl font-bold">20 req/min</p>
-                    <p className="text-sm text-muted-foreground">Login, register, token refresh</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-blue-600">Material APIs</h4>
-                    <p className="text-2xl font-bold">60 req/min</p>
-                    <p className="text-sm text-muted-foreground">Read operations</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-orange-600">Recognition APIs</h4>
-                    <p className="text-2xl font-bold">20 req/min</p>
-                    <p className="text-sm text-muted-foreground">AI processing intensive</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-purple-600">Search APIs</h4>
-                    <p className="text-2xl font-bold">60 req/min</p>
-                    <p className="text-sm text-muted-foreground">Vector and text search</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-red-600">Admin APIs</h4>
-                    <p className="text-2xl font-bold">10 req/min</p>
-                    <p className="text-sm text-muted-foreground">Administrative operations</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium text-cyan-600">Analytics APIs</h4>
-                    <p className="text-2xl font-bold">100 req/min</p>
-                    <p className="text-sm text-muted-foreground">Event tracking</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Custom Rate Limit Rules */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Custom Rate Limit Rules</CardTitle>
-                  <CardDescription>
-                    Override default limits for specific IPs, CIDRs, or users
-                  </CardDescription>
-                </div>
-                <Dialog open={createRuleOpen} onOpenChange={setCreateRuleOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Custom Rule
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create Rate Limit Rule</DialogTitle>
-                      <DialogDescription>
-                        Define a custom rate limit rule that overrides defaults
-                      </DialogDescription>
-                    </DialogHeader>
-                    <CreateRateLimitForm 
-                      onSuccess={() => {
-                        setCreateRuleOpen(false);
-                        loadData();
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                {rateLimitRules.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-semibold">No Custom Rules</h3>
-                    <p className="text-muted-foreground">
-                      All endpoints use default rate limits. Create custom rules to override defaults.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {rateLimitRules.map((rule) => (
-                      <div key={rule.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{rule.name}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {rule.target_type}: {rule.target_value}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {rule.requests_per_minute} requests per minute
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={rule.is_active ? "default" : "secondary"}>
-                            {rule.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => apiGatewayService.deleteRateLimitRule(rule.id).then(loadData)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
                     ))}
                   </div>
                 )}
