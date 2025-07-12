@@ -125,13 +125,15 @@ async function extractWithJinaAI(url: string, options: any): Promise<MaterialDat
       
       // Process each search result
       for (const result of searchData.data || []) {
-        const extractedMaterials = extractMaterialsFromContent(
+        const comprehensiveMaterial = createComprehensiveMaterial(
           result.content,
           result.url,
           result.title,
           []
         );
-        materials.push(...extractedMaterials);
+        if (comprehensiveMaterial) {
+          materials.push(comprehensiveMaterial);
+        }
       }
       
     } else {
@@ -258,20 +260,19 @@ async function extractWithFirecrawl(url: string, options: any): Promise<Material
 
   console.log('Using Firecrawl for extraction');
 
-  const extractPrompt = options.prompt || `Extract material information from this page. Look for:
+  // Use scrape endpoint with extract format
+  const scrapeBody = {
+    url: url,
+    formats: ["extract"],
+    extract: {
+      prompt: options.prompt || `Extract material information from this page. Look for:
 - Material name
-- Price (if available)
+- Price (if available)  
 - Description
 - Images
 - Properties like dimensions, color, finish
 - Category (tiles, stone, wood, etc.)
-Return a list of materials found on the page.`;
-
-  const extractBody = {
-    url: url,
-    formats: ["extract"],
-    extract: {
-      prompt: extractPrompt,
+Return a list of materials found on the page.`,
       schema: options.schema || {
         type: "object",
         properties: {
@@ -303,15 +304,15 @@ Return a list of materials found on the page.`;
     }
   };
 
-  console.log('Firecrawl extract request body:', JSON.stringify(extractBody, null, 2));
+  console.log('Firecrawl scrape request:', JSON.stringify(scrapeBody, null, 2));
   
-  const response = await fetch('https://api.firecrawl.dev/v1/extract', {
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(extractBody),
+    body: JSON.stringify(scrapeBody),
   });
 
   console.log('Firecrawl response status:', response.status);
@@ -319,21 +320,22 @@ Return a list of materials found on the page.`;
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Firecrawl error response:', errorText);
-    throw new Error(`Firecrawl extract API error: ${response.status} - ${errorText}`);
+    throw new Error(`Firecrawl API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   console.log('Firecrawl response data:', JSON.stringify(data, null, 2));
   
   if (!data.success) {
-    console.error('Firecrawl extraction failed - full response:', data);
-    throw new Error('Firecrawl extraction failed: ' + JSON.stringify(data));
+    console.error('Firecrawl scraping failed - full response:', data);
+    throw new Error('Firecrawl scraping failed: ' + JSON.stringify(data));
   }
 
   const materials: MaterialData[] = [];
   
-  if (data.data && data.data.materials && Array.isArray(data.data.materials)) {
-    for (const material of data.data.materials) {
+  // Check if extraction data exists
+  if (data.data && data.data.extract && data.data.extract.materials && Array.isArray(data.data.extract.materials)) {
+    for (const material of data.data.extract.materials) {
       if (material.name) {
         const processedMaterial: MaterialData = {
           name: material.name,
