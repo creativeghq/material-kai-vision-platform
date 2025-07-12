@@ -321,6 +321,13 @@ serve(async (req) => {
 
     console.log('Request received:', { originalFilename, fileSize, userId, hasApiKey: !!azureApiKey });
 
+    // Check file size limit for Azure Document Intelligence (50MB)
+    const azureSizeLimit = 50 * 1024 * 1024; // 50MB in bytes
+    if (fileSize > azureSizeLimit) {
+      console.log(`File too large for Azure (${fileSize} bytes > ${azureSizeLimit} bytes), using fallback processing`);
+      throw new Error(`File size ${Math.round(fileSize / 1024 / 1024)}MB exceeds Azure Document Intelligence limit of 50MB. Please use a smaller file or the system will automatically use standard processing.`);
+    }
+
     if (!fileUrl || !originalFilename || !userId) {
       console.error('Missing required fields:', { fileUrl: !!fileUrl, originalFilename: !!originalFilename, userId: !!userId });
       return new Response(
