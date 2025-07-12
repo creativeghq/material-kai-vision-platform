@@ -12,6 +12,7 @@ import AdminDashboard from "./components/Admin/AdminDashboard";
 import KnowledgeBaseManagement from "./components/Admin/KnowledgeBaseManagement";
 import AgentMLCoordination from "./components/Admin/AgentMLCoordination";
 import { AdminPanel } from "./components/Admin/AdminPanel";
+import { ApiGatewayAdmin } from "./components/Admin/ApiGatewayAdmin";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,11 @@ const App = () => (
             <Route path="/admin/metadata" element={
               <AuthGuard>
                 <AdminPanel />
+              </AuthGuard>
+            } />
+            <Route path="/admin/api-gateway" element={
+              <AuthGuard>
+                <ApiGatewayAdmin />
               </AuthGuard>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
