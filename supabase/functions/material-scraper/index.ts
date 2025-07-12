@@ -42,56 +42,54 @@ serve(async (req) => {
     
     console.log('Starting material scraping for:', url);
     
-    // Configure Firecrawl crawl options
-    const crawlOptions = {
-      crawlerOptions: {
-        limit: options.limit || 50,
-        maxDepth: options.maxDepth || 2,
-        includePaths: options.includePaths || [],
-        excludePaths: options.excludePaths || [],
-      },
-      pageOptions: {
+    // Configure Firecrawl crawl options for v1 API
+    const crawlBody = {
+      url,
+      limit: options.limit || 50,
+      scrapeOptions: {
+        formats: ['markdown', 'html'],
         onlyMainContent: true,
-        includeHtml: false,
-        screenshot: false,
-        extractorOptions: {
-          mode: 'llm-extraction',
-          extractionPrompt: `
-            Extract material/product information from this page. Look for:
-            - Product names and titles
-            - Material categories (tiles, flooring, stone, wood, etc.)
-            - Descriptions and specifications
-            - Prices and pricing information
-            - Technical properties (dimensions, finish, etc.)
-            - High-quality product images
-            - Brand/supplier information
-            
-            Return the data as a JSON array of materials with the following structure:
-            {
-              "materials": [
-                {
-                  "name": "Product name",
-                  "description": "Product description",
-                  "category": "Material category",
-                  "price": "Price if available",
-                  "images": ["array of image URLs"],
-                  "properties": {
-                    "dimensions": "size info",
-                    "finish": "finish type",
-                    "material": "material type",
-                    "color": "color info",
-                    "thickness": "thickness if applicable"
-                  },
-                  "supplier": "Brand or supplier name"
-                }
-              ]
-            }
-          `
-        }
+        includeTags: ['img', 'picture', 'figure'],
+        excludeTags: ['nav', 'footer', 'header', 'aside'],
+        waitFor: 2000
+      },
+      extractorOptions: {
+        mode: 'llm-extraction',
+        extractionPrompt: `
+          Extract material/product information from this page. Look for:
+          - Product names and titles
+          - Material categories (tiles, flooring, stone, wood, etc.)
+          - Descriptions and specifications
+          - Prices and pricing information
+          - Technical properties (dimensions, finish, etc.)
+          - High-quality product images
+          - Brand/supplier information
+          
+          Return the data as a JSON array of materials with the following structure:
+          {
+            "materials": [
+              {
+                "name": "Product name",
+                "description": "Product description",
+                "category": "Material category",
+                "price": "Price if available",
+                "images": ["array of image URLs"],
+                "properties": {
+                  "dimensions": "size info",
+                  "finish": "finish type",
+                  "material": "material type",
+                  "color": "color info",
+                  "thickness": "thickness if applicable"
+                },
+                "supplier": "Brand or supplier name"
+              }
+            ]
+          }
+        `
       }
     };
 
-    console.log('Calling Firecrawl API with options:', crawlOptions);
+    console.log('Calling Firecrawl API with body:', crawlBody);
 
     // Call Firecrawl API
     const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/crawl', {
@@ -100,10 +98,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        url,
-        ...crawlOptions
-      }),
+      body: JSON.stringify(crawlBody),
     });
 
     if (!firecrawlResponse.ok) {
