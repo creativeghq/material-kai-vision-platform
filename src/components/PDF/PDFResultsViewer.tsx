@@ -269,7 +269,6 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
         <TabsList>
           <TabsTrigger value="materials">Materials Catalog</TabsTrigger>
           <TabsTrigger value="tiles">Tile Analysis</TabsTrigger>
-          <TabsTrigger value="images">Extracted Images</TabsTrigger>
           <TabsTrigger value="review">Review & Workflow</TabsTrigger>
           <TabsTrigger value="metadata">Document Info</TabsTrigger>
         </TabsList>
@@ -313,7 +312,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
             </div>
           </div>
 
-          {/* Tiles Grid */}
+          {/* Tiles Grid with Images */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredTiles.map((tile) => (
               <Card 
@@ -322,7 +321,8 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                 onClick={() => setSelectedTile(tile)}
               >
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
+                  {/* Tile Header */}
+                  <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-medium">Tile {tile.tile_index + 1}</span>
                     {tile.material_detected && (
                       <Badge variant="default" className="bg-green-100 text-green-800">
@@ -331,18 +331,59 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                     )}
                   </div>
                   
+                  {/* Extracted Image */}
+                  {tile.image_url && (
+                    <div className="mb-3">
+                      <img 
+                        src={tile.image_url} 
+                        alt={`Tile ${tile.tile_index + 1} from page ${tile.page_number}`}
+                        className="w-full h-32 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Tile Information */}
                   <div className="space-y-2">
-                    <div className="text-xs text-muted-foreground">
-                      Position: {tile.x_coordinate}, {tile.y_coordinate}
+                    <div className="text-xs text-muted-foreground grid grid-cols-2 gap-2">
+                      <span>Position: {tile.x_coordinate}, {tile.y_coordinate}</span>
+                      <span>Size: {tile.width} × {tile.height}</span>
                     </div>
                     
                     {tile.extracted_text && (
-                      <div className="text-sm bg-muted p-2 rounded text-ellipsis overflow-hidden">
-                        {tile.extracted_text.substring(0, 100)}
-                        {tile.extracted_text.length > 100 && '...'}
+                      <div className="text-sm bg-muted p-2 rounded">
+                        <p className="text-xs text-muted-foreground mb-1">Extracted Text:</p>
+                        <p className="text-ellipsis overflow-hidden">
+                          {tile.extracted_text.substring(0, 80)}
+                          {tile.extracted_text.length > 80 && '...'}
+                        </p>
                       </div>
                     )}
                     
+                    {/* Material Properties */}
+                    {tile.material_detected && tile.structured_data && (
+                      <div className="text-sm bg-primary/5 p-2 rounded">
+                        <p className="text-xs text-muted-foreground mb-1">Material Properties:</p>
+                        {tile.structured_data.effects && (
+                          <div className="flex flex-wrap gap-1 mb-1">
+                            {tile.structured_data.effects.slice(0, 3).map((effect: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {effect}
+                              </Badge>
+                            ))}
+                            {tile.structured_data.effects.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{tile.structured_data.effects.length - 3} more
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        {tile.structured_data.category && (
+                          <p className="text-xs">Category: {tile.structured_data.category}</p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Confidence Scores */}
                     <div className="flex justify-between text-xs">
                       <span>OCR: {formatConfidence(tile.ocr_confidence || 0)}</span>
                       {tile.material_detected && (
@@ -364,41 +405,6 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
           )}
         </TabsContent>
 
-        <TabsContent value="images" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Extracted Images</CardTitle>
-              <CardDescription>Images and visual elements extracted from the PDF</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tiles.filter(t => t.image_url).length === 0 ? (
-                <Alert>
-                  <AlertDescription>No images were extracted from this document.</AlertDescription>
-                </Alert>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {tiles.filter(t => t.image_url).map((tile) => (
-                    <div key={tile.id} className="border rounded-lg p-2">
-                      <img 
-                        src={tile.image_url} 
-                        alt={`Extracted from page ${tile.page_number}`}
-                        className="w-full h-32 object-cover rounded mb-2"
-                      />
-                      <div className="text-xs text-muted-foreground">
-                        <p>Page {tile.page_number}, Tile {tile.tile_index + 1}</p>
-                        {tile.material_detected && (
-                          <Badge variant="secondary" className="mt-1 text-xs">
-                            {tile.material_type}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="review" className="space-y-4">
           <PDFReviewWorkflow 
