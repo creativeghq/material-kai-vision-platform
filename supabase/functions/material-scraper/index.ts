@@ -92,35 +92,11 @@ serve(async (req) => {
     if (data.data && Array.isArray(data.data)) {
       for (const page of data.data) {
         if (page.markdown) {
-          // Extract materials from markdown content
-          const lines = page.markdown.split('\n').filter(line => line.trim().length > 0);
+          console.log(`Processing page: ${page.url}`);
+          const extractedMaterials = extractMaterialsFromMarkdown(page.markdown, page.url || url);
+          materials.push(...extractedMaterials);
           
-          for (const line of lines.slice(0, 20)) { // Process first 20 lines per page
-            if (line.length > 10 && line.length < 100 && 
-                (line.toLowerCase().includes('tile') || 
-                 line.toLowerCase().includes('wood') || 
-                 line.toLowerCase().includes('stone') || 
-                 line.toLowerCase().includes('floor') || 
-                 line.toLowerCase().includes('material') || 
-                 line.toLowerCase().includes('finish'))) {
-              
-              materials.push({
-                name: line.trim(),
-                description: `Found on page: ${page.url || url}`,
-                category: categorizeEffect(line.toLowerCase()),
-                price: '',
-                images: [],
-                properties: {
-                  sourceUrl: page.url || url,
-                  pageTitle: page.title || ''
-                },
-                sourceUrl: page.url || url,
-                supplier: extractSupplierFromUrl(page.url || url)
-              });
-              
-              if (materials.length >= 50) break; // Limit total results
-            }
-          }
+          if (materials.length >= 100) break; // Limit total results
         }
       }
     }
@@ -147,6 +123,158 @@ serve(async (req) => {
     });
   }
 });
+
+function extractMaterialsFromMarkdown(markdown: string, pageUrl: string): MaterialData[] {
+  const materials: MaterialData[] = [];
+  const lines = markdown.split('\n');
+  
+  // Material indicators
+  const materialKeywords = [
+    'tile', 'tiles', 'ceramic', 'porcelain', 'stone', 'marble', 'granite',
+    'wood', 'timber', 'oak', 'pine', 'mahogany', 'bamboo',
+    'fabric', 'textile', 'cotton', 'linen', 'wool', 'silk',
+    'metal', 'steel', 'aluminum', 'brass', 'copper', 'iron',
+    'glass', 'acrylic', 'plastic', 'vinyl', 'leather',
+    'concrete', 'brick', 'laminate', 'veneer', 'composite'
+  ];
+  
+  // Price patterns
+  const priceRegex = /[\$£€¥]\s*\d+(?:[.,]\d{2})?(?:\s*-\s*[\$£€¥]\s*\d+(?:[.,]\d{2})?)?/;
+  const priceRegex2 = /\d+(?:[.,]\d{2})?\s*(?:USD|EUR|GBP|dollars?|euros?|pounds?)/i;
+  
+  // Dimension patterns
+  const dimensionRegex = /\d+\s*(?:x|×)\s*\d+(?:\s*(?:x|×)\s*\d+)?\s*(?:mm|cm|m|inch|in|ft|feet)(?:es)?/i;
+  
+  let currentProduct: Partial<MaterialData> | null = null;
+  let isInProductSection = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const lowerLine = line.toLowerCase();
+    
+    // Skip empty lines and navigation
+    if (!line || lowerLine.includes('menu') || lowerLine.includes('navigation') || 
+        lowerLine.includes('footer') || lowerLine.includes('header')) {
+      continue;
+    }
+    
+    // Detect product headings (usually with # or ##)
+    if (line.startsWith('#') && materialKeywords.some(keyword => lowerLine.includes(keyword))) {
+      // Save previous product if exists
+      if (currentProduct && currentProduct.name) {
+        materials.push(createMaterialFromPartial(currentProduct, pageUrl));
+      }
+      
+      // Start new product
+      currentProduct = {
+        name: line.replace(/^#+\s*/, '').trim(),
+        properties: {},
+        images: []
+      };
+      isInProductSection = true;
+      continue;
+    }
+    
+    // Detect product names in regular text
+    if (!currentProduct && materialKeywords.some(keyword => lowerLine.includes(keyword))) {
+      // Look for potential product names
+      if (line.length > 5 && line.length < 150 && 
+          !lowerLine.includes('http') && !lowerLine.includes('www.')) {
+        currentProduct = {
+          name: line.trim(),
+          properties: {},
+          images: []
+        };
+        isInProductSection = true;
+        continue;
+      }
+    }
+    
+    if (currentProduct && isInProductSection) {
+      // Extract price
+      if (priceRegex.test(line) || priceRegex2.test(line)) {
+        const priceMatch = line.match(priceRegex) || line.match(priceRegex2);
+        if (priceMatch) {
+          currentProduct.price = priceMatch[0];
+        }
+      }
+      
+      // Extract dimensions
+      if (dimensionRegex.test(line)) {
+        const dimMatch = line.match(dimensionRegex);
+        if (dimMatch && currentProduct.properties) {
+          currentProduct.properties.dimensions = dimMatch[0];
+        }
+      }
+      
+      // Extract color information
+      const colorKeywords = ['white', 'black', 'brown', 'grey', 'gray', 'beige', 'cream', 'natural', 'dark', 'light'];
+      if (colorKeywords.some(color => lowerLine.includes(color))) {
+        const colorMatch = colorKeywords.find(color => lowerLine.includes(color));
+        if (colorMatch && currentProduct.properties) {
+          currentProduct.properties.color = colorMatch;
+        }
+      }
+      
+      // Extract finish information
+      const finishKeywords = ['matte', 'gloss', 'satin', 'polished', 'textured', 'smooth', 'rough', 'brushed'];
+      if (finishKeywords.some(finish => lowerLine.includes(finish))) {
+        const finishMatch = finishKeywords.find(finish => lowerLine.includes(finish));
+        if (finishMatch && currentProduct.properties) {
+          currentProduct.properties.finish = finishMatch;
+        }
+      }
+      
+      // Look for description
+      if (!currentProduct.description && line.length > 20 && line.length < 300 &&
+          !priceRegex.test(line) && !dimensionRegex.test(line)) {
+        currentProduct.description = line;
+      }
+      
+      // Look for image URLs
+      if (line.includes('.jpg') || line.includes('.png') || line.includes('.jpeg') || line.includes('.webp')) {
+        const imageMatch = line.match(/https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp)/i);
+        if (imageMatch && currentProduct.images) {
+          currentProduct.images.push(imageMatch[0]);
+        }
+      }
+      
+      // End product section if we hit another heading or empty lines
+      if (line.startsWith('#') || (line === '' && lines[i + 1] === '')) {
+        if (currentProduct.name) {
+          materials.push(createMaterialFromPartial(currentProduct, pageUrl));
+        }
+        currentProduct = null;
+        isInProductSection = false;
+      }
+    }
+  }
+  
+  // Save last product
+  if (currentProduct && currentProduct.name) {
+    materials.push(createMaterialFromPartial(currentProduct, pageUrl));
+  }
+  
+  console.log(`Extracted ${materials.length} materials from page: ${pageUrl}`);
+  return materials;
+}
+
+function createMaterialFromPartial(partial: Partial<MaterialData>, pageUrl: string): MaterialData {
+  return {
+    name: partial.name || 'Unknown Material',
+    description: partial.description || '',
+    category: categorizeEffect(partial.name?.toLowerCase() || ''),
+    price: partial.price || '',
+    images: partial.images || [],
+    properties: {
+      ...partial.properties,
+      sourceUrl: pageUrl,
+      extractedAt: new Date().toISOString()
+    },
+    sourceUrl: pageUrl,
+    supplier: extractSupplierFromUrl(pageUrl)
+  };
+}
 
 function categorizeEffect(category: string): string {
   const categoryMap: Record<string, string> = {
