@@ -264,6 +264,7 @@ async function extractWithFirecrawl(url: string, options: any): Promise<Material
   const scrapeBody = {
     url: url,
     formats: ["extract"],
+    timeout: 60000, // 60 seconds timeout
     extract: {
       prompt: options.prompt || `Extract material information from this page. Look for:
 - Material name
@@ -306,59 +307,77 @@ Return a list of materials found on the page.`,
 
   console.log('Firecrawl scrape request:', JSON.stringify(scrapeBody, null, 2));
   
-  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(scrapeBody),
-  });
+  try {
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(scrapeBody),
+    });
 
-  console.log('Firecrawl response status:', response.status);
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Firecrawl error response:', errorText);
-    throw new Error(`Firecrawl API error: ${response.status} - ${errorText}`);
-  }
+    console.log('Firecrawl response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Firecrawl error response:', errorText);
+      
+      // Handle timeout specifically
+      if (response.status === 408 || errorText.includes('timed out')) {
+        throw new Error('Page is too large or complex for Firecrawl to process. Try a simpler page or use Jina AI instead.');
+      }
+      
+      throw new Error(`Firecrawl API error: ${response.status} - ${errorText}`);
+    }
 
-  const data = await response.json();
-  console.log('Firecrawl response data:', JSON.stringify(data, null, 2));
-  
-  if (!data.success) {
-    console.error('Firecrawl scraping failed - full response:', data);
-    throw new Error('Firecrawl scraping failed: ' + JSON.stringify(data));
-  }
+    const data = await response.json();
+    console.log('Firecrawl response data keys:', Object.keys(data));
+    
+    if (!data.success) {
+      console.error('Firecrawl scraping failed - full response:', data);
+      
+      // Handle timeout in response data
+      if (data.error && data.error.includes('timed out')) {
+        throw new Error('Page processing timed out. This usually happens with large product listing pages. Try a specific product page instead.');
+      }
+      
+      throw new Error('Firecrawl scraping failed: ' + JSON.stringify(data));
+    }
 
-  const materials: MaterialData[] = [];
-  
-  // Check if extraction data exists
-  if (data.data && data.data.extract && data.data.extract.materials && Array.isArray(data.data.extract.materials)) {
-    for (const material of data.data.extract.materials) {
-      if (material.name) {
-        const processedMaterial: MaterialData = {
-          name: material.name,
-          description: material.description || '',
-          category: material.category || categorizeFromName(material.name),
-          price: material.price || '',
-          images: Array.isArray(material.images) ? material.images : [],
-          properties: {
-            ...material.properties,
+    const materials: MaterialData[] = [];
+    
+    // Check if extraction data exists
+    if (data.data && data.data.extract && data.data.extract.materials && Array.isArray(data.data.extract.materials)) {
+      for (const material of data.data.extract.materials) {
+        if (material.name) {
+          const processedMaterial: MaterialData = {
+            name: material.name,
+            description: material.description || '',
+            category: material.category || categorizeFromName(material.name),
+            price: material.price || '',
+            images: Array.isArray(material.images) ? material.images : [],
+            properties: {
+              ...material.properties,
+              sourceUrl: url,
+              extractedAt: new Date().toISOString(),
+              extractedBy: 'firecrawl'
+            },
             sourceUrl: url,
-            extractedAt: new Date().toISOString(),
-            extractedBy: 'firecrawl'
-          },
-          sourceUrl: url,
-          supplier: extractSupplierFromUrl(url)
-        };
-        
-        materials.push(processedMaterial);
+            supplier: extractSupplierFromUrl(url)
+          };
+          
+          materials.push(processedMaterial);
+        }
       }
     }
-  }
 
-  return materials;
+    return materials;
+    
+  } catch (error) {
+    console.error('Firecrawl processing error:', error);
+    throw error;
+  }
 }
 
 function extractMaterialsFromContent(
