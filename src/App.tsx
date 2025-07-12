@@ -137,32 +137,24 @@ const App = () => (
                 <ApiGatewayAdmin />
               </AuthGuard>
             } />
-            <Route path="/svbrdf" element={
+            <Route path="/admin/svbrdf" element={
               <AuthGuard>
-                <Layout>
-                  <SVBRDFExtractionPage />
-                </Layout>
+                <SVBRDFExtractionPage />
               </AuthGuard>
             } />
-            <Route path="/nerf" element={
+            <Route path="/admin/nerf" element={
               <AuthGuard>
-                <Layout>
-                  <NeRFReconstructionPage />
-                </Layout>
+                <NeRFReconstructionPage />
               </AuthGuard>
             } />
-            <Route path="/ocr" element={
+            <Route path="/admin/ocr" element={
               <AuthGuard>
-                <Layout>
-                  <OCRProcessor />
-                </Layout>
+                <OCRProcessor />
               </AuthGuard>
             } />
-            <Route path="/rag" element={
+            <Route path="/admin/rag-interface" element={
               <AuthGuard>
-                <Layout>
-                  <EnhancedRAGInterface />
-                </Layout>
+                <EnhancedRAGInterface />
               </AuthGuard>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

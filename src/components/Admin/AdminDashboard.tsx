@@ -92,6 +92,38 @@ const AdminDashboard: React.FC = () => {
       path: "/admin/metadata",
       status: "active", 
       count: "23 fields"
+    },
+    {
+      title: "SVBRDF Processing",
+      description: "Standalone SVBRDF material extraction tools",
+      icon: Microscope,
+      path: "/admin/svbrdf",
+      status: "active",
+      count: "Advanced tools"
+    },
+    {
+      title: "NeRF Reconstruction",
+      description: "3D scene reconstruction from images",
+      icon: Brain,
+      path: "/admin/nerf",
+      status: "active",
+      count: "Standalone mode"
+    },
+    {
+      title: "OCR Processing",
+      description: "Text extraction from material images",
+      icon: Search,
+      path: "/admin/ocr",
+      status: "active",
+      count: "Text analysis"
+    },
+    {
+      title: "Enhanced RAG Interface",
+      description: "Direct access to enhanced search interface",
+      icon: Database,
+      path: "/admin/rag-interface",
+      status: "active",
+      count: "Search tools"
     }
   ];
 
