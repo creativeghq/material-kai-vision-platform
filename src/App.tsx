@@ -29,6 +29,7 @@ import { NeRFReconstructionPage } from "./components/NeRF/NeRFReconstructionPage
 import { OCRProcessor } from "./components/OCR/OCRProcessor";
 import { IntegratedRAGManagement } from "./components/Admin/IntegratedRAGManagement";
 import PDFProcessing from "./pages/PDFProcessing";
+import { MaterialScraperPage } from "./components/Scraper/MaterialScraperPage";
 
 const queryClient = new QueryClient();
 
@@ -157,6 +158,13 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <PDFProcessing />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/scraper" element={
+              <AuthGuard>
+                <Layout>
+                  <MaterialScraperPage />
                 </Layout>
               </AuthGuard>
             } />

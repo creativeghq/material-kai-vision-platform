@@ -11,7 +11,8 @@ import {
   Layers,
   Box,
   ScanText,
-  Search
+  Search,
+  Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useLocation } from 'react-router-dom';
@@ -20,6 +21,7 @@ const navigationItems = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'recognition', label: 'Recognition', path: '/recognition', icon: Eye },
   { id: 'catalog', label: 'Material Catalog', path: '/catalog', icon: Archive },
+  { id: 'scraper', label: 'Web Scraper', path: '/scraper', icon: Globe },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: '3d', label: '3D Visualization', path: '/3d', icon: Grid3X3 },
   { id: 'agents', label: 'AI Agents', path: '/agents', icon: Brain },
