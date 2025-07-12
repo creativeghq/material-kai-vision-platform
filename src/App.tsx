@@ -28,6 +28,7 @@ import { SVBRDFExtractionPage } from "./components/SVBRDF/SVBRDFExtractionPage";
 import { NeRFReconstructionPage } from "./components/NeRF/NeRFReconstructionPage";
 import { OCRProcessor } from "./components/OCR/OCRProcessor";
 import { IntegratedRAGManagement } from "./components/Admin/IntegratedRAGManagement";
+import PDFProcessing from "./pages/PDFProcessing";
 
 const queryClient = new QueryClient();
 
@@ -150,6 +151,13 @@ const App = () => (
             <Route path="/admin/ocr" element={
               <AuthGuard>
                 <OCRProcessor />
+              </AuthGuard>
+            } />
+            <Route path="/admin/pdf-processing" element={
+              <AuthGuard>
+                <Layout>
+                  <PDFProcessing />
+                </Layout>
               </AuthGuard>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

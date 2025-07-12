@@ -14,7 +14,8 @@ import {
   Tags,
   Shield,
   ArrowLeft,
-  Home
+  Home,
+  FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -116,6 +117,14 @@ const AdminDashboard: React.FC = () => {
       path: "/admin/ocr",
       status: "active",
       count: "Text analysis"
+    },
+    {
+      title: "PDF Processing",
+      description: "Extract materials from PDF catalogs and specifications",
+      icon: FileText,
+      path: "/admin/pdf-processing",
+      status: "active",
+      count: "Batch processing"
     },
   ];
 

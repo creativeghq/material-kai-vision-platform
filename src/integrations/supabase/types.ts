@@ -1189,6 +1189,177 @@ export type Database = {
         }
         Relationships: []
       }
+      pdf_processing_results: {
+        Row: {
+          confidence_score_avg: number | null
+          created_at: string
+          document_author: string | null
+          document_keywords: string | null
+          document_subject: string | null
+          document_title: string | null
+          error_message: string | null
+          extraction_options: Json | null
+          file_size: number | null
+          file_url: string
+          id: string
+          material_recognition_model_version: string | null
+          materials_identified_count: number | null
+          ocr_model_version: string | null
+          original_filename: string
+          overlap_percentage: number | null
+          processing_completed_at: string | null
+          processing_started_at: string | null
+          processing_status: string
+          processing_time_ms: number | null
+          tile_size_pixels: number | null
+          total_pages: number | null
+          total_tiles_extracted: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence_score_avg?: number | null
+          created_at?: string
+          document_author?: string | null
+          document_keywords?: string | null
+          document_subject?: string | null
+          document_title?: string | null
+          error_message?: string | null
+          extraction_options?: Json | null
+          file_size?: number | null
+          file_url: string
+          id?: string
+          material_recognition_model_version?: string | null
+          materials_identified_count?: number | null
+          ocr_model_version?: string | null
+          original_filename: string
+          overlap_percentage?: number | null
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          processing_status?: string
+          processing_time_ms?: number | null
+          tile_size_pixels?: number | null
+          total_pages?: number | null
+          total_tiles_extracted?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence_score_avg?: number | null
+          created_at?: string
+          document_author?: string | null
+          document_keywords?: string | null
+          document_subject?: string | null
+          document_title?: string | null
+          error_message?: string | null
+          extraction_options?: Json | null
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          material_recognition_model_version?: string | null
+          materials_identified_count?: number | null
+          ocr_model_version?: string | null
+          original_filename?: string
+          overlap_percentage?: number | null
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          processing_status?: string
+          processing_time_ms?: number | null
+          tile_size_pixels?: number | null
+          total_pages?: number | null
+          total_tiles_extracted?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pdf_processing_tiles: {
+        Row: {
+          created_at: string
+          extracted_text: string | null
+          height: number
+          id: string
+          image_embedding: string | null
+          image_url: string | null
+          material_confidence: number | null
+          material_detected: boolean | null
+          material_type: string | null
+          metadata_extracted: Json | null
+          ocr_confidence: number | null
+          page_number: number
+          pdf_processing_id: string
+          related_material_id: string | null
+          structured_data: Json | null
+          text_embedding: string | null
+          tile_index: number
+          updated_at: string
+          width: number
+          x_coordinate: number
+          y_coordinate: number
+        }
+        Insert: {
+          created_at?: string
+          extracted_text?: string | null
+          height: number
+          id?: string
+          image_embedding?: string | null
+          image_url?: string | null
+          material_confidence?: number | null
+          material_detected?: boolean | null
+          material_type?: string | null
+          metadata_extracted?: Json | null
+          ocr_confidence?: number | null
+          page_number: number
+          pdf_processing_id: string
+          related_material_id?: string | null
+          structured_data?: Json | null
+          text_embedding?: string | null
+          tile_index: number
+          updated_at?: string
+          width: number
+          x_coordinate: number
+          y_coordinate: number
+        }
+        Update: {
+          created_at?: string
+          extracted_text?: string | null
+          height?: number
+          id?: string
+          image_embedding?: string | null
+          image_url?: string | null
+          material_confidence?: number | null
+          material_detected?: boolean | null
+          material_type?: string | null
+          metadata_extracted?: Json | null
+          ocr_confidence?: number | null
+          page_number?: number
+          pdf_processing_id?: string
+          related_material_id?: string | null
+          structured_data?: Json | null
+          text_embedding?: string | null
+          tile_index?: number
+          updated_at?: string
+          width?: number
+          x_coordinate?: number
+          y_coordinate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_processing_tiles_pdf_processing_id_fkey"
+            columns: ["pdf_processing_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdf_processing_tiles_related_material_id_fkey"
+            columns: ["related_material_id"]
+            isOneToOne: false
+            referencedRelation: "materials_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       processing_queue: {
         Row: {
           completed_at: string | null
