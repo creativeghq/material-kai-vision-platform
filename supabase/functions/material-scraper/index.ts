@@ -46,8 +46,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Add timeout for the entire edge function
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.log('Edge function timeout after 4 minutes');
+    controller.abort();
+  }, 240000); // 4 minutes timeout
+
   try {
     const { url, service, sitemapMode = false, options = {} }: JinaExtractRequest = await req.json();
+    console.log(`Received request: service=${service}, sitemapMode=${sitemapMode}, url=${url}`);
     
     console.log('Starting material extraction:', { url, service, sitemapMode, options });
     
@@ -70,11 +78,14 @@ serve(async (req) => {
     processingTime = Date.now() - processingTime;
     
     console.log(`Successfully extracted ${materials.length} materials using ${service}`);
+    
+    // Clear timeout on successful completion
+    clearTimeout(timeoutId);
 
     return new Response(JSON.stringify({
       success: true,
-      materials,
-      totalPages: 1,
+      data: materials, // Keep consistent with sitemap response
+      totalProcessed: materials.length,
       processingTime,
       service,
       extractedCount: materials.length
@@ -83,7 +94,23 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    // Clear timeout on error
+    clearTimeout(timeoutId);
+    
     console.error('Material extraction error:', error);
+    
+    // Handle abort errors specifically
+    if (error.name === 'AbortError') {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Request timeout - try with a simpler page or fewer options.',
+        timeout: true
+      }), {
+        status: 408,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
@@ -110,16 +137,18 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
   
   console.log(`Processing ALL ${totalPages} URLs from sitemap (no page limit)`);
   
-  // Process URLs in batches to avoid overwhelming the APIs
-  const batchSize = service === 'jina' ? 1 : 2; // Single URL for Jina to avoid timeouts
+  // Process URLs in batches to avoid overwhelming the APIs and edge function timeouts
+  const batchSize = service === 'jina' ? 1 : (service === 'firecrawl' ? 1 : 2); // Single URL per batch to avoid timeouts
   const totalBatches = Math.ceil(totalPages / batchSize);
+  console.log(`Will process ${totalPages} URLs in ${totalBatches} batches of ${batchSize} each`);
+  
   for (let i = 0; i < totalPages; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
     const currentBatch = Math.floor(i / batchSize) + 1;
     console.log(`Processing batch ${currentBatch}/${totalBatches} (${batch.length} URLs) with ${service}`);
     
-    // Shorter timeout for Jina AI to prevent edge function timeout
-    const timeoutMs = service === 'jina' ? 15000 : 25000;
+    // Shorter timeout for both services to prevent edge function timeout
+    const timeoutMs = service === 'jina' ? 15000 : 20000; // Reduced Firecrawl timeout
     
     const batchPromise = Promise.race([
       processBatch(batch, service, options),
@@ -143,8 +172,8 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
       // Continue with next batch even if this one fails
     }
     
-    // Longer delay for Jina AI to be more respectful
-    const delayMs = service === 'jina' ? 7000 : 3000;
+    // Longer delay for both services to be more respectful and prevent overload
+    const delayMs = service === 'jina' ? 7000 : 5000; // Increased Firecrawl delay
     if (i + batchSize < totalPages) {
       console.log(`Waiting ${delayMs}ms before next batch...`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -411,7 +440,7 @@ async function extractWithFirecrawl(url: string, options: any): Promise<Material
   const scrapeBody: any = {
     url: url,
     formats: ["extract"],
-    timeout: 90000, // 90 seconds timeout for complex pages
+    timeout: 45000, // 45 seconds timeout to prevent edge function timeout
     extract: {
       prompt: options.prompt || `Extract material information from this page. Look for:
 - Material name
@@ -480,6 +509,10 @@ Return a list of materials found on the page.`,
   });
   
   try {
+    // Add timeout to fetch request itself
+    const fetchController = new AbortController();
+    const fetchTimeout = setTimeout(() => fetchController.abort(), 50000); // 50 second timeout
+    
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -487,7 +520,10 @@ Return a list of materials found on the page.`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(scrapeBody),
+      signal: fetchController.signal,
     });
+    
+    clearTimeout(fetchTimeout);
 
     console.log('Firecrawl response status:', response.status);
     
