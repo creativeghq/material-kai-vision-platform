@@ -117,14 +117,6 @@ const AdminDashboard: React.FC = () => {
       status: "active",
       count: "Text analysis"
     },
-    {
-      title: "Enhanced RAG Interface",
-      description: "Direct access to enhanced search interface",
-      icon: Database,
-      path: "/admin/rag-interface",
-      status: "active",
-      count: "Search tools"
-    }
   ];
 
   const getStatusColor = (status: string) => {
