@@ -46,12 +46,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Add timeout for the entire edge function
+  // Add timeout for the entire edge function - Deno has a 60-90 second limit
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
-    console.log('Edge function timeout after 4 minutes');
+    console.log('Edge function timeout after 50 seconds');
     controller.abort();
-  }, 240000); // 4 minutes timeout
+  }, 50000); // 50 seconds timeout to stay within Deno limits
 
   try {
     const { url, service, sitemapMode = false, options = {} }: JinaExtractRequest = await req.json();
@@ -133,53 +133,73 @@ async function extractFromSitemap(sitemapUrl: string, service: 'firecrawl' | 'ji
   }
   
   const allMaterials: MaterialData[] = [];
-  const totalPages = urls.length;
   
-  console.log(`Processing ALL ${totalPages} URLs from sitemap (no page limit)`);
+  // Limit URLs to prevent timeout (edge functions have ~60 second limits)
+  const maxUrls = 5; // Process maximum 5 URLs to stay within timeout limits
+  const urlsToProcess = urls.slice(0, maxUrls);
+  console.log(`Processing ${urlsToProcess.length} URLs from sitemap (limited to ${maxUrls} to prevent timeout)`);
   
-  // Process URLs in batches to avoid overwhelming the APIs and edge function timeouts
-  const batchSize = service === 'jina' ? 1 : (service === 'firecrawl' ? 1 : 2); // Single URL per batch to avoid timeouts
-  const totalBatches = Math.ceil(totalPages / batchSize);
-  console.log(`Will process ${totalPages} URLs in ${totalBatches} batches of ${batchSize} each`);
+  if (urlsToProcess.length < urls.length) {
+    console.log(`Note: Only processing first ${maxUrls} of ${urls.length} URLs to prevent timeout. Use single page mode for specific URLs.`);
+  }
   
-  for (let i = 0; i < totalPages; i += batchSize) {
-    const batch = urls.slice(i, i + batchSize);
-    const currentBatch = Math.floor(i / batchSize) + 1;
-    console.log(`Processing batch ${currentBatch}/${totalBatches} (${batch.length} URLs) with ${service}`);
+  // Process URLs one by one with proper error handling
+  for (let i = 0; i < urlsToProcess.length; i++) {
+    const url = urlsToProcess[i];
+    console.log(`Processing URL ${i + 1}/${urlsToProcess.length}: ${url}`);
     
-    // Shorter timeout for both services to prevent edge function timeout
-    const timeoutMs = service === 'jina' ? 15000 : 20000; // Reduced Firecrawl timeout
-    
-    const batchPromise = Promise.race([
-      processBatch(batch, service, options),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`${service} batch timeout after ${timeoutMs}ms`)), timeoutMs)
-      )
-    ]);
+    // Add timeout for individual URL processing
+    const urlTimeoutMs = service === 'jina' ? 10000 : 15000; // Shorter individual timeouts
     
     try {
-      const batchResults = await batchPromise as MaterialData[][];
+      const urlPromise = Promise.race([
+        service === 'jina' ? extractWithJinaAI(url, options) : extractWithFirecrawl(url, options),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`${service} URL timeout after ${urlTimeoutMs}ms`)), urlTimeoutMs)
+        )
+      ]);
       
-      // Flatten and add to results
-      for (const pageResults of batchResults) {
-        allMaterials.push(...pageResults);
-      }
+      const results = await urlPromise as MaterialData[];
+      allMaterials.push(...results);
       
-      console.log(`Batch ${currentBatch} complete: ${allMaterials.length} total materials so far`);
+      console.log(`URL ${i + 1} complete: Found ${results.length} materials (${allMaterials.length} total)`);
       
     } catch (error) {
-      console.error(`Batch ${currentBatch} failed with ${service}:`, error.message);
-      // Continue with next batch even if this one fails
+      console.error(`URL ${i + 1} failed with ${service}:`, error.message);
+      // Continue with next URL even if this one fails
     }
     
-    // Longer delay for both services to be more respectful and prevent overload
-    const delayMs = service === 'jina' ? 7000 : 5000; // Increased Firecrawl delay
-    if (i + batchSize < totalPages) {
-      console.log(`Waiting ${delayMs}ms before next batch...`);
+    // Add small delay between URLs to prevent overwhelming APIs
+    if (i < urlsToProcess.length - 1) {
+      const delayMs = service === 'jina' ? 2000 : 1500;
+      console.log(`Waiting ${delayMs}ms before next URL...`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
-  console.log(`Sitemap processing complete: ${allMaterials.length} materials from ${totalPages} pages`);
+  
+  console.log(`Sitemap processing complete: ${allMaterials.length} materials from ${urlsToProcess.length} URLs`);
+  
+  // Add note about limitation in the response
+  if (urlsToProcess.length < urls.length) {
+    const limitationNote = {
+      name: `Note: Only processed ${urlsToProcess.length} of ${urls.length} URLs`,
+      description: `To prevent timeouts, sitemap processing is limited to ${maxUrls} URLs. Use single page mode to process specific product pages.`,
+      category: 'System',
+      price: '',
+      images: [],
+      properties: {
+        isSystemMessage: true,
+        totalUrlsFound: urls.length,
+        urlsProcessed: urlsToProcess.length,
+        limitReason: 'Edge function timeout prevention'
+      },
+      sourceUrl: sitemapUrl,
+      supplier: 'System',
+      confidence: 1.0
+    };
+    allMaterials.unshift(limitationNote as MaterialData);
+  }
+  
   return allMaterials;
 }
 
