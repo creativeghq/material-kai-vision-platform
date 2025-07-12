@@ -42,3 +42,15 @@ verify_jwt = false
 
 [functions.rag-knowledge-search]
 verify_jwt = false
+
+[functions.api-gateway]
+verify_jwt = false
+
+[functions.style-analysis]
+verify_jwt = false
+
+[functions.material-properties-analysis]
+verify_jwt = false
+
+[functions.enhanced-crewai]
+verify_jwt = false

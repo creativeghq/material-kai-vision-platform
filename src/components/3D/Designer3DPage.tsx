@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ThreeJsViewer } from './ThreeJsViewer';
-import { CrewAI3DGenerationAPI } from '@/services/crewai3DGenerationAPI';
+import { integratedWorkflowService } from '@/services/integratedWorkflowService';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Wand2, Download, Share2 } from 'lucide-react';
 
@@ -40,18 +40,25 @@ export const Designer3DPage: React.FC = () => {
 
     setIsGenerating(true);
     try {
-      const result = await CrewAI3DGenerationAPI.generate3D({
-        prompt,
-        room_type: roomType || undefined,
+      // Use integrated workflow service for enhanced 3D generation
+      const { generationResult, enhancements } = await integratedWorkflowService.enhanced3DGeneration(prompt, {
+        roomType: roomType || undefined,
         style: style || undefined
       });
 
-      setGeneratedImages(result.image_urls || []);
-      setGenerationData(result);
+      setGeneratedImages(generationResult.image_urls || []);
+      setGenerationData({
+        ...generationResult,
+        ...(enhancements.nerfReconstruction && {
+          nerf_reconstruction: enhancements.nerfReconstruction.reconstructionId,
+          model_file_url: enhancements.nerfReconstruction.modelFileUrl,
+          mesh_file_url: enhancements.nerfReconstruction.meshFileUrl
+        })
+      });
       
       toast({
         title: '3D Design Generated!',
-        description: `Your interior design was created in ${(result.processing_time_ms / 1000).toFixed(1)}s`,
+        description: `Design created with ${enhancements.nerfReconstruction ? 'NeRF reconstruction' : 'standard processing'}`,
         variant: 'default'
       });
     } catch (error) {

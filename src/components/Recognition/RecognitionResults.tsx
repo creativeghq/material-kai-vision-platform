@@ -116,17 +116,32 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                   </div>
                 )}
 
+                {/* Enhanced Material Properties */}
+                {result.metadata?.properties?.extracted_text && (
+                  <div className="text-xs text-muted-foreground mb-2">
+                    <span className="font-medium">Text Found: </span>
+                    {result.metadata.properties.extracted_text.substring(0, 50)}...
+                  </div>
+                )}
+                
+                {result.metadata?.properties?.svbrdf_maps && (
+                  <div className="text-xs text-success mb-2">
+                    <span className="font-medium">SVBRDF Maps Available</span>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="flex space-x-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Add to favorites">
                       <Star className="w-3 h-3" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Download SVBRDF maps" 
+                            disabled={!result.metadata?.properties?.svbrdf_maps}>
                       <Download className="w-3 h-3" />
                     </Button>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Share result">
                     <Share2 className="w-3 h-3" />
                   </Button>
                 </div>
