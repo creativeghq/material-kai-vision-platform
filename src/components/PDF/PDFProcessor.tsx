@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { PDFResultsViewer } from './PDFResultsViewer';
 
 interface ProcessingOptions {
   tileSize: number;
@@ -44,6 +45,7 @@ export const PDFProcessor: React.FC = () => {
   const { toast } = useToast();
   const [processing, setProcessing] = useState<ProcessingStatus[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [viewingResults, setViewingResults] = useState<string | null>(null);
   const [options, setOptions] = useState<ProcessingOptions>({
     tileSize: 512,
     overlapPercentage: 10,
@@ -198,6 +200,16 @@ export const PDFProcessor: React.FC = () => {
     );
   };
 
+  // Show results viewer if viewing results
+  if (viewingResults) {
+    return (
+      <PDFResultsViewer 
+        processingId={viewingResults} 
+        onClose={() => setViewingResults(null)} 
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Upload Area */}
@@ -337,7 +349,11 @@ export const PDFProcessor: React.FC = () => {
                   </div>
                   
                   {item.status === 'completed' && (
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setViewingResults(item.result?.processingId || item.id)}
+                    >
                       <Eye className="h-4 w-4 mr-2" />
                       View Results
                     </Button>
