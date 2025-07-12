@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,11 +43,19 @@ export const ApiGatewayAdmin: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
+  const [endpointDetailsOpen, setEndpointDetailsOpen] = useState(false);
+  const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
 
-  // State for dialogs
-  const [createNetworkOpen, setCreateNetworkOpen] = useState(false);
-  const [createApiKeyOpen, setCreateApiKeyOpen] = useState(false);
-  const [createRuleOpen, setCreateRuleOpen] = useState(false);
+  // Global rate limits state
+  const [globalRateLimits, setGlobalRateLimits] = useState({
+    authentication: 20,
+    materials: 60,
+    recognition: 20,
+    search: 60,
+    admin: 10,
+    analytics: 100
+  });
 
   useEffect(() => {
     loadData();
@@ -101,28 +108,35 @@ export const ApiGatewayAdmin: React.FC = () => {
       );
       toast.success(`Endpoint ${!currentValue ? 'enabled' : 'disabled'} for internal access`);
     } catch (error) {
-      console.error('Error toggling endpoint access:', error);
-      toast.error('Failed to update endpoint access');
+      console.error('Error toggling internal access:', error);
+      toast.error('Failed to update internal access');
     }
   };
 
-  const copyApiKey = (apiKey: string) => {
-    navigator.clipboard.writeText(apiKey);
-    toast.success('API key copied to clipboard');
-  };
-
-  const revokeApiKey = async (id: string) => {
+  const updateEndpointRateLimit = async (endpointId: string, newLimit: number) => {
     try {
-      await apiGatewayService.revokeApiKey(id);
-      setApiKeys(prev => 
-        prev.map(key => 
-          key.id === id ? { ...key, is_active: false } : key
+      setEndpoints(prev => 
+        prev.map(ep => 
+          ep.id === endpointId ? { ...ep, rate_limit_per_minute: newLimit } : ep
         )
       );
-      toast.success('API key revoked');
+      toast.success('Rate limit updated');
     } catch (error) {
-      console.error('Error revoking API key:', error);
-      toast.error('Failed to revoke API key');
+      console.error('Error updating rate limit:', error);
+      toast.error('Failed to update rate limit');
+    }
+  };
+
+  const updateGlobalRateLimit = async (category: string, newLimit: number) => {
+    try {
+      setGlobalRateLimits(prev => ({
+        ...prev,
+        [category]: newLimit
+      }));
+      toast.success(`Global ${category} rate limit updated to ${newLimit} req/min`);
+    } catch (error) {
+      console.error('Error updating global rate limit:', error);
+      toast.error('Failed to update global rate limit');
     }
   };
 
@@ -137,6 +151,11 @@ export const ApiGatewayAdmin: React.FC = () => {
     }
   };
 
+  const copyApiKey = (apiKey: string) => {
+    navigator.clipboard.writeText(apiKey);
+    toast.success('API key copied to clipboard');
+  };
+
   const filteredEndpoints = endpoints.filter(endpoint => {
     const matchesSearch = endpoint.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          endpoint.description?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -146,12 +165,47 @@ export const ApiGatewayAdmin: React.FC = () => {
 
   const categories = Array.from(new Set(endpoints.map(ep => ep.category))).sort();
 
+  const getEndpointResponseExample = (path: string) => {
+    const examples: Record<string, string> = {
+      '/api/materials': JSON.stringify({
+        data: [
+          { id: "uuid", name: "Material Name", category: "metals", properties: {} }
+        ],
+        success: true
+      }, null, 2),
+      '/api/recognition': JSON.stringify({
+        data: {
+          detected_materials: ["Steel", "Aluminum"],
+          confidence_score: 0.95,
+          processing_time_ms: 1200
+        },
+        success: true
+      }, null, 2),
+      '/api/search': JSON.stringify({
+        data: {
+          results: [],
+          total: 0,
+          query_time_ms: 45
+        },
+        success: true
+      }, null, 2)
+    };
+    
+    return examples[path] || JSON.stringify({
+      data: {},
+      success: true,
+      message: "Operation completed successfully"
+    }, null, 2);
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-          <p className="mt-4 text-muted-foreground">Loading API Gateway...</p>
+      <div className="min-h-screen bg-background">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p>Loading API Gateway...</p>
+          </div>
         </div>
       </div>
     );
@@ -187,14 +241,14 @@ export const ApiGatewayAdmin: React.FC = () => {
             <div>
               <h1 className="text-2xl font-bold tracking-tight">API Gateway Management</h1>
               <p className="text-sm text-muted-foreground">
-                Manage API endpoints, access control, rate limiting, and analytics
+                Configure endpoints, access control, rate limiting, and monitoring
               </p>
             </div>
           </div>
-          <Button onClick={seedDefaultEndpoints} variant="outline">
-            <Plus className="mr-2 h-4 w-4" />
-            Seed Default Endpoints
-          </Button>
+          <Badge variant="outline" className="text-sm">
+            <Shield className="h-3 w-3 mr-1" />
+            Admin Access
+          </Badge>
         </div>
       </div>
 
@@ -232,70 +286,77 @@ export const ApiGatewayAdmin: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-green-600">Authentication</h4>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                  {Object.entries({
+                    authentication: { value: globalRateLimits.authentication, color: 'text-green-600', description: 'Login, register, tokens' },
+                    materials: { value: globalRateLimits.materials, color: 'text-blue-600', description: 'CRUD operations' },
+                    recognition: { value: globalRateLimits.recognition, color: 'text-orange-600', description: 'AI processing' },
+                    search: { value: globalRateLimits.search, color: 'text-purple-600', description: 'Vector & text search' },
+                    admin: { value: globalRateLimits.admin, color: 'text-red-600', description: 'Administrative ops' },
+                    analytics: { value: globalRateLimits.analytics, color: 'text-cyan-600', description: 'Event tracking' }
+                  }).map(([category, config]) => (
+                    <div key={category} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className={`font-medium ${config.color}`}>
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </h4>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Edit {category.charAt(0).toUpperCase() + category.slice(1)} Rate Limit</DialogTitle>
+                              <DialogDescription>
+                                Update the global rate limit for {category} endpoints
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="rateLimit">Rate Limit (requests/minute)</Label>
+                                <Input
+                                  id="rateLimit"
+                                  type="number"
+                                  defaultValue={config.value}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const newValue = parseInt((e.target as HTMLInputElement).value);
+                                      if (!isNaN(newValue)) {
+                                        updateGlobalRateLimit(category, newValue);
+                                      }
+                                    }
+                                  }}
+                                  placeholder="Enter rate limit"
+                                />
+                              </div>
+                              <Button 
+                                onClick={(e) => {
+                                  const input = (e.target as HTMLButtonElement).parentElement?.querySelector('input');
+                                  if (input) {
+                                    const newValue = parseInt(input.value);
+                                    if (!isNaN(newValue)) {
+                                      updateGlobalRateLimit(category, newValue);
+                                    }
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                Update Rate Limit
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                      <p className="text-2xl font-bold">{config.value} req/min</p>
+                      <p className="text-sm text-muted-foreground">{config.description}</p>
                     </div>
-                    <p className="text-2xl font-bold">20 req/min</p>
-                    <p className="text-sm text-muted-foreground">Login, register, tokens</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-blue-600">Materials</h4>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-2xl font-bold">60 req/min</p>
-                    <p className="text-sm text-muted-foreground">CRUD operations</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-orange-600">Recognition</h4>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-2xl font-bold">20 req/min</p>
-                    <p className="text-sm text-muted-foreground">AI processing</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-purple-600">Search</h4>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-2xl font-bold">60 req/min</p>
-                    <p className="text-sm text-muted-foreground">Vector & text search</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-red-600">Admin</h4>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-2xl font-bold">10 req/min</p>
-                    <p className="text-sm text-muted-foreground">Administrative ops</p>
-                  </div>
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-cyan-600">Analytics</h4>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-2xl font-bold">100 req/min</p>
-                    <p className="text-sm text-muted-foreground">Event tracking</p>
-                  </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
+            {/* API Endpoints */}
             <Card>
               <CardHeader>
                 <CardTitle>API Endpoints</CardTitle>
@@ -361,7 +422,13 @@ export const ApiGatewayAdmin: React.FC = () => {
                       <TableBody>
                         {filteredEndpoints.map((endpoint) => (
                           <TableRow key={endpoint.id}>
-                            <TableCell className="font-mono text-sm">
+                            <TableCell 
+                              className="font-mono text-sm cursor-pointer hover:text-blue-600"
+                              onClick={() => {
+                                setSelectedEndpoint(endpoint);
+                                setEndpointDetailsOpen(true);
+                              }}
+                            >
                               {endpoint.path}
                             </TableCell>
                             <TableCell>
@@ -379,8 +446,16 @@ export const ApiGatewayAdmin: React.FC = () => {
                                   type="number" 
                                   value={endpoint.rate_limit_per_minute}
                                   onChange={(e) => {
-                                    // Handle rate limit update
-                                    console.log('Update rate limit for', endpoint.path, 'to', e.target.value);
+                                    const newLimit = parseInt(e.target.value);
+                                    if (!isNaN(newLimit)) {
+                                      updateEndpointRateLimit(endpoint.id, newLimit);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const newLimit = parseInt(e.target.value);
+                                    if (!isNaN(newLimit)) {
+                                      updateEndpointRateLimit(endpoint.id, newLimit);
+                                    }
                                   }}
                                   className="w-20 h-8" 
                                 />
@@ -436,101 +511,14 @@ export const ApiGatewayAdmin: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Internal Networks Tab */}
-          <TabsContent value="networks" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Internal Networks</CardTitle>
-                  <CardDescription>
-                    Define CIDR ranges that should be considered internal networks
-                  </CardDescription>
-                </div>
-                <Dialog open={createNetworkOpen} onOpenChange={setCreateNetworkOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Network
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add Internal Network</DialogTitle>
-                      <DialogDescription>
-                        Define a new internal network CIDR range
-                      </DialogDescription>
-                    </DialogHeader>
-                    <CreateNetworkForm 
-                      onSuccess={() => {
-                        setCreateNetworkOpen(false);
-                        loadData();
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {internalNetworks.map((network) => (
-                    <div key={network.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <h4 className="font-medium">{network.name}</h4>
-                        <p className="text-sm text-muted-foreground">{network.cidr_range}</p>
-                        {network.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{network.description}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={network.is_active ? "default" : "secondary"}>
-                          {network.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => apiGatewayService.deleteInternalNetwork(network.id).then(loadData)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* API Keys Tab */}
           <TabsContent value="api-keys" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>API Keys & User Analytics</CardTitle>
-                  <CardDescription>
-                    Manage API keys with user analytics and endpoint usage data
-                  </CardDescription>
-                </div>
-                <Dialog open={createApiKeyOpen} onOpenChange={setCreateApiKeyOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Generate API Key
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Generate API Key</DialogTitle>
-                      <DialogDescription>
-                        Create a new API key for external access
-                      </DialogDescription>
-                    </DialogHeader>
-                    <CreateApiKeyForm 
-                      onSuccess={() => {
-                        setCreateApiKeyOpen(false);
-                        loadData();
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
+              <CardHeader>
+                <CardTitle>API Keys & User Analytics</CardTitle>
+                <CardDescription>
+                  Manage API keys with user analytics and endpoint usage data
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {apiKeys.length === 0 ? (
@@ -588,6 +576,78 @@ export const ApiGatewayAdmin: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
+                            <Sheet>
+                              <SheetTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedApiKey(apiKey)}
+                                >
+                                  <Settings className="h-4 w-4 mr-1" />
+                                  Rules
+                                </Button>
+                              </SheetTrigger>
+                              <SheetContent>
+                                <SheetHeader>
+                                  <SheetTitle>Custom Rate Limit Rules</SheetTitle>
+                                  <SheetDescription>
+                                    Configure specific rate limit rules for {apiKey.key_name}
+                                  </SheetDescription>
+                                </SheetHeader>
+                                <div className="mt-6 space-y-4">
+                                  <div className="space-y-2">
+                                    <Label>Override Global Rate Limit</Label>
+                                    <Input
+                                      type="number"
+                                      placeholder="Enter custom rate limit"
+                                      defaultValue={apiKey.rate_limit_override || ''}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                      Leave empty to use global rate limits
+                                    </p>
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    <Label>Allowed Endpoints</Label>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                      {endpoints.map((endpoint) => (
+                                        <div key={endpoint.id} className="flex items-center space-x-2">
+                                          <input
+                                            type="checkbox"
+                                            id={`endpoint-${endpoint.id}`}
+                                            defaultChecked={apiKey.allowed_endpoints?.includes(endpoint.id)}
+                                            className="rounded"
+                                          />
+                                          <Label 
+                                            htmlFor={`endpoint-${endpoint.id}`}
+                                            className="text-sm font-mono"
+                                          >
+                                            {endpoint.method} {endpoint.path}
+                                          </Label>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label>Expiration Date</Label>
+                                    <Input
+                                      type="datetime-local"
+                                      defaultValue={apiKey.expires_at ? new Date(apiKey.expires_at).toISOString().slice(0, 16) : ''}
+                                    />
+                                  </div>
+
+                                  <div className="flex space-x-2">
+                                    <Button className="flex-1">
+                                      Update Rules
+                                    </Button>
+                                    <Button variant="outline" className="flex-1">
+                                      Reset to Default
+                                    </Button>
+                                  </div>
+                                </div>
+                              </SheetContent>
+                            </Sheet>
                             <Button
                               variant="outline"
                               size="sm"
@@ -598,98 +658,13 @@ export const ApiGatewayAdmin: React.FC = () => {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => {
+                                // Toggle API key active status
+                                console.log('Toggle API key status');
+                              }}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Sheet>
-                              <SheetTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  <Shield className="h-4 w-4" />
-                                </Button>
-                              </SheetTrigger>
-                              <SheetContent className="w-[600px] sm:w-[800px]">
-                                <SheetHeader>
-                                  <SheetTitle>Custom Rate Limit Rules - {apiKey.key_name}</SheetTitle>
-                                  <SheetDescription>
-                                    Override default rate limits for this API key
-                                  </SheetDescription>
-                                </SheetHeader>
-                                <div className="mt-6 space-y-4">
-                                  <div className="flex justify-between items-center">
-                                    <h4 className="font-medium">Active Custom Rules</h4>
-                                    <Dialog>
-                                      <DialogTrigger asChild>
-                                        <Button size="sm">
-                                          <Plus className="mr-2 h-4 w-4" />
-                                          Add Rule
-                                        </Button>
-                                      </DialogTrigger>
-                                      <DialogContent>
-                                        <DialogHeader>
-                                          <DialogTitle>Create Custom Rate Limit Rule</DialogTitle>
-                                          <DialogDescription>
-                                            Override the default rate limit for this API key
-                                          </DialogDescription>
-                                        </DialogHeader>
-                                        <CreateRateLimitForm 
-                                          onSuccess={() => {
-                                            loadData();
-                                          }}
-                                        />
-                                      </DialogContent>
-                                    </Dialog>
-                                  </div>
-                                  
-                                  {/* Custom Rules List */}
-                                  <div className="space-y-3">
-                                    {rateLimitRules
-                                      .filter(rule => rule.target_value === apiKey.api_key)
-                                      .map((rule) => (
-                                      <div key={rule.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                        <div>
-                                          <h5 className="font-medium">{rule.name}</h5>
-                                          <p className="text-sm text-muted-foreground">
-                                            {rule.requests_per_minute} requests per minute
-                                          </p>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                          <Badge variant={rule.is_active ? "default" : "secondary"}>
-                                            {rule.is_active ? "Active" : "Inactive"}
-                                          </Badge>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => apiGatewayService.deleteRateLimitRule(rule.id).then(loadData)}
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    
-                                    {rateLimitRules.filter(rule => rule.target_value === apiKey.api_key).length === 0 && (
-                                      <div className="text-center py-8 text-muted-foreground">
-                                        <Shield className="mx-auto h-8 w-8 mb-2" />
-                                        <p>No custom rules configured</p>
-                                        <p className="text-sm">This API key uses default rate limits</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </SheetContent>
-                            </Sheet>
-                            {apiKey.is_active && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => revokeApiKey(apiKey.id)}
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            )}
                           </div>
                         </div>
                       </Card>
@@ -702,12 +677,10 @@ export const ApiGatewayAdmin: React.FC = () => {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-4">
-            {/* Overview Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
-                  <Activity className="h-4 w-4 text-muted-foreground" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total API Calls</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">0</div>
@@ -715,272 +688,154 @@ export const ApiGatewayAdmin: React.FC = () => {
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Internal Requests</CardTitle>
-                  <Network className="h-4 w-4 text-muted-foreground" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Active API Keys</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">From internal networks</p>
+                  <div className="text-2xl font-bold">{apiKeys.filter(k => k.is_active).length}</div>
+                  <p className="text-xs text-muted-foreground">Currently active</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">External Requests</CardTitle>
-                  <Globe className="h-4 w-4 text-muted-foreground" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Rate Limit Hits</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">From external sources</p>
+                  <p className="text-xs text-muted-foreground">Rate limit exceeded</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Rate Limited</CardTitle>
-                  <Shield className="h-4 w-4 text-muted-foreground" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Error Rate</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">Blocked requests</p>
+                  <div className="text-2xl font-bold">0%</div>
+                  <p className="text-xs text-muted-foreground">Last 24 hours</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Detailed Analytics */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top Endpoints</CardTitle>
-                  <CardDescription>Most frequently accessed endpoints</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Activity className="mx-auto h-8 w-8 mb-2" />
-                      <p>No usage data available</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Request Sources</CardTitle>
-                  <CardDescription>Internal vs External traffic breakdown</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Network className="mx-auto h-8 w-8 mb-2" />
-                      <p>No traffic data available</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Activity */}
             <Card>
               <CardHeader>
                 <CardTitle>Recent API Activity</CardTitle>
-                <CardDescription>Latest API requests and responses</CardDescription>
+                <CardDescription>Latest API requests and their status</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
-                  <Activity className="mx-auto h-12 w-12 mb-4" />
-                  <h3 className="text-lg font-semibold">No Recent Activity</h3>
-                  <p>API requests will appear here once traffic starts flowing</p>
+                  <Activity className="mx-auto h-8 w-8 mb-2" />
+                  <p>No recent API activity</p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Endpoint Details Modal */}
+        <Sheet open={endpointDetailsOpen} onOpenChange={setEndpointDetailsOpen}>
+          <SheetContent className="w-[700px] sm:w-[800px]">
+            <SheetHeader>
+              <SheetTitle>API Endpoint Details</SheetTitle>
+              <SheetDescription>
+                Detailed information about this API endpoint
+              </SheetDescription>
+            </SheetHeader>
+            {selectedEndpoint && (
+              <div className="mt-6 space-y-6">
+                <div className="grid gap-4">
+                  <div>
+                    <h4 className="font-medium text-sm text-muted-foreground">Endpoint Path</h4>
+                    <p className="font-mono text-lg">{selectedEndpoint.path}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium text-sm text-muted-foreground">Method</h4>
+                      <Badge variant="outline" className="mt-1">{selectedEndpoint.method}</Badge>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-sm text-muted-foreground">Category</h4>
+                      <Badge variant="secondary" className="mt-1">{selectedEndpoint.category}</Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-sm text-muted-foreground">Description</h4>
+                    <p className="text-sm">{selectedEndpoint.description || 'No description available'}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  <h3 className="text-lg font-semibold">Access Configuration</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Public Access</span>
+                        <Badge variant={selectedEndpoint.is_public ? "default" : "secondary"}>
+                          {selectedEndpoint.is_public ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {selectedEndpoint.is_public ? 'Available to external users' : 'Internal access only'}
+                      </p>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Internal Access</span>
+                        <Badge variant={selectedEndpoint.is_internal ? "default" : "secondary"}>
+                          {selectedEndpoint.is_internal ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {selectedEndpoint.is_internal ? 'Available to internal networks' : 'No internal access'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  <h3 className="text-lg font-semibold">Rate Limiting</h3>
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Current Rate Limit</span>
+                      <Badge variant="outline">{selectedEndpoint.rate_limit_per_minute} req/min</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Maximum requests allowed per minute for this endpoint
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  <h3 className="text-lg font-semibold">Response Format</h3>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <h4 className="font-medium text-sm mb-2">Expected Response</h4>
+                    <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {getEndpointResponseExample(selectedEndpoint.path)}
+                    </pre>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  <h3 className="text-lg font-semibold">Usage Statistics</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-3 border rounded-lg">
+                      <div className="text-lg font-semibold">0</div>
+                      <div className="text-xs text-muted-foreground">Total Calls</div>
+                    </div>
+                    <div className="text-center p-3 border rounded-lg">
+                      <div className="text-lg font-semibold">0ms</div>
+                      <div className="text-xs text-muted-foreground">Avg Response Time</div>
+                    </div>
+                    <div className="text-center p-3 border rounded-lg">
+                      <div className="text-lg font-semibold">0%</div>
+                      <div className="text-xs text-muted-foreground">Error Rate</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
-  );
-};
-
-// Helper Components for Forms
-const CreateNetworkForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
-  const [name, setName] = useState('');
-  const [cidrRange, setCidrRange] = useState('');
-  const [description, setDescription] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiGatewayService.createInternalNetwork({
-        name,
-        cidr_range: cidrRange,
-        description,
-        is_active: true,
-      });
-      toast.success('Internal network created');
-      onSuccess();
-    } catch (error) {
-      console.error('Error creating network:', error);
-      toast.error('Failed to create internal network');
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Name</Label>
-        <Input
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g., Office Network"
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="cidr">CIDR Range</Label>
-        <Input
-          id="cidr"
-          value={cidrRange}
-          onChange={(e) => setCidrRange(e.target.value)}
-          placeholder="e.g., 192.168.1.0/24"
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Optional description"
-        />
-      </div>
-      <Button type="submit" className="w-full">Create Network</Button>
-    </form>
-  );
-};
-
-const CreateApiKeyForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
-  const [keyName, setKeyName] = useState('');
-  const [rateLimit, setRateLimit] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiGatewayService.generateApiKey('system', keyName, {
-        rateLimit: rateLimit ? parseInt(rateLimit) : undefined,
-      });
-      toast.success('API key generated');
-      onSuccess();
-    } catch (error) {
-      console.error('Error generating API key:', error);
-      toast.error('Failed to generate API key');
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="keyName">Key Name</Label>
-        <Input
-          id="keyName"
-          value={keyName}
-          onChange={(e) => setKeyName(e.target.value)}
-          placeholder="e.g., Mobile App Key"
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="rateLimit">Rate Limit (requests/minute)</Label>
-        <Input
-          id="rateLimit"
-          type="number"
-          value={rateLimit}
-          onChange={(e) => setRateLimit(e.target.value)}
-          placeholder="Leave empty for default"
-        />
-      </div>
-      <Button type="submit" className="w-full">Generate API Key</Button>
-    </form>
-  );
-};
-
-const CreateRateLimitForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
-  const [name, setName] = useState('');
-  const [targetType, setTargetType] = useState<'ip' | 'cidr' | 'user' | 'api_key'>('ip');
-  const [targetValue, setTargetValue] = useState('');
-  const [requestsPerMinute, setRequestsPerMinute] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiGatewayService.createRateLimitRule({
-        name,
-        target_type: targetType,
-        target_value: targetValue,
-        requests_per_minute: parseInt(requestsPerMinute),
-        is_active: true,
-      });
-      toast.success('Rate limit rule created');
-      onSuccess();
-    } catch (error) {
-      console.error('Error creating rate limit rule:', error);
-      toast.error('Failed to create rate limit rule');
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="ruleName">Rule Name</Label>
-        <Input
-          id="ruleName"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g., High Volume Client"
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="targetType">Target Type</Label>
-        <Select value={targetType} onValueChange={(value: any) => setTargetType(value)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ip">IP Address</SelectItem>
-            <SelectItem value="cidr">CIDR Range</SelectItem>
-            <SelectItem value="user">User ID</SelectItem>
-            <SelectItem value="api_key">API Key</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <Label htmlFor="targetValue">Target Value</Label>
-        <Input
-          id="targetValue"
-          value={targetValue}
-          onChange={(e) => setTargetValue(e.target.value)}
-          placeholder={
-            targetType === 'ip' ? 'e.g., 192.168.1.100' :
-            targetType === 'cidr' ? 'e.g., 10.0.0.0/8' :
-            targetType === 'user' ? 'e.g., user-uuid' :
-            'e.g., api-key-value'
-          }
-          required
-        />
-      </div>
-      <div>
-        <Label htmlFor="requestsPerMinute">Requests per Minute</Label>
-        <Input
-          id="requestsPerMinute"
-          type="number"
-          value={requestsPerMinute}
-          onChange={(e) => setRequestsPerMinute(e.target.value)}
-          placeholder="e.g., 100"
-          required
-        />
-      </div>
-      <Button type="submit" className="w-full">Create Rule</Button>
-    </form>
   );
 };
