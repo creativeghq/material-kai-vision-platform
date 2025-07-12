@@ -20,7 +20,7 @@ interface ProcessingOptions {
   overlapPercentage: number;
   extractStructuredData: boolean;
   detectMaterials: boolean;
-  processingMethod: 'azure' | 'hybrid' | 'standard';
+  processingMethod: 'azure' | 'hybrid';
 }
 
 interface ProcessingResult {
@@ -53,11 +53,10 @@ interface ProcessingStatus {
 }
 
 // Helper function to get processing method display name
-const getProcessingMethodName = (method: 'azure' | 'hybrid' | 'standard'): string => {
+const getProcessingMethodName = (method: 'azure' | 'hybrid'): string => {
   switch (method) {
     case 'azure': return 'Azure AI';
     case 'hybrid': return 'Hybrid Python';
-    case 'standard': return 'Standard';
     default: return 'Unknown';
   }
 };
@@ -201,20 +200,6 @@ export const PDFProcessor: React.FC = () => {
             });
           }
         }
-      } else {
-        console.log('Using standard PDF processing...');
-        const standardResponse = await supabase.functions.invoke('pdf-processor', {
-          body: {
-            fileUrl: publicUrl,
-            originalFilename: file.name,
-            fileSize: file.size,
-            userId: user.id,
-            extractionOptions: options
-          }
-        });
-        
-        processingResult = standardResponse.data;
-        processingError = standardResponse.error;
       }
 
       if (processingError) {
@@ -316,9 +301,9 @@ export const PDFProcessor: React.FC = () => {
             <FileText className="h-5 w-5" />
             Intelligent PDF Material Catalog Processor
           </CardTitle>
-          <CardDescription>
-            Upload PDF documents for intelligent analysis. Choose between Azure AI Document Intelligence for advanced structured data extraction or Standard processing for reliable material detection across all file sizes.
-          </CardDescription>
+           <CardDescription>
+             Upload PDF documents for intelligent analysis. Choose between Azure AI Document Intelligence for advanced structured data extraction or Hybrid Python processing for professional-grade material catalog analysis.
+           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Processing Method Selection */}
@@ -329,7 +314,7 @@ export const PDFProcessor: React.FC = () => {
             </div>
             <Select 
               value={options.processingMethod} 
-              onValueChange={(value: 'azure' | 'hybrid' | 'standard') => setOptions(prev => ({ ...prev, processingMethod: value }))}
+              onValueChange={(value: 'azure' | 'hybrid') => setOptions(prev => ({ ...prev, processingMethod: value }))}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select processing method" />
@@ -353,15 +338,6 @@ export const PDFProcessor: React.FC = () => {
                     </div>
                   </div>
                 </SelectItem>
-                <SelectItem value="standard">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-green-500" />
-                    <div>
-                      <div className="font-medium">Standard Processing</div>
-                      <div className="text-xs text-muted-foreground">Basic OCR and material detection for large files and simple extraction needs</div>
-                    </div>
-                  </div>
-                </SelectItem>
               </SelectContent>
             </Select>
             {options.processingMethod === 'hybrid' && (
@@ -377,14 +353,6 @@ export const PDFProcessor: React.FC = () => {
                 <Zap className="h-4 w-4" />
                 <AlertDescription>
                   Azure AI provides cloud-based document intelligence with advanced table and form recognition. File size limit: 50MB.
-                </AlertDescription>
-              </Alert>
-            )}
-            {options.processingMethod === 'standard' && (
-              <Alert>
-                <FileText className="h-4 w-4" />
-                <AlertDescription>
-                  Standard processing provides reliable OCR and basic material detection for large files and simple extraction needs.
                 </AlertDescription>
               </Alert>
             )}
@@ -454,14 +422,12 @@ export const PDFProcessor: React.FC = () => {
             ) : (
               <div>
                 <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
-                <p className="text-sm text-muted-foreground">
-                  {options.processingMethod === 'hybrid' 
-                    ? 'Hybrid: Professional-grade extraction with image analysis and cross-page correlations'
-                    : options.processingMethod === 'azure' 
-                    ? 'Azure AI: Up to 50MB per file for advanced cloud analysis'
-                    : 'Standard: Supports large files up to 50MB with reliable processing'
-                  }
-                </p>
+                 <p className="text-sm text-muted-foreground">
+                   {options.processingMethod === 'hybrid' 
+                     ? 'Hybrid: Professional-grade extraction with image analysis and cross-page correlations'
+                     : 'Azure AI: Up to 50MB per file for advanced cloud analysis'
+                   }
+                 </p>
               </div>
             )}
           </div>
