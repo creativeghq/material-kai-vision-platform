@@ -16,6 +16,8 @@ import { ApiGatewayAdmin } from "./components/Admin/ApiGatewayAdmin";
 import { MetadataFieldsManagement } from "./components/Admin/MetadataFieldsManagement";
 import { RAGManagementPanel } from "./components/Admin/RAGManagementPanel";
 import { AITestingPanel } from "./components/Admin/AITestingPanel";
+import { AnalyticsDashboard } from "./components/Admin/AnalyticsDashboard";
+import { SystemPerformance } from "./components/Admin/SystemPerformance";
 
 const queryClient = new QueryClient();
 
@@ -40,7 +42,7 @@ const App = () => (
             } />
             <Route path="/admin/analytics" element={
               <AuthGuard>
-                <AdminPanel />
+                <AnalyticsDashboard />
               </AuthGuard>
             } />
             <Route path="/admin/knowledge-base" element={
@@ -65,7 +67,7 @@ const App = () => (
             } />
             <Route path="/admin/performance" element={
               <AuthGuard>
-                <AdminPanel />
+                <SystemPerformance />
               </AuthGuard>
             } />
             <Route path="/admin/rag" element={
