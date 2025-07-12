@@ -56,7 +56,7 @@ serve(async (req) => {
       },
       includePaths: options.includePaths || [],
       excludePaths: options.excludePaths || [],
-      maxDepth: options.maxDepth || 2
+      maxDepth: options.maxDepth || 3  // Increased default to 3
     };
 
     console.log('Calling Firecrawl v1 crawl API...');
