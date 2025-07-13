@@ -61,6 +61,9 @@ verify_jwt = false
 [functions.convertapi-pdf-processor]
 verify_jwt = false
 
+[functions.parse-sitemap]
+verify_jwt = false
+
 [functions.scrape-single-page]
 verify_jwt = false
 

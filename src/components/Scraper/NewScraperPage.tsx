@@ -75,46 +75,25 @@ Return a list of materials found on the page.`);
     try {
       console.log('Parsing sitemap:', url);
       
-      // Use CORS proxy for sitemap parsing
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch sitemap: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      const sitemapContent = data.contents;
-      
-      // Parse XML to extract URLs
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(sitemapContent, 'text/xml');
-      
-      // Handle different sitemap formats
-      let urls: string[] = [];
-      
-      // Standard sitemap format
-      const urlElements = xmlDoc.getElementsByTagName('url');
-      for (let i = 0; i < urlElements.length; i++) {
-        const locElement = urlElements[i].getElementsByTagName('loc')[0];
-        if (locElement) {
-          urls.push(locElement.textContent || '');
+      // Use the backend edge function to parse sitemap
+      const { data, error } = await supabase.functions.invoke('parse-sitemap', {
+        body: {
+          sitemapUrl: url,
+          maxPages: maxPages
         }
+      });
+      
+      if (error) {
+        console.error('Error parsing sitemap:', error);
+        throw new Error(error.message || 'Failed to parse sitemap');
       }
       
-      // If no URLs found, try alternate format
-      if (urls.length === 0) {
-        const locElements = xmlDoc.getElementsByTagName('loc');
-        for (let i = 0; i < locElements.length; i++) {
-          urls.push(locElements[i].textContent || '');
-        }
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to parse sitemap');
       }
       
-      // Filter out empty URLs and limit
-      urls = urls.filter(url => url.trim().length > 0).slice(0, maxPages);
-      
-      console.log(`Found ${urls.length} URLs in sitemap`);
-      return urls;
+      console.log(`Found ${data.count} URLs in sitemap`);
+      return data.urls;
       
     } catch (error) {
       console.error('Error parsing sitemap:', error);
