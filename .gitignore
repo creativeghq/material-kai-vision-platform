@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Roo system directories
+.ruru
+.roo
+.roomodes
