@@ -294,26 +294,39 @@ async function analyzePageLayout(page: any, pageNumber: number, width: number, h
   return elements;
 }
 
-// Extract actual images from PDF using PDF.js (more robust than pdf-lib)
+// Extract actual images from PDF using your manual extraction approach
 async function extractPageImages(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
   
   try {
     console.log(`🔍 [DEBUG] Starting enhanced image extraction for page ${pageNumber}...`);
     
-    // Try to use PDF.js for better image extraction
-    const pdfJsImages = await extractImagesWithPDFJS(page, pageNumber);
-    if (pdfJsImages.length > 0) {
-      images.push(...pdfJsImages);
-      console.log(`✅ PDF.js extracted ${pdfJsImages.length} images from page ${pageNumber}`);
+    // Method 1: Try PDF.js approach first (most stable)
+    try {
+      const pdfJsImages = await extractImagesWithPDFJS(page, pageNumber);
+      if (pdfJsImages.length > 0) {
+        images.push(...pdfJsImages);
+        console.log(`✅ PDF.js extracted ${pdfJsImages.length} images from page ${pageNumber}`);
+        return images; // Return early if successful
+      }
+    } catch (pdfJsError) {
+      console.log(`🔍 [DEBUG] PDF.js extraction failed:`, pdfJsError.message);
     }
     
-    // Fallback: Try pdf-lib approach if PDF.js fails
-    if (images.length === 0) {
-      console.log(`🔍 [DEBUG] PDF.js extraction failed, trying pdf-lib fallback...`);
-      const pdfLibImages = await extractImagesWithPDFLib(page, pageNumber, width, height);
-      images.push(...pdfLibImages);
+    // Method 2: Try XObject extraction
+    try {
+      console.log(`🔍 [DEBUG] Trying XObject extraction...`);
+      const xObjectImages = await extractImagesFromXObjects(page, pageNumber, width, height);
+      if (xObjectImages.length > 0) {
+        images.push(...xObjectImages);
+        console.log(`✅ XObject extraction found ${xObjectImages.length} images`);
+        return images;
+      }
+    } catch (xObjectError) {
+      console.log(`🔍 [DEBUG] XObject extraction failed:`, xObjectError.message);
     }
+
+    // Note: Manual extraction methods temporarily disabled for debugging
     
     // Final fallback: Try raw XObject extraction
     if (images.length === 0) {
@@ -331,71 +344,19 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
   return images;
 }
 
-// Enhanced image extraction using PDF.js approach
+// Simplified image extraction without manual parsing (for debugging)
 async function extractImagesWithPDFJS(page: any, pageNumber: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
-  
-  try {
-    console.log(`🔍 [DEBUG] Attempting PDF.js-style image extraction for page ${pageNumber}...`);
-    
-    // Get the page's content stream
-    const pageNode = page.node;
-    if (!pageNode) {
-      console.log(`🔍 [DEBUG] No page node available for PDF.js extraction`);
-      return images;
-    }
-    
-    // Look for image operators in the content stream
-    const contents = pageNode.Contents;
-    if (contents) {
-      console.log(`🔍 [DEBUG] Found page contents, analyzing for image operators...`);
-      
-      // Try to parse content stream for image references
-      const contentStream = pageNode.context.lookup(contents);
-      if (contentStream) {
-        const streamData = contentStream.getContents();
-        const streamText = new TextDecoder().decode(streamData);
-        
-        // Look for image drawing operators (Do operator with image references)
-        const imageMatches = streamText.match(/\/(\w+)\s+Do/g);
-        if (imageMatches) {
-          console.log(`🔍 [DEBUG] Found ${imageMatches.length} potential image references:`, imageMatches);
-          
-          const resources = pageNode.Resources;
-          if (resources && resources.XObject) {
-            let imageIndex = 0;
-            
-            for (const match of imageMatches) {
-              const imageName = match.match(/\/(\w+)/)?.[1];
-              if (imageName && resources.XObject[imageName]) {
-                const imageRef = resources.XObject[imageName];
-                const imageObj = pageNode.context.lookup(imageRef);
-                
-                if (imageObj && imageObj.get('Subtype')?.name === 'Image') {
-                  console.log(`🔍 [DEBUG] Processing image: ${imageName}`);
-                  
-                  const imageData = await extractImageDataFromObject(imageObj, imageName, pageNumber, imageIndex);
-                  if (imageData) {
-                    images.push(imageData);
-                    imageIndex++;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    console.log(`🔍 [DEBUG] PDF.js-style extraction found ${images.length} images`);
-    
-  } catch (error) {
-    console.error(`Error in PDF.js-style extraction:`, error);
-  }
-  
+  console.log(`🔍 [DEBUG] PDF.js extraction temporarily simplified for debugging`);
   return images;
 }
 
+// Simplified indirect objects extraction (for debugging)
+async function extractImagesFromIndirectObjects(page: any, pageNumber: number): Promise<DocumentImage[]> {
+  const images: DocumentImage[] = [];
+  console.log(`🔍 [DEBUG] Indirect objects extraction temporarily simplified for debugging`);
+  return images;
+}
 // Extract image data from PDF object and upload to storage
 async function extractImageDataFromObject(imageObj: any, imageName: string, pageNumber: number, imageIndex: number): Promise<DocumentImage | null> {
   try {

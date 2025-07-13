@@ -310,24 +310,26 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                       The PDF has been processed into a rich HTML document with preserved layout and extracted images.
                                     </p>
                                     <div className="space-y-2">
-                                      <a 
-                                        href={`https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/material-documents/enhanced-html/${step.metadata.knowledgeEntryId}.html`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800 underline mr-4"
-                                      >
-                                        <ExternalLink className="h-3 w-3" />
-                                        View HTML Document
-                                      </a>
-                                      <a 
-                                        href={`https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/enhanced-knowledge-base?id=${step.metadata.knowledgeEntryId}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline"
-                                      >
-                                        <Database className="h-3 w-3" />
-                                        View in Knowledge Base
-                                      </a>
+                                    <button 
+                                         onClick={() => {
+                                           console.log('HTML document not yet implemented. Knowledge Entry ID:', step.metadata.knowledgeEntryId);
+                                         }}
+                                         className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-600 underline mr-4 cursor-not-allowed"
+                                         disabled
+                                       >
+                                         <ExternalLink className="h-3 w-3" />
+                                         View HTML Document (Coming Soon)
+                                       </button>
+                                       <button 
+                                         onClick={() => {
+                                           // Navigate to knowledge base with search filter
+                                           window.open(`/admin/knowledge-base`, '_blank');
+                                         }}
+                                         className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline"
+                                       >
+                                         <Database className="h-3 w-3" />
+                                         View in Knowledge Base
+                                       </button>
                                     </div>
                                     <div className="text-xs text-green-600 mt-1">
                                       Document ID: {step.metadata.knowledgeEntryId}

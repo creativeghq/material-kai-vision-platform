@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import EmbeddingGenerationPanel from './EmbeddingGenerationPanel';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -228,6 +230,14 @@ const KnowledgeBaseManagement: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
+        
+        <Tabs defaultValue="entries" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="entries">Knowledge Entries</TabsTrigger>
+            <TabsTrigger value="embeddings">Embedding Generation</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="entries" className="space-y-4">
 
       {/* Filters */}
       <Card>
@@ -454,6 +464,13 @@ const KnowledgeBaseManagement: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+          
+          </TabsContent>
+
+          <TabsContent value="embeddings" className="space-y-4">
+            <EmbeddingGenerationPanel />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
