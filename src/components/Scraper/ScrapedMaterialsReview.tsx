@@ -14,7 +14,9 @@ import {
   Download, 
   Loader2,
   Clock,
-  ExternalLink 
+  ExternalLink,
+  Search,
+  AlertCircle
 } from 'lucide-react';
 
 interface ScrapedMaterialTemp {
@@ -30,9 +32,19 @@ interface ScrapedMaterialTemp {
 
 interface ScrapedMaterialsReviewProps {
   sessionId?: string | null;
+  currentResults?: any[];
+  onMaterialsUpdate?: (materials: any[]) => void;
+  onAddAllToCatalog?: () => void;
+  isLoading?: boolean;
 }
 
-export const ScrapedMaterialsReview = ({ sessionId }: ScrapedMaterialsReviewProps) => {
+export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
+  sessionId,
+  currentResults = [],
+  onMaterialsUpdate,
+  onAddAllToCatalog,
+  isLoading = false
+}) => {
   const { toast } = useToast();
   const [materials, setMaterials] = useState<ScrapedMaterialTemp[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,12 +52,12 @@ export const ScrapedMaterialsReview = ({ sessionId }: ScrapedMaterialsReviewProp
   const [bulkAction, setBulkAction] = useState<'approve' | 'reject' | 'delete' | null>(null);
 
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId && currentResults.length === 0) {
       loadMaterialsBySession(sessionId);
-    } else {
+    } else if (currentResults.length === 0) {
       loadAllUnreviewedMaterials();
     }
-  }, [sessionId]);
+  }, [sessionId, currentResults.length]);
 
   const loadMaterialsBySession = async (sessionId: string) => {
     setLoading(true);
@@ -278,11 +290,15 @@ export const ScrapedMaterialsReview = ({ sessionId }: ScrapedMaterialsReviewProp
     });
   };
 
+  // Show current results first if available, otherwise show stored materials
+  const displayMaterials = currentResults.length > 0 ? currentResults : materials;
+  const showCurrentResults = currentResults.length > 0;
+
   const approvedCount = materials.filter(m => m.approved === true).length;
   const rejectedCount = materials.filter(m => m.approved === false).length;
   const unreviewedCount = materials.filter(m => !m.reviewed).length;
 
-  if (loading && materials.length === 0) {
+  if (loading && materials.length === 0 && currentResults.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
@@ -294,292 +310,243 @@ export const ScrapedMaterialsReview = ({ sessionId }: ScrapedMaterialsReviewProp
   }
 
   return (
-    <div className="space-y-6">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold">{materials.length}</div>
-            <div className="text-sm text-muted-foreground">Total Materials</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{approvedCount}</div>
-            <div className="text-sm text-muted-foreground">Approved</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{rejectedCount}</div>
-            <div className="text-sm text-muted-foreground">Rejected</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-orange-600">{unreviewedCount}</div>
-            <div className="text-sm text-muted-foreground">Unreviewed</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Bulk Actions */}
-      {selectedMaterials.size > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <span className="text-sm">
-                {selectedMaterials.size} material(s) selected
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBulkAction('approve')}
-                  className="text-green-600"
-                >
-                  <Check className="h-4 w-4 mr-1" />
-                  Approve Selected
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBulkAction('reject')}
-                  className="text-red-600"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Reject Selected
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBulkAction('delete')}
-                  className="text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete Selected
-                </Button>
-              </div>
-              {bulkAction && (
-                <Button
-                  size="sm"
-                  onClick={handleBulkAction}
-                  disabled={loading}
-                >
-                  Confirm {bulkAction}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Action Buttons */}
-      <div className="flex gap-4">
-        <Button
-          onClick={addApprovedToCatalog}
-          disabled={loading || approvedCount === 0}
-          className="flex items-center gap-2"
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          Add {approvedCount} Approved to Catalog
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => window.location.reload()}
-        >
-          Refresh
-        </Button>
-      </div>
-
-      {/* Materials List */}
-      <div className="grid gap-4">
-        {materials.map((material) => (
-          <MaterialReviewCard
-            key={material.id}
-            material={material}
-            isSelected={selectedMaterials.has(material.id)}
-            onToggleSelection={() => toggleMaterialSelection(material.id)}
-            onUpdateReview={updateMaterialReview}
-            onDelete={deleteMaterial}
-          />
-        ))}
-      </div>
-
-      {materials.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No materials to review</h3>
-            <p className="text-muted-foreground">
-              {sessionId 
-                ? "No materials found for this scraping session"
-                : "No unreviewed materials found. Try scraping some websites first."
-              }
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-};
-
-interface MaterialReviewCardProps {
-  material: ScrapedMaterialTemp;
-  isSelected: boolean;
-  onToggleSelection: () => void;
-  onUpdateReview: (id: string, approved: boolean | null, notes?: string) => void;
-  onDelete: (id: string) => void;
-}
-
-const MaterialReviewCard = ({ 
-  material, 
-  isSelected, 
-  onToggleSelection, 
-  onUpdateReview, 
-  onDelete 
-}: MaterialReviewCardProps) => {
-  const [notes, setNotes] = useState(material.notes || '');
-  const materialData = material.material_data;
-
-  const getStatusBadge = () => {
-    if (!material.reviewed) {
-      return <Badge variant="secondary">Unreviewed</Badge>;
-    }
-    if (material.approved === true) {
-      return <Badge variant="default" className="bg-green-600">Approved</Badge>;
-    }
-    if (material.approved === false) {
-      return <Badge variant="destructive">Rejected</Badge>;
-    }
-    return <Badge variant="outline">Reviewed</Badge>;
-  };
-
-  return (
-    <Card className={`${isSelected ? 'ring-2 ring-primary' : ''}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3">
-            <Checkbox
-              checked={isSelected}
-              onCheckedChange={onToggleSelection}
-            />
-            <div className="flex-1">
-              <CardTitle className="text-lg">{materialData.name}</CardTitle>
-              <div className="flex items-center gap-2 mt-1">
-                {getStatusBadge()}
-                <Badge variant="outline">{materialData.category || 'Uncategorized'}</Badge>
-                {materialData.price && (
-                  <Badge variant="outline">{materialData.price}</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
-              {new Date(material.scraped_at).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Search className="h-5 w-5" />
+          {showCurrentResults ? `Current Results (${currentResults.length})` : `Review Materials (${materials.length})`}
+        </CardTitle>
       </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {/* Material Info */}
-        <div className="space-y-2">
-          {materialData.description && (
-            <p className="text-sm text-muted-foreground line-clamp-3">
-              {materialData.description}
-            </p>
-          )}
-          
-          <div className="flex items-center gap-2">
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
-            <a 
-              href={materialData.sourceUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex gap-2 flex-wrap">
+            {showCurrentResults && onAddAllToCatalog && (
+              <Button
+                onClick={onAddAllToCatalog}
+                disabled={isLoading}
+                size="sm"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>Add All to Catalog</>
+                )}
+              </Button>
+            )}
+            
+            <Button
+              onClick={loadAllUnreviewedMaterials}
+              disabled={loading}
+              variant="outline"
+              size="sm"
             >
-              {materialData.sourceUrl}
-            </a>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>Load Stored Materials</>
+              )}
+            </Button>
+            
+            {sessionId && (
+              <Button
+                onClick={() => loadMaterialsBySession(sessionId)}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+              >
+                Load Current Session
+              </Button>
+            )}
+
+            {!showCurrentResults && materials.length > 0 && (
+              <Button
+                onClick={addApprovedToCatalog}
+                disabled={loading || approvedCount === 0}
+                size="sm"
+                variant="outline"
+              >
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                Add {approvedCount} Approved to Catalog
+              </Button>
+            )}
           </div>
-          
-          {materialData.supplier && (
-            <p className="text-sm">
-              <span className="font-medium">Supplier:</span> {materialData.supplier}
-            </p>
+
+          {/* Summary Stats for stored materials */}
+          {!showCurrentResults && materials.length > 0 && (
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold">{materials.length}</div>
+                  <div className="text-sm text-muted-foreground">Total Materials</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-green-600">{approvedCount}</div>
+                  <div className="text-sm text-muted-foreground">Approved</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-red-600">{rejectedCount}</div>
+                  <div className="text-sm text-muted-foreground">Rejected</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-orange-600">{unreviewedCount}</div>
+                  <div className="text-sm text-muted-foreground">Unreviewed</div>
+                </CardContent>
+              </Card>
+            </div>
           )}
-        </div>
 
-        {/* Images */}
-        {materialData.images && materialData.images.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto">
-            {materialData.images.slice(0, 3).map((img: string, idx: number) => (
-              <img
-                key={idx}
-                src={img}
-                alt={`${materialData.name} ${idx + 1}`}
-                className="w-16 h-16 object-cover rounded border"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            ))}
-          </div>
-        )}
+          {/* Bulk Actions for stored materials */}
+          {!showCurrentResults && selectedMaterials.size > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm">
+                    {selectedMaterials.size} material(s) selected
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setBulkAction('approve')}
+                      className="text-green-600"
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Approve Selected
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setBulkAction('reject')}
+                      className="text-red-600"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Reject Selected
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setBulkAction('delete')}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete Selected
+                    </Button>
+                  </div>
+                  {bulkAction && (
+                    <Button
+                      size="sm"
+                      onClick={handleBulkAction}
+                      disabled={loading}
+                    >
+                      Confirm {bulkAction}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Notes */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Review Notes</label>
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add notes about this material..."
-            className="min-h-[60px]"
-          />
-        </div>
+          {displayMaterials.length > 0 ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  {showCurrentResults 
+                    ? `Current results: ${currentResults.length} materials`
+                    : `Found ${materials.length} stored materials for review`
+                  }
+                </p>
+              </div>
+              
+              <div className="grid gap-4">
+                {displayMaterials.map((material, index) => {
+                  // Handle both current results and stored materials formats
+                  const materialData = material.material_data || material;
+                  const isStored = !!material.id;
+                  
+                  return (
+                    <div key={material.id || index} className="p-4 border rounded-lg space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start gap-3">
+                          {isStored && (
+                            <Checkbox
+                              checked={selectedMaterials.has(material.id)}
+                              onCheckedChange={() => toggleMaterialSelection(material.id)}
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h3 className="font-medium">{materialData.name}</h3>
+                            <p className="text-sm text-muted-foreground">{materialData.description}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Source: {material.source_url || materialData.sourceUrl}
+                            </p>
+                            {materialData.price && (
+                              <p className="text-sm font-medium text-green-600">{materialData.price}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {isStored && (
+                          <div className="flex gap-2 ml-4">
+                            <Button
+                              onClick={() => updateMaterialReview(material.id, true)}
+                              disabled={loading}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              onClick={() => updateMaterialReview(material.id, false)}
+                              disabled={loading}
+                              size="sm"
+                              variant="destructive"
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {materialData.properties && (
+                        <div className="text-xs bg-muted p-2 rounded">
+                          <strong>Properties:</strong> {JSON.stringify(materialData.properties, null, 2)}
+                        </div>
+                      )}
 
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onUpdateReview(material.id, true, notes)}
-            disabled={material.approved === true}
-            className="text-green-600"
-          >
-            <Check className="h-4 w-4 mr-1" />
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onUpdateReview(material.id, false, notes)}
-            disabled={material.approved === false}
-            className="text-red-600"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Reject
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onUpdateReview(material.id, null, notes)}
-            disabled={material.reviewed && material.approved === null}
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            Mark Reviewed
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onDelete(material.id)}
-            className="text-destructive ml-auto"
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete
-          </Button>
+                      {isStored && material.reviewed && (
+                        <div className="flex items-center gap-2">
+                          {material.approved === true && <Badge className="bg-green-600">Approved</Badge>}
+                          {material.approved === false && <Badge variant="destructive">Rejected</Badge>}
+                          {material.notes && (
+                            <span className="text-xs text-muted-foreground">Notes: {material.notes}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No materials to review. Run a scrape to see results here.</p>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
