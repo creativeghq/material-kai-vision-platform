@@ -236,7 +236,6 @@ Return a list of materials found on the page.`,
       <Tabs defaultValue="scraper" className="space-y-6">
         <TabsList>
           <TabsTrigger value="scraper">Web Scraper</TabsTrigger>
-          <TabsTrigger value="results">Results ({scrapedMaterials.length})</TabsTrigger>
           <TabsTrigger value="review">Review Materials</TabsTrigger>
         </TabsList>
 
@@ -724,32 +723,16 @@ Return a list of materials found on the page.`,
           </Card>
         </TabsContent>
 
-        <TabsContent value="results" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Scraped Materials ({scrapedMaterials.length})</CardTitle>
-              {scrapedMaterials.length > 0 && (
-                <Button 
-                  onClick={handleAddAllToCatalog}
-                  disabled={isLoading}
-                  className="flex items-center gap-2"
-                >
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  Add All to Catalog
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              <ScrapedMaterialsViewer 
-                materials={scrapedMaterials}
-                onMaterialsUpdate={setScrapedMaterials}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="review" className="space-y-6">
-          <ScrapedMaterialsReview sessionId={sessionId} />
+          <ScrapedMaterialsReview 
+            sessionId={sessionId}
+            currentResults={scrapedMaterials}
+            onMaterialsUpdate={(updatedMaterials) => {
+              console.log('Materials updated:', updatedMaterials.length);
+            }}
+            onAddAllToCatalog={handleAddAllToCatalog}
+            isLoading={isLoading}
+          />
         </TabsContent>
       </Tabs>
     </div>

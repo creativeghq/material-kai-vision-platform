@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface JinaExtractRequest {
+interface ScrapeRequest {
   url: string;
   service: 'firecrawl' | 'jina';
   sitemapMode?: boolean;
@@ -71,7 +71,7 @@ serve(async (req) => {
       maxPages = 100,
       saveTemporary = false,
       options = {} 
-    }: JinaExtractRequest = await req.json();
+    }: ScrapeRequest = await req.json();
     
     console.log(`Processing: ${service}, sitemap: ${sitemapMode}, url: ${url}`);
     console.log(`Batch size: ${batchSize}, Max pages: ${maxPages}, Save temporary: ${saveTemporary}`);
