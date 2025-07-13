@@ -52,13 +52,22 @@ const AdminDashboard: React.FC = () => {
       priority: 3
     },
     {
+      title: "Material Scraper",
+      description: "Scrape material data from websites and external sources",
+      icon: Globe,
+      path: "/admin/material-scraper",
+      status: "active",
+      count: "Web scraping",
+      priority: 4
+    },
+    {
       title: "Knowledge Base Management",
       description: "Manage enhanced knowledge base entries from PDF processing",
       icon: Database,
       path: "/admin/knowledge-base",
       status: "active", 
       count: "1,247 entries",
-      priority: 4
+      priority: 5
     },
     {
       title: "Material Catalog",
@@ -67,7 +76,7 @@ const AdminDashboard: React.FC = () => {
       path: "/catalog",
       status: "active",
       count: "342 materials",
-      priority: 5
+      priority: 6
     },
     {
       title: "Analytics Dashboard",
@@ -76,7 +85,7 @@ const AdminDashboard: React.FC = () => {
       path: "/admin/analytics",
       status: "active",
       count: "Real-time",
-      priority: 6
+      priority: 7
     },
     {
       title: "API Gateway",
@@ -85,7 +94,7 @@ const AdminDashboard: React.FC = () => {
       path: "/admin/api-gateway",
       status: "active",
       count: "12 endpoints",
-      priority: 7
+      priority: 8
     },
     {
       title: "System Performance",
@@ -94,7 +103,7 @@ const AdminDashboard: React.FC = () => {
       path: "/admin/performance", 
       status: "active",
       count: "99.8% uptime",
-      priority: 8
+      priority: 9
     }
   ];
 
