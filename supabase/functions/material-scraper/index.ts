@@ -13,6 +13,7 @@ interface ScrapeRequest {
   batchSize?: number;
   maxPages?: number;
   saveTemporary?: boolean;
+  sessionId?: string;
   options?: {
     prompt?: string;
     schema?: Record<string, any>;
@@ -92,6 +93,7 @@ Deno.serve(async (req) => {
         batchSize = 5,
         maxPages = 100,
         saveTemporary = false,
+        sessionId: providedSessionId,
         options = {} 
       }: ScrapeRequest = requestData;
       
@@ -278,9 +280,22 @@ async function processProgressiveSitemap(
           console.log(`[${sessionId}][${globalIndex}] SUCCESS: Found ${results.length} materials`);
           successCount++;
           
-          // Save each result immediately to the database
+          // Save each result immediately to the database with duplicate check
           for (const material of results) {
             try {
+              // Check if this material URL has already been scraped for this user
+              const { data: existingMaterial } = await supabase
+                .from('scraped_materials_temp')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('source_url', material.sourceUrl)
+                .limit(1);
+
+              if (existingMaterial && existingMaterial.length > 0) {
+                console.log(`[${sessionId}][${globalIndex}] DUPLICATE: Skipping already scraped URL: ${material.sourceUrl}`);
+                continue;
+              }
+
               const { error: insertError } = await supabase
                 .from('scraped_materials_temp')
                 .insert({
@@ -1026,13 +1041,30 @@ async function saveToTemporaryStorage(req: Request, materials: MaterialData[]): 
   
   console.log(`Saving ${materials.length} materials for user ${userId} with session ${sessionId}`);
   
-  // Prepare data for insertion
-  const insertData = materials.map(material => ({
-    user_id: userId,
-    scraping_session_id: sessionId,
-    material_data: material,
-    source_url: material.sourceUrl
-  }));
+  // Prepare data for insertion with duplicate checking
+  const insertData = [];
+  
+  for (const material of materials) {
+    // Check if this material URL has already been scraped for this user
+    const { data: existingMaterial } = await supabase
+      .from('scraped_materials_temp')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('source_url', material.sourceUrl)
+      .limit(1);
+
+    if (existingMaterial && existingMaterial.length > 0) {
+      console.log(`Duplicate detected: Skipping already scraped URL: ${material.sourceUrl}`);
+      continue;
+    }
+
+    insertData.push({
+      user_id: userId,
+      scraping_session_id: sessionId,
+      material_data: material,
+      source_url: material.sourceUrl
+    });
+  }
   
   const { error } = await supabase
     .from('scraped_materials_temp')

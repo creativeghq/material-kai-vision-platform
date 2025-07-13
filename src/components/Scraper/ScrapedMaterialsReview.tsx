@@ -47,6 +47,8 @@ interface ScrapedMaterialsReviewProps {
   onMaterialsUpdate?: (materials: ScrapedMaterial[]) => void;
   onAddAllToCatalog?: () => void;
   isLoading?: boolean;
+  onContinueScraping?: (sessionId: string) => void;
+  onRetryScraping?: () => void;
 }
 
 export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
@@ -54,21 +56,117 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
   currentResults = [],
   onMaterialsUpdate,
   onAddAllToCatalog,
-  isLoading = false
+  isLoading = false,
+  onContinueScraping,
+  onRetryScraping
 }) => {
   const { toast } = useToast();
   const [materials, setMaterials] = useState<ScrapedMaterialTemp[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'approve' | 'reject' | 'delete' | null>(null);
+  const [sessionStats, setSessionStats] = useState<{
+    totalProcessed: number;
+    totalExpected: number;
+    isActive: boolean;
+    currentUrl?: string;
+    startedAt?: string;
+    estimatedTimeRemaining?: number;
+  } | null>(null);
+  const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'active' | 'paused' | 'completed' | 'error'>('idle');
 
   useEffect(() => {
     if (sessionId && currentResults.length === 0) {
       loadMaterialsBySession(sessionId);
+      checkActiveSession(sessionId);
     } else if (currentResults.length === 0) {
-      loadAllUnreviewedMaterials();
+      loadAllUnreviewedMaterials(0, 50);
+      checkForActiveSessions();
     }
+
+    // Set up real-time subscription for new materials
+    const channel = supabase
+      .channel('scraped-materials-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'scraped_materials_temp'
+        },
+        (payload) => {
+          console.log('New material scraped:', payload);
+          const newMaterial = payload.new as ScrapedMaterialTemp;
+          
+          // Add new material to the list if it matches our current session or if we're viewing all
+          if (!sessionId || newMaterial.scraping_session_id === sessionId) {
+            setMaterials(prev => [newMaterial, ...prev]);
+            setScrapingStatus('active');
+            
+            // Update session stats with enhanced progress tracking
+            setSessionStats(prev => {
+              const newStats = prev ? {
+                ...prev,
+                totalProcessed: prev.totalProcessed + 1,
+                currentUrl: newMaterial.source_url,
+                estimatedTimeRemaining: prev.totalExpected > prev.totalProcessed + 1 ? 
+                  ((Date.now() - new Date(prev.startedAt || Date.now()).getTime()) / (prev.totalProcessed + 1)) * 
+                  (prev.totalExpected - prev.totalProcessed - 1) / 1000 : 0
+              } : {
+                totalProcessed: 1,
+                totalExpected: 1,
+                isActive: true,
+                currentUrl: newMaterial.source_url,
+                startedAt: new Date().toISOString(),
+                estimatedTimeRemaining: 0
+              };
+              
+              // Check if scraping is completed
+              if (newStats.totalProcessed >= newStats.totalExpected) {
+                setScrapingStatus('completed');
+                setTimeout(() => setScrapingStatus('idle'), 3000);
+              }
+              
+              return newStats;
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'scraping_sessions'
+        },
+        (payload) => {
+          console.log('Scraping session updated:', payload);
+          const sessionData = payload.new as any;
+          
+          if (sessionData.session_id === sessionId) {
+            if (sessionData.status === 'active') {
+              setScrapingStatus('active');
+            } else if (sessionData.status === 'completed') {
+              setScrapingStatus('completed');
+              setTimeout(() => setScrapingStatus('idle'), 3000);
+            } else if (sessionData.status === 'error') {
+              setScrapingStatus('error');
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [sessionId, currentResults.length]);
+
+  const loadMoreMaterials = () => {
+    if (sessionStats && materials.length < sessionStats.totalExpected) {
+      loadAllUnreviewedMaterials(materials.length, 50);
+    }
+  };
 
   const loadMaterialsBySession = async (sessionId: string) => {
     setLoading(true);
@@ -82,6 +180,32 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
       if (error) throw error;
       setMaterials((data || []) as ScrapedMaterialTemp[]);
       console.log('Loaded materials by session:', sessionId, 'Count:', data?.length || 0);
+      
+      // Check for session progress info from latest material
+      if (data && data.length > 0) {
+        const latestMaterial = data[0];
+        const materialData = latestMaterial.material_data as any;
+        if (materialData?.metadata?.sessionProgress) {
+          const progress = materialData.metadata.sessionProgress;
+          setSessionStats({
+            totalProcessed: data.length,
+            totalExpected: progress.totalExpected || data.length,
+            isActive: progress.isActive || false,
+            currentUrl: progress.currentUrl,
+            startedAt: progress.startedAt || latestMaterial.scraped_at,
+            estimatedTimeRemaining: progress.estimatedTimeRemaining || 0
+          });
+          
+          setScrapingStatus(progress.isActive ? 'active' : 'idle');
+        } else {
+          setSessionStats({
+            totalProcessed: data.length,
+            totalExpected: data.length,
+            isActive: false,
+            startedAt: latestMaterial.scraped_at
+          });
+        }
+      }
     } catch (error) {
       console.error('Error loading materials by session:', error);
       toast({
@@ -94,20 +218,42 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
     }
   };
 
-  const loadAllUnreviewedMaterials = async () => {
+  const loadAllUnreviewedMaterials = async (offset = 0, limit = 50) => {
     setLoading(true);
-    console.log('Loading all unreviewed materials...');
+    console.log('Loading all unreviewed materials...', { offset, limit });
     try {
       const { data, error } = await supabase
         .from('scraped_materials_temp')
         .select('*')
         .eq('reviewed', false)
         .order('scraped_at', { ascending: false })
-        .limit(50);
+        .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      setMaterials((data || []) as ScrapedMaterialTemp[]);
+      
+      if (offset === 0) {
+        setMaterials((data || []) as ScrapedMaterialTemp[]);
+      } else {
+        setMaterials(prev => [...prev, ...((data || []) as ScrapedMaterialTemp[])]);
+      }
+      
       console.log('Loaded unreviewed materials count:', data?.length || 0);
+      
+      // Get total count for progress
+      const { count } = await supabase
+        .from('scraped_materials_temp')
+        .select('*', { count: 'exact', head: true })
+        .eq('reviewed', false);
+        
+      if (count !== null) {
+        setSessionStats({
+          totalProcessed: offset + (data?.length || 0),
+          totalExpected: count,
+          isActive: false,
+          startedAt: data && data.length > 0 ? data[data.length - 1].scraped_at : new Date().toISOString()
+        });
+        setScrapingStatus('idle');
+      }
     } catch (error) {
       console.error('Error loading unreviewed materials:', error);
       toast({
@@ -117,6 +263,68 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkActiveSession = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('scraping_sessions')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('status', 'active')
+        .single();
+
+      if (error || !data) {
+        console.log('No active session found for:', sessionId);
+        return;
+      }
+
+      console.log('Found active session:', data);
+      setScrapingStatus('active');
+      setSessionStats({
+        totalProcessed: data.materials_processed || 0,
+        totalExpected: data.total_materials_found || 100, // Default expectation
+        isActive: true,
+        currentUrl: data.source_url,
+        startedAt: data.created_at
+      });
+    } catch (error) {
+      console.error('Error checking active session:', error);
+    }
+  };
+
+  const checkForActiveSessions = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('scraping_sessions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error || !data || data.length === 0) {
+        console.log('No active sessions found');
+        setScrapingStatus('idle');
+        return;
+      }
+
+      const activeSession = data[0];
+      console.log('Found active session:', activeSession);
+      setScrapingStatus('active');
+      setSessionStats({
+        totalProcessed: activeSession.materials_processed || 0,
+        totalExpected: activeSession.total_materials_found || 100,
+        isActive: true,
+        currentUrl: activeSession.source_url,
+        startedAt: activeSession.created_at
+      });
+    } catch (error) {
+      console.error('Error checking for active sessions:', error);
     }
   };
 
@@ -289,6 +497,56 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
     }
   };
 
+  const clearAllReviewData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user's data only
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to clear review data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Delete all scraped materials for this user
+      const { error } = await supabase
+        .from('scraped_materials_temp')
+        .delete()
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+
+      // Clear scraping sessions
+      await supabase
+        .from('scraping_sessions')
+        .delete()
+        .eq('user_id', session.user.id);
+
+      // Clear local state
+      setMaterials([]);
+      setSelectedMaterials(new Set());
+      setSessionStats(null);
+
+      toast({
+        title: "Success",
+        description: "All review data cleared successfully",
+      });
+    } catch (error) {
+      console.error('Error clearing review data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear review data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleMaterialSelection = (materialId: string) => {
     setSelectedMaterials(prev => {
       const newSet = new Set(prev);
@@ -330,6 +588,11 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {/* Debug Information */}
+          <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded">
+            Debug: Status = {scrapingStatus} | Session Active = {sessionStats?.isActive ? 'Yes' : 'No'} | Materials = {materials.length}
+          </div>
+          
           <div className="flex gap-2 flex-wrap">
             {showCurrentResults && onAddAllToCatalog && (
               <Button
@@ -349,7 +612,7 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
             )}
             
             <Button
-              onClick={loadAllUnreviewedMaterials}
+              onClick={() => loadAllUnreviewedMaterials(0, 50)}
               disabled={loading}
               variant="outline"
               size="sm"
@@ -371,7 +634,49 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
                 variant="outline"
                 size="sm"
               >
-                Load Current Session
+                Refresh Session
+              </Button>
+            )}
+
+            {sessionStats && sessionStats.isActive && sessionId && onContinueScraping && (
+              <Button
+                onClick={() => onContinueScraping(sessionId)}
+                disabled={loading}
+                variant="default"
+                size="sm"
+                className="text-blue-600 border-blue-600"
+              >
+                Continue Scraping
+              </Button>
+            )}
+
+            {onRetryScraping && (
+              <Button
+                onClick={onRetryScraping}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                className="text-orange-600"
+              >
+                Retry Process
+              </Button>
+            )}
+
+            {sessionStats && sessionStats.totalExpected > materials.length && (
+              <Button
+                onClick={loadMoreMaterials}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>Load More ({materials.length}/{sessionStats.totalExpected})</>
+                )}
               </Button>
             )}
 
@@ -386,7 +691,126 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
                 Add {approvedCount} Approved to Catalog
               </Button>
             )}
+
+            {materials.length > 0 && (
+              <Button
+                onClick={clearAllReviewData}
+                disabled={loading}
+                size="sm"
+                variant="destructive"
+                className="ml-auto"
+              >
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Clear All Review
+              </Button>
+            )}
           </div>
+
+          {/* Scraping Status Indicator */}
+          {(scrapingStatus === 'active' || sessionStats?.isActive) && (
+            <Card className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <h3 className="font-medium text-blue-800 dark:text-blue-200">
+                      Active Scraping in Progress
+                    </h3>
+                  </div>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Live
+                  </Badge>
+                </div>
+                
+                {sessionStats?.currentUrl && (
+                  <div className="text-sm text-blue-700 dark:text-blue-300 mb-2 font-mono bg-white/50 dark:bg-blue-900/30 p-2 rounded truncate">
+                    Currently processing: {sessionStats.currentUrl}
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between text-sm text-blue-700 dark:text-blue-300 mb-2">
+                  <span>Progress: {sessionStats?.totalProcessed || 0} of {sessionStats?.totalExpected || 0} materials</span>
+                  {sessionStats?.estimatedTimeRemaining && sessionStats.estimatedTimeRemaining > 0 && (
+                    <span>~{Math.ceil(sessionStats.estimatedTimeRemaining / 60)} min remaining</span>
+                  )}
+                </div>
+                
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-500 animate-fade-in" 
+                    style={{ 
+                      width: `${sessionStats ? Math.min((sessionStats.totalProcessed / sessionStats.totalExpected) * 100, 100) : 0}%` 
+                    }}
+                  />
+                </div>
+                
+                <div className="mt-3 text-xs text-blue-600 dark:text-blue-400">
+                  💡 New materials will appear automatically as they are discovered and processed
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Completion Status */}
+          {scrapingStatus === 'completed' && (
+            <Card className="mb-4 border-green-200 bg-green-50 dark:bg-green-950/30 animate-fade-in">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                  <Check className="h-5 w-5" />
+                  <h3 className="font-medium">Scraping Completed Successfully!</h3>
+                </div>
+                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  All materials have been processed and are ready for review.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Error Status */}
+          {scrapingStatus === 'error' && (
+            <Card className="mb-4 border-red-200 bg-red-50 dark:bg-red-950/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+                  <AlertCircle className="h-5 w-5" />
+                  <h3 className="font-medium">Scraping Error</h3>
+                </div>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  There was an issue with the scraping process. You can try to continue or retry the process.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Progress and Summary Stats */}
+          {sessionStats && !sessionStats.isActive && scrapingStatus !== 'active' && (
+            <Card className="mb-4">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium">Session Summary</h3>
+                  <Badge variant="outline" className="text-muted-foreground">
+                    Completed
+                  </Badge>
+                </div>
+                <div className="text-sm text-muted-foreground mb-2">
+                  {sessionStats.totalProcessed} of {sessionStats.totalExpected} materials processed
+                  {sessionStats.startedAt && (
+                    <span className="ml-2">
+                      • Started {new Date(sessionStats.startedAt).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300" 
+                    style={{ 
+                      width: `${Math.min((sessionStats.totalProcessed / sessionStats.totalExpected) * 100, 100)}%` 
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Summary Stats for stored materials */}
           {!showCurrentResults && materials.length > 0 && (
@@ -394,7 +818,7 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
               <Card>
                 <CardContent className="p-4">
                   <div className="text-2xl font-bold">{materials.length}</div>
-                  <div className="text-sm text-muted-foreground">Total Materials</div>
+                  <div className="text-sm text-muted-foreground">Loaded Materials</div>
                 </CardContent>
               </Card>
               <Card>

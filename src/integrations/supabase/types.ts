@@ -350,6 +350,276 @@ export type Database = {
         }
         Relationships: []
       }
+      document_chunks: {
+        Row: {
+          bbox: Json | null
+          chunk_index: number
+          chunk_type: string
+          created_at: string | null
+          document_id: string | null
+          embedding: string | null
+          hierarchy_level: number | null
+          html_content: string | null
+          id: string
+          metadata: Json
+          page_number: number | null
+          parent_chunk_id: string | null
+          text: string
+          updated_at: string | null
+        }
+        Insert: {
+          bbox?: Json | null
+          chunk_index: number
+          chunk_type: string
+          created_at?: string | null
+          document_id?: string | null
+          embedding?: string | null
+          hierarchy_level?: number | null
+          html_content?: string | null
+          id?: string
+          metadata?: Json
+          page_number?: number | null
+          parent_chunk_id?: string | null
+          text: string
+          updated_at?: string | null
+        }
+        Update: {
+          bbox?: Json | null
+          chunk_index?: number
+          chunk_type?: string
+          created_at?: string | null
+          document_id?: string | null
+          embedding?: string | null
+          hierarchy_level?: number | null
+          html_content?: string | null
+          id?: string
+          metadata?: Json
+          page_number?: number | null
+          parent_chunk_id?: string | null
+          text?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_parent_chunk_id_fkey"
+            columns: ["parent_chunk_id"]
+            isOneToOne: false
+            referencedRelation: "document_chunks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_images: {
+        Row: {
+          alt_text: string | null
+          bbox: Json | null
+          caption: string | null
+          chunk_id: string | null
+          confidence: number | null
+          created_at: string | null
+          document_id: string | null
+          id: string
+          image_type: string | null
+          image_url: string
+          metadata: Json | null
+          page_number: number | null
+          proximity_score: number | null
+        }
+        Insert: {
+          alt_text?: string | null
+          bbox?: Json | null
+          caption?: string | null
+          chunk_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          image_type?: string | null
+          image_url: string
+          metadata?: Json | null
+          page_number?: number | null
+          proximity_score?: number | null
+        }
+        Update: {
+          alt_text?: string | null
+          bbox?: Json | null
+          caption?: string | null
+          chunk_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          image_type?: string | null
+          image_url?: string
+          metadata?: Json | null
+          page_number?: number | null
+          proximity_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_images_chunk_id_fkey"
+            columns: ["chunk_id"]
+            isOneToOne: false
+            referencedRelation: "document_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_images_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_layout_analysis: {
+        Row: {
+          analysis_metadata: Json | null
+          created_at: string | null
+          document_id: string | null
+          id: string
+          layout_elements: Json
+          page_number: number
+          processing_version: string | null
+          reading_order: Json | null
+          structure_confidence: number | null
+        }
+        Insert: {
+          analysis_metadata?: Json | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          layout_elements?: Json
+          page_number: number
+          processing_version?: string | null
+          reading_order?: Json | null
+          structure_confidence?: number | null
+        }
+        Update: {
+          analysis_metadata?: Json | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          layout_elements?: Json
+          page_number?: number
+          processing_version?: string | null
+          reading_order?: Json | null
+          structure_confidence?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_layout_analysis_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_processing_status: {
+        Row: {
+          created_at: string | null
+          current_step: string | null
+          document_id: string | null
+          end_time: string | null
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          processing_id: string
+          progress: number | null
+          start_time: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_step?: string | null
+          document_id?: string | null
+          end_time?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          processing_id: string
+          progress?: number | null
+          start_time?: string | null
+          status: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_step?: string | null
+          document_id?: string | null
+          end_time?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          processing_id?: string
+          progress?: number | null
+          start_time?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_processing_status_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_quality_metrics: {
+        Row: {
+          chunking_quality: number | null
+          created_at: string | null
+          document_id: string | null
+          id: string
+          image_mapping_accuracy: number | null
+          layout_preservation: number | null
+          overall_quality: number | null
+          processing_time_ms: number | null
+          statistics: Json | null
+        }
+        Insert: {
+          chunking_quality?: number | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          image_mapping_accuracy?: number | null
+          layout_preservation?: number | null
+          overall_quality?: number | null
+          processing_time_ms?: number | null
+          statistics?: Json | null
+        }
+        Update: {
+          chunking_quality?: number | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          image_mapping_accuracy?: number | null
+          layout_preservation?: number | null
+          overall_quality?: number | null
+          processing_time_ms?: number | null
+          statistics?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_quality_metrics_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: true
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enhanced_knowledge_base: {
         Row: {
           accuracy_score: number | null
@@ -499,6 +769,66 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      image_text_associations: {
+        Row: {
+          association_type: string
+          chunk_ids: Json | null
+          confidence: number | null
+          created_at: string | null
+          document_id: string | null
+          id: string
+          image_id: string | null
+          metadata: Json | null
+          proximity_score: number | null
+          semantic_score: number | null
+          spatial_relationship: Json | null
+          text_block_ids: Json | null
+        }
+        Insert: {
+          association_type: string
+          chunk_ids?: Json | null
+          confidence?: number | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          image_id?: string | null
+          metadata?: Json | null
+          proximity_score?: number | null
+          semantic_score?: number | null
+          spatial_relationship?: Json | null
+          text_block_ids?: Json | null
+        }
+        Update: {
+          association_type?: string
+          chunk_ids?: Json | null
+          confidence?: number | null
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          image_id?: string | null
+          metadata?: Json | null
+          proximity_score?: number | null
+          semantic_score?: number | null
+          spatial_relationship?: Json | null
+          text_block_ids?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "image_text_associations_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "pdf_processing_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_text_associations_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "document_images"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       internal_networks: {
         Row: {
@@ -1866,6 +2196,45 @@ export type Database = {
           scraped_at?: string
           scraping_session_id?: string
           source_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scraping_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          materials_processed: number | null
+          scraping_config: Json
+          session_id: string
+          source_url: string
+          status: string
+          total_materials_found: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          materials_processed?: number | null
+          scraping_config?: Json
+          session_id: string
+          source_url: string
+          status?: string
+          total_materials_found?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          materials_processed?: number | null
+          scraping_config?: Json
+          session_id?: string
+          source_url?: string
+          status?: string
+          total_materials_found?: number | null
           updated_at?: string
           user_id?: string
         }
