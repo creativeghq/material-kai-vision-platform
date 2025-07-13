@@ -2201,180 +2201,78 @@ export type Database = {
         }
         Relationships: []
       }
-      scraping_chunks: {
+      scraping_pages: {
         Row: {
-          chunk_index: number
           completed_at: string | null
-          created_at: string | null
+          created_at: string
           error_message: string | null
           id: string
           materials_found: number | null
-          max_retries: number | null
-          metadata: Json | null
-          processed_count: number | null
+          page_index: number
           processing_time_ms: number | null
           retry_count: number | null
           session_id: string
           started_at: string | null
-          status: string | null
-          total_count: number
-          updated_at: string | null
-          urls: Json
+          status: string
+          updated_at: string
+          url: string
         }
         Insert: {
-          chunk_index: number
           completed_at?: string | null
-          created_at?: string | null
+          created_at?: string
           error_message?: string | null
           id?: string
           materials_found?: number | null
-          max_retries?: number | null
-          metadata?: Json | null
-          processed_count?: number | null
+          page_index: number
           processing_time_ms?: number | null
           retry_count?: number | null
           session_id: string
           started_at?: string | null
-          status?: string | null
-          total_count?: number
-          updated_at?: string | null
-          urls?: Json
+          status?: string
+          updated_at?: string
+          url: string
         }
         Update: {
-          chunk_index?: number
           completed_at?: string | null
-          created_at?: string | null
+          created_at?: string
           error_message?: string | null
           id?: string
           materials_found?: number | null
-          max_retries?: number | null
-          metadata?: Json | null
-          processed_count?: number | null
+          page_index?: number
           processing_time_ms?: number | null
           retry_count?: number | null
           session_id?: string
           started_at?: string | null
-          status?: string | null
-          total_count?: number
-          updated_at?: string | null
-          urls?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scraping_chunks_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scraping_session_stats"
-            referencedColumns: ["session_id"]
-          },
-          {
-            foreignKeyName: "scraping_chunks_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scraping_sessions"
-            referencedColumns: ["session_id"]
-          },
-        ]
-      }
-      scraping_processing_queue: {
-        Row: {
-          attempts: number | null
-          chunk_id: string | null
-          completed_at: string | null
-          created_at: string | null
-          error_message: string | null
-          id: string
-          max_attempts: number | null
-          metadata: Json | null
-          priority: number | null
-          processing_time_ms: number | null
-          result_data: Json | null
-          scheduled_at: string | null
-          session_id: string
-          started_at: string | null
-          status: string | null
-          updated_at: string | null
-          url: string
-        }
-        Insert: {
-          attempts?: number | null
-          chunk_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          max_attempts?: number | null
-          metadata?: Json | null
-          priority?: number | null
-          processing_time_ms?: number | null
-          result_data?: Json | null
-          scheduled_at?: string | null
-          session_id: string
-          started_at?: string | null
-          status?: string | null
-          updated_at?: string | null
-          url: string
-        }
-        Update: {
-          attempts?: number | null
-          chunk_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          max_attempts?: number | null
-          metadata?: Json | null
-          priority?: number | null
-          processing_time_ms?: number | null
-          result_data?: Json | null
-          scheduled_at?: string | null
-          session_id?: string
-          started_at?: string | null
-          status?: string | null
-          updated_at?: string | null
+          status?: string
+          updated_at?: string
           url?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "scraping_processing_queue_chunk_id_fkey"
-            columns: ["chunk_id"]
-            isOneToOne: false
-            referencedRelation: "scraping_chunks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scraping_processing_queue_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scraping_session_stats"
-            referencedColumns: ["session_id"]
-          },
-          {
-            foreignKeyName: "scraping_processing_queue_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "scraping_sessions"
-            referencedColumns: ["session_id"]
-          },
-        ]
+        Relationships: []
       }
       scraping_sessions: {
         Row: {
           auto_resume: boolean | null
           chunks_completed: number | null
           chunks_total: number | null
+          completed_pages: number | null
           created_at: string
           current_chunk_id: string | null
+          current_page_url: string | null
           estimated_total_materials: number | null
+          failed_pages: number | null
           id: string
           last_processed_url: string | null
           materials_processed: number | null
+          pending_pages: number | null
           processing_mode: string | null
+          progress_percentage: number | null
           scraping_config: Json
           session_id: string
+          session_type: string | null
           source_url: string
           status: string
           total_materials_found: number | null
+          total_pages: number | null
           updated_at: string
           user_id: string
         }
@@ -2382,18 +2280,25 @@ export type Database = {
           auto_resume?: boolean | null
           chunks_completed?: number | null
           chunks_total?: number | null
+          completed_pages?: number | null
           created_at?: string
           current_chunk_id?: string | null
+          current_page_url?: string | null
           estimated_total_materials?: number | null
+          failed_pages?: number | null
           id?: string
           last_processed_url?: string | null
           materials_processed?: number | null
+          pending_pages?: number | null
           processing_mode?: string | null
+          progress_percentage?: number | null
           scraping_config?: Json
           session_id: string
+          session_type?: string | null
           source_url: string
           status?: string
           total_materials_found?: number | null
+          total_pages?: number | null
           updated_at?: string
           user_id: string
         }
@@ -2401,18 +2306,25 @@ export type Database = {
           auto_resume?: boolean | null
           chunks_completed?: number | null
           chunks_total?: number | null
+          completed_pages?: number | null
           created_at?: string
           current_chunk_id?: string | null
+          current_page_url?: string | null
           estimated_total_materials?: number | null
+          failed_pages?: number | null
           id?: string
           last_processed_url?: string | null
           materials_processed?: number | null
+          pending_pages?: number | null
           processing_mode?: string | null
+          progress_percentage?: number | null
           scraping_config?: Json
           session_id?: string
+          session_type?: string | null
           source_url?: string
           status?: string
           total_materials_found?: number | null
+          total_pages?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -2694,37 +2606,7 @@ export type Database = {
       }
     }
     Views: {
-      scraping_session_stats: {
-        Row: {
-          actual_chunks_created: number | null
-          auto_resume: boolean | null
-          chunks_completed: number | null
-          chunks_completed_count: number | null
-          chunks_failed_count: number | null
-          chunks_pending_count: number | null
-          chunks_processing_count: number | null
-          chunks_total: number | null
-          estimated_total_materials: number | null
-          materials_processed: number | null
-          processing_mode: string | null
-          progress_percentage: number | null
-          queue_completed_count: number | null
-          queue_failed_count: number | null
-          queue_pending_count: number | null
-          queue_processing_count: number | null
-          session_created_at: string | null
-          session_id: string | null
-          session_status: string | null
-          session_updated_at: string | null
-          source_url: string | null
-          total_materials_found: number | null
-          total_materials_from_chunks: number | null
-          total_queue_items: number | null
-          total_urls_in_chunks: number | null
-          total_urls_processed: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       binary_quantize: {
@@ -2851,6 +2733,10 @@ export type Database = {
           current_chunk_id_param?: string
           last_processed_url_param?: string
         }
+        Returns: undefined
+      }
+      update_session_statistics: {
+        Args: { session_uuid: string }
         Returns: undefined
       }
       vector_avg: {

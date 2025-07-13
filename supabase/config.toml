@@ -60,3 +60,9 @@ verify_jwt = false
 
 [functions.convertapi-pdf-processor]
 verify_jwt = false
+
+[functions.scrape-single-page]
+verify_jwt = false
+
+[functions.scrape-session-manager]
+verify_jwt = false
