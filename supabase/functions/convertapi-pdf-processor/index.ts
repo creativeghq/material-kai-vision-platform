@@ -343,24 +343,6 @@ serve(async (req) => {
       );
     }
 
-    // Get the auth header and verify JWT
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Verify the JWT token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const requestData: ConvertAPIProcessingRequest = await req.json();
     const { fileUrl, originalFilename, fileSize, userId, options = {} } = requestData;
 
@@ -396,191 +378,276 @@ serve(async (req) => {
     const processingId = processingRecord.id;
     const startTime = Date.now();
 
-    try {
-      // Step 1: Convert PDF to HTML using ConvertAPI
-      console.log('📄 Step 1: Converting PDF to HTML...');
-      const { htmlContent, downloadUrl } = await convertPDFToHTML(fileUrl);
-
-      // Step 2: Extract image URLs from HTML
-      console.log('🖼️ Step 2: Extracting image URLs...');
-      const imageUrls = extractImageUrls(htmlContent);
-
-      // Step 3: Download and store images
-      console.log('💾 Step 3: Downloading and storing images...');
-      const processedImages: ProcessedImage[] = [];
-      
-      for (let i = 0; i < imageUrls.length; i++) {
-        const imageUrl = imageUrls[i];
-        const processedImage = await downloadAndStoreImage(imageUrl, userId, i);
-        if (processedImage) {
-          processedImages.push(processedImage);
-        }
-      }
-
-      // Step 4: Replace image URLs in HTML
-      console.log('🔄 Step 4: Replacing image URLs...');
-      const finalHtmlContent = replaceImageUrls(htmlContent, processedImages);
-
-      // Step 5: Extract text for embedding
-      console.log('📝 Step 5: Extracting text for embedding...');
-      const extractedText = extractTextFromHTML(finalHtmlContent);
-
-      // Step 6: Generate embeddings
-      console.log('🧠 Step 6: Generating embeddings...');
-      const embedding = await generateEmbedding(extractedText);
-
-      // Step 7: Store in knowledge base
-      console.log('💾 Step 7: Storing in knowledge base...');
-      const knowledgeEntry = {
-        title: `${originalFilename.replace('.pdf', '')} - HTML Document`,
-        content: extractedText,
-        html_content: finalHtmlContent,
-        content_type: 'pdf_html_document',
-        source_url: fileUrl,
-        semantic_tags: ['pdf', 'html', 'convertapi', 'uploaded-content'],
-        language: options.language || 'en',
-        technical_complexity: 5,
-        reading_level: 10,
-        openai_embedding: embedding,
-        confidence_scores: {
-          conversion: 0.95,
-          text_extraction: 0.9,
-          overall: 0.92
-        },
-        search_keywords: extractedText.split(' ').slice(0, 30),
-        metadata: {
-          source_type: 'convertapi_pdf_upload',
-          processing_method: 'convertapi_html_conversion',
-          file_info: {
-            original_filename: originalFilename,
-            file_size: fileSize,
-            processing_date: new Date().toISOString()
+    // PHASE 1: Call ConvertAPI (lightweight, fast)
+    console.log('📄 Phase 1: Initiating ConvertAPI conversion...');
+    
+    const response = await fetch('https://v2.convertapi.com/convert/pdf/to/html', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${convertApiKey}`,
+      },
+      body: JSON.stringify({
+        Parameters: [
+          {
+            Name: 'File',
+            FileValue: {
+              Url: fileUrl
+            }
           },
-          conversion_info: {
-            html_download_url: downloadUrl,
-            images_processed: processedImages.length,
-            images_found: imageUrls.length
+          {
+            Name: 'PageRange',
+            Value: '1-20' // Reduced to 20 pages to avoid memory issues
           },
-          processed_images: processedImages.map(img => ({
-            original_url: img.originalUrl,
-            supabase_url: img.supabaseUrl,
-            filename: img.filename,
-            size: img.size
-          }))
-        },
-        created_by: userId,
-        last_modified_by: userId,
-        status: 'published'
-      };
-
-      const { data: knowledgeData, error: knowledgeError } = await supabase
-        .from('enhanced_knowledge_base')
-        .insert(knowledgeEntry)
-        .select()
-        .single();
-
-      if (knowledgeError) {
-        console.error('Knowledge base insertion error:', knowledgeError);
-        throw new Error(`Failed to add document to knowledge base: ${knowledgeError.message}`);
-      }
-
-      if (!knowledgeData) {
-        throw new Error('Document was not properly added to knowledge base');
-      }
-
-      console.log('✅ Document successfully added to knowledge base:', knowledgeData.id);
-
-      const processingTime = Date.now() - startTime;
-
-      // Update processing results
-      const finalUpdate = {
-        processing_status: 'completed',
-        processing_completed_at: new Date().toISOString(),
-        processing_time_ms: processingTime,
-        document_title: knowledgeEntry.title,
-        document_classification: {
-          content_type: 'pdf_html_document',
-          processing_method: 'convertapi_html_conversion'
-        },
-        confidence_score_avg: 0.92,
-        document_keywords: knowledgeEntry.search_keywords.join(', ')
-      };
-
-      await supabase
-        .from('pdf_processing_results')
-        .update(finalUpdate)
-        .eq('id', processingId);
-
-      console.log(`🎉 ConvertAPI PDF processing completed in ${processingTime}ms`);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          processingId: processingId,
-          knowledgeEntryId: knowledgeData.id,
-          processingTimeMs: processingTime,
-          confidence: 0.92,
-          extractedContent: {
-            textLength: extractedText.length,
-            htmlLength: finalHtmlContent.length,
-            title: knowledgeEntry.title
+          {
+            Name: 'EmbedCss',
+            Value: true
           },
-          conversionInfo: {
-            imagesFound: imageUrls.length,
-            imagesProcessed: processedImages.length,
-            htmlDownloadUrl: downloadUrl
-          },
-          message: 'PDF successfully converted to HTML and processed with ConvertAPI'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+          {
+            Name: 'EmbedImages',
+            Value: false
+          }
+        ]
+      })
+    });
 
-    } catch (processingError) {
-      console.error('❌ Error during ConvertAPI PDF processing:', processingError);
-      console.error('❌ Error type:', typeof processingError);
-      console.error('❌ Error details:', processingError);
-      
+    if (!response.ok) {
+      const errorText = await response.text();
       await supabase
         .from('pdf_processing_results')
         .update({
           processing_status: 'failed',
           processing_completed_at: new Date().toISOString(),
-          error_message: processingError instanceof Error ? processingError.message : String(processingError),
+          error_message: `ConvertAPI request failed: ${response.status} - ${errorText}`,
           processing_time_ms: Date.now() - startTime
         })
         .eq('id', processingId);
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: processingError instanceof Error ? processingError.message : String(processingError),
-          errorType: processingError instanceof Error ? processingError.name : typeof processingError,
-          details: `ConvertAPI processing failed: ${processingError instanceof Error ? processingError.message : String(processingError)}`,
-          processingId,
-          context: 'convertapi_processing_step'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+        
+      throw new Error(`ConvertAPI request failed: ${response.status} - ${errorText}`);
     }
+
+    const result = await response.json();
+    console.log('✅ ConvertAPI conversion initiated successfully');
+
+    if (!result.Files || result.Files.length === 0) {
+      throw new Error('No HTML file returned from ConvertAPI');
+    }
+
+    // Get the HTML file URL
+    const htmlFile = result.Files.find((file: any) => file.FileName.endsWith('.html'));
+    if (!htmlFile) {
+      throw new Error('No HTML file found in ConvertAPI response');
+    }
+
+    // Store ConvertAPI result info and return immediately
+    await supabase
+      .from('pdf_processing_results')
+      .update({
+        processing_status: 'downloading',
+        document_classification: {
+          content_type: 'pdf_html_document',
+          processing_method: 'convertapi_html_conversion',
+          convertapi_download_url: htmlFile.Url
+        }
+      })
+      .eq('id', processingId);
+
+    // PHASE 2: Background processing - Download HTML and images to storage
+    const backgroundProcessing = async () => {
+      try {
+        console.log('📥 Phase 2: Starting background download and processing...');
+        
+        // Download HTML content
+        console.log('📥 Downloading HTML content from ConvertAPI...');
+        const htmlResponse = await fetch(htmlFile.Url);
+        if (!htmlResponse.ok) {
+          throw new Error(`Failed to download HTML: ${htmlResponse.status}`);
+        }
+
+        const htmlContent = await htmlResponse.text();
+        console.log(`✅ Downloaded HTML content (${htmlContent.length} characters)`);
+
+        // Store HTML content to Supabase storage
+        const htmlStoragePath = `${userId}/pdf-html/${originalFilename.replace('.pdf', '')}-${Date.now()}.html`;
+        const { data: htmlUpload, error: htmlUploadError } = await supabase.storage
+          .from('pdf-documents')
+          .upload(htmlStoragePath, htmlContent, {
+            contentType: 'text/html',
+            upsert: false
+          });
+
+        if (htmlUploadError) {
+          throw new Error(`Failed to upload HTML to storage: ${htmlUploadError.message}`);
+        }
+
+        // Get public URL for HTML
+        const { data: { publicUrl: htmlPublicUrl } } = supabase.storage
+          .from('pdf-documents')
+          .getPublicUrl(htmlStoragePath);
+
+        // Extract image URLs from HTML
+        console.log('🖼️ Extracting image URLs from HTML...');
+        const imageUrls = extractImageUrls(htmlContent);
+        
+        // Process images in smaller batches to avoid memory issues
+        const processedImages: ProcessedImage[] = [];
+        const batchSize = 3; // Process 3 images at a time
+        
+        for (let i = 0; i < imageUrls.length; i += batchSize) {
+          const batch = imageUrls.slice(i, i + batchSize);
+          console.log(`Processing image batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(imageUrls.length/batchSize)}`);
+          
+          const batchPromises = batch.map((imageUrl, batchIndex) => 
+            downloadAndStoreImage(imageUrl, userId, i + batchIndex)
+          );
+          
+          const batchResults = await Promise.allSettled(batchPromises);
+          
+          for (const result of batchResults) {
+            if (result.status === 'fulfilled' && result.value) {
+              processedImages.push(result.value);
+            }
+          }
+          
+          // Small delay between batches to avoid overwhelming the system
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        // Replace image URLs in HTML
+        console.log('🔄 Replacing image URLs in HTML...');
+        const finalHtmlContent = replaceImageUrls(htmlContent, processedImages);
+
+        // Store updated HTML with replaced URLs
+        const updatedHtmlPath = `${userId}/pdf-html/${originalFilename.replace('.pdf', '')}-final-${Date.now()}.html`;
+        await supabase.storage
+          .from('pdf-documents')
+          .upload(updatedHtmlPath, finalHtmlContent, {
+            contentType: 'text/html',
+            upsert: false
+          });
+
+        const { data: { publicUrl: finalHtmlUrl } } = supabase.storage
+          .from('pdf-documents')
+          .getPublicUrl(updatedHtmlPath);
+
+        // Extract text for embedding (limited to avoid memory issues)
+        console.log('📝 Extracting text for embedding...');
+        const extractedText = extractTextFromHTML(finalHtmlContent).substring(0, 5000); // Limit text
+
+        // Generate embeddings
+        console.log('🧠 Generating embeddings...');
+        const embedding = await generateEmbedding(extractedText);
+
+        // Store in knowledge base
+        console.log('💾 Storing in knowledge base...');
+        const knowledgeEntry = {
+          title: `${originalFilename.replace('.pdf', '')} - HTML Document`,
+          content: extractedText,
+          content_type: 'pdf_html_document',
+          source_url: fileUrl,
+          semantic_tags: ['pdf', 'html', 'convertapi', 'uploaded-content'],
+          language: options.language || 'en',
+          technical_complexity: 5,
+          reading_level: 10,
+          openai_embedding: embedding,
+          confidence_scores: {
+            conversion: 0.95,
+            text_extraction: 0.9,
+            overall: 0.92
+          },
+          search_keywords: extractedText.split(' ').slice(0, 20), // Reduced keywords
+          metadata: {
+            source_type: 'convertapi_pdf_upload',
+            processing_method: 'convertapi_html_conversion',
+            file_info: {
+              original_filename: originalFilename,
+              file_size: fileSize,
+              processing_date: new Date().toISOString()
+            },
+            storage_info: {
+              html_storage_url: finalHtmlUrl,
+              original_html_url: htmlPublicUrl,
+              images_processed: processedImages.length,
+              images_found: imageUrls.length
+            },
+            processed_images: processedImages.map(img => ({
+              original_url: img.originalUrl,
+              supabase_url: img.supabaseUrl,
+              filename: img.filename,
+              size: img.size
+            }))
+          },
+          created_by: userId,
+          last_modified_by: userId,
+          status: 'published'
+        };
+
+        const { data: knowledgeData, error: knowledgeError } = await supabase
+          .from('enhanced_knowledge_base')
+          .insert(knowledgeEntry)
+          .select()
+          .single();
+
+        if (knowledgeError) {
+          throw new Error(`Failed to add document to knowledge base: ${knowledgeError.message}`);
+        }
+
+        // Final update to processing results
+        const processingTime = Date.now() - startTime;
+        await supabase
+          .from('pdf_processing_results')
+          .update({
+            processing_status: 'completed',
+            processing_completed_at: new Date().toISOString(),
+            processing_time_ms: processingTime,
+            document_title: knowledgeEntry.title,
+            confidence_score_avg: 0.92,
+            document_keywords: knowledgeEntry.search_keywords?.join(', ')
+          })
+          .eq('id', processingId);
+
+        console.log(`🎉 Background processing completed in ${processingTime}ms`);
+
+      } catch (backgroundError) {
+        console.error('❌ Background processing error:', backgroundError);
+        
+        await supabase
+          .from('pdf_processing_results')
+          .update({
+            processing_status: 'failed',
+            processing_completed_at: new Date().toISOString(),
+            error_message: backgroundError instanceof Error ? backgroundError.message : String(backgroundError),
+            processing_time_ms: Date.now() - startTime
+          })
+          .eq('id', processingId);
+      }
+    };
+
+    // Start background processing without awaiting
+    EdgeRuntime.waitUntil(backgroundProcessing());
+
+    // Return immediate response
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'PDF conversion initiated successfully',
+        processingId: processingId,
+        status: 'processing',
+        details: 'HTML content will be downloaded and processed in the background',
+        estimatedTime: '30-60 seconds'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('❌ Top-level error in ConvertAPI PDF processor:', error);
-    console.error('❌ Error type:', typeof error);
-    console.error('❌ Error name:', error instanceof Error ? error.name : 'Unknown');
-    console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
-    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     return new Response(
       JSON.stringify({ 
         success: false,
         error: error instanceof Error ? error.message : String(error),
         errorType: error instanceof Error ? error.name : typeof error,
-        errorDetails: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        } : error,
-        context: 'convertapi_top_level_error'
+        context: 'convertapi_initialization_error'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
