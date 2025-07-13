@@ -321,6 +321,7 @@ async function extractWithFirecrawlSimple(url: string, options: any): Promise<Ma
   console.log('Using Firecrawl for:', url);
 
   try {
+    // First try to scrape with both markdown and extract formats
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -329,25 +330,35 @@ async function extractWithFirecrawlSimple(url: string, options: any): Promise<Ma
       },
       body: JSON.stringify({
         url: url,
-        formats: ["extract"],
+        formats: ["markdown", "extract"],
         timeout: 20000,
         extract: {
-          prompt: options.prompt || "Extract material/product information including name, description, price, and properties.",
+          prompt: "Extract all product/material information from this page. Look for product names, descriptions, prices, specifications, and any material properties. Include building materials, tiles, flooring, fixtures, furniture, or any construction/design products.",
           schema: {
             type: "object",
             properties: {
-              materials: {
+              products: {
                 type: "array",
                 items: {
                   type: "object",
                   properties: {
-                    name: { type: "string" },
-                    description: { type: "string" },
-                    price: { type: "string" },
-                    category: { type: "string" },
-                    images: { type: "array", items: { type: "string" } },
-                    properties: { type: "object" }
-                  }
+                    name: { type: "string", description: "Product or material name" },
+                    description: { type: "string", description: "Product description or details" },
+                    price: { type: "string", description: "Price information if available" },
+                    category: { type: "string", description: "Material category (e.g., tiles, wood, metal, etc.)" },
+                    brand: { type: "string", description: "Brand or manufacturer" },
+                    specifications: { type: "object", description: "Technical specifications or properties" },
+                    availability: { type: "string", description: "Stock status or availability" }
+                  },
+                  required: ["name"]
+                }
+              },
+              page_info: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  images: { type: "array", items: { type: "string" } }
                 }
               }
             }
@@ -357,50 +368,128 @@ async function extractWithFirecrawlSimple(url: string, options: any): Promise<Ma
     });
 
     if (!response.ok) {
-      throw new Error(`Firecrawl API error: ${response.status}`);
+      throw new Error(`Firecrawl API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Firecrawl response:', JSON.stringify(data, null, 2));
     
     if (!data.success) {
-      throw new Error('Firecrawl scraping failed');
+      throw new Error(`Firecrawl scraping failed: ${data.error || 'Unknown error'}`);
     }
 
-    const extractedData = data.data?.extract?.materials || [];
+    const materials: MaterialData[] = [];
     
-    const materials: MaterialData[] = extractedData.map((item: any) => ({
-      name: item.name || extractNameFromUrl(url),
-      description: item.description || '',
-      category: item.category || 'Other',
-      price: item.price || '',
-      images: Array.isArray(item.images) ? item.images.slice(0, 5) : [],
-      properties: item.properties || {},
-      sourceUrl: url,
-      supplier: extractSupplierFromUrl(url),
-      confidence: 0.9
-    }));
-
-    // If no materials extracted, create a basic one
+    // Extract from structured data
+    const extractedProducts = data.data?.extract?.products || [];
+    console.log('Extracted products count:', extractedProducts.length);
+    
+    for (const product of extractedProducts) {
+      if (product.name && product.name.trim()) {
+        materials.push({
+          name: product.name.trim(),
+          description: product.description || '',
+          category: product.category || inferCategoryFromContent(product.name + ' ' + (product.description || '')),
+          price: product.price || '',
+          images: data.data?.extract?.page_info?.images?.slice(0, 3) || [],
+          properties: {
+            brand: product.brand || '',
+            specifications: product.specifications || {},
+            availability: product.availability || '',
+            extractedBy: 'firecrawl-extract'
+          },
+          sourceUrl: url,
+          supplier: product.brand || extractSupplierFromUrl(url),
+          confidence: 0.9
+        });
+      }
+    }
+    
+    // If no structured products found, try to extract from markdown content
     if (materials.length === 0) {
+      const markdown = data.data?.markdown || '';
+      const pageInfo = data.data?.extract?.page_info || {};
+      
+      console.log('No structured products found, trying markdown extraction');
+      console.log('Markdown content length:', markdown.length);
+      
+      if (markdown.length > 100) {
+        // Extract potential product information from markdown
+        const productData = extractProductFromMarkdown(markdown, url, pageInfo);
+        if (productData) {
+          materials.push(productData);
+        }
+      }
+    }
+    
+    // If still no materials found, create a basic entry from page content
+    if (materials.length === 0) {
+      const pageInfo = data.data?.extract?.page_info || {};
+      const markdown = data.data?.markdown || '';
+      
+      console.log('Creating basic material from page content');
       materials.push({
-        name: extractNameFromUrl(url),
-        description: 'Material information extracted from page',
-        category: 'Other',
-        price: '',
-        images: [],
-        properties: { extractedBy: 'firecrawl' },
+        name: pageInfo.title || extractNameFromUrl(url),
+        description: pageInfo.description || markdown.substring(0, 200) + '...',
+        category: inferCategoryFromContent((pageInfo.title || '') + ' ' + (pageInfo.description || '')),
+        price: extractPriceFromContent(markdown),
+        images: pageInfo.images?.slice(0, 3) || [],
+        properties: { 
+          extractedBy: 'firecrawl-fallback',
+          hasContent: markdown.length > 0,
+          contentLength: markdown.length
+        },
         sourceUrl: url,
         supplier: extractSupplierFromUrl(url),
-        confidence: 0.5
+        confidence: 0.6
       });
     }
 
+    console.log(`Extracted ${materials.length} materials from ${url}`);
     return materials;
 
   } catch (error) {
     console.error('Firecrawl extraction error:', error);
     throw error;
   }
+}
+
+function extractProductFromMarkdown(markdown: string, url: string, pageInfo: any): MaterialData | null {
+  // Look for product patterns in markdown
+  const lines = markdown.split('\n').filter(line => line.trim());
+  
+  // Try to find product headings
+  const headings = lines.filter(line => line.match(/^#+\s+/));
+  const productHeading = headings.find(h => 
+    h.toLowerCase().includes('product') || 
+    h.toLowerCase().includes('material') ||
+    h.toLowerCase().includes('tile') ||
+    h.toLowerCase().includes('floor')
+  ) || headings[0];
+  
+  if (!productHeading) return null;
+  
+  const name = productHeading.replace(/^#+\s+/, '').trim();
+  
+  // Extract description from following content
+  const headingIndex = lines.indexOf(productHeading);
+  const descriptionLines = lines.slice(headingIndex + 1, headingIndex + 5);
+  const description = descriptionLines.join(' ').substring(0, 300);
+  
+  return {
+    name: name || extractNameFromUrl(url),
+    description: description,
+    category: inferCategoryFromContent(name + ' ' + description),
+    price: extractPriceFromContent(markdown),
+    images: pageInfo.images?.slice(0, 3) || [],
+    properties: { 
+      extractedBy: 'markdown-parsing',
+      source: 'markdown'
+    },
+    sourceUrl: url,
+    supplier: extractSupplierFromUrl(url),
+    confidence: 0.7
+  };
 }
 
 // Helper functions
