@@ -20,7 +20,7 @@ interface ProcessingOptions {
   overlapPercentage: number;
   extractStructuredData: boolean;
   detectMaterials: boolean;
-  processingMethod: 'azure' | 'hybrid';
+  processingMethod: 'azure' | 'hybrid' | 'html';
 }
 
 interface ProcessingResult {
@@ -53,10 +53,11 @@ interface ProcessingStatus {
 }
 
 // Helper function to get processing method display name
-const getProcessingMethodName = (method: 'azure' | 'hybrid'): string => {
+const getProcessingMethodName = (method: 'azure' | 'hybrid' | 'html'): string => {
   switch (method) {
     case 'azure': return 'Azure AI';
     case 'hybrid': return 'Hybrid Python';
+    case 'html': return 'HTML Conversion';
     default: return 'Unknown';
   }
 };
@@ -142,7 +143,22 @@ export const PDFProcessor: React.FC = () => {
       // Call the selected PDF processor
       let processingResult, processingError;
       
-      if (options.processingMethod === 'hybrid') {
+      if (options.processingMethod === 'html') {
+        console.log('Using HTML Conversion processing...');
+        const htmlResponse = await supabase.functions.invoke('html-pdf-processor', {
+          body: {
+            fileUrl: publicUrl,
+            originalFilename: file.name,
+            fileSize: file.size,
+            userId: user.id,
+            extractionOptions: options
+          }
+        });
+        
+        processingResult = htmlResponse.data;
+        processingError = htmlResponse.error;
+        
+      } else if (options.processingMethod === 'hybrid') {
         console.log('Using Hybrid Python processing...');
         const hybridResponse = await supabase.functions.invoke('hybrid-pdf-processor', {
           body: {
@@ -218,16 +234,20 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
-      const isHybridProcessing = options.processingMethod === 'hybrid' && 
+      const isHtmlProcessing = options.processingMethod === 'html' &&
+        processingResult.summary.htmlFeatures;
+      const isHybridProcessing = options.processingMethod === 'hybrid' &&
         processingResult.summary.hybridFeatures;
-      const isAzureProcessing = options.processingMethod === 'azure' && 
+      const isAzureProcessing = options.processingMethod === 'azure' &&
         (processingResult.summary.extractedTables !== undefined || processingResult.summary.keyValuePairs !== undefined);
       
       toast({
         title: `${getProcessingMethodName(options.processingMethod)} Processing Complete`,
-        description: isHybridProcessing
+        description: isHtmlProcessing
+          ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials with ${processingResult.summary.htmlFeatures.extractedImages} images, ${processingResult.summary.htmlFeatures.tablesExtracted} tables, and ${processingResult.summary.htmlFeatures.documentStructure} structure elements via HTML conversion.`
+          : isHybridProcessing
           ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials with ${processingResult.summary.hybridFeatures.extractedImages} images, ${processingResult.summary.hybridFeatures.materialCorrelations} correlations, and ${processingResult.summary.hybridFeatures.documentStructure} structure elements.`
-          : isAzureProcessing 
+          : isAzureProcessing
           ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials, ${processingResult.summary.extractedTables || 0} tables, and ${processingResult.summary.keyValuePairs || 0} key-value pairs.`
           : `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials using ${options.processingMethod} processing.`,
       });
@@ -312,19 +332,28 @@ export const PDFProcessor: React.FC = () => {
               <Settings className="h-4 w-4" />
               <Label className="text-base font-medium">Processing Method</Label>
             </div>
-            <Select 
-              value={options.processingMethod} 
-              onValueChange={(value: 'azure' | 'hybrid') => setOptions(prev => ({ ...prev, processingMethod: value }))}
+            <Select
+              value={options.processingMethod}
+              onValueChange={(value: 'azure' | 'hybrid' | 'html') => setOptions(prev => ({ ...prev, processingMethod: value }))}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select processing method" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="html">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-green-500" />
+                    <div>
+                      <div className="font-medium">HTML Conversion Processing (NEW)</div>
+                      <div className="text-xs text-muted-foreground">Convert PDF to HTML for superior structure extraction, table parsing, and image detection</div>
+                    </div>
+                  </div>
+                </SelectItem>
                 <SelectItem value="hybrid">
                   <div className="flex items-center gap-2">
                     <Brain className="h-4 w-4 text-purple-500" />
                     <div>
-                      <div className="font-medium">Enhanced Hybrid Processing (Recommended)</div>
+                      <div className="font-medium">Enhanced Hybrid Processing</div>
                       <div className="text-xs text-muted-foreground">Advanced material detection with enhanced image extraction, 12+ categories, and visual catalog analysis</div>
                     </div>
                   </div>
@@ -340,6 +369,14 @@ export const PDFProcessor: React.FC = () => {
                 </SelectItem>
               </SelectContent>
             </Select>
+            {options.processingMethod === 'html' && (
+              <Alert>
+                <FileText className="h-4 w-4" />
+                <AlertDescription>
+                  HTML conversion processing converts PDF to structured HTML for superior content extraction. Features advanced table parsing, image detection, and DOM-based material analysis with enhanced accuracy.
+                </AlertDescription>
+              </Alert>
+            )}
             {options.processingMethod === 'hybrid' && (
               <Alert>
                 <Brain className="h-4 w-4" />
@@ -423,7 +460,9 @@ export const PDFProcessor: React.FC = () => {
               <div>
                 <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
                  <p className="text-sm text-muted-foreground">
-                    {options.processingMethod === 'hybrid'
+                    {options.processingMethod === 'html'
+                      ? 'HTML Conversion: Superior structure extraction with advanced table parsing and DOM-based material analysis'
+                      : options.processingMethod === 'hybrid'
                       ? 'Enhanced Hybrid: Advanced material detection with enhanced image extraction, 12+ categories, and visual catalog analysis'
                       : 'Azure AI: Up to 50MB per file for advanced cloud analysis'
                     }
