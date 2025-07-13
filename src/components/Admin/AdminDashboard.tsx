@@ -70,15 +70,6 @@ const AdminDashboard: React.FC = () => {
       priority: 5
     },
     {
-      title: "Material Catalog",
-      description: "Browse and manage materials catalog with PDF integration",
-      icon: Tags,
-      path: "/catalog",
-      status: "active",
-      count: "342 materials",
-      priority: 6
-    },
-    {
       title: "Analytics Dashboard",
       description: "System performance metrics and usage analytics",
       icon: BarChart3,

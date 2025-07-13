@@ -56,7 +56,7 @@ interface ReviewedTile extends PDFTile {
 
 interface WorkflowAction {
   id: string;
-  type: 'ai_analysis' | 'material_catalog' | 'image_generation';
+  type: 'ai_analysis' | 'image_generation';
   label: string;
   description: string;
   icon: React.ReactNode;
@@ -83,13 +83,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
   const [workflowProgress, setWorkflowProgress] = useState(0);
 
   const availableWorkflows: WorkflowAction[] = [
-    {
-      id: 'material_catalog',
-      type: 'material_catalog',
-      label: 'Material Catalog + RAG',
-      description: 'Add to materials catalog with automatic embedding generation',
-      icon: <Database className="h-4 w-4" />
-    },
     {
       id: 'ai_analysis',
       type: 'ai_analysis',
@@ -178,9 +171,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
               workflowResults.ai_analysis = await performAIAnalysis(selectedTileData);
               break;
               
-            case 'material_catalog':
-              workflowResults.material_catalog = await addToMaterialCatalogWithEmbeddings(selectedTileData);
-              break;
               
             case 'image_generation':
               workflowResults.image_generation = await generateMaterialImages(selectedTileData);
@@ -233,71 +223,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
     return data;
   };
 
-  const addToMaterialCatalogWithEmbeddings = async (tiles: ReviewedTile[]) => {
-    const materials = tiles.map(tile => ({
-      name: `${tile.corrected_material_type || tile.material_type} - ${tile.page_number}-${tile.tile_index}`,
-      category: tile.corrected_material_type || tile.material_type,
-      description: tile.corrected_text || tile.extracted_text,
-      properties: tile.structured_data || {},
-      metadata: {
-        source: 'pdf_extraction',
-        processing_id: processingId,
-        confidence: tile.material_confidence,
-        reviewed: true,
-        approved: tile.approved
-      }
-    }));
-
-    // Insert materials into catalog
-    const { data: catalogData, error: catalogError } = await supabase
-      .from('materials_catalog')
-      .insert(materials.map(m => ({ 
-        ...m, 
-        category: m.category as any // Type assertion for now
-      })))
-      .select();
-
-    if (catalogError) throw catalogError;
-
-    // Generate embeddings for each material
-    const embeddingResults = [];
-    for (let i = 0; i < catalogData.length; i++) {
-      const material = catalogData[i];
-      const tile = tiles[i];
-      
-      try {
-        // Create embeddings for the material
-        const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('enhanced-rag-search', {
-          body: {
-            action: 'embed_material',
-            material_id: material.id,
-            content: material.description,
-            metadata: {
-              material_type: material.category,
-              confidence: tile.material_confidence,
-              source: 'pdf_extraction',
-              properties: material.properties
-            }
-          }
-        });
-
-        if (embeddingError) {
-          console.error(`Embedding failed for material ${material.id}:`, embeddingError);
-        } else {
-          embeddingResults.push({ material_id: material.id, embedding_data: embeddingData });
-        }
-      } catch (error) {
-        console.error(`Embedding error for material ${material.id}:`, error);
-      }
-    }
-
-    return { 
-      added: materials.length, 
-      catalog_data: catalogData,
-      embeddings_generated: embeddingResults.length,
-      embedding_results: embeddingResults
-    };
-  };
 
   const generateMaterialImages = async (tiles: ReviewedTile[]) => {
     const images = [];

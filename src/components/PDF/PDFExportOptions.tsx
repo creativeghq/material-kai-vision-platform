@@ -114,63 +114,6 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
     });
   };
 
-  const exportMaterialCatalog = () => {
-    const materialTiles = tiles.filter(t => t.material_detected);
-    const materialSummary = materialTiles.reduce((acc, tile) => {
-      const type = tile.material_type;
-      if (!acc[type]) {
-        acc[type] = {
-          material_type: type,
-          count: 0,
-          avg_confidence: 0,
-          examples: [],
-          properties_detected: new Set()
-        };
-      }
-      
-      acc[type].count++;
-      acc[type].avg_confidence += tile.material_confidence || 0;
-      
-      if (acc[type].examples.length < 3) {
-        acc[type].examples.push({
-          text: tile.extracted_text?.substring(0, 200),
-          confidence: tile.material_confidence,
-          page: tile.page_number
-        });
-      }
-
-      // Collect unique properties
-      if (tile.structured_data) {
-        Object.keys(tile.structured_data).forEach(prop => {
-          acc[type].properties_detected.add(prop);
-        });
-      }
-
-      return acc;
-    }, {} as any);
-
-    // Convert sets to arrays and calculate averages
-    Object.values(materialSummary).forEach((material: any) => {
-      material.avg_confidence = material.avg_confidence / material.count;
-      material.properties_detected = Array.from(material.properties_detected);
-    });
-
-    const catalogContent = JSON.stringify({
-      processing_id: processingId,
-      catalog_type: 'material_summary',
-      generated_at: new Date().toISOString(),
-      total_materials_detected: materialTiles.length,
-      unique_material_types: Object.keys(materialSummary).length,
-      materials: Object.values(materialSummary)
-    }, null, 2);
-
-    downloadFile(catalogContent, `material_catalog_${processingId}.json`, 'application/json');
-    
-    toast({
-      title: "Material Catalog Export",
-      description: `Exported catalog with ${Object.keys(materialSummary).length} material types`,
-    });
-  };
 
   const downloadFile = (content: string, filename: string, contentType: string) => {
     const blob = new Blob([content], { type: contentType });
@@ -227,16 +170,11 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
             Export JSON
           </Button>
           
-          <Button onClick={exportMaterialCatalog} variant="outline" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Material Catalog
-          </Button>
         </div>
 
         <div className="text-xs text-muted-foreground">
           <p>• CSV: Tabular data for spreadsheet analysis</p>
           <p>• JSON: Complete structured data with metadata</p>
-          <p>• Material Catalog: Summarized materials by type</p>
         </div>
       </CardContent>
     </Card>

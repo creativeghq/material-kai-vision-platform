@@ -31,7 +31,6 @@ export const Dashboard: React.FC = () => {
       <SearchHub 
         onMaterialSelect={(materialId) => {
           console.log('Material selected:', materialId);
-          window.location.href = `/catalog?material=${materialId}`;
         }}
         onNavigateToMoodboard={() => {
           window.location.href = '/moodboard';
@@ -81,24 +80,6 @@ export const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/catalog'}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <Package className="h-8 w-8 text-green-500" />
-              <span className="text-sm text-muted-foreground">8,432 Items</span>
-            </div>
-            <CardTitle className="text-lg">Material Catalog</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Browse comprehensive material database
-            </p>
-            <Button variant="outline" size="sm" className="w-full">
-              <Database className="h-4 w-4 mr-2" />
-              Browse Catalog
-            </Button>
-          </CardContent>
-        </Card>
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/moodboard'}>
           <CardHeader className="pb-3">

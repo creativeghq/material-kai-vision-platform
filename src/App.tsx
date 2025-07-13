@@ -19,7 +19,7 @@ import { AITestingPanel } from "./components/Admin/AITestingPanel";
 import { AnalyticsDashboard } from "./components/Admin/AnalyticsDashboard";
 import { SystemPerformance } from "./components/Admin/SystemPerformance";
 import { MaterialRecognition } from "./components/Recognition/MaterialRecognition";
-import { MaterialCatalog } from "./components/Catalog/MaterialCatalog";
+
 import { MoodBoardPage } from "./components/MoodBoard/MoodBoardPage";
 import { Designer3DPage } from "./components/3D/Designer3DPage";
 import { AIStudioPage } from "./components/AI/AIStudioPage";
@@ -54,13 +54,6 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <MaterialRecognition />
-                </Layout>
-              </AuthGuard>
-            } />
-            <Route path="/catalog" element={
-              <AuthGuard>
-                <Layout>
-                  <MaterialCatalog />
                 </Layout>
               </AuthGuard>
             } />
