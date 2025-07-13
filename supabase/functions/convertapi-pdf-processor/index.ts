@@ -75,6 +75,76 @@ function extractImageUrls(html: string): string[] {
   return imageUrls;
 }
 
+// Extract base64 images from HTML
+function extractBase64Images(html: string): Array<{src: string, data: string, type: string}> {
+  const base64Images: Array<{src: string, data: string, type: string}> = [];
+  const base64Regex = /<img[^>]+src=["\']data:image\/([^;]+);base64,([^"\']+)["\'][^>]*>/gi;
+  let match;
+  let count = 0;
+  
+  while ((match = base64Regex.exec(html)) !== null && count < 5) { // Limit to 5 base64 images
+    const type = match[1]; // png, jpg, etc.
+    const data = match[2]; // base64 data
+    const fullSrc = match[0]; // full img tag
+    
+    base64Images.push({
+      src: fullSrc,
+      data: data,
+      type: type
+    });
+    count++;
+  }
+  
+  console.log(`Found ${base64Images.length} base64 images to convert`);
+  return base64Images;
+}
+
+// Convert base64 image to file and upload to Supabase
+async function processBase64Image(
+  base64Data: string, 
+  imageType: string, 
+  userId: string, 
+  index: number
+): Promise<{originalSrc: string, supabaseUrl: string, filename: string} | null> {
+  try {
+    // Decode base64 to binary
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    const filename = `base64-image-${index}-${Date.now()}.${imageType}`;
+    const storagePath = `${userId}/pdf-images/${filename}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('pdf-documents')
+      .upload(storagePath, bytes, {
+        contentType: `image/${imageType}`,
+        upsert: false
+      });
+    
+    if (uploadError) {
+      console.error(`Failed to upload base64 image ${index}:`, uploadError);
+      return null;
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('pdf-documents')
+      .getPublicUrl(storagePath);
+    
+    console.log(`✅ Converted base64 image ${index} to: ${publicUrl}`);
+    return {
+      originalSrc: `data:image/${imageType};base64,${base64Data}`,
+      supabaseUrl: publicUrl,
+      filename: filename
+    };
+  } catch (error) {
+    console.error(`Failed to process base64 image ${index}:`, error);
+    return null;
+  }
+}
+
 // Generate embeddings using OpenAI (memory optimized)
 async function generateEmbedding(text: string): Promise<number[]> {
   if (!openaiApiKey) {
@@ -349,11 +419,13 @@ serve(async (req) => {
       // STEP 3: Extract and process images (limited)
       console.log('🖼️ Step 3: Processing images...');
       const imageUrls = extractImageUrls(htmlContent);
-      console.log(`Found ${imageUrls.length} images to process`);
+      const base64Images = extractBase64Images(htmlContent);
+      console.log(`Found ${imageUrls.length} HTTP images and ${base64Images.length} base64 images to process`);
 
       const processedImages: ProcessedImage[] = [];
+      const processedBase64Images: Array<{originalSrc: string, supabaseUrl: string, filename: string}> = [];
       
-      // Process images one at a time to avoid memory issues
+      // Process HTTP images one at a time to avoid memory issues
       for (let i = 0; i < Math.min(imageUrls.length, 5); i++) { // Limit to 5 images
         const imageUrl = imageUrls[i];
         const processedImage = await downloadAndStoreImage(imageUrl, userId, i);
@@ -365,11 +437,31 @@ serve(async (req) => {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      console.log(`✅ Processed ${processedImages.length} images successfully`);
+      // Process base64 images
+      for (let i = 0; i < Math.min(base64Images.length, 5); i++) { // Limit to 5 base64 images
+        const base64Image = base64Images[i];
+        const processedBase64 = await processBase64Image(base64Image.data, base64Image.type, userId, i);
+        if (processedBase64) {
+          processedBase64Images.push(processedBase64);
+        }
+        
+        // Small delay between images
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      console.log(`✅ Processed ${processedImages.length} HTTP images and ${processedBase64Images.length} base64 images successfully`);
 
       // STEP 4: Replace image URLs and store final HTML
       console.log('🔄 Step 4: Finalizing HTML content...');
-      const finalHtmlContent = replaceImageUrls(htmlContent, processedImages);
+      let finalHtmlContent = replaceImageUrls(htmlContent, processedImages);
+      
+      // Replace base64 images with Supabase URLs
+      for (const base64Image of processedBase64Images) {
+        finalHtmlContent = finalHtmlContent.replace(
+          new RegExp(base64Image.originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          base64Image.supabaseUrl
+        );
+      }
 
       // Store final HTML in Supabase storage
       const htmlStoragePath = `${userId}/pdf-html/${originalFilename.replace('.pdf', '')}-${Date.now()}.html`;
@@ -434,7 +526,9 @@ serve(async (req) => {
           storage_info: {
             html_storage_url: htmlPublicUrl,
             images_processed: processedImages.length,
-            images_found: imageUrls.length
+            images_found: imageUrls.length,
+            base64_images_processed: processedBase64Images.length,
+            base64_images_found: base64Images.length
           },
           processed_images: processedImages.map(img => ({
             original_url: img.originalUrl,
@@ -495,6 +589,8 @@ serve(async (req) => {
           conversionInfo: {
             imagesFound: imageUrls.length,
             imagesProcessed: processedImages.length,
+            base64ImagesFound: base64Images.length,
+            base64ImagesProcessed: processedBase64Images.length,
             pagesProcessed: 10
           },
           message: 'PDF successfully converted to HTML and processed with ConvertAPI (memory-optimized)'
