@@ -308,19 +308,37 @@ serve(async (req) => {
       console.log('📥 Step 2: Extracting HTML content...');
       let htmlContent: string;
       
-      if (htmlFile.FileData) {
-        // HTML content is embedded directly in the response
-        console.log('✅ HTML content found in FileData property');
-        htmlContent = htmlFile.FileData;
-      } else if (htmlFile.Url || htmlFile.url || htmlFile.FileUrl || htmlFile.downloadUrl) {
-        // Fallback: try to download from URL if available
+      // Always prefer downloading from URL to get clean HTML content
+      if (htmlFile.Url || htmlFile.url || htmlFile.FileUrl || htmlFile.downloadUrl) {
         const htmlFileUrl = htmlFile.Url || htmlFile.url || htmlFile.FileUrl || htmlFile.downloadUrl;
-        console.log('📥 Downloading HTML content from:', htmlFileUrl);
+        console.log('📥 Downloading HTML content from URL:', htmlFileUrl);
         const htmlResponse = await fetch(htmlFileUrl);
         if (!htmlResponse.ok) {
           throw new Error(`Failed to download HTML: ${htmlResponse.status}`);
         }
         htmlContent = await htmlResponse.text();
+        console.log('✅ Downloaded clean HTML content from URL');
+      } else if (htmlFile.FileData) {
+        // Fallback: try to decode FileData if it's base64 encoded
+        console.log('⚠️ Using FileData as fallback, checking for base64 encoding...');
+        let rawData = htmlFile.FileData;
+        
+        // Check if it's base64 encoded (common with ConvertAPI)
+        try {
+          // If it looks like base64, decode it
+          if (typeof rawData === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(rawData.replace(/\s/g, ''))) {
+            console.log('🔍 Detected base64 encoding, decoding...');
+            htmlContent = atob(rawData);
+            console.log('✅ Successfully decoded base64 HTML content');
+          } else {
+            // Use as-is if not base64
+            htmlContent = rawData;
+            console.log('✅ Using FileData as plain text');
+          }
+        } catch (decodeError) {
+          console.warn('⚠️ Failed to decode base64, using raw data:', decodeError);
+          htmlContent = rawData;
+        }
       } else {
         console.error('❌ HTML file object keys:', Object.keys(htmlFile));
         throw new Error(`No HTML content found. Available properties: ${Object.keys(htmlFile).join(', ')}`);
