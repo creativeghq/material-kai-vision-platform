@@ -77,6 +77,42 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
     } else if (currentResults.length === 0) {
       loadAllUnreviewedMaterials(0, 50);
     }
+
+    // Set up real-time subscription for new materials
+    const channel = supabase
+      .channel('scraped-materials-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'scraped_materials_temp'
+        },
+        (payload) => {
+          console.log('New material scraped:', payload);
+          const newMaterial = payload.new as ScrapedMaterialTemp;
+          
+          // Add new material to the list if it matches our current session or if we're viewing all
+          if (!sessionId || newMaterial.scraping_session_id === sessionId) {
+            setMaterials(prev => [newMaterial, ...prev]);
+            
+            // Update session stats
+            setSessionStats(prev => prev ? {
+              ...prev,
+              totalProcessed: prev.totalProcessed + 1
+            } : {
+              totalProcessed: 1,
+              totalExpected: 1,
+              isActive: true
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [sessionId, currentResults.length]);
 
   const loadMoreMaterials = () => {
@@ -337,6 +373,56 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
     }
   };
 
+  const clearAllReviewData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user's data only
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to clear review data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Delete all scraped materials for this user
+      const { error } = await supabase
+        .from('scraped_materials_temp')
+        .delete()
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+
+      // Clear scraping sessions
+      await supabase
+        .from('scraping_sessions')
+        .delete()
+        .eq('user_id', session.user.id);
+
+      // Clear local state
+      setMaterials([]);
+      setSelectedMaterials(new Set());
+      setSessionStats(null);
+
+      toast({
+        title: "Success",
+        description: "All review data cleared successfully",
+      });
+    } catch (error) {
+      console.error('Error clearing review data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear review data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleMaterialSelection = (materialId: string) => {
     setSelectedMaterials(prev => {
       const newSet = new Set(prev);
@@ -474,6 +560,19 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
               >
                 {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
                 Add {approvedCount} Approved to Catalog
+              </Button>
+            )}
+
+            {materials.length > 0 && (
+              <Button
+                onClick={clearAllReviewData}
+                disabled={loading}
+                size="sm"
+                variant="destructive"
+                className="ml-auto"
+              >
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Clear All Review
               </Button>
             )}
           </div>

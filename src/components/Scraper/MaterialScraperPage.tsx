@@ -75,7 +75,7 @@ Return a list of materials found on the page.`,
     rerank: true
   });
 
-  const handleScrape = async (e: React.FormEvent) => {
+  const handleScrape = async (e: React.FormEvent, providedSessionId?: string) => {
     e.preventDefault();
     
     if (!url) {
@@ -102,26 +102,34 @@ Return a list of materials found on the page.`,
       
       console.log('User authenticated, calling scraper function...');
       
-      // Create or update scraping session
-      const currentSessionId = `scrape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Create or use provided session ID
+      const currentSessionId = providedSessionId || `scrape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      const { error: sessionError } = await supabase.from('scraping_sessions').insert({
-        user_id: session.user.id,
-        session_id: currentSessionId,
-        source_url: url,
-        scraping_config: {
-          service: options.service,
-          sitemapMode: options.sitemapMode,
-          batchSize: batchSize,
-          maxPages: maxPages,
-          saveTemporary: saveTemporary,
-          options: JSON.parse(JSON.stringify(options)) // Ensure proper JSON serialization
-        } as any, // Cast to bypass strict typing
-        status: 'active'
-      });
+      // Create or update scraping session only if not continuing
+      if (!providedSessionId) {
+        const { error: sessionError } = await supabase.from('scraping_sessions').insert({
+          user_id: session.user.id,
+          session_id: currentSessionId,
+          source_url: url,
+          scraping_config: {
+            service: options.service,
+            sitemapMode: options.sitemapMode,
+            batchSize: batchSize,
+            maxPages: maxPages,
+            saveTemporary: saveTemporary,
+            options: JSON.parse(JSON.stringify(options)) // Ensure proper JSON serialization
+          } as any, // Cast to bypass strict typing
+          status: 'active'
+        });
 
-      if (sessionError) {
-        console.error('Failed to create scraping session:', sessionError);
+        if (sessionError) {
+          console.error('Failed to create scraping session:', sessionError);
+        }
+      } else {
+        // Update existing session status to active
+        await supabase.from('scraping_sessions')
+          .update({ status: 'active', updated_at: new Date().toISOString() })
+          .eq('session_id', currentSessionId);
       }
       
       // Simulate progress updates
@@ -817,9 +825,9 @@ Return a list of materials found on the page.`,
                   setSaveTemporary(config.saveTemporary || false);
                   setOptions(config.options || options);
                   
-                  // Start the scraping process
+                  // Start the scraping process with the existing session ID
                   const formEvent = { preventDefault: () => {} } as React.FormEvent;
-                  await handleScrape(formEvent);
+                  await handleScrape(formEvent, sessionId);
                 } else {
                   toast({
                     title: "No Session",
