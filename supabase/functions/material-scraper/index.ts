@@ -220,19 +220,20 @@ async function parseSitemapSimple(sitemapUrl: string, options: any): Promise<str
     
     console.log(`Found ${urls.length} URLs in sitemap`);
     
-    // Apply filtering if provided
-    const includePatterns = options.includePatterns || [];
-    const excludePatterns = options.excludePatterns || [];
+    // Apply filtering if provided - default to product-related patterns
+    const includePatterns = options.includePatterns && options.includePatterns.length > 0 
+      ? options.includePatterns 
+      : ['/product', '/item', '/tile', '/material', '/floor', '/wall', '/ceramic', '/stone'];
+    const excludePatterns = options.excludePatterns || ['/cart', '/checkout', '/account', '/login', '/search'];
     
     let filteredUrls = urls;
     
-    if (includePatterns.length > 0) {
-      filteredUrls = filteredUrls.filter(url => 
-        includePatterns.some((pattern: string) => 
-          url.toLowerCase().includes(pattern.toLowerCase())
-        )
-      );
-    }
+    // Always apply include patterns for better results
+    filteredUrls = filteredUrls.filter(url => 
+      includePatterns.some((pattern: string) => 
+        url.toLowerCase().includes(pattern.toLowerCase())
+      )
+    );
     
     if (excludePatterns.length > 0) {
       filteredUrls = filteredUrls.filter(url => 
@@ -327,80 +328,89 @@ async function extractWithFirecrawlSimple(url: string, options: any): Promise<Ma
         'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(15000), // 15 second timeout
       body: JSON.stringify({
         url: url,
-        formats: ["extract"],
-        timeout: 20000,
-        extract: {
-          prompt: options.prompt || "Extract material/product information including name, description, price, and properties.",
-          schema: {
-            type: "object",
-            properties: {
-              materials: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    description: { type: "string" },
-                    price: { type: "string" },
-                    category: { type: "string" },
-                    images: { type: "array", items: { type: "string" } },
-                    properties: { type: "object" }
-                  }
-                }
-              }
-            }
+        formats: ["markdown", "html"],
+        timeout: 10000,
+        actions: [
+          {
+            type: 'wait',
+            milliseconds: 2000
           }
-        }
+        ]
       }),
     });
 
+    console.log(`Firecrawl response status: ${response.status}`);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Firecrawl API error: ${response.status} - ${errorText}`);
       throw new Error(`Firecrawl API error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('Firecrawl response received:', !!data.success);
     
     if (!data.success) {
+      console.error('Firecrawl scraping failed:', data.error || 'Unknown error');
       throw new Error('Firecrawl scraping failed');
     }
 
-    const extractedData = data.data?.extract?.materials || [];
-    
-    const materials: MaterialData[] = extractedData.map((item: any) => ({
-      name: item.name || extractNameFromUrl(url),
-      description: item.description || '',
-      category: item.category || 'Other',
-      price: item.price || '',
-      images: Array.isArray(item.images) ? item.images.slice(0, 5) : [],
-      properties: item.properties || {},
-      sourceUrl: url,
-      supplier: extractSupplierFromUrl(url),
-      confidence: 0.9
-    }));
-
-    // If no materials extracted, create a basic one
-    if (materials.length === 0) {
-      materials.push({
-        name: extractNameFromUrl(url),
-        description: 'Material information extracted from page',
-        category: 'Other',
-        price: '',
-        images: [],
-        properties: { extractedBy: 'firecrawl' },
-        sourceUrl: url,
-        supplier: extractSupplierFromUrl(url),
-        confidence: 0.5
-      });
+    const scrapedData = data.data;
+    if (!scrapedData) {
+      console.log('No data returned from Firecrawl');
+      return [];
     }
 
-    return materials;
+    // Extract material information from the scraped content
+    const markdown = scrapedData.markdown || '';
+    const html = scrapedData.html || '';
+    const title = scrapedData.metadata?.title || extractNameFromUrl(url);
+    
+    console.log(`Content length - Markdown: ${markdown.length}, HTML: ${html.length}`);
+
+    // Simple material extraction logic
+    const material: MaterialData = {
+      name: title,
+      description: markdown.substring(0, 500) + (markdown.length > 500 ? '...' : ''),
+      category: inferCategoryFromContent(markdown + ' ' + title),
+      price: extractPriceFromContent(markdown + ' ' + html),
+      images: extractImagesFromHtml(html),
+      properties: {
+        contentLength: markdown.length,
+        extractedBy: 'firecrawl',
+        hasContent: markdown.length > 0,
+        url: url
+      },
+      sourceUrl: url,
+      supplier: extractSupplierFromUrl(url),
+      confidence: 0.7
+    };
+
+    console.log(`Extracted material: ${material.name}, category: ${material.category}, price: ${material.price}`);
+    return [material];
 
   } catch (error) {
     console.error('Firecrawl extraction error:', error);
     throw error;
   }
+}
+
+// Helper function to extract images from HTML
+function extractImagesFromHtml(html: string): string[] {
+  const images: string[] = [];
+  const imgMatches = html.match(/<img[^>]+src="([^"]+)"/gi);
+  if (imgMatches) {
+    for (const match of imgMatches.slice(0, 5)) { // Limit to 5 images
+      const srcMatch = match.match(/src="([^"]+)"/i);
+      if (srcMatch) {
+        images.push(srcMatch[1]);
+      }
+    }
+  }
+  return images;
 }
 
 // Helper functions
