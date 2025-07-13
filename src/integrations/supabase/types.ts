@@ -1829,6 +1829,48 @@ export type Database = {
           },
         ]
       }
+      scraped_materials_temp: {
+        Row: {
+          approved: boolean | null
+          created_at: string
+          id: string
+          material_data: Json
+          notes: string | null
+          reviewed: boolean
+          scraped_at: string
+          scraping_session_id: string
+          source_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved?: boolean | null
+          created_at?: string
+          id?: string
+          material_data: Json
+          notes?: string | null
+          reviewed?: boolean
+          scraped_at?: string
+          scraping_session_id?: string
+          source_url: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved?: boolean | null
+          created_at?: string
+          id?: string
+          material_data?: Json
+          notes?: string | null
+          reviewed?: boolean
+          scraped_at?: string
+          scraping_session_id?: string
+          source_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       search_analytics: {
         Row: {
           avg_relevance_score: number | null

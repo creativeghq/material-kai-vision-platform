@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.5';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,9 @@ interface JinaExtractRequest {
   url: string;
   service: 'firecrawl' | 'jina';
   sitemapMode?: boolean;
+  batchSize?: number;
+  maxPages?: number;
+  saveTemporary?: boolean;
   options?: {
     prompt?: string;
     schema?: Record<string, any>;
@@ -59,14 +63,29 @@ serve(async (req) => {
   console.log('Material scraper function called');
 
   try {
-    const { url, service, sitemapMode = false, options = {} }: JinaExtractRequest = await req.json();
+    const { 
+      url, 
+      service, 
+      sitemapMode = false, 
+      batchSize = 5,
+      maxPages = 100,
+      saveTemporary = false,
+      options = {} 
+    }: JinaExtractRequest = await req.json();
+    
     console.log(`Processing: ${service}, sitemap: ${sitemapMode}, url: ${url}`);
+    console.log(`Batch size: ${batchSize}, Max pages: ${maxPages}, Save temporary: ${saveTemporary}`);
     
     let materials: MaterialData[] = [];
+    let sessionId: string | null = null;
     
     if (sitemapMode) {
-      // Simplified sitemap processing
-      materials = await processSitemapSimple(url, service, options);
+      // Sitemap processing with configurable parameters
+      materials = await processSitemapEnhanced(url, service, {
+        ...options,
+        batchSize,
+        maxPages
+      });
     } else {
       // Single page processing
       if (service === 'jina') {
@@ -77,12 +96,20 @@ serve(async (req) => {
     }
     
     console.log(`Extracted ${materials.length} materials`);
+    
+    // Save to temporary storage if requested
+    if (saveTemporary && materials.length > 0) {
+      sessionId = await saveToTemporaryStorage(req, materials);
+      console.log(`Saved to temporary storage with session ID: ${sessionId}`);
+    }
 
     return new Response(JSON.stringify({
       success: true,
       data: materials,
       totalProcessed: materials.length,
-      service: service
+      service: service,
+      sessionId: sessionId,
+      savedTemporary: saveTemporary
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -98,6 +125,128 @@ serve(async (req) => {
     });
   }
 });
+
+async function processSitemapEnhanced(sitemapUrl: string, service: 'firecrawl' | 'jina', options: any): Promise<MaterialData[]> {
+  console.log('Processing sitemap with enhanced options:', sitemapUrl);
+  console.log('Enhanced options:', JSON.stringify(options, null, 2));
+  
+  try {
+    // Fetch and parse sitemap
+    const urls = await parseSitemapSimple(sitemapUrl, options);
+    console.log(`Found ${urls.length} URLs in sitemap`);
+    
+    if (urls.length === 0) {
+      console.log('No URLs found in sitemap');
+      return [{
+        name: 'No URLs Found',
+        description: 'No product URLs were found in the sitemap that match the filtering criteria.',
+        category: 'System Note',
+        price: '',
+        images: [],
+        properties: { totalUrlsFound: 0, urlsProcessed: 0 },
+        sourceUrl: sitemapUrl,
+        supplier: 'System'
+      }];
+    }
+    
+    // Use configurable parameters
+    const batchSize = options.batchSize || 5;
+    const maxUrls = Math.min(urls.length, options.maxPages || 100);
+    const urlsToProcess = urls.slice(0, maxUrls);
+    
+    console.log(`Processing ${urlsToProcess.length} URLs in batches of ${batchSize} (max: ${options.maxPages || 100})`);
+    
+    const allMaterials: MaterialData[] = [];
+    let processedCount = 0;
+    let successCount = 0;
+    
+    // Process URLs in batches
+    for (let i = 0; i < urlsToProcess.length; i += batchSize) {
+      const batch = urlsToProcess.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urlsToProcess.length/batchSize)}: ${batch.length} URLs`);
+      
+      // Process batch in parallel for better performance
+      const batchPromises = batch.map(async (url, batchIndex) => {
+        const globalIndex = i + batchIndex + 1;
+        console.log(`[${globalIndex}/${urlsToProcess.length}] Processing: ${url}`);
+        
+        try {
+          const results = service === 'jina' 
+            ? await extractWithJinaSimple(url, options)
+            : await extractWithFirecrawlSimple(url, options);
+          
+          processedCount++;
+          
+          if (results && results.length > 0) {
+            console.log(`[${globalIndex}] SUCCESS: Found ${results.length} materials`);
+            successCount++;
+            return results;
+          } else {
+            console.log(`[${globalIndex}] No materials found on this page`);
+            return [];
+          }
+          
+        } catch (error) {
+          console.error(`[${globalIndex}] ERROR processing ${url}:`, error.message);
+          processedCount++;
+          return [];
+        }
+      });
+      
+      // Wait for batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Flatten and add to all materials
+      for (const results of batchResults) {
+        if (results.length > 0) {
+          allMaterials.push(...results);
+        }
+      }
+      
+      console.log(`Batch complete. Total materials so far: ${allMaterials.length}`);
+      
+      // Small delay between batches to be respectful to the server
+      if (i + batchSize < urlsToProcess.length) {
+        const delayMs = Math.max(1000, batchSize * 500); // Adaptive delay
+        console.log(`Waiting ${delayMs}ms before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    
+    console.log(`Enhanced sitemap processing complete:`);
+    console.log(`- URLs found: ${urls.length}`);
+    console.log(`- URLs processed: ${processedCount}`);
+    console.log(`- Successful extractions: ${successCount}`);
+    console.log(`- Materials extracted: ${allMaterials.length}`);
+    
+    // Add comprehensive summary
+    allMaterials.unshift({
+      name: `Enhanced Sitemap Processing Summary`,
+      description: `Successfully extracted ${allMaterials.length} materials from ${successCount} successful pages out of ${processedCount} processed URLs. Total of ${urls.length} URLs found in sitemap.`,
+      category: 'System Summary',
+      price: '',
+      images: [],
+      properties: {
+        totalUrlsFound: urls.length,
+        urlsProcessed: processedCount,
+        successfulExtractions: successCount,
+        materialsFound: allMaterials.length - 1, // Exclude this summary
+        service: service,
+        batchSize: batchSize,
+        maxPages: options.maxPages || 100,
+        successRate: `${Math.round((successCount / processedCount) * 100)}%`
+      },
+      sourceUrl: sitemapUrl,
+      supplier: 'System'
+    });
+    
+    return allMaterials;
+    
+  } catch (error) {
+    console.error('Enhanced sitemap processing error:', error);
+    throw new Error(`Failed to process sitemap: ${error.message}`);
+  }
+}
 
 async function processSitemapSimple(sitemapUrl: string, service: 'firecrawl' | 'jina', options: any): Promise<MaterialData[]> {
   console.log('Processing sitemap:', sitemapUrl);
@@ -615,4 +764,50 @@ function extractPriceFromContent(content: string): string {
   // Simple price extraction
   const priceMatch = content.match(/[\$€£¥][\d,]+\.?\d*/);
   return priceMatch ? priceMatch[0] : '';
+}
+
+async function saveToTemporaryStorage(req: Request, materials: MaterialData[]): Promise<string> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  
+  // Get user ID from request headers
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader) {
+    throw new Error('No authorization header found');
+  }
+  
+  const { data: userData, error: userError } = await supabase.auth.getUser(
+    authHeader.replace('Bearer ', '')
+  );
+  
+  if (userError || !userData.user) {
+    throw new Error('Invalid user token');
+  }
+  
+  const userId = userData.user.id;
+  const sessionId = crypto.randomUUID();
+  
+  console.log(`Saving ${materials.length} materials for user ${userId} with session ${sessionId}`);
+  
+  // Prepare data for insertion
+  const insertData = materials.map(material => ({
+    user_id: userId,
+    scraping_session_id: sessionId,
+    material_data: material,
+    source_url: material.sourceUrl
+  }));
+  
+  const { error } = await supabase
+    .from('scraped_materials_temp')
+    .insert(insertData);
+  
+  if (error) {
+    console.error('Error saving to temporary storage:', error);
+    throw new Error(`Failed to save materials: ${error.message}`);
+  }
+  
+  console.log(`Successfully saved ${materials.length} materials to temporary storage`);
+  return sessionId;
 }

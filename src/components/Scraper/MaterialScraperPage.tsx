@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ScrapedMaterialsViewer } from './ScrapedMaterialsViewer';
+import { ScrapedMaterialsReview } from './ScrapedMaterialsReview';
 import { Globe, Loader2, Search, AlertCircle } from 'lucide-react';
 
 interface ScrapedMaterial {
@@ -49,6 +50,10 @@ export const MaterialScraperPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [scrapedMaterials, setScrapedMaterials] = useState<ScrapedMaterial[]>([]);
   const [progress, setProgress] = useState(0);
+  const [batchSize, setBatchSize] = useState(10);
+  const [maxPages, setMaxPages] = useState(100);
+  const [saveTemporary, setSaveTemporary] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [options, setOptions] = useState<ScrapingOptions>({
     service: 'firecrawl',
     sitemapMode: false,
@@ -99,6 +104,9 @@ Return a list of materials found on the page.`,
           url, 
           service: options.service,
           sitemapMode: options.sitemapMode,
+          batchSize: batchSize,
+          maxPages: maxPages,
+          saveTemporary: saveTemporary,
           options: {
             ...options,
             service: options.service,
@@ -125,9 +133,14 @@ Return a list of materials found on the page.`,
       console.log('Scraping completed:', data);
       setScrapedMaterials(data.data || []);
       
+      // Store sessionId if materials were saved temporarily
+      if (data.sessionId) {
+        setSessionId(data.sessionId);
+      }
+      
       toast({
         title: "Success",
-        description: `Found ${data.data?.length || 0} materials using ${data.service || options.service}`,
+        description: `Found ${data.data?.length || 0} materials using ${data.service || options.service}${data.savedTemporary ? ' (saved for review)' : ''}`,
       });
 
     } catch (error) {
@@ -224,6 +237,7 @@ Return a list of materials found on the page.`,
         <TabsList>
           <TabsTrigger value="scraper">Web Scraper</TabsTrigger>
           <TabsTrigger value="results">Results ({scrapedMaterials.length})</TabsTrigger>
+          <TabsTrigger value="review">Review Materials</TabsTrigger>
         </TabsList>
 
         <TabsContent value="scraper" className="space-y-6">
@@ -246,6 +260,60 @@ Return a list of materials found on the page.`,
                     placeholder="https://example.com/materials"
                     disabled={isLoading}
                   />
+                </div>
+
+                {/* Batch Processing Controls */}
+                <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/30">
+                  <div className="space-y-2">
+                    <Label htmlFor="batchSize">Batch Size</Label>
+                    <Input
+                      id="batchSize"
+                      type="number"
+                      value={batchSize}
+                      onChange={(e) => setBatchSize(parseInt(e.target.value) || 10)}
+                      min="1"
+                      max="20"
+                      placeholder="10"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      URLs processed simultaneously
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="maxPages">Max Pages</Label>
+                    <Input
+                      id="maxPages"
+                      type="number"
+                      value={maxPages}
+                      onChange={(e) => setMaxPages(parseInt(e.target.value) || 100)}
+                      min="1"
+                      max="1000"
+                      placeholder="100"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Maximum pages to process
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Save Options</Label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="saveTemporary"
+                        checked={saveTemporary}
+                        onChange={(e) => setSaveTemporary(e.target.checked)}
+                        disabled={isLoading}
+                      />
+                      <Label htmlFor="saveTemporary" className="text-sm">Save for review</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Save results temporarily for review
+                    </p>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -678,6 +746,10 @@ Return a list of materials found on the page.`,
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="review" className="space-y-6">
+          <ScrapedMaterialsReview sessionId={sessionId} />
         </TabsContent>
       </Tabs>
     </div>
