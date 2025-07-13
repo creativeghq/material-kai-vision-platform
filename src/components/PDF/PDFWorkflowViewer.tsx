@@ -20,7 +20,8 @@ import {
   BarChart3,
   Zap,
   PlayCircle,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -295,6 +296,31 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                         <li key={i}>{detail}</li>
                                       ))}
                                     </ul>
+                                  </div>
+                                )}
+
+                                {/* Show HTML link for knowledge-storage step */}
+                                {step.id === 'knowledge-storage' && step.status === 'completed' && step.metadata?.knowledgeEntryId && (
+                                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                                    <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
+                                      <ExternalLink className="h-4 w-4" />
+                                      <span>Generated HTML Document</span>
+                                    </div>
+                                    <p className="text-sm text-green-700 mb-2">
+                                      The PDF has been processed into a rich HTML document with preserved layout and extracted images.
+                                    </p>
+                                    <a 
+                                      href={`https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/material-documents/enhanced-html/${step.metadata.knowledgeEntryId}.html`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800 underline"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      View HTML Document
+                                    </a>
+                                    <div className="text-xs text-green-600 mt-1">
+                                      Document ID: {step.metadata.knowledgeEntryId}
+                                    </div>
                                   </div>
                                 )}
                                 

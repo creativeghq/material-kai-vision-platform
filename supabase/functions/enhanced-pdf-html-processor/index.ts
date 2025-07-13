@@ -850,10 +850,10 @@ serve(async (req) => {
       const fullText = layoutElements.flat().map(el => el.content).join(' ');
       const embedding = await generateEmbedding(fullText);
 
-      // Store in enhanced knowledge base
+      // Store HTML content in storage and enhanced knowledge base
       const knowledgeEntry = {
         title: `${originalFilename.replace('.pdf', '')} - Enhanced HTML Document`,
-        content: fullText,
+        content: htmlContent, // Store the full HTML content instead of just text
         content_type: 'enhanced_pdf_html',
         source_url: htmlUrl,
         semantic_tags: ['pdf', 'html-converted', 'layout-aware', 'material-document'],
@@ -884,7 +884,8 @@ serve(async (req) => {
               acc[el.type] = (acc[el.type] || 0) + 1;
               return acc;
             }, {} as Record<string, number>)
-          }
+          },
+          html_url: htmlUrl
         },
         created_by: userId,
         last_modified_by: userId,
@@ -892,6 +893,12 @@ serve(async (req) => {
       };
 
       console.log('Storing enhanced content in knowledge base...');
+      console.log('Knowledge entry data:', {
+        title: knowledgeEntry.title,
+        contentLength: knowledgeEntry.content.length,
+        contentType: knowledgeEntry.content_type,
+        status: knowledgeEntry.status
+      });
 
       const { data: knowledgeData, error: knowledgeError } = await supabase
         .from('enhanced_knowledge_base')
@@ -901,7 +908,14 @@ serve(async (req) => {
 
       if (knowledgeError) {
         console.error('Knowledge base insertion error:', knowledgeError);
+        throw new Error(`Failed to store in knowledge base: ${knowledgeError.message}`);
       }
+
+      if (!knowledgeData) {
+        throw new Error('No data returned from knowledge base insertion');
+      }
+
+      console.log('Successfully stored in knowledge base with ID:', knowledgeData.id);
 
       const processingTime = Date.now() - startTime;
 
