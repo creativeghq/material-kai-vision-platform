@@ -79,6 +79,8 @@ export const PDFProcessor: React.FC = () => {
       progress: 0
     }]);
 
+    let response: any = null;
+
     try {
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -120,7 +122,7 @@ export const PDFProcessor: React.FC = () => {
 
       // Process using the ConvertAPI pdf-processor
       console.log('Processing PDF with ConvertAPI approach...');
-      const response = await supabase.functions.invoke('convertapi-pdf-processor', {
+      response = await supabase.functions.invoke('convertapi-pdf-processor', {
         body: {
           fileUrl: publicUrl,
           originalFilename: file.name,
