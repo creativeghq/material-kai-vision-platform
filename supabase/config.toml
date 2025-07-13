@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.material-scraper]
 verify_jwt = false
+
+[functions.convertapi-pdf-processor]
+verify_jwt = false
