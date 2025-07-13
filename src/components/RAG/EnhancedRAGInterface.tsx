@@ -448,12 +448,40 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                           }
                         </p>
 
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">{result.source}</Badge>
-                          {result.metadata?.tags && (
-                            result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
-                              <Badge key={i} variant="outline">{tag}</Badge>
-                            ))
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">{result.source}</Badge>
+                            {result.metadata?.tags && (
+                              result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
+                                <Badge key={i} variant="outline">{tag}</Badge>
+                              ))
+                            )}
+                          </div>
+                          
+                          {/* PDF Link for additional details */}
+                          {result.pdfUrl && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center gap-1"
+                              onClick={() => window.open(result.pdfUrl, '_blank')}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              View PDF Details
+                            </Button>
+                          )}
+                          
+                          {/* Fallback to general source URL */}
+                          {!result.pdfUrl && result.sourceUrl && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center gap-1"
+                              onClick={() => window.open(result.sourceUrl, '_blank')}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              View Source
+                            </Button>
                           )}
                         </div>
                       </CardContent>

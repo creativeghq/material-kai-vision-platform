@@ -50,6 +50,8 @@ export interface KnowledgeResult {
   relevanceScore: number;
   source: string;
   metadata: Record<string, any>;
+  pdfUrl?: string; // Link to original PDF on Supabase for additional details
+  sourceUrl?: string; // General source URL (kept for backward compatibility)
 }
 
 export interface MaterialKnowledgeResult {
@@ -195,6 +197,7 @@ export class EnhancedRAGService {
     content: string;
     contentType?: string;
     sourceUrl?: string;
+    pdfUrl?: string; // Link to PDF stored on Supabase for additional details
     materialIds?: string[];
     materialCategories?: string[];
     semanticTags?: string[];
@@ -228,6 +231,7 @@ export class EnhancedRAGService {
           content: entry.content,
           content_type: entry.contentType || 'article',
           source_url: entry.sourceUrl,
+          pdf_url: entry.pdfUrl, // Store PDF URL for additional details
           material_ids: entry.materialIds || [],
           material_categories: entry.materialCategories || [],
           semantic_tags: entry.semanticTags || [],

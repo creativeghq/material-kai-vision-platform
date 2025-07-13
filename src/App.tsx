@@ -32,6 +32,7 @@ import PDFProcessing from "./pages/PDFProcessing";
 import SearchHub from "./pages/SearchHub";
 import { MaterialSuggestionsPanel } from "./components/Admin/MaterialSuggestionsPanel";
 import { MaterialScraperPage } from "./components/Scraper/MaterialScraperPage";
+import { PDFKnowledgeDemo } from "./pages/PDFKnowledgeDemo";
 
 const queryClient = new QueryClient();
 
@@ -195,6 +196,13 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <MaterialScraperPage />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/pdf-knowledge-demo" element={
+              <AuthGuard>
+                <Layout>
+                  <PDFKnowledgeDemo />
                 </Layout>
               </AuthGuard>
             } />
