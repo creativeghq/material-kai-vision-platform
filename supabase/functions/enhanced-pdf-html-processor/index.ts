@@ -348,6 +348,28 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
 async function extractImagesWithPDFJS(page: any, pageNumber: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
   console.log(`🔍 [DEBUG] PDF.js extraction temporarily simplified for debugging`);
+  
+  // Generate placeholder images for now to test the function
+  for (let i = 0; i < 2; i++) {
+    const imageUrl = await generateMaterialImagePlaceholder(pageNumber, i, 300, 200);
+    images.push({
+      id: `pdfjs_${pageNumber}_${i}`,
+      imageUrl,
+      imageType: 'placeholder',
+      caption: `Material sample ${i + 1} from page ${pageNumber}`,
+      altText: `Material image placeholder`,
+      bbox: {
+        x: 50 + (i * 350),
+        y: 200,
+        width: 300,
+        height: 200
+      },
+      pageNumber,
+      proximityScore: 0.8,
+      associatedChunkIds: []
+    });
+  }
+  
   return images;
 }
 
