@@ -69,7 +69,11 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
     totalProcessed: number;
     totalExpected: number;
     isActive: boolean;
+    currentUrl?: string;
+    startedAt?: string;
+    estimatedTimeRemaining?: number;
   } | null>(null);
+  const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'active' | 'paused' | 'completed' | 'error'>('idle');
 
   useEffect(() => {
     if (sessionId && currentResults.length === 0) {
@@ -95,16 +99,57 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
           // Add new material to the list if it matches our current session or if we're viewing all
           if (!sessionId || newMaterial.scraping_session_id === sessionId) {
             setMaterials(prev => [newMaterial, ...prev]);
+            setScrapingStatus('active');
             
-            // Update session stats
-            setSessionStats(prev => prev ? {
-              ...prev,
-              totalProcessed: prev.totalProcessed + 1
-            } : {
-              totalProcessed: 1,
-              totalExpected: 1,
-              isActive: true
+            // Update session stats with enhanced progress tracking
+            setSessionStats(prev => {
+              const newStats = prev ? {
+                ...prev,
+                totalProcessed: prev.totalProcessed + 1,
+                currentUrl: newMaterial.source_url,
+                estimatedTimeRemaining: prev.totalExpected > prev.totalProcessed + 1 ? 
+                  ((Date.now() - new Date(prev.startedAt || Date.now()).getTime()) / (prev.totalProcessed + 1)) * 
+                  (prev.totalExpected - prev.totalProcessed - 1) / 1000 : 0
+              } : {
+                totalProcessed: 1,
+                totalExpected: 1,
+                isActive: true,
+                currentUrl: newMaterial.source_url,
+                startedAt: new Date().toISOString(),
+                estimatedTimeRemaining: 0
+              };
+              
+              // Check if scraping is completed
+              if (newStats.totalProcessed >= newStats.totalExpected) {
+                setScrapingStatus('completed');
+                setTimeout(() => setScrapingStatus('idle'), 3000);
+              }
+              
+              return newStats;
             });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'scraping_sessions'
+        },
+        (payload) => {
+          console.log('Scraping session updated:', payload);
+          const sessionData = payload.new as any;
+          
+          if (sessionData.session_id === sessionId) {
+            if (sessionData.status === 'active') {
+              setScrapingStatus('active');
+            } else if (sessionData.status === 'completed') {
+              setScrapingStatus('completed');
+              setTimeout(() => setScrapingStatus('idle'), 3000);
+            } else if (sessionData.status === 'error') {
+              setScrapingStatus('error');
+            }
           }
         }
       )
@@ -139,10 +184,23 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
         const latestMaterial = data[0];
         const materialData = latestMaterial.material_data as any;
         if (materialData?.metadata?.sessionProgress) {
+          const progress = materialData.metadata.sessionProgress;
           setSessionStats({
             totalProcessed: data.length,
-            totalExpected: materialData.metadata.sessionProgress.totalExpected || data.length,
-            isActive: materialData.metadata.sessionProgress.isActive || false
+            totalExpected: progress.totalExpected || data.length,
+            isActive: progress.isActive || false,
+            currentUrl: progress.currentUrl,
+            startedAt: progress.startedAt || latestMaterial.scraped_at,
+            estimatedTimeRemaining: progress.estimatedTimeRemaining || 0
+          });
+          
+          setScrapingStatus(progress.isActive ? 'active' : 'idle');
+        } else {
+          setSessionStats({
+            totalProcessed: data.length,
+            totalExpected: data.length,
+            isActive: false,
+            startedAt: latestMaterial.scraped_at
           });
         }
       }
@@ -189,8 +247,10 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
         setSessionStats({
           totalProcessed: offset + (data?.length || 0),
           totalExpected: count,
-          isActive: false
+          isActive: false,
+          startedAt: data && data.length > 0 ? data[data.length - 1].scraped_at : new Date().toISOString()
         });
+        setScrapingStatus('idle');
       }
     } catch (error) {
       console.error('Error loading unreviewed materials:', error);
@@ -577,21 +637,99 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
             )}
           </div>
 
+          {/* Scraping Status Indicator */}
+          {(scrapingStatus === 'active' || sessionStats?.isActive) && (
+            <Card className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <h3 className="font-medium text-blue-800 dark:text-blue-200">
+                      Active Scraping in Progress
+                    </h3>
+                  </div>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Live
+                  </Badge>
+                </div>
+                
+                {sessionStats?.currentUrl && (
+                  <div className="text-sm text-blue-700 dark:text-blue-300 mb-2 font-mono bg-white/50 dark:bg-blue-900/30 p-2 rounded truncate">
+                    Currently processing: {sessionStats.currentUrl}
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between text-sm text-blue-700 dark:text-blue-300 mb-2">
+                  <span>Progress: {sessionStats?.totalProcessed || 0} of {sessionStats?.totalExpected || 0} materials</span>
+                  {sessionStats?.estimatedTimeRemaining && sessionStats.estimatedTimeRemaining > 0 && (
+                    <span>~{Math.ceil(sessionStats.estimatedTimeRemaining / 60)} min remaining</span>
+                  )}
+                </div>
+                
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-500 animate-fade-in" 
+                    style={{ 
+                      width: `${sessionStats ? Math.min((sessionStats.totalProcessed / sessionStats.totalExpected) * 100, 100) : 0}%` 
+                    }}
+                  />
+                </div>
+                
+                <div className="mt-3 text-xs text-blue-600 dark:text-blue-400">
+                  💡 New materials will appear automatically as they are discovered and processed
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Completion Status */}
+          {scrapingStatus === 'completed' && (
+            <Card className="mb-4 border-green-200 bg-green-50 dark:bg-green-950/30 animate-fade-in">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                  <Check className="h-5 w-5" />
+                  <h3 className="font-medium">Scraping Completed Successfully!</h3>
+                </div>
+                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  All materials have been processed and are ready for review.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Error Status */}
+          {scrapingStatus === 'error' && (
+            <Card className="mb-4 border-red-200 bg-red-50 dark:bg-red-950/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+                  <AlertCircle className="h-5 w-5" />
+                  <h3 className="font-medium">Scraping Error</h3>
+                </div>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  There was an issue with the scraping process. You can try to continue or retry the process.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Progress and Summary Stats */}
-          {sessionStats && (
+          {sessionStats && !sessionStats.isActive && scrapingStatus !== 'active' && (
             <Card className="mb-4">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium">Scraping Progress</h3>
-                  {sessionStats.isActive && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      <Clock className="h-3 w-3 mr-1" />
-                      Active
-                    </Badge>
-                  )}
+                  <h3 className="font-medium">Session Summary</h3>
+                  <Badge variant="outline" className="text-muted-foreground">
+                    Completed
+                  </Badge>
                 </div>
                 <div className="text-sm text-muted-foreground mb-2">
                   {sessionStats.totalProcessed} of {sessionStats.totalExpected} materials processed
+                  {sessionStats.startedAt && (
+                    <span className="ml-2">
+                      • Started {new Date(sessionStats.startedAt).toLocaleString()}
+                    </span>
+                  )}
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
                   <div 
