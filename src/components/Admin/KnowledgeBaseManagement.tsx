@@ -109,6 +109,47 @@ const KnowledgeBaseManagement: React.FC = () => {
 
   const handleDeleteEntry = async (id: string) => {
     try {
+      // Get the entry first to check for associated files
+      const { data: entry, error: fetchError } = await supabase
+        .from('enhanced_knowledge_base')
+        .select('metadata')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Delete associated storage files if they exist
+      if (entry?.metadata && typeof entry.metadata === 'object') {
+        const filesToDelete = [];
+        const metadata = entry.metadata as any;
+        
+        // Check for processed images
+        if (metadata.processed_images && Array.isArray(metadata.processed_images)) {
+          for (const image of metadata.processed_images) {
+            if (image.storage_path) {
+              filesToDelete.push(image.storage_path);
+            }
+          }
+        }
+        
+        // Check for document files
+        if (metadata.file_path) {
+          filesToDelete.push(metadata.file_path);
+        }
+        
+        // Delete from material-images bucket
+        if (filesToDelete.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('material-images')
+            .remove(filesToDelete);
+          
+          if (storageError) {
+            console.warn('Some storage files could not be deleted:', storageError);
+          }
+        }
+      }
+
+      // Delete the database entry
       const { error } = await supabase
         .from('enhanced_knowledge_base')
         .delete()
@@ -119,7 +160,7 @@ const KnowledgeBaseManagement: React.FC = () => {
       setEntries(entries.filter(entry => entry.id !== id));
       toast({
         title: "Success",
-        description: "Knowledge entry deleted successfully"
+        description: "Knowledge entry and associated files deleted successfully"
       });
     } catch (error) {
       console.error('Error deleting entry:', error);

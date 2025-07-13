@@ -294,6 +294,67 @@ export class HybridPDFPipelineService {
     try {
       console.log(`Deleting document ${documentId} and all associated data`);
 
+      // Get processing details and associated knowledge entries to clean up storage
+      const { data: processingData } = await supabase
+        .from('pdf_processing_results')
+        .select('file_url')
+        .eq('id', documentId)
+        .single();
+
+      const { data: knowledgeEntries } = await supabase
+        .from('enhanced_knowledge_base')
+        .select('metadata')
+        .or(`metadata->document_id.eq.${documentId},metadata->processing_id.eq.${documentId}`);
+
+      // Collect all files to delete from storage
+      const filesToDelete = {
+        'pdf-documents': [] as string[],
+        'material-images': [] as string[]
+      };
+
+      // Add original PDF file
+      if (processingData?.file_url) {
+        const fileName = processingData.file_url.split('/').pop();
+        if (fileName) {
+          filesToDelete['pdf-documents'].push(fileName);
+        }
+      }
+
+      // Add associated images and files from knowledge entries
+      if (knowledgeEntries) {
+        for (const entry of knowledgeEntries) {
+          if (entry.metadata && typeof entry.metadata === 'object') {
+            const metadata = entry.metadata as any;
+            
+            if (metadata.processed_images && Array.isArray(metadata.processed_images)) {
+              for (const image of metadata.processed_images) {
+                if (image.storage_path) {
+                  filesToDelete['material-images'].push(image.storage_path);
+                }
+              }
+            }
+            if (metadata.file_path) {
+              filesToDelete['material-images'].push(metadata.file_path);
+            }
+          }
+        }
+      }
+
+      // Delete files from storage buckets
+      for (const [bucket, files] of Object.entries(filesToDelete)) {
+        if (files.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from(bucket)
+            .remove(files);
+          
+          if (storageError) {
+            console.warn(`Some files could not be deleted from ${bucket}:`, storageError);
+          } else {
+            console.log(`Deleted ${files.length} files from ${bucket} bucket`);
+          }
+        }
+      }
+
       // Delete from enhanced knowledge base
       await supabase
         .from('enhanced_knowledge_base')
@@ -306,11 +367,7 @@ export class HybridPDFPipelineService {
         .delete()
         .eq('id', documentId);
 
-      // Note: Layout analysis would be deleted if the table existed
-      // Currently using enhanced_knowledge_base for all storage
-      console.log('Layout analysis cleanup completed');
-
-      console.log(`Successfully deleted document ${documentId}`);
+      console.log(`Successfully deleted document ${documentId} and associated storage files`);
 
     } catch (error) {
       console.error('Error deleting document:', error);
