@@ -9,16 +9,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Search, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
   Eye,
   Download,
   Upload,
   Filter,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +36,7 @@ interface KnowledgeEntry {
   material_ids: string[];
   relevance_score: number;
   source_url?: string;
+  pdf_url?: string; // PDF link for additional details
 }
 
 const KnowledgeBaseManagement: React.FC = () => {
@@ -298,6 +300,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 <TableHead>Title</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>PDF Link</TableHead>
                 <TableHead>Relevance</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
@@ -327,10 +330,35 @@ const KnowledgeBaseManagement: React.FC = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
+                    {entry.pdf_url ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1"
+                        onClick={() => window.open(entry.pdf_url, '_blank')}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        View PDF
+                      </Button>
+                    ) : entry.source_url ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1"
+                        onClick={() => window.open(entry.source_url, '_blank')}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Source
+                      </Button>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No link</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center">
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
                           style={{ width: `${(entry.relevance_score || 0) * 100}%` }}
                         />
                       </div>
