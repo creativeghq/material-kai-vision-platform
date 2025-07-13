@@ -389,25 +389,7 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
       }
     }
     
-    // If no images were extracted, create a material sample placeholder
-    if (images.length === 0) {
-      console.log(`No images extracted from page ${pageNumber}, generating material sample`);
-      const placeholderUrl = await generateMaterialSampleImage(pageNumber);
-      
-      if (placeholderUrl) {
-        images.push({
-          id: `sample_${pageNumber}`,
-          imageUrl: placeholderUrl,
-          imageType: 'material_sample',
-          caption: `Material sample for page ${pageNumber}`,
-          altText: `Generated material sample showing typical texture and properties`,
-          bbox: { x: 300, y: height - 250, width: 300, height: 200 },
-          pageNumber,
-          proximityScore: 0.8,
-          associatedChunkIds: []
-        });
-      }
-    }
+    console.log(`Extracted ${images.length} real images from page ${pageNumber}`);
     
   } catch (error) {
     console.error(`Error extracting images from page ${pageNumber}:`, error);
@@ -443,34 +425,6 @@ async function uploadImageToStorage(imageBytes: Uint8Array, filename: string, mi
   }
 }
 
-// Generate material sample image as fallback
-async function generateMaterialSampleImage(pageNumber: number): Promise<string | null> {
-  try {
-    const prompt = `High-quality material sample, professional product photography, clean background, detailed texture, page ${pageNumber} specimen`;
-    
-    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-material-image`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt,
-        material_type: 'building_material',
-        style: 'professional'
-      })
-    });
-    
-    if (response.ok) {
-      const result = await response.json();
-      return result.imageUrl || null;
-    }
-  } catch (error) {
-    console.error('Error generating material sample:', error);
-  }
-  
-  return null;
-}
 
 // Generate HTML for a single page
 async function generatePageHTML(elements: LayoutElement[], images: DocumentImage[], pageNumber: number, width: number, height: number, options: any): Promise<string> {
