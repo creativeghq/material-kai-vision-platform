@@ -111,64 +111,6 @@ async function extractPDFText(pdfBuffer: ArrayBuffer): Promise<{ text: string, c
   }
 }
 
-// Simplified AI-powered material categorization
-async function categorizeMaterials(text: string): Promise<{ categories: string[], confidence: number, properties: any }> {
-  try {
-    if (!openaiApiKey) {
-      return { categories: ['general'], confidence: 0.5, properties: {} };
-    }
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{
-          role: 'user',
-          content: `Analyze this PDF content and identify key material categories and properties. Return a JSON object with:
-          {
-            "categories": ["array of material categories like ceramics, metals, concrete, etc."],
-            "confidence": number between 0-1,
-            "properties": {
-              "key_materials": ["list of specific materials mentioned"],
-              "applications": ["list of applications mentioned"],
-              "standards": ["list of standards/certifications mentioned"],
-              "specifications": ["key technical specifications"]
-            }
-          }
-          
-          Text content: "${text.substring(0, 2000)}"`
-        }],
-        max_tokens: 500
-      }),
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      const content = result.choices[0]?.message?.content || '{}';
-      
-      try {
-        const parsedResult = JSON.parse(content);
-        return {
-          categories: parsedResult.categories || ['general'],
-          confidence: parsedResult.confidence || 0.8,
-          properties: parsedResult.properties || {}
-        };
-      } catch (parseError) {
-        console.error('Error parsing AI response:', parseError);
-        return { categories: ['general'], confidence: 0.5, properties: {} };
-      }
-    }
-
-    return { categories: ['general'], confidence: 0.5, properties: {} };
-  } catch (error) {
-    console.error('Material categorization error:', error);
-    return { categories: ['general'], confidence: 0.5, properties: {} };
-  }
-}
 
 // Generate embeddings for the extracted content
 async function generateEmbedding(text: string): Promise<string | null> {
@@ -270,13 +212,8 @@ serve(async (req) => {
       
       console.log('Extracting text content...');
 
-      // Direct text extraction (simplified approach)
+      // Direct text extraction
       const { text: extractedText, confidence } = await extractPDFText(pdfBuffer);
-      
-      console.log('Categorizing materials...');
-
-      // AI-powered material categorization
-      const { categories, confidence: catConfidence, properties } = await categorizeMaterials(extractedText);
       
       console.log('Generating embeddings...');
 
@@ -285,31 +222,23 @@ serve(async (req) => {
 
       // Store content in enhanced knowledge base
       const knowledgeEntry = {
-        title: `${originalFilename.replace('.pdf', '')} - Material Specifications`,
+        title: `${originalFilename.replace('.pdf', '')} - Document Content`,
         content: extractedText,
         content_type: 'pdf_document',
         source_url: fileUrl,
-        material_categories: categories,
-        semantic_tags: ['pdf', 'material-spec', 'technical-document'],
+        semantic_tags: ['pdf', 'document', 'uploaded-content'],
         language: options.language || 'en',
-        technical_complexity: 8, // High technical complexity for material specs
-        reading_level: 12, // College level
+        technical_complexity: 5,
+        reading_level: 10,
         openai_embedding: embedding,
         confidence_scores: {
           text_extraction: confidence,
-          material_categorization: catConfidence,
-          overall: (confidence + catConfidence) / 2
+          overall: confidence
         },
-        search_keywords: [
-          ...categories,
-          ...(properties.key_materials || []),
-          ...(properties.applications || []),
-          ...(properties.standards || [])
-        ],
+        search_keywords: extractedText.split(' ').slice(0, 20), // First 20 words as keywords
         metadata: {
           source_type: 'pdf_upload',
-          processing_method: 'simplified_extraction',
-          material_properties: properties,
+          processing_method: 'direct_extraction',
           file_info: {
             original_filename: originalFilename,
             file_size: fileSize,
@@ -342,12 +271,10 @@ serve(async (req) => {
         processing_time_ms: processingTime,
         document_title: knowledgeEntry.title,
         document_classification: {
-          material_categories: categories,
-          content_type: 'technical_specification',
-          complexity_level: 'high'
+          content_type: 'pdf_document',
+          processing_method: 'direct_extraction'
         },
-        confidence_score_avg: (confidence + catConfidence) / 2,
-        materials_identified_count: (properties.key_materials || []).length,
+        confidence_score_avg: confidence,
         document_keywords: knowledgeEntry.search_keywords.join(', ')
       };
 
@@ -356,23 +283,18 @@ serve(async (req) => {
         .update(finalUpdate)
         .eq('id', processingId);
 
-      console.log(`Simplified PDF processing completed in ${processingTime}ms`);
+      console.log(`PDF processing completed in ${processingTime}ms`);
 
       return new Response(
         JSON.stringify({
           success: true,
           processingId: processingId,
           knowledgeEntryId: knowledgeData?.id,
-          materialCategories: categories,
-          materialsDetected: (properties.key_materials || []).length,
           processingTimeMs: processingTime,
-          confidence: (confidence + catConfidence) / 2,
+          confidence: confidence,
           extractedContent: {
             textLength: extractedText.length,
-            categories: categories,
-            keyMaterials: properties.key_materials || [],
-            applications: properties.applications || [],
-            standards: properties.standards || []
+            title: knowledgeEntry.title
           },
           message: 'PDF successfully processed and added to knowledge base'
         }),
