@@ -1028,7 +1028,8 @@ serve(async (req) => {
         title: `${originalFilename.replace('.pdf', '')} - Enhanced HTML Document`,
         content: htmlContent, // Store the full HTML content instead of just text
         content_type: 'enhanced_pdf_html',
-        source_url: htmlUrl,
+        source_url: htmlUrl, // HTML version for viewing
+        pdf_url: fileUrl, // Original PDF file for download/viewing
         semantic_tags: ['pdf', 'html-converted', 'layout-aware', 'material-document'],
         language: options.language || 'en',
         technical_complexity: 7,
