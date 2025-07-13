@@ -304,22 +304,29 @@ serve(async (req) => {
 
       console.log('📄 HTML file object:', JSON.stringify(htmlFile, null, 2));
       
-      // Check if Url property exists (ConvertAPI might use different property names)
-      const htmlFileUrl = htmlFile.Url || htmlFile.url || htmlFile.FileUrl || htmlFile.downloadUrl;
-      if (!htmlFileUrl) {
+      // STEP 2: Extract HTML content
+      console.log('📥 Step 2: Extracting HTML content...');
+      let htmlContent: string;
+      
+      if (htmlFile.FileData) {
+        // HTML content is embedded directly in the response
+        console.log('✅ HTML content found in FileData property');
+        htmlContent = htmlFile.FileData;
+      } else if (htmlFile.Url || htmlFile.url || htmlFile.FileUrl || htmlFile.downloadUrl) {
+        // Fallback: try to download from URL if available
+        const htmlFileUrl = htmlFile.Url || htmlFile.url || htmlFile.FileUrl || htmlFile.downloadUrl;
+        console.log('📥 Downloading HTML content from:', htmlFileUrl);
+        const htmlResponse = await fetch(htmlFileUrl);
+        if (!htmlResponse.ok) {
+          throw new Error(`Failed to download HTML: ${htmlResponse.status}`);
+        }
+        htmlContent = await htmlResponse.text();
+      } else {
         console.error('❌ HTML file object keys:', Object.keys(htmlFile));
-        throw new Error(`No valid URL found in HTML file object. Available properties: ${Object.keys(htmlFile).join(', ')}`);
+        throw new Error(`No HTML content found. Available properties: ${Object.keys(htmlFile).join(', ')}`);
       }
 
-      // STEP 2: Download HTML content
-      console.log('📥 Step 2: Downloading HTML content from:', htmlFileUrl);
-      const htmlResponse = await fetch(htmlFileUrl);
-      if (!htmlResponse.ok) {
-        throw new Error(`Failed to download HTML: ${htmlResponse.status}`);
-      }
-
-      const htmlContent = await htmlResponse.text();
-      console.log(`✅ Downloaded HTML content (${htmlContent.length} characters)`);
+      console.log(`✅ Extracted HTML content (${htmlContent.length} characters)`);
 
       // STEP 3: Extract and process images (limited)
       console.log('🖼️ Step 3: Processing images...');
