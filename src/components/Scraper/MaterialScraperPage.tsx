@@ -31,7 +31,8 @@ interface ScrapingOptions {
   // Firecrawl options
   prompt?: string;
   schema?: Record<string, any>;
-  cssSelectors?: string[]; // New CSS selector support
+  includeTags?: string[]; // CSS selectors to include
+  excludeTags?: string[]; // CSS selectors to exclude
   onlyMainContent?: boolean; // Extract only main content
   waitFor?: number; // Wait time in milliseconds
   // Jina AI options
@@ -102,7 +103,7 @@ Return a list of materials found on the page.`,
             ...options,
             service: options.service,
             // Pass Firecrawl targeting options
-            includeTags: options.cssSelectors, // Map CSS selectors to includeTags
+            includeTags: options.includeTags,
             onlyMainContent: options.onlyMainContent,
             waitFor: options.waitFor
           }
@@ -383,116 +384,123 @@ Return a list of materials found on the page.`,
                    </div>
                 )}
                 
-                {options.service === 'firecrawl' && !options.sitemapMode && (
+                {options.service === 'firecrawl' && (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="font-medium text-sm">Firecrawl Configuration</h3>
+                    <h3 className="font-medium text-sm">Firecrawl Targeting Options</h3>
                     
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="cssSelectors">CSS Selectors (comma-separated) - Target specific elements</Label>
-                        <Input
-                          id="cssSelectors"
-                          value={options.cssSelectors?.join(', ') || ''}
-                          onChange={(e) => setOptions(prev => ({ 
-                            ...prev, 
-                            cssSelectors: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
-                          }))}
-                          placeholder=".product-card, .item-details, #main-content"
-                          disabled={isLoading}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Specify CSS selectors to extract content from specific page elements only
-                        </p>
+                      {/* CSS Selectors Section */}
+                      <div className="space-y-3 p-3 border rounded bg-background/50">
+                        <h4 className="text-sm font-medium text-foreground">CSS Selectors (Content Filtering)</h4>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="includeTags">Include Tags (CSS selectors to target specific elements)</Label>
+                          <Input
+                            id="includeTags"
+                            value={options.includeTags?.join(', ') || ''}
+                            onChange={(e) => setOptions(prev => ({ 
+                              ...prev, 
+                              includeTags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                            }))}
+                            placeholder=".product-card, .item-details, .material-info"
+                            disabled={isLoading}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Only extract content from elements matching these CSS selectors
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="excludeTags">Exclude Tags (CSS selectors to ignore)</Label>
+                          <Input
+                            id="excludeTags"
+                            value={options.excludeTags?.join(', ') || ''}
+                            onChange={(e) => setOptions(prev => ({ 
+                              ...prev, 
+                              excludeTags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                            }))}
+                            placeholder=".header, .footer, .navigation, .sidebar"
+                            disabled={isLoading}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Skip content from elements matching these CSS selectors
+                          </p>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="onlyMainContent"
-                          checked={options.onlyMainContent || false}
-                          onChange={(e) => setOptions(prev => ({ ...prev, onlyMainContent: e.target.checked }))}
-                          disabled={isLoading}
-                        />
-                        <Label htmlFor="onlyMainContent" className="text-sm">Extract only main content (skip headers, footers, navigation)</Label>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="waitFor">Wait time (milliseconds) - For dynamic content</Label>
-                        <Input
-                          id="waitFor"
-                          type="number"
-                          value={options.waitFor || 0}
-                          onChange={(e) => setOptions(prev => ({ ...prev, waitFor: parseInt(e.target.value) || 0 }))}
-                          min="0"
-                          max="10000"
-                          placeholder="0"
-                          disabled={isLoading}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Wait for dynamic content to load before extraction
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="prompt">Extraction Instructions</Label>
-                      <textarea
-                        id="prompt"
-                        value={options.prompt}
-                        onChange={(e) => setOptions(prev => ({ ...prev, prompt: e.target.value }))}
-                        placeholder="Tell the AI what to extract from the page..."
-                        disabled={isLoading}
-                        rows={6}
-                        className="w-full px-3 py-2 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setOptions(prev => ({ 
-                          ...prev, 
-                          prompt: `Extract building materials from this page including:
-- Product name
-- Price (with currency)
-- Material type (tiles, stone, wood, etc.)
-- Dimensions and specifications
-- Color and finish
-- Images
-- Availability and stock status`,
-                          cssSelectors: ['.product-item', '.product-card', '.material-card']
-                        }))}
-                        disabled={isLoading}
-                      >
-                        Building Materials
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setOptions(prev => ({ 
-                          ...prev, 
-                          prompt: `Extract product catalog information:
-- Product name and model
-- Price and pricing tiers
+
+                      {/* Extraction Prompt Section */}
+                      <div className="space-y-3 p-3 border rounded bg-background/50">
+                        <h4 className="text-sm font-medium text-foreground">AI Extraction Prompt</h4>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="extractPrompt">Custom Extraction Prompt</Label>
+                          <textarea
+                            id="extractPrompt"
+                            className="w-full min-h-[100px] p-3 border border-input rounded-md bg-background text-sm resize-vertical"
+                            value={options.prompt || ''}
+                            onChange={(e) => setOptions(prev => ({ ...prev, prompt: e.target.value }))}
+                            placeholder="Extract all material and product information from this page. Look for:
+- Product names and model numbers
+- Prices and pricing tiers
 - Technical specifications
-- Images and gallery
-- Category and subcategory
-- Brand and manufacturer
-- Product description`,
-                          cssSelectors: ['.product-list-item', '.catalog-item', '#product-details']
-                        }))}
-                        disabled={isLoading}
-                      >
-                        Product Catalog
-                      </Button>
+- Material properties (dimensions, colors, finishes)
+- Stock status and availability
+- Brand and manufacturer details
+- Product images and descriptions"
+                            disabled={isLoading}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Tell the AI exactly what information to extract from the filtered content
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* General Options */}
+                      <div className="space-y-3 p-3 border rounded bg-background/50">
+                        <h4 className="text-sm font-medium text-foreground">General Options</h4>
+                        
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="onlyMainContent"
+                            checked={options.onlyMainContent !== false}
+                            onChange={(e) => setOptions(prev => ({ ...prev, onlyMainContent: e.target.checked }))}
+                            disabled={isLoading}
+                          />
+                          <Label htmlFor="onlyMainContent" className="text-sm">Extract only main content (recommended)</Label>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="waitFor">Wait time (milliseconds) - For dynamic content</Label>
+                          <Input
+                            id="waitFor"
+                            type="number"
+                            value={options.waitFor || 0}
+                            onChange={(e) => setOptions(prev => ({ ...prev, waitFor: parseInt(e.target.value) || 0 }))}
+                            min="0"
+                            max="10000"
+                            placeholder="0"
+                            disabled={isLoading}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Wait for JavaScript content to load before extraction
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Usage Info */}
+                      <div className="p-3 border rounded bg-blue-50 dark:bg-blue-950/30">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          💡 <strong>How it works:</strong> CSS selectors filter which page elements to scrape, 
+                          then the AI extraction prompt tells Firecrawl exactly what data to extract from those elements. 
+                          Both work together for precise targeting.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                
-                {options.service === 'jina' && (
+                   </div>
+                 )}
+                 
+                 {options.service === 'jina' && (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                     <h3 className="font-medium text-sm">Jina AI Configuration</h3>
                     
