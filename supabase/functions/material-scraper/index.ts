@@ -14,6 +14,7 @@ interface ScrapeRequest {
   maxPages?: number;
   saveTemporary?: boolean;
   sessionId?: string;
+  chunkSize?: number;
   options?: {
     prompt?: string;
     schema?: Record<string, any>;
@@ -40,6 +41,12 @@ interface ScrapeRequest {
       country?: string;
       languages?: string[];
     };
+    // Enhanced Phase 4 options
+    chunkSize?: number;
+    resumeSession?: boolean;
+    retryStrategy?: 'exponential' | 'linear' | 'immediate';
+    maxRetries?: number;
+    rateLimitDelay?: number;
   };
 }
 
@@ -94,6 +101,7 @@ Deno.serve(async (req) => {
         maxPages = 100,
         saveTemporary = false,
         sessionId: providedSessionId,
+        chunkSize = 50,
         options = {} 
       }: ScrapeRequest = requestData;
       
@@ -113,12 +121,18 @@ Deno.serve(async (req) => {
       let sessionId: string | null = null;
       
       if (sitemapMode) {
-        // Progressive sitemap processing - start background job
-        sessionId = await startProgressiveSitemapProcessing(url, service, {
-          ...options,
-          batchSize,
-          maxPages
-        }, req);
+        // Check if resuming a session
+        if (options.resumeSession && providedSessionId) {
+          sessionId = await resumeChunkedProcessing(providedSessionId, req);
+        } else {
+          // Start new chunked sitemap processing
+          sessionId = await startChunkedSitemapProcessing(url, service, {
+            ...options,
+            batchSize,
+            maxPages,
+            chunkSize
+          }, req);
+        }
         
         // Return immediately with session ID for tracking
         return {
@@ -187,36 +201,54 @@ Deno.serve(async (req) => {
   }
 });
 
-// Progressive sitemap processing - runs in background
-async function startProgressiveSitemapProcessing(
+// Enhanced chunked sitemap processing with recovery
+async function startChunkedSitemapProcessing(
   sitemapUrl: string, 
   service: 'firecrawl' | 'jina', 
   options: any,
   req: Request
 ): Promise<string> {
-  console.log('Starting progressive sitemap processing for:', sitemapUrl);
+  console.log('Starting chunked sitemap processing for:', sitemapUrl);
   
   // Generate session ID for tracking
   const sessionId = crypto.randomUUID();
   
   // Start background processing using EdgeRuntime.waitUntil for proper background handling
   EdgeRuntime.waitUntil(
-    processProgressiveSitemap(sessionId, sitemapUrl, service, options, req).catch(error => {
-      console.error('Progressive processing error:', error);
+    processChunkedSitemap(sessionId, sitemapUrl, service, options, req).catch(error => {
+      console.error('Chunked processing error:', error);
     })
   );
   
   return sessionId;
 }
 
-async function processProgressiveSitemap(
+// Resume chunked processing from existing session
+async function resumeChunkedProcessing(
+  sessionId: string,
+  req: Request
+): Promise<string> {
+  console.log(`Resuming chunked processing for session: ${sessionId}`);
+  
+  // Start background processing to continue from where it left off
+  EdgeRuntime.waitUntil(
+    continueChunkedProcessing(sessionId, req).catch(error => {
+      console.error('Resume processing error:', error);
+    })
+  );
+  
+  return sessionId;
+}
+
+// Enhanced chunked processing with retry logic and rate limiting
+async function processChunkedSitemap(
   sessionId: string,
   sitemapUrl: string, 
   service: 'firecrawl' | 'jina', 
   options: any,
   req: Request
 ): Promise<void> {
-  console.log(`[${sessionId}] Starting progressive processing`);
+  console.log(`[${sessionId}] Starting chunked processing`);
   
   try {
     // Get auth info from request
@@ -256,122 +288,289 @@ async function processProgressiveSitemap(
     
     const maxUrls = Math.min(urls.length, options.maxPages || 100);
     const urlsToProcess = urls.slice(0, maxUrls);
+    const chunkSize = options.chunkSize || 50;
     
-    console.log(`[${sessionId}] Processing ${urlsToProcess.length} URLs progressively`);
+    console.log(`[${sessionId}] Creating ${Math.ceil(urlsToProcess.length / chunkSize)} chunks of size ${chunkSize}`);
     
-    let processedCount = 0;
-    let successCount = 0;
+    // Create chunks in database
+    const chunks = [];
+    for (let i = 0; i < urlsToProcess.length; i += chunkSize) {
+      const chunkUrls = urlsToProcess.slice(i, i + chunkSize);
+      chunks.push({
+        session_id: sessionId,
+        chunk_index: Math.floor(i / chunkSize),
+        urls: chunkUrls,
+        total_count: chunkUrls.length,
+        status: 'pending'
+      });
+    }
     
-    // Process URLs one by one
-    for (let i = 0; i < urlsToProcess.length; i++) {
-      const url = urlsToProcess[i];
-      const globalIndex = i + 1;
-      
-      console.log(`[${sessionId}][${globalIndex}/${urlsToProcess.length}] Processing: ${url}`);
-      
+    // Insert chunks into database
+    const { error: chunksError } = await supabase
+      .from('scraping_chunks')
+      .insert(chunks);
+    
+    if (chunksError) {
+      console.error(`[${sessionId}] Failed to create chunks:`, chunksError);
+      throw new Error('Failed to create processing chunks');
+    }
+    
+    // Update session with chunk info
+    await supabase
+      .from('scraping_sessions')
+      .update({
+        chunks_total: chunks.length,
+        chunks_completed: 0,
+        estimated_total_materials: urlsToProcess.length,
+        processing_mode: 'chunked',
+        auto_resume: true,
+        status: 'processing'
+      })
+      .eq('session_id', sessionId);
+    
+    console.log(`[${sessionId}] Starting chunk processing with enhanced retry logic`);
+    
+    // Process chunks with enhanced error handling and retry logic
+    await processNextChunk(sessionId, service, options, supabase, user.id);
+    
+  } catch (error) {
+    console.error(`[${sessionId}] Chunked processing failed:`, error);
+    
+    // Mark session as failed
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      await supabase
+        .from('scraping_sessions')
+        .update({ status: 'failed', error_details: error.message })
+        .eq('session_id', sessionId);
+    }
+  }
+}
+
+// Continue processing from existing session
+async function continueChunkedProcessing(
+  sessionId: string,
+  req: Request
+): Promise<void> {
+  console.log(`[${sessionId}] Continuing chunked processing`);
+  
+  try {
+    // Get auth info and supabase client
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) throw new Error('No authorization header found');
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !supabaseKey) throw new Error('Supabase credentials not configured');
+    
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) throw new Error('Authentication failed');
+    
+    // Get session details
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('scraping_sessions')
+      .select('*')
+      .eq('session_id', sessionId)
+      .single();
+    
+    if (sessionError || !sessionData) {
+      throw new Error('Session not found');
+    }
+    
+    const config = sessionData.scraping_config as any;
+    const service = config.service || 'firecrawl';
+    const options = config.options || {};
+    
+    // Resume processing
+    await processNextChunk(sessionId, service, options, supabase, user.id);
+    
+  } catch (error) {
+    console.error(`[${sessionId}] Resume processing failed:`, error);
+  }
+}
+
+// Enhanced chunk processing with retry logic
+async function processNextChunk(
+  sessionId: string,
+  service: 'firecrawl' | 'jina',
+  options: any,
+  supabase: any,
+  userId: string
+): Promise<void> {
+  const retryStrategy = options.retryStrategy || 'exponential';
+  const maxRetries = options.maxRetries || 3;
+  const baseDelay = options.rateLimitDelay || 2000;
+  
+  while (true) {
+    // Get next pending chunk
+    const { data: nextChunk, error: chunkError } = await supabase
+      .rpc('get_next_pending_chunk', { session_id_param: sessionId });
+    
+    if (chunkError || !nextChunk || nextChunk.length === 0) {
+      console.log(`[${sessionId}] No more pending chunks`);
+      break;
+    }
+    
+    const chunk = nextChunk[0];
+    const chunkId = chunk.chunk_id;
+    const urls = chunk.urls;
+    
+    console.log(`[${sessionId}] Processing chunk ${chunk.chunk_index}: ${urls.length} URLs`);
+    
+    // Mark chunk as processing
+    await supabase
+      .from('scraping_chunks')
+      .update({ 
+        status: 'processing', 
+        started_at: new Date().toISOString(),
+        retry_count: 0
+      })
+      .eq('id', chunkId);
+    
+    let chunkSuccess = false;
+    let chunkRetries = 0;
+    
+    // Process chunk with retry logic
+    while (!chunkSuccess && chunkRetries <= maxRetries) {
       try {
-        const results = service === 'jina' 
-          ? await extractWithJinaSimple(url, options)
-          : await extractWithFirecrawlSimple(url, options);
+        let materialsFound = 0;
         
-        processedCount++;
-        
-        if (results && results.length > 0) {
-          console.log(`[${sessionId}][${globalIndex}] SUCCESS: Found ${results.length} materials`);
-          successCount++;
+        // Process each URL in the chunk
+        for (let i = 0; i < urls.length; i++) {
+          const url = urls[i];
           
-          // Save each result immediately to the database with duplicate check
-          for (const material of results) {
-            try {
-              // Check if this material URL has already been scraped for this user
-              const { data: existingMaterial } = await supabase
-                .from('scraped_materials_temp')
-                .select('id')
-                .eq('user_id', user.id)
-                .eq('source_url', material.sourceUrl)
-                .limit(1);
-
-              if (existingMaterial && existingMaterial.length > 0) {
-                console.log(`[${sessionId}][${globalIndex}] DUPLICATE: Skipping already scraped URL: ${material.sourceUrl}`);
-                continue;
-              }
-
-              const { error: insertError } = await supabase
-                .from('scraped_materials_temp')
-                .insert({
-                  user_id: user.id,
-                  scraping_session_id: sessionId,
-                  source_url: material.sourceUrl,
-                  material_data: material,
-                  reviewed: false,
-                  approved: null,
-                  scraped_at: new Date().toISOString()
-                });
+          try {
+            const results = service === 'jina' 
+              ? await extractWithJinaSimple(url, options)
+              : await extractWithFirecrawlSimple(url, options);
+            
+            if (results && results.length > 0) {
+              materialsFound += results.length;
               
-              if (insertError) {
-                console.error(`[${sessionId}][${globalIndex}] Database insert error:`, insertError);
-              } else {
-                console.log(`[${sessionId}][${globalIndex}] Saved material: ${material.name}`);
+              // Save results to database
+              for (const material of results) {
+                try {
+                  // Check for duplicates
+                  const { data: existing } = await supabase
+                    .from('scraped_materials_temp')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('source_url', material.sourceUrl)
+                    .limit(1);
+
+                  if (!existing || existing.length === 0) {
+                    await supabase
+                      .from('scraped_materials_temp')
+                      .insert({
+                        user_id: userId,
+                        scraping_session_id: sessionId,
+                        source_url: material.sourceUrl,
+                        material_data: material,
+                        reviewed: false,
+                        approved: null,
+                        scraped_at: new Date().toISOString()
+                      });
+                  }
+                } catch (dbError) {
+                  console.error(`[${sessionId}] Database error:`, dbError);
+                }
               }
-            } catch (dbError) {
-              console.error(`[${sessionId}][${globalIndex}] Database error:`, dbError);
             }
+            
+            // Rate limiting between URLs
+            if (i < urls.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, baseDelay));
+            }
+            
+          } catch (urlError) {
+            console.error(`[${sessionId}] Error processing URL ${url}:`, urlError.message);
           }
-        } else {
-          console.log(`[${sessionId}][${globalIndex}] No materials found on this page`);
         }
         
-      } catch (error) {
-        console.error(`[${sessionId}][${globalIndex}] ERROR processing ${url}:`, error.message);
-        processedCount++;
-      }
-      
-      // Small delay between requests to be respectful
-      if (i < urlsToProcess.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Mark chunk as completed
+        await supabase
+          .from('scraping_chunks')
+          .update({ 
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            materials_found: materialsFound,
+            processing_time_ms: Date.now() - new Date().getTime()
+          })
+          .eq('id', chunkId);
+        
+        // Update session progress
+        await supabase.rpc('update_session_progress', {
+          session_id_param: sessionId,
+          chunks_completed_param: chunk.chunk_index + 1
+        });
+        
+        chunkSuccess = true;
+        console.log(`[${sessionId}] Chunk ${chunk.chunk_index} completed: ${materialsFound} materials`);
+        
+      } catch (chunkError) {
+        chunkRetries++;
+        console.error(`[${sessionId}] Chunk ${chunk.chunk_index} retry ${chunkRetries}:`, chunkError.message);
+        
+        if (chunkRetries <= maxRetries) {
+          // Calculate retry delay based on strategy
+          let retryDelay = baseDelay;
+          switch (retryStrategy) {
+            case 'exponential':
+              retryDelay = baseDelay * Math.pow(2, chunkRetries - 1);
+              break;
+            case 'linear':
+              retryDelay = baseDelay * chunkRetries;
+              break;
+            case 'immediate':
+              retryDelay = 0;
+              break;
+          }
+          
+          console.log(`[${sessionId}] Retrying chunk in ${retryDelay}ms`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          
+          // Update retry count
+          await supabase
+            .from('scraping_chunks')
+            .update({ retry_count: chunkRetries })
+            .eq('id', chunkId);
+        } else {
+          // Mark chunk as failed
+          await supabase
+            .from('scraping_chunks')
+            .update({ 
+              status: 'failed',
+              error_message: chunkError.message,
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', chunkId);
+          
+          break; // Move to next chunk
+        }
       }
     }
     
-    console.log(`[${sessionId}] Progressive processing complete:`);
-    console.log(`[${sessionId}] - URLs found: ${urls.length}`);
-    console.log(`[${sessionId}] - URLs processed: ${processedCount}`);
-    console.log(`[${sessionId}] - Successful extractions: ${successCount}`);
-    
-    // Save completion summary
-    const summaryMaterial: MaterialData = {
-      name: `Progressive Scraping Complete - Session ${sessionId}`,
-      description: `Completed progressive scraping of ${processedCount} URLs from sitemap. Found materials on ${successCount} pages. All results have been saved to the review system.`,
-      category: 'System Summary',
-      price: '',
-      images: [],
-      properties: {
-        sessionId: sessionId,
-        totalUrlsFound: urls.length,
-        urlsProcessed: processedCount,
-        successfulExtractions: successCount,
-        service: service,
-        completedAt: new Date().toISOString(),
-        progressiveMode: true
-      },
-      sourceUrl: sitemapUrl,
-      supplier: 'System'
-    };
-    
-    await supabase
-      .from('scraped_materials_temp')
-      .insert({
-        user_id: user.id,
-        scraping_session_id: sessionId,
-        source_url: sitemapUrl,
-        material_data: summaryMaterial,
-        reviewed: false,
-        approved: null,
-        scraped_at: new Date().toISOString()
-      });
-    
-  } catch (error) {
-    console.error(`[${sessionId}] Progressive processing failed:`, error);
+    // Small delay between chunks
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
+  
+  // Mark session as completed
+  await supabase
+    .from('scraping_sessions')
+    .update({ 
+      status: 'completed',
+      completed_at: new Date().toISOString()
+    })
+    .eq('session_id', sessionId);
+  
+  console.log(`[${sessionId}] All chunks processed`);
 }
 
 async function processSitemapEnhanced(sitemapUrl: string, service: 'firecrawl' | 'jina', options: any): Promise<MaterialData[]> {

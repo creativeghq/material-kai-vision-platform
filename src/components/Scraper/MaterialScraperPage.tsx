@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ScrapedMaterialsViewer } from './ScrapedMaterialsViewer';
 import { ScrapedMaterialsReview } from './ScrapedMaterialsReview';
-import { Globe, Loader2, Search, AlertCircle } from 'lucide-react';
+import { Globe, Loader2, Search, AlertCircle, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface ScrapedMaterial {
   name: string;
@@ -42,6 +43,12 @@ interface ScrapingOptions {
   useSearch?: boolean;
   searchQuery?: string;
   rerank?: boolean;
+  // Enhanced Phase 4 options
+  chunkSize?: number;
+  resumeSession?: boolean;
+  retryStrategy?: 'exponential' | 'linear' | 'immediate';
+  maxRetries?: number;
+  rateLimitDelay?: number;
 }
 
 export const MaterialScraperPage = () => {
@@ -54,6 +61,9 @@ export const MaterialScraperPage = () => {
   const [maxPages, setMaxPages] = useState(100);
   const [saveTemporary, setSaveTemporary] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [autoRecoverySession, setAutoRecoverySession] = useState<string | null>(null);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const [chunkSize, setChunkSize] = useState(50);
   const [options, setOptions] = useState<ScrapingOptions>({
     service: 'firecrawl',
     sitemapMode: false,
@@ -72,8 +82,94 @@ Return a list of materials found on the page.`,
     classificationLabels: ['Tiles', 'Stone', 'Wood', 'Metal', 'Fabric', 'Glass', 'Plastic', 'Concrete'],
     useSearch: false,
     searchQuery: '',
-    rerank: true
+    rerank: true,
+    // Phase 4 enhanced options
+    chunkSize: 50,
+    retryStrategy: 'exponential',
+    maxRetries: 3,
+    rateLimitDelay: 2000
   });
+
+  // Auto-recovery on page load
+  useEffect(() => {
+    checkForIncompleteSession();
+  }, []);
+
+  const checkForIncompleteSession = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Check for incomplete sessions from scraping_sessions table
+      const { data: incompleteSessions, error } = await supabase
+        .from('scraping_sessions')
+        .select('session_id, status, created_at')
+        .eq('user_id', session.user.id)
+        .in('status', ['active', 'processing'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking for incomplete sessions:', error);
+        return;
+      }
+
+      if (incompleteSessions && incompleteSessions.length > 0) {
+        const incompleteSession = incompleteSessions[0];
+        setAutoRecoverySession(incompleteSession.session_id);
+        setShowRecoveryDialog(true);
+      }
+    } catch (error) {
+      console.error('Error in auto-recovery check:', error);
+    }
+  };
+
+  const handleAutoRecovery = async (shouldResume: boolean) => {
+    setShowRecoveryDialog(false);
+    
+    if (shouldResume && autoRecoverySession) {
+      try {
+        // Get session details
+        const { data: sessionData, error } = await supabase
+          .from('scraping_sessions')
+          .select('*')
+          .eq('session_id', autoRecoverySession)
+          .single();
+
+        if (error || !sessionData) {
+          toast({
+            title: "Recovery Failed",
+            description: "Could not load session details",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Restore session configuration
+        const config = sessionData.scraping_config as any;
+        setUrl(sessionData.source_url);
+        setBatchSize(config.batchSize || 10);
+        setMaxPages(config.maxPages || 100);
+        setSaveTemporary(config.saveTemporary || false);
+        setOptions({ ...options, ...config.options, resumeSession: true });
+        setSessionId(autoRecoverySession);
+
+        toast({
+          title: "Session Recovered",
+          description: "Previous scraping session restored. Ready to continue.",
+        });
+      } catch (error) {
+        console.error('Error in auto-recovery:', error);
+        toast({
+          title: "Recovery Error",
+          description: "Failed to restore session",
+          variant: "destructive",
+        });
+      }
+    }
+    
+    setAutoRecoverySession(null);
+  };
 
   const handleScrape = async (e: React.FormEvent, providedSessionId?: string) => {
     e.preventDefault();
@@ -146,9 +242,12 @@ Return a list of materials found on the page.`,
           maxPages: maxPages,
           saveTemporary: saveTemporary,
           sessionId: currentSessionId,
+          chunkSize: chunkSize,
           options: {
             ...options,
             service: options.service,
+            chunkSize: chunkSize,
+            resumeSession: !!providedSessionId,
             // Pass Firecrawl targeting options
             includeTags: options.includeTags,
             onlyMainContent: options.onlyMainContent,
@@ -353,19 +452,19 @@ Return a list of materials found on the page.`,
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Save Options</Label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="saveTemporary"
-                        checked={saveTemporary}
-                        onChange={(e) => setSaveTemporary(e.target.checked)}
-                        disabled={isLoading}
-                      />
-                      <Label htmlFor="saveTemporary" className="text-sm">Save for review</Label>
-                    </div>
+                    <Label htmlFor="chunkSize">Chunk Size</Label>
+                    <Input
+                      id="chunkSize"
+                      type="number"
+                      value={chunkSize}
+                      onChange={(e) => setChunkSize(parseInt(e.target.value) || 50)}
+                      min="10"
+                      max="500"
+                      placeholder="50"
+                      disabled={isLoading}
+                    />
                     <p className="text-xs text-muted-foreground">
-                      Save results temporarily for review
+                      URLs per chunk for large sitemaps
                     </p>
                   </div>
                 </div>
@@ -742,6 +841,44 @@ Return a list of materials found on the page.`,
                   )}
                 </Button>
               </form>
+
+              {/* Session Recovery Dialog */}
+              <Dialog open={showRecoveryDialog} onOpenChange={setShowRecoveryDialog}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <RefreshCw className="h-5 w-5" />
+                      Incomplete Session Found
+                    </DialogTitle>
+                    <DialogDescription>
+                      We found an incomplete scraping session from a previous visit. 
+                      Would you like to resume where you left off?
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  {autoRecoverySession && (
+                    <div className="py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Session ID: <span className="font-mono">{autoRecoverySession.substring(0, 8)}...</span>
+                      </p>
+                    </div>
+                  )}
+                  
+                  <DialogFooter>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleAutoRecovery(false)}
+                    >
+                      Start Fresh
+                    </Button>
+                    <Button 
+                      onClick={() => handleAutoRecovery(true)}
+                    >
+                      Resume Session
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <div className="space-y-3">
                 <Label>Popular Material Sites</Label>
