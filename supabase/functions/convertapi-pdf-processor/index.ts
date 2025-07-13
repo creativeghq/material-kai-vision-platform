@@ -398,9 +398,17 @@ serve(async (req) => {
       console.log(`📊 Content sizes - HTML: ${finalHtmlContent.length} chars, Text: ${extractedText.length} chars`);
       console.log(`📋 HTML content preview (first 200 chars):`, finalHtmlContent.substring(0, 200));
       
+      // If content is too large (>1MB), truncate but keep essential structure
+      let contentToStore = finalHtmlContent;
+      const maxContentSize = 1024 * 1024; // 1MB limit
+      if (finalHtmlContent.length > maxContentSize) {
+        console.log(`⚠️ Content too large (${finalHtmlContent.length} chars), truncating to ${maxContentSize} chars`);
+        contentToStore = finalHtmlContent.substring(0, maxContentSize) + '\n<!-- Content truncated due to size -->'; 
+      }
+      
       const knowledgeEntry = {
         title: `${originalFilename.replace('.pdf', '')} - HTML Document`,
-        content: finalHtmlContent, // Store full HTML with local images for rich display
+        content: contentToStore, // Store HTML with local images for rich display
         content_type: 'enhanced_pdf_html', // Match the type expected by HTMLDocumentViewer
         source_url: htmlPublicUrl, // Point to the HTML file, not original PDF
         semantic_tags: ['pdf', 'html', 'convertapi', 'uploaded-content'],
