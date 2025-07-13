@@ -260,7 +260,14 @@ serve(async (req) => {
 
       if (knowledgeError) {
         console.error('Knowledge base insertion error:', knowledgeError);
+        throw new Error(`Failed to add document to knowledge base: ${knowledgeError.message}`);
       }
+
+      if (!knowledgeData) {
+        throw new Error('Document was not properly added to knowledge base');
+      }
+
+      console.log('Document successfully added to knowledge base:', knowledgeData.id);
 
       const processingTime = Date.now() - startTime;
 
@@ -289,7 +296,7 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           processingId: processingId,
-          knowledgeEntryId: knowledgeData?.id,
+          knowledgeEntryId: knowledgeData.id,
           processingTimeMs: processingTime,
           confidence: confidence,
           extractedContent: {
