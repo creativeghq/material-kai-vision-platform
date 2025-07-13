@@ -78,8 +78,10 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
   useEffect(() => {
     if (sessionId && currentResults.length === 0) {
       loadMaterialsBySession(sessionId);
+      checkActiveSession(sessionId);
     } else if (currentResults.length === 0) {
       loadAllUnreviewedMaterials(0, 50);
+      checkForActiveSessions();
     }
 
     // Set up real-time subscription for new materials
@@ -261,6 +263,68 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkActiveSession = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('scraping_sessions')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('status', 'active')
+        .single();
+
+      if (error || !data) {
+        console.log('No active session found for:', sessionId);
+        return;
+      }
+
+      console.log('Found active session:', data);
+      setScrapingStatus('active');
+      setSessionStats({
+        totalProcessed: data.materials_processed || 0,
+        totalExpected: data.total_materials_found || 100, // Default expectation
+        isActive: true,
+        currentUrl: data.source_url,
+        startedAt: data.created_at
+      });
+    } catch (error) {
+      console.error('Error checking active session:', error);
+    }
+  };
+
+  const checkForActiveSessions = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('scraping_sessions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error || !data || data.length === 0) {
+        console.log('No active sessions found');
+        setScrapingStatus('idle');
+        return;
+      }
+
+      const activeSession = data[0];
+      console.log('Found active session:', activeSession);
+      setScrapingStatus('active');
+      setSessionStats({
+        totalProcessed: activeSession.materials_processed || 0,
+        totalExpected: activeSession.total_materials_found || 100,
+        isActive: true,
+        currentUrl: activeSession.source_url,
+        startedAt: activeSession.created_at
+      });
+    } catch (error) {
+      console.error('Error checking for active sessions:', error);
     }
   };
 
@@ -524,6 +588,11 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {/* Debug Information */}
+          <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded">
+            Debug: Status = {scrapingStatus} | Session Active = {sessionStats?.isActive ? 'Yes' : 'No'} | Materials = {materials.length}
+          </div>
+          
           <div className="flex gap-2 flex-wrap">
             {showCurrentResults && onAddAllToCatalog && (
               <Button
