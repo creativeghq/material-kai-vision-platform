@@ -294,25 +294,32 @@ async function analyzePageLayout(page: any, pageNumber: number, width: number, h
   return elements;
 }
 
-// Extract actual images from PDF using PDF.js (more robust than pdf-lib)
+// Extract actual images from PDF using your manual extraction approach
 async function extractPageImages(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
   
   try {
     console.log(`🔍 [DEBUG] Starting enhanced image extraction for page ${pageNumber}...`);
     
-    // Try to use PDF.js for better image extraction
-    const pdfJsImages = await extractImagesWithPDFJS(page, pageNumber);
-    if (pdfJsImages.length > 0) {
-      images.push(...pdfJsImages);
-      console.log(`✅ PDF.js extracted ${pdfJsImages.length} images from page ${pageNumber}`);
+    // Method 1: Try the manual byte parsing approach (your method)
+    const manualImages = await extractImagesManualParsing(page, pageNumber);
+    if (manualImages.length > 0) {
+      images.push(...manualImages);
+      console.log(`✅ Manual parsing extracted ${manualImages.length} images from page ${pageNumber}`);
     }
     
-    // Fallback: Try pdf-lib approach if PDF.js fails
+    // Method 2: Try pdf-lib indirect objects approach (your first method)
     if (images.length === 0) {
-      console.log(`🔍 [DEBUG] PDF.js extraction failed, trying pdf-lib fallback...`);
-      const pdfLibImages = await extractImagesWithPDFLib(page, pageNumber, width, height);
+      console.log(`🔍 [DEBUG] Manual parsing failed, trying pdf-lib indirect objects...`);
+      const pdfLibImages = await extractImagesFromIndirectObjects(page, pageNumber);
       images.push(...pdfLibImages);
+    }
+    
+    // Method 3: Fallback to PDF.js approach
+    if (images.length === 0) {
+      console.log(`🔍 [DEBUG] pdf-lib failed, trying PDF.js fallback...`);
+      const pdfJsImages = await extractImagesWithPDFJS(page, pageNumber);
+      images.push(...pdfJsImages);
     }
     
     // Final fallback: Try raw XObject extraction
@@ -326,6 +333,173 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
     
   } catch (error) {
     console.error(`❌ Error extracting images from page ${pageNumber}:`, error);
+  }
+  
+  return images;
+}
+
+// Your manual byte parsing approach for JPEG extraction
+async function extractImagesManualParsing(page: any, pageNumber: number): Promise<DocumentImage[]> {
+  const images: DocumentImage[] = [];
+  
+  try {
+    console.log(`🔍 [DEBUG] Starting manual byte parsing for page ${pageNumber}...`);
+    
+    // Get the PDF document and extract raw bytes
+    const pdfDoc = page.doc;
+    const pdfBytes = await pdfDoc.save();
+    const convertedBuffer = new Uint8Array(pdfBytes);
+    
+    // JPEG signature bytes
+    const firstBeginSignatureSymbol = 0xFF;
+    const secondBeginSignatureSymbol = 0xD8;
+    const jpegEndSignature = [0xFF, 0xD9];
+    
+    const indexesStartSignatureImage: number[] = [];
+    
+    // Find JPEG start signatures
+    convertedBuffer.forEach((el, i) => {
+      if (el === firstBeginSignatureSymbol &&
+        convertedBuffer[i + 1] === secondBeginSignatureSymbol &&
+        convertedBuffer[i + 2] === firstBeginSignatureSymbol &&
+        (convertedBuffer[i + 3] === 0xE0 || // JFIF
+         convertedBuffer[i + 3] === 0xE1 || // EXIF
+         convertedBuffer[i + 3] === 0xE2 || // Extended
+         convertedBuffer[i + 3] === 0xE3 || // Extended
+         convertedBuffer[i + 3] === 0xE8)) { // SPIFF
+        indexesStartSignatureImage.push(i);
+      }
+    });
+    
+    console.log(`🔍 [DEBUG] Found ${indexesStartSignatureImage.length} JPEG signatures`);
+    
+    // Extract JPEG data
+    for (let i = 0; i < indexesStartSignatureImage.length; i++) {
+      const startIndex = indexesStartSignatureImage[i];
+      
+      // Find the end of this JPEG
+      let endIndex = -1;
+      for (let j = startIndex + 4; j < convertedBuffer.length - 1; j++) {
+        if (convertedBuffer[j] === jpegEndSignature[0] && convertedBuffer[j + 1] === jpegEndSignature[1]) {
+          endIndex = j + 2;
+          break;
+        }
+      }
+      
+      if (endIndex !== -1) {
+        const jpegData = convertedBuffer.slice(startIndex, endIndex);
+        
+        // Filter out tiny images (likely not actual content images)
+        if (jpegData.length > 1000) {
+          console.log(`🔍 [DEBUG] Extracting JPEG ${i}: ${jpegData.length} bytes`);
+          
+          const filename = `manual-extracted-p${pageNumber}-img${i}-${Date.now()}.jpg`;
+          const imageUrl = await uploadImageToStorage(jpegData, filename, 'image/jpeg');
+          
+          if (imageUrl) {
+            images.push({
+              id: `manual_${pageNumber}_${i}`,
+              imageUrl,
+              imageType: 'manual_extracted',
+              caption: `Manually extracted image ${i + 1} from page ${pageNumber}`,
+              altText: `JPEG image extracted using manual byte parsing`,
+              bbox: {
+                x: 50 + (i * 150),
+                y: 300,
+                width: 200,
+                height: 150
+              },
+              pageNumber,
+              proximityScore: 0.90,
+              associatedChunkIds: []
+            });
+          }
+        } else {
+          console.log(`🔍 [DEBUG] Skipping small JPEG ${i}: ${jpegData.length} bytes`);
+        }
+      }
+    }
+    
+    console.log(`🔍 [DEBUG] Manual parsing extracted ${images.length} images`);
+    
+  } catch (error) {
+    console.error(`Error in manual parsing extraction:`, error);
+  }
+  
+  return images;
+}
+
+// Your pdf-lib indirect objects approach
+async function extractImagesFromIndirectObjects(page: any, pageNumber: number): Promise<DocumentImage[]> {
+  const images: DocumentImage[] = [];
+  
+  try {
+    console.log(`🔍 [DEBUG] Starting pdf-lib indirect objects extraction for page ${pageNumber}...`);
+    
+    const pdfDoc = page.doc;
+    
+    // Get all indirect objects that might contain images
+    const imageObjects: any[] = [];
+    if (pdfDoc.context?.indirectObjects) {
+      pdfDoc.context.indirectObjects.forEach((obj: any) => {
+        if (obj && obj.contents && obj.contents instanceof Uint8Array) {
+          imageObjects.push(obj.contents);
+        }
+      });
+    }
+    
+    console.log(`🔍 [DEBUG] Found ${imageObjects.length} potential image objects`);
+    
+    // Check each object for image signatures
+    for (let i = 0; i < imageObjects.length; i++) {
+      const contents = imageObjects[i];
+      if (contents && contents.length > 10) {
+        let mimeType = '';
+        let extension = '';
+        
+        // Check for JPEG signature
+        if (contents[0] === 0xFF && contents[1] === 0xD8 && contents[2] === 0xFF) {
+          mimeType = 'image/jpeg';
+          extension = 'jpg';
+        }
+        // Check for PNG signature
+        else if (contents[0] === 0x89 && contents[1] === 0x50 && contents[2] === 0x4E && contents[3] === 0x47) {
+          mimeType = 'image/png';
+          extension = 'png';
+        }
+        
+        if (mimeType && contents.length > 1000) {
+          console.log(`🔍 [DEBUG] Found ${mimeType} image: ${contents.length} bytes`);
+          
+          const filename = `indirect-obj-p${pageNumber}-img${i}-${Date.now()}.${extension}`;
+          const imageUrl = await uploadImageToStorage(contents, filename, mimeType);
+          
+          if (imageUrl) {
+            images.push({
+              id: `indirect_${pageNumber}_${i}`,
+              imageUrl,
+              imageType: 'indirect_object',
+              caption: `Image from indirect object ${i} on page ${pageNumber}`,
+              altText: `${mimeType} image extracted from PDF indirect objects`,
+              bbox: {
+                x: 50 + (i * 150),
+                y: 250,
+                width: 200,
+                height: 150
+              },
+              pageNumber,
+              proximityScore: 0.85,
+              associatedChunkIds: []
+            });
+          }
+        }
+      }
+    }
+    
+    console.log(`🔍 [DEBUG] Indirect objects extraction found ${images.length} images`);
+    
+  } catch (error) {
+    console.error(`Error in indirect objects extraction:`, error);
   }
   
   return images;
