@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.5';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 interface ScrapeRequest {
@@ -54,13 +54,28 @@ interface MaterialData {
   confidence?: number;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  console.log(`Material scraper function called - Method: ${req.method}, URL: ${req.url}`);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('Handling CORS preflight request');
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
-  console.log('Material scraper function called');
+  if (req.method !== 'POST') {
+    console.log(`Invalid method: ${req.method}`);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Method not allowed. Use POST.' 
+    }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   try {
     // Add timeout and better error handling
