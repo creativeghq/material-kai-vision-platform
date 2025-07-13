@@ -94,6 +94,14 @@ Return a list of materials found on the page.`,
     try {
       console.log('Starting scrape for:', url);
       
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to use the scraper. Please sign in first.');
+      }
+      
+      console.log('User authenticated, calling scraper function...');
+      
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setProgress(prev => Math.min(prev + 10, 90));
@@ -120,6 +128,8 @@ Return a list of materials found on the page.`,
 
       clearInterval(progressInterval);
       setProgress(100);
+
+      console.log('Function response:', { data, error });
 
       if (error) {
         console.error('Scraping error:', error);
