@@ -197,10 +197,12 @@ async function startProgressiveSitemapProcessing(
   // Generate session ID for tracking
   const sessionId = crypto.randomUUID();
   
-  // Start background processing (don't await)
-  processProgressiveSitemap(sessionId, sitemapUrl, service, options, req).catch(error => {
-    console.error('Progressive processing error:', error);
-  });
+  // Start background processing using EdgeRuntime.waitUntil for proper background handling
+  EdgeRuntime.waitUntil(
+    processProgressiveSitemap(sessionId, sitemapUrl, service, options, req).catch(error => {
+      console.error('Progressive processing error:', error);
+    })
+  );
   
   return sessionId;
 }
@@ -693,7 +695,8 @@ async function parseSitemapSimple(sitemapUrl: string, options: any): Promise<str
 async function extractWithJinaSimple(url: string, options: any): Promise<MaterialData[]> {
   const JINA_API_KEY = Deno.env.get('JINA_API_KEY');
   if (!JINA_API_KEY) {
-    throw new Error('JINA_API_KEY not configured');
+    console.error('JINA_API_KEY not configured');
+    return [];
   }
 
   console.log('Using Jina AI for:', url);
@@ -747,14 +750,15 @@ async function extractWithJinaSimple(url: string, options: any): Promise<Materia
 
   } catch (error) {
     console.error('Jina extraction error:', error);
-    throw error;
+    return [];
   }
 }
 
 async function extractWithFirecrawlSimple(url: string, options: any): Promise<MaterialData[]> {
   const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
   if (!FIRECRAWL_API_KEY) {
-    throw new Error('FIRECRAWL_API_KEY not configured');
+    console.error('FIRECRAWL_API_KEY not configured');
+    return [];
   }
 
   console.log('Using Firecrawl for:', url);
