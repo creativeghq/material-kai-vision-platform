@@ -81,7 +81,7 @@ const PDFProcessing = () => {
       </div>
       
       <Tabs defaultValue="workflow" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-1">
           <TabsTrigger value="workflow" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Live Workflow
@@ -91,9 +91,6 @@ const PDFProcessing = () => {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="upload">Quick Upload</TabsTrigger>
-          <TabsTrigger value="enhanced">Enhanced Processing</TabsTrigger>
-          <TabsTrigger value="basic">Basic Processing</TabsTrigger>
         </TabsList>
 
         <TabsContent value="workflow" className="space-y-6">
@@ -171,47 +168,6 @@ const PDFProcessing = () => {
             jobs={workflowJobs} 
             onRetryJob={handleRetryJob}
           />
-        </TabsContent>
-
-        <TabsContent value="upload">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Quick Upload
-              </CardTitle>
-              <CardDescription>
-                Simple drag-and-drop interface for quick PDF processing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors
-                  ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}`}
-              >
-                <input {...getInputProps()} />
-                <Upload className="h-16 w-16 mx-auto mb-6 text-muted-foreground" />
-                {isDragActive ? (
-                  <p className="text-xl text-primary">Drop PDF files here...</p>
-                ) : (
-                  <div>
-                    <p className="text-xl mb-3">Drag & drop PDF files here, or click to select</p>
-                    <p className="text-muted-foreground">
-                      Files will be processed using the advanced workflow and results will appear in the Live Workflow tab
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="enhanced">
-          <EnhancedPDFProcessor />
-        </TabsContent>
-        <TabsContent value="basic">
-          <PDFProcessor />
         </TabsContent>
       </Tabs>
     </div>
