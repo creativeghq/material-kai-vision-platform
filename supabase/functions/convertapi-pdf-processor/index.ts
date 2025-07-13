@@ -289,6 +289,7 @@ serve(async (req) => {
 
       const result = await response.json();
       console.log('✅ ConvertAPI conversion completed');
+      console.log('📋 ConvertAPI result structure:', JSON.stringify(result, null, 2));
 
       if (!result.Files || result.Files.length === 0) {
         throw new Error('No HTML file returned from ConvertAPI');
@@ -297,12 +298,22 @@ serve(async (req) => {
       // Get the HTML file URL
       const htmlFile = result.Files.find((file: any) => file.FileName.endsWith('.html'));
       if (!htmlFile) {
+        console.error('❌ Available files:', result.Files.map((f: any) => ({ FileName: f.FileName, keys: Object.keys(f) })));
         throw new Error('No HTML file found in ConvertAPI response');
       }
 
+      console.log('📄 HTML file object:', JSON.stringify(htmlFile, null, 2));
+      
+      // Check if Url property exists (ConvertAPI might use different property names)
+      const htmlFileUrl = htmlFile.Url || htmlFile.url || htmlFile.FileUrl || htmlFile.downloadUrl;
+      if (!htmlFileUrl) {
+        console.error('❌ HTML file object keys:', Object.keys(htmlFile));
+        throw new Error(`No valid URL found in HTML file object. Available properties: ${Object.keys(htmlFile).join(', ')}`);
+      }
+
       // STEP 2: Download HTML content
-      console.log('📥 Step 2: Downloading HTML content...');
-      const htmlResponse = await fetch(htmlFile.Url);
+      console.log('📥 Step 2: Downloading HTML content from:', htmlFileUrl);
+      const htmlResponse = await fetch(htmlFileUrl);
       if (!htmlResponse.ok) {
         throw new Error(`Failed to download HTML: ${htmlResponse.status}`);
       }
