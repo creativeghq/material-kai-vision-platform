@@ -325,7 +325,7 @@ export const PDFProcessor: React.FC = () => {
                     <Brain className="h-4 w-4 text-purple-500" />
                     <div>
                       <div className="font-medium">Enhanced Hybrid Processing (Recommended)</div>
-                      <div className="text-xs text-muted-foreground">Advanced material detection with 12+ categories, enhanced patterns, and professional-grade analysis</div>
+                      <div className="text-xs text-muted-foreground">Advanced material detection with enhanced image extraction, 12+ categories, and visual catalog analysis</div>
                     </div>
                   </div>
                 </SelectItem>
@@ -344,7 +344,7 @@ export const PDFProcessor: React.FC = () => {
               <Alert>
                 <Brain className="h-4 w-4" />
                 <AlertDescription>
-                  Enhanced hybrid processing with advanced material detection patterns covering 12+ material categories including porcelain tile, natural stone, engineered stone, wood flooring, and more. Features superior accuracy and professional-grade analysis.
+                  Enhanced hybrid processing with advanced material detection patterns covering 12+ material categories including porcelain tile, natural stone, engineered stone, wood flooring, and more. Features enhanced image extraction, visual catalog analysis, and professional-grade material recognition.
                 </AlertDescription>
               </Alert>
             )}
@@ -423,11 +423,11 @@ export const PDFProcessor: React.FC = () => {
               <div>
                 <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
                  <p className="text-sm text-muted-foreground">
-                   {options.processingMethod === 'hybrid'
-                     ? 'Enhanced Hybrid: Advanced material detection with 12+ categories and professional-grade analysis'
-                     : 'Azure AI: Up to 50MB per file for advanced cloud analysis'
-                   }
-                 </p>
+                    {options.processingMethod === 'hybrid'
+                      ? 'Enhanced Hybrid: Advanced material detection with enhanced image extraction, 12+ categories, and visual catalog analysis'
+                      : 'Azure AI: Up to 50MB per file for advanced cloud analysis'
+                    }
+                  </p>
               </div>
             )}
           </div>
