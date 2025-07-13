@@ -252,24 +252,33 @@ export class PDFWorkflowService {
         }
 
         const data = response.data;
+        const htmlContentLength = data.extractedContent?.htmlContent || 0;
+        const chunksCreated = data.extractedContent?.textLength || 0;
+        const imagesExtracted = data.imagesExtracted || 0;
+        const layoutElements = data.layoutElementsCount || 0;
+        const processingTime = data.processingTimeMs || 0;
+        const confidence = data.confidence || 0;
+        
         return {
           details: [
-            `HTML content generated: ${data.htmlContentLength || 0} characters`,
-            `Document chunks created: ${data.chunksCreated || 0}`,
-            `Images extracted: ${data.imagesExtracted || 0}`,
-            `Layout elements: ${data.layoutElements || 0}`,
-            `Processing time: ${Math.round((data.processingTimeMs || 0) / 1000)}s`,
-            `Overall confidence: ${Math.round((data.overallConfidence || 0) * 100)}%`
+            `HTML content generated: ${htmlContentLength.toLocaleString()} characters`,
+            `Document chunks created: ${Math.ceil(chunksCreated / 500)} chunks`,
+            `Images extracted: ${imagesExtracted}`,
+            `Layout elements: ${layoutElements}`,
+            `Processing time: ${Math.round(processingTime / 1000)}s`,
+            `Overall confidence: ${Math.round(confidence * 100)}%`,
+            `HTML file stored in Supabase storage`
           ],
           metadata: {
-            htmlContentLength: data.htmlContentLength,
-            chunksCreated: data.chunksCreated,
-            imagesExtracted: data.imagesExtracted,
-            layoutElements: data.layoutElements,
-            processingTime: data.processingTimeMs,
-            confidence: data.overallConfidence,
+            htmlContentLength,
+            chunksCreated: Math.ceil(chunksCreated / 500),
+            imagesExtracted,
+            layoutElements,
+            processingTime,
+            confidence,
             knowledgeEntryId: data.knowledgeEntryId,
-            documentId: data.documentId
+            documentId: data.processingId,
+            htmlUrl: data.htmlUrl
           },
           result: data
         };

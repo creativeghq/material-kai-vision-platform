@@ -309,15 +309,26 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                     <p className="text-sm text-green-700 mb-2">
                                       The PDF has been processed into a rich HTML document with preserved layout and extracted images.
                                     </p>
-                                    <a 
-                                      href={`https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/material-documents/enhanced-html/${step.metadata.knowledgeEntryId}.html`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800 underline"
-                                    >
-                                      <ExternalLink className="h-3 w-3" />
-                                      View HTML Document
-                                    </a>
+                                    <div className="space-y-2">
+                                      <a 
+                                        href={`https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/material-documents/enhanced-html/${step.metadata.knowledgeEntryId}.html`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800 underline mr-4"
+                                      >
+                                        <ExternalLink className="h-3 w-3" />
+                                        View HTML Document
+                                      </a>
+                                      <a 
+                                        href={`https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/enhanced-knowledge-base?id=${step.metadata.knowledgeEntryId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline"
+                                      >
+                                        <Database className="h-3 w-3" />
+                                        View in Knowledge Base
+                                      </a>
+                                    </div>
                                     <div className="text-xs text-green-600 mt-1">
                                       Document ID: {step.metadata.knowledgeEntryId}
                                     </div>

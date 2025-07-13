@@ -294,14 +294,14 @@ async function analyzePageLayout(page: any, pageNumber: number, width: number, h
   return elements;
 }
 
-// Extract actual images from PDF page
+// Extract actual images from PDF page using pdf-lib 
 async function extractPageImages(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
   
   try {
     console.log(`Extracting images from page ${pageNumber}...`);
     
-    // Get the page's resources to find images
+    // Get the page's content stream and resources
     const pageNode = page.node;
     const resources = pageNode.Resources;
     
@@ -309,87 +309,107 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
       const xObjects = resources.XObject;
       console.log(`Found ${Object.keys(xObjects).length} XObjects on page ${pageNumber}`);
       
+      let imageIndex = 0;
+      
       for (const [name, xObjectRef] of Object.entries(xObjects)) {
         try {
-          // Dereference the XObject
+          // Dereference the XObject to get actual object
           const xObject = pageNode.context.lookup(xObjectRef);
           
           if (xObject && xObject.Subtype && xObject.Subtype.name === 'Image') {
-            console.log(`Processing image XObject: ${name}`);
+            console.log(`Processing image XObject: ${name} on page ${pageNumber}`);
             
             // Extract image properties
             const imageWidth = xObject.Width?.value || 200;
             const imageHeight = xObject.Height?.value || 150;
             
-            // Get image data
-            let imageBytes: Uint8Array | null = null;
-            let mimeType = 'image/jpeg'; // default
+            // Try to extract image data
+            let imageData: Uint8Array | null = null;
+            let mimeType = 'image/jpeg';
             
-            try {
-              // Try to get the image data
-              if (xObject.data) {
-                imageBytes = new Uint8Array(xObject.data);
-              } else if (xObject.bytes) {
-                imageBytes = new Uint8Array(xObject.bytes);
-              } else {
-                // Try to decode the stream
-                const stream = xObject.stream;
-                if (stream) {
-                  imageBytes = new Uint8Array(stream);
+            // Get image data from different possible sources
+            if (xObject.data && xObject.data.length > 0) {
+              imageData = new Uint8Array(xObject.data);
+            } else if (xObject.bytes && xObject.bytes.length > 0) {
+              imageData = new Uint8Array(xObject.bytes);
+            } else if (xObject.getContents) {
+              try {
+                const contents = xObject.getContents();
+                if (contents && contents.length > 0) {
+                  imageData = new Uint8Array(contents);
                 }
+              } catch (e) {
+                console.log('Could not get contents from xObject');
               }
-              
-              // Determine MIME type from filter
-              if (xObject.Filter) {
-                const filter = Array.isArray(xObject.Filter) ? xObject.Filter[0] : xObject.Filter;
-                if (filter && filter.name) {
-                  switch (filter.name) {
-                    case 'DCTDecode':
-                      mimeType = 'image/jpeg';
-                      break;
-                    case 'FlateDecode':
-                      mimeType = 'image/png';
-                      break;
-                    default:
-                      mimeType = 'image/jpeg';
-                  }
-                }
-              }
-              
-              if (imageBytes && imageBytes.length > 0) {
-                // Upload to Supabase storage
-                const filename = `extracted-img-p${pageNumber}-${name}-${Date.now()}.${mimeType === 'image/png' ? 'png' : 'jpg'}`;
-                const imageUrl = await uploadImageToStorage(imageBytes, filename, mimeType);
-                
-                if (imageUrl) {
-                  const imageId = `extracted_${pageNumber}_${name}`;
-                  images.push({
-                    id: imageId,
-                    imageUrl,
-                    imageType: 'extracted_image',
-                    caption: `Extracted image: ${name} from page ${pageNumber}`,
-                    altText: `Image extracted from PDF showing material or technical details`,
-                    bbox: { x: 50 + (images.length * 100), y: height - 200, width: imageWidth, height: imageHeight },
-                    pageNumber,
-                    proximityScore: 0.95,
-                    associatedChunkIds: []
-                  });
-                  
-                  console.log(`Successfully extracted and uploaded image: ${filename}`);
-                }
-              }
-              
-            } catch (imageProcessError) {
-              console.error(`Error processing image ${name}:`, imageProcessError);
             }
+            
+            // Determine image format from filter
+            if (xObject.Filter) {
+              const filter = Array.isArray(xObject.Filter) ? xObject.Filter[0] : xObject.Filter;
+              if (filter && filter.name) {
+                switch (filter.name) {
+                  case 'DCTDecode':
+                    mimeType = 'image/jpeg';
+                    break;
+                  case 'FlateDecode':
+                    mimeType = 'image/png';
+                    break;
+                  case 'CCITTFaxDecode':
+                    mimeType = 'image/tiff';
+                    break;
+                  default:
+                    mimeType = 'image/jpeg';
+                }
+              }
+            }
+            
+            // If we have image data, upload it
+            if (imageData && imageData.length > 100) { // Ensure we have substantial data
+              const extension = mimeType.split('/')[1];
+              const filename = `extracted-img-p${pageNumber}-${name}-${Date.now()}.${extension}`;
+              
+              console.log(`Uploading image: ${filename} (${imageData.length} bytes)`);
+              
+              const imageUrl = await uploadImageToStorage(imageData, filename, mimeType);
+              
+              if (imageUrl) {
+                const imageId = `extracted_${pageNumber}_${imageIndex}`;
+                images.push({
+                  id: imageId,
+                  imageUrl,
+                  imageType: 'extracted_image',
+                  caption: `Extracted image ${imageIndex + 1} from page ${pageNumber}`,
+                  altText: `Image extracted from PDF showing material or technical details`,
+                  bbox: { 
+                    x: 50 + (imageIndex * 120), 
+                    y: height - 200 - (imageIndex * 50), 
+                    width: Math.min(imageWidth, 300), 
+                    height: Math.min(imageHeight, 200) 
+                  },
+                  pageNumber,
+                  proximityScore: 0.95,
+                  associatedChunkIds: []
+                });
+                
+                console.log(`Successfully extracted and uploaded image: ${filename}`);
+                imageIndex++;
+              }
+            } else {
+              console.log(`Skipping ${name} - insufficient image data (${imageData?.length || 0} bytes)`);
+            }
+            
+          } else {
+            console.log(`Skipping ${name} - not an image XObject`);
           }
         } catch (xObjectError) {
           console.error(`Error processing XObject ${name}:`, xObjectError);
         }
       }
+    } else {
+      console.log(`No XObjects found on page ${pageNumber}`);
     }
     
-    console.log(`Extracted ${images.length} real images from page ${pageNumber}`);
+    console.log(`Successfully extracted ${images.length} images from page ${pageNumber}`);
     
   } catch (error) {
     console.error(`Error extracting images from page ${pageNumber}:`, error);
@@ -885,7 +905,8 @@ serve(async (req) => {
               return acc;
             }, {} as Record<string, number>)
           },
-          html_url: htmlUrl
+          html_url: htmlUrl,
+          html_storage_path: htmlFileName
         },
         created_by: userId,
         last_modified_by: userId,
