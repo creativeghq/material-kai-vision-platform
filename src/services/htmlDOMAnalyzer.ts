@@ -769,8 +769,8 @@ export class HTMLDOMAnalyzer {
         .insert({
           document_id: documentId,
           page_number: 1, // Will be updated for multi-page documents
-          layout_elements: results.elements,
-          reading_order: results.structure.readingOrder,
+          layout_elements: results.elements as any,
+          reading_order: results.structure.readingOrder as any,
           structure_confidence: results.structure.metadata.confidence,
           processing_version: '1.0.0'
         });
@@ -803,8 +803,8 @@ export class HTMLDOMAnalyzer {
         structure: {
           title: 'Stored Document',
           sections: [],
-          readingOrder: data.reading_order || [],
-          totalElements: data.layout_elements?.length || 0,
+          readingOrder: (data.reading_order as any) || [],
+          totalElements: Array.isArray(data.layout_elements) ? data.layout_elements.length : 0,
           pageCount: 1,
           metadata: {
             processingDate: data.created_at,
@@ -812,7 +812,7 @@ export class HTMLDOMAnalyzer {
             elementTypes: {}
           }
         },
-        elements: data.layout_elements || [],
+        elements: (data.layout_elements as any) || [],
         images: [],
         tables: [],
         textBlocks: []
