@@ -225,25 +225,44 @@ export class PDFWorkflowService {
       const processingResult = await this.executeStep(jobId, 'text-extraction', async () => {
         const { data: { user } } = await supabase.auth.getUser();
         
-        const response = await supabase.functions.invoke('enhanced-pdf-html-processor', {
-          body: {
-            fileUrl: uploadResult.result?.publicUrl,
-            originalFilename: file.name,
-            fileSize: file.size,
-            userId: user!.id,
-            options: {
-              chunkSize: 500,
-              overlap: 50,
-              includeImages: true,
-              preserveLayout: true,
-              extractMaterials: true,
-              language: 'en'
-            }
-          }
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        console.log('Invoking convertapi-pdf-processor with:', {
+          fileUrl: uploadResult.result?.publicUrl,
+          originalFilename: file.name,
+          userId: user.id
         });
 
-        if (response.error) {
-          throw new Error(`Enhanced PDF processing failed: ${response.error.message}`);
+        let response;
+        try {
+          response = await supabase.functions.invoke('convertapi-pdf-processor', {
+            body: {
+              fileUrl: uploadResult.result?.publicUrl,
+              originalFilename: file.name,
+              fileSize: file.size,
+              userId: user.id,
+              options: {
+                chunkSize: 500,
+                overlap: 50,
+                includeImages: true,
+                preserveLayout: true,
+                extractMaterials: true,
+                language: 'en'
+              }
+            }
+          });
+
+          console.log('Edge function response:', response);
+
+          if (response.error) {
+            console.error('Edge function error:', response.error);
+            throw new Error(`Enhanced PDF processing failed: ${response.error.message}`);
+          }
+        } catch (error) {
+          console.error('Failed to call edge function:', error);
+          throw new Error(`Failed to send a request to the Edge Function: ${error.message}`);
         }
 
         if (!response.data?.success) {
