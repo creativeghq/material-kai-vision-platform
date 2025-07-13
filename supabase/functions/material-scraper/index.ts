@@ -63,63 +63,95 @@ serve(async (req) => {
   console.log('Material scraper function called');
 
   try {
-    const { 
-      url, 
-      service, 
-      sitemapMode = false, 
-      batchSize = 5,
-      maxPages = 100,
-      saveTemporary = false,
-      options = {} 
-    }: ScrapeRequest = await req.json();
-    
-    console.log(`Processing: ${service}, sitemap: ${sitemapMode}, url: ${url}`);
-    console.log(`Batch size: ${batchSize}, Max pages: ${maxPages}, Save temporary: ${saveTemporary}`);
-    
-    let materials: MaterialData[] = [];
-    let sessionId: string | null = null;
-    
-    if (sitemapMode) {
-      // Sitemap processing with configurable parameters
-      materials = await processSitemapEnhanced(url, service, {
-        ...options,
-        batchSize,
-        maxPages
-      });
-    } else {
-      // Single page processing
-      if (service === 'jina') {
-        materials = await extractWithJinaSimple(url, options);
-      } else {
-        materials = await extractWithFirecrawlSimple(url, options);
-      }
-    }
-    
-    console.log(`Extracted ${materials.length} materials`);
-    
-    // Save to temporary storage if requested
-    if (saveTemporary && materials.length > 0) {
-      sessionId = await saveToTemporaryStorage(req, materials);
-      console.log(`Saved to temporary storage with session ID: ${sessionId}`);
-    }
+    // Add timeout and better error handling
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Function timeout after 4 minutes')), 240000)
+    );
 
-    return new Response(JSON.stringify({
-      success: true,
-      data: materials,
-      totalProcessed: materials.length,
-      service: service,
-      sessionId: sessionId,
-      savedTemporary: saveTemporary
-    }), {
+    const processPromise = async () => {
+      const requestData = await req.json();
+      const { 
+        url, 
+        service, 
+        sitemapMode = false, 
+        batchSize = 5,
+        maxPages = 100,
+        saveTemporary = false,
+        options = {} 
+      }: ScrapeRequest = requestData;
+      
+      console.log(`Processing: ${service}, sitemap: ${sitemapMode}, url: ${url}`);
+      console.log(`Batch size: ${batchSize}, Max pages: ${maxPages}, Save temporary: ${saveTemporary}`);
+      
+      // Validate inputs
+      if (!url || typeof url !== 'string') {
+        throw new Error('Invalid URL provided');
+      }
+      
+      if (!['jina', 'firecrawl'].includes(service)) {
+        throw new Error('Invalid service provided. Must be "jina" or "firecrawl"');
+      }
+      
+      let materials: MaterialData[] = [];
+      let sessionId: string | null = null;
+      
+      if (sitemapMode) {
+        // Sitemap processing with configurable parameters
+        materials = await processSitemapEnhanced(url, service, {
+          ...options,
+          batchSize,
+          maxPages
+        });
+      } else {
+        // Single page processing
+        if (service === 'jina') {
+          materials = await extractWithJinaSimple(url, options);
+        } else {
+          materials = await extractWithFirecrawlSimple(url, options);
+        }
+      }
+      
+      console.log(`Extracted ${materials.length} materials`);
+      
+      // Save to temporary storage if requested
+      if (saveTemporary && materials.length > 0) {
+        try {
+          sessionId = await saveToTemporaryStorage(req, materials);
+          console.log(`Saved to temporary storage with session ID: ${sessionId}`);
+        } catch (saveError) {
+          console.error('Warning: Failed to save to temporary storage:', saveError.message);
+          // Continue without saving - don't fail the entire operation
+        }
+      }
+
+      return {
+        success: true,
+        data: materials,
+        totalProcessed: materials.length,
+        service: service,
+        sessionId: sessionId,
+        savedTemporary: saveTemporary && sessionId !== null
+      };
+    };
+
+    const result = await Promise.race([processPromise(), timeoutPromise]);
+
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(JSON.stringify({
+    console.error('Error in material scraper:', error);
+    
+    // Return more detailed error information
+    const errorResponse = {
       success: false,
-      error: error.message,
-    }), {
+      error: error.message || 'Unknown error occurred',
+      details: error.stack ? error.stack.substring(0, 500) : 'No stack trace available',
+      timestamp: new Date().toISOString()
+    };
+    
+    return new Response(JSON.stringify(errorResponse), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
