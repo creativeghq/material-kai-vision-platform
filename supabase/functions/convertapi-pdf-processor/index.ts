@@ -537,24 +537,51 @@ serve(async (req) => {
 
     } catch (processingError) {
       console.error('❌ Error during ConvertAPI PDF processing:', processingError);
+      console.error('❌ Error type:', typeof processingError);
+      console.error('❌ Error details:', processingError);
       
       await supabase
         .from('pdf_processing_results')
         .update({
           processing_status: 'failed',
           processing_completed_at: new Date().toISOString(),
-          error_message: processingError.message,
+          error_message: processingError instanceof Error ? processingError.message : String(processingError),
           processing_time_ms: Date.now() - startTime
         })
         .eq('id', processingId);
 
-      throw processingError;
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: processingError instanceof Error ? processingError.message : String(processingError),
+          errorType: processingError instanceof Error ? processingError.name : typeof processingError,
+          details: `ConvertAPI processing failed: ${processingError instanceof Error ? processingError.message : String(processingError)}`,
+          processingId,
+          context: 'convertapi_processing_step'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
   } catch (error) {
-    console.error('❌ Error in ConvertAPI PDF processor:', error);
+    console.error('❌ Top-level error in ConvertAPI PDF processor:', error);
+    console.error('❌ Error type:', typeof error);
+    console.error('❌ Error name:', error instanceof Error ? error.name : 'Unknown');
+    console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.name : typeof error,
+        errorDetails: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error,
+        context: 'convertapi_top_level_error'
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
