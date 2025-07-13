@@ -395,6 +395,9 @@ serve(async (req) => {
 
       // STEP 6: Store in knowledge base
       console.log('💾 Step 6: Storing in knowledge base...');
+      console.log(`📊 Content sizes - HTML: ${finalHtmlContent.length} chars, Text: ${extractedText.length} chars`);
+      console.log(`📋 HTML content preview (first 200 chars):`, finalHtmlContent.substring(0, 200));
+      
       const knowledgeEntry = {
         title: `${originalFilename.replace('.pdf', '')} - HTML Document`,
         content: finalHtmlContent, // Store full HTML with local images for rich display
