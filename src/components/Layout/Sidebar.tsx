@@ -19,13 +19,12 @@ import { Link, useLocation } from 'react-router-dom';
 
 const navigationItems = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
-  { id: 'recognition', label: 'Recognition', path: '/recognition', icon: Eye },
+  { id: 'search', label: 'Search Hub', path: '/search-hub', icon: Search },
+  { id: 'pdf', label: 'PDF Upload', path: '/pdf-processing', icon: ScanText },
   { id: 'catalog', label: 'Material Catalog', path: '/catalog', icon: Archive },
-  { id: 'scraper', label: 'Web Scraper', path: '/scraper', icon: Globe },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
-  { id: '3d', label: '3D Visualization', path: '/3d', icon: Grid3X3 },
-  { id: 'agents', label: 'AI Agents', path: '/agents', icon: Brain },
-  { id: 'analytics', label: 'Analytics', path: '/analytics', icon: Activity },
+  { id: '3d', label: '3D Designer', path: '/3d', icon: Box },
+  { id: 'scraper', label: 'Web Scraper', path: '/scraper', icon: Globe },
   { id: 'admin', label: 'Admin Panel', path: '/admin', icon: Settings },
 ];
 
