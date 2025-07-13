@@ -134,18 +134,41 @@ export const EnhancedPDFProcessor: React.FC = () => {
       setUploadProgress(40);
       updateJobStatus(jobId, 'processing', 30, 'Creating document record...');
 
-      // For demo purposes, simulate document creation without calling the problematic PDF processor
-      updateJobStatus(jobId, 'processing', 50, 'Creating document record (demo mode)...');
+      // Create document record first using the original PDF processor
+      const response = await supabase.functions.invoke('pdf-processor', {
+        body: {
+          fileUrl: publicUrl,
+          originalFilename: file.name,
+          fileSize: file.size,
+          userId: user.id,
+          options: {
+            extractMaterials: options.enableLayoutAnalysis,
+            language: 'en'
+          }
+        }
+      });
       
-      // Generate a mock document ID
-      const documentId = `demo-doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      if (response.error) {
+        console.error('PDF processor response error:', response.error);
+        throw new Error(`Document creation failed: ${response.error.message}`);
+      }
+
+      console.log('PDF processor response:', response.data);
       
+      // Use knowledgeEntryId if available, otherwise use processingId as fallback
+      const documentId = response.data?.knowledgeEntryId || response.data?.processingId;
+      
+      if (!documentId) {
+        console.error('No document ID found in response:', response.data);
+        throw new Error('No document ID returned from PDF processor');
+      }
+
+      updateJobStatus(jobId, 'processing', 50, 'Starting enhanced processing simulation...');
+
       // Update job with document ID
       setProcessingJobs(prev => prev.map(job =>
         job.id === jobId ? { ...job, documentId } : job
       ));
-
-      updateJobStatus(jobId, 'processing', 60, 'Starting enhanced processing simulation...');
       // For now, simulate enhanced processing until hybrid pipeline functions are deployed
       updateJobStatus(jobId, 'processing', 70, 'Simulating enhanced processing...');
       
