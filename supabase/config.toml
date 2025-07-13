@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.enhanced-crewai]
 verify_jwt = false
+
+[functions.material-scraper]
+verify_jwt = false
