@@ -825,9 +825,9 @@ Return a list of materials found on the page.`,
                   setSaveTemporary(config.saveTemporary || false);
                   setOptions(config.options || options);
                   
-                  // Start the scraping process with the existing session ID
+                  // Start the scraping process with a NEW session ID (don't reuse old one)
                   const formEvent = { preventDefault: () => {} } as React.FormEvent;
-                  await handleScrape(formEvent, sessionId);
+                  await handleScrape(formEvent); // Don't pass sessionId to create a new one
                 } else {
                   toast({
                     title: "No Session",
