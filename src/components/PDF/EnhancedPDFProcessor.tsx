@@ -157,7 +157,9 @@ export const EnhancedPDFProcessor: React.FC = () => {
       
       // Check if the PDF processor was successful
       if (!response.data?.success) {
-        throw new Error('PDF processor did not complete successfully');
+        const errorMsg = response.data?.error || response.data?.message || 'PDF processor did not complete successfully';
+        console.error('PDF processor failed:', errorMsg);
+        throw new Error(`PDF processing failed: ${errorMsg}`);
       }
       
       // Use knowledgeEntryId if available, otherwise use processingId as fallback
