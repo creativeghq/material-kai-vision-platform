@@ -21,7 +21,9 @@ import {
   Upload,
   Filter,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Image,
+  Zap
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +41,7 @@ interface KnowledgeEntry {
   relevance_score: number;
   source_url?: string;
   pdf_url?: string; // PDF link for additional details
+  metadata?: any; // Use any for now to handle Json type from database
 }
 
 const KnowledgeBaseManagement: React.FC = () => {
@@ -234,6 +237,7 @@ const KnowledgeBaseManagement: React.FC = () => {
         <Tabs defaultValue="entries" className="space-y-4">
           <TabsList>
             <TabsTrigger value="entries">Knowledge Entries</TabsTrigger>
+            <TabsTrigger value="images">Images</TabsTrigger>
             <TabsTrigger value="embeddings">Embedding Generation</TabsTrigger>
           </TabsList>
 
@@ -311,6 +315,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>PDF Link</TableHead>
+                <TableHead>HTML Link</TableHead>
                 <TableHead>Relevance</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
@@ -362,6 +367,21 @@ const KnowledgeBaseManagement: React.FC = () => {
                       </Button>
                     ) : (
                       <span className="text-sm text-muted-foreground">No link</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {entry.metadata?.storage_info?.html_storage_url ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1"
+                        onClick={() => window.open(entry.metadata.storage_info.html_storage_url, '_blank')}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        View HTML
+                      </Button>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No HTML</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -465,6 +485,200 @@ const KnowledgeBaseManagement: React.FC = () => {
         </DialogContent>
       </Dialog>
           
+          </TabsContent>
+
+          <TabsContent value="images" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Image className="h-5 w-5" />
+                  Extracted Images Library
+                </CardTitle>
+                <CardDescription>
+                  Browse and manage images extracted from PDF documents for OCR and visual recognition
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  // Extract all images from entries with processed images
+                  const allImages = entries.flatMap(entry => {
+                    if (!entry.metadata?.processed_images) return [];
+                    return entry.metadata.processed_images.map((img: any) => ({
+                      ...img,
+                      sourceTitle: entry.title,
+                      sourceId: entry.id,
+                      sourceType: entry.content_type,
+                      createdAt: entry.created_at
+                    }));
+                  });
+
+                  if (allImages.length === 0) {
+                    return (
+                      <div className="text-center py-12">
+                        <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium mb-2">No Images Found</h3>
+                        <p className="text-muted-foreground mb-4">
+                          Process some PDF documents first to see extracted images here.
+                        </p>
+                        <Button 
+                          variant="outline"
+                          onClick={() => navigate('/admin/pdf-processing')}
+                        >
+                          Go to PDF Processing
+                        </Button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Image className="h-4 w-4 text-blue-600" />
+                              <div>
+                                <p className="text-sm text-muted-foreground">Total Images</p>
+                                <p className="text-2xl font-bold">{allImages.length}</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-4 w-4 text-green-600" />
+                              <div>
+                                <p className="text-sm text-muted-foreground">Ready for OCR</p>
+                                <p className="text-2xl font-bold">{allImages.length}</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Eye className="h-4 w-4 text-purple-600" />
+                              <div>
+                                <p className="text-sm text-muted-foreground">Visual Analysis</p>
+                                <p className="text-2xl font-bold">Available</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Search className="h-4 w-4 text-orange-600" />
+                              <div>
+                                <p className="text-sm text-muted-foreground">Similarity Search</p>
+                                <p className="text-2xl font-bold">Future</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Images Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {allImages.map((image: any, index: number) => (
+                          <Card key={`${image.sourceId}-${index}`} className="overflow-hidden">
+                            <div className="aspect-square bg-muted relative">
+                              <img
+                                src={image.supabase_url}
+                                alt={image.filename}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = '/placeholder.svg';
+                                }}
+                              />
+                              <div className="absolute top-2 right-2">
+                                <Badge variant="secondary" className="text-xs">
+                                  {image.size ? `${(image.size / 1024).toFixed(1)}KB` : 'Unknown'}
+                                </Badge>
+                              </div>
+                            </div>
+                            <CardContent className="p-3">
+                              <div className="space-y-2">
+                                <div>
+                                  <p className="font-medium text-sm truncate" title={image.filename}>
+                                    {image.filename}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate" title={image.sourceTitle}>
+                                    From: {image.sourceTitle}
+                                  </p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs flex-1"
+                                    onClick={() => window.open(image.supabase_url, '_blank')}
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(image.supabase_url);
+                                      toast({
+                                        title: "Copied!",
+                                        description: "Image URL copied to clipboard"
+                                      });
+                                    }}
+                                  >
+                                    Copy URL
+                                  </Button>
+                                </div>
+                                <div className="text-xs text-muted-foreground space-y-1">
+                                  <div>Source Type: <Badge variant="outline" className="text-xs">{image.sourceType}</Badge></div>
+                                  <div>Extracted: {new Date(image.createdAt).toLocaleDateString()}</div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      {/* Future Features Section */}
+                      <Card className="border-dashed">
+                        <CardContent className="p-6 text-center space-y-4">
+                          <h3 className="text-lg font-medium">🚀 Coming Soon: Advanced Image Analysis</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div className="space-y-2">
+                              <div className="h-8 w-8 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+                                <Eye className="h-4 w-4 text-blue-600" />
+                              </div>
+                              <h4 className="font-medium">OCR Text Extraction</h4>
+                              <p className="text-muted-foreground">Extract text from images for searchable content</p>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="h-8 w-8 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                                <Search className="h-4 w-4 text-green-600" />
+                              </div>
+                              <h4 className="font-medium">Visual Similarity</h4>
+                              <p className="text-muted-foreground">Find similar tiles, textures, and materials</p>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="h-8 w-8 mx-auto bg-purple-100 rounded-full flex items-center justify-center">
+                                <Zap className="h-4 w-4 text-purple-600" />
+                              </div>
+                              <h4 className="font-medium">AI Material Recognition</h4>
+                              <p className="text-muted-foreground">Automatically identify materials and properties</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="embeddings" className="space-y-4">
