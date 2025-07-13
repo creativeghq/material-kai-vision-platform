@@ -134,39 +134,18 @@ export const EnhancedPDFProcessor: React.FC = () => {
       setUploadProgress(40);
       updateJobStatus(jobId, 'processing', 30, 'Creating document record...');
 
-      // Create document record first using the original PDF processor
-      const response = await supabase.functions.invoke('pdf-processor', {
-        body: {
-          fileUrl: publicUrl,
-          originalFilename: file.name,
-          fileSize: file.size,
-          userId: user.id,
-          options: {
-            extractMaterials: options.enableLayoutAnalysis,
-            language: 'en'
-          }
-        }
-      });
+      // For demo purposes, simulate document creation without calling the problematic PDF processor
+      updateJobStatus(jobId, 'processing', 50, 'Creating document record (demo mode)...');
       
-      if (response.error) {
-        console.error('PDF processor response error:', response.error);
-        throw new Error(`Document creation failed: ${response.error.message}`);
-      }
-
-      console.log('PDF processor response:', response.data);
-      const documentId = response.data?.knowledgeEntryId || response.data?.id;
+      // Generate a mock document ID
+      const documentId = `demo-doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      if (!documentId) {
-        console.error('No document ID found in response:', response.data);
-        throw new Error('No document ID returned from PDF processor');
-      }
-      updateJobStatus(jobId, 'processing', 50, 'Starting hybrid pipeline processing...');
-
       // Update job with document ID
-      setProcessingJobs(prev => prev.map(job => 
+      setProcessingJobs(prev => prev.map(job =>
         job.id === jobId ? { ...job, documentId } : job
       ));
 
+      updateJobStatus(jobId, 'processing', 60, 'Starting enhanced processing simulation...');
       // For now, simulate enhanced processing until hybrid pipeline functions are deployed
       updateJobStatus(jobId, 'processing', 70, 'Simulating enhanced processing...');
       
@@ -224,7 +203,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
 
       toast({
         title: "Enhanced Processing Complete (Demo Mode)",
-        description: `Successfully processed ${file.name}. Enhanced features will be fully active once the hybrid pipeline functions are deployed.`,
+        description: `Successfully demonstrated enhanced processing for ${file.name}. File uploaded and demo workflow completed. Deploy the hybrid pipeline backend for full functionality.`,
       });
 
     } catch (error) {
