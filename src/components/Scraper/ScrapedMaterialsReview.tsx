@@ -47,6 +47,8 @@ interface ScrapedMaterialsReviewProps {
   onMaterialsUpdate?: (materials: ScrapedMaterial[]) => void;
   onAddAllToCatalog?: () => void;
   isLoading?: boolean;
+  onContinueScraping?: (sessionId: string) => void;
+  onRetryScraping?: () => void;
 }
 
 export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
@@ -54,21 +56,34 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
   currentResults = [],
   onMaterialsUpdate,
   onAddAllToCatalog,
-  isLoading = false
+  isLoading = false,
+  onContinueScraping,
+  onRetryScraping
 }) => {
   const { toast } = useToast();
   const [materials, setMaterials] = useState<ScrapedMaterialTemp[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<'approve' | 'reject' | 'delete' | null>(null);
+  const [sessionStats, setSessionStats] = useState<{
+    totalProcessed: number;
+    totalExpected: number;
+    isActive: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (sessionId && currentResults.length === 0) {
       loadMaterialsBySession(sessionId);
     } else if (currentResults.length === 0) {
-      loadAllUnreviewedMaterials();
+      loadAllUnreviewedMaterials(0, 50);
     }
   }, [sessionId, currentResults.length]);
+
+  const loadMoreMaterials = () => {
+    if (sessionStats && materials.length < sessionStats.totalExpected) {
+      loadAllUnreviewedMaterials(materials.length, 50);
+    }
+  };
 
   const loadMaterialsBySession = async (sessionId: string) => {
     setLoading(true);
@@ -82,6 +97,19 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
       if (error) throw error;
       setMaterials((data || []) as ScrapedMaterialTemp[]);
       console.log('Loaded materials by session:', sessionId, 'Count:', data?.length || 0);
+      
+      // Check for session progress info from latest material
+      if (data && data.length > 0) {
+        const latestMaterial = data[0];
+        const materialData = latestMaterial.material_data as any;
+        if (materialData?.metadata?.sessionProgress) {
+          setSessionStats({
+            totalProcessed: data.length,
+            totalExpected: materialData.metadata.sessionProgress.totalExpected || data.length,
+            isActive: materialData.metadata.sessionProgress.isActive || false
+          });
+        }
+      }
     } catch (error) {
       console.error('Error loading materials by session:', error);
       toast({
@@ -94,20 +122,40 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
     }
   };
 
-  const loadAllUnreviewedMaterials = async () => {
+  const loadAllUnreviewedMaterials = async (offset = 0, limit = 50) => {
     setLoading(true);
-    console.log('Loading all unreviewed materials...');
+    console.log('Loading all unreviewed materials...', { offset, limit });
     try {
       const { data, error } = await supabase
         .from('scraped_materials_temp')
         .select('*')
         .eq('reviewed', false)
         .order('scraped_at', { ascending: false })
-        .limit(50);
+        .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      setMaterials((data || []) as ScrapedMaterialTemp[]);
+      
+      if (offset === 0) {
+        setMaterials((data || []) as ScrapedMaterialTemp[]);
+      } else {
+        setMaterials(prev => [...prev, ...((data || []) as ScrapedMaterialTemp[])]);
+      }
+      
       console.log('Loaded unreviewed materials count:', data?.length || 0);
+      
+      // Get total count for progress
+      const { count } = await supabase
+        .from('scraped_materials_temp')
+        .select('*', { count: 'exact', head: true })
+        .eq('reviewed', false);
+        
+      if (count !== null) {
+        setSessionStats({
+          totalProcessed: offset + (data?.length || 0),
+          totalExpected: count,
+          isActive: false
+        });
+      }
     } catch (error) {
       console.error('Error loading unreviewed materials:', error);
       toast({
@@ -349,7 +397,7 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
             )}
             
             <Button
-              onClick={loadAllUnreviewedMaterials}
+              onClick={() => loadAllUnreviewedMaterials(0, 50)}
               disabled={loading}
               variant="outline"
               size="sm"
@@ -371,7 +419,49 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
                 variant="outline"
                 size="sm"
               >
-                Load Current Session
+                Refresh Session
+              </Button>
+            )}
+
+            {sessionStats && sessionStats.isActive && sessionId && onContinueScraping && (
+              <Button
+                onClick={() => onContinueScraping(sessionId)}
+                disabled={loading}
+                variant="default"
+                size="sm"
+                className="text-blue-600 border-blue-600"
+              >
+                Continue Scraping
+              </Button>
+            )}
+
+            {onRetryScraping && (
+              <Button
+                onClick={onRetryScraping}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                className="text-orange-600"
+              >
+                Retry Process
+              </Button>
+            )}
+
+            {sessionStats && sessionStats.totalExpected > materials.length && (
+              <Button
+                onClick={loadMoreMaterials}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>Load More ({materials.length}/{sessionStats.totalExpected})</>
+                )}
               </Button>
             )}
 
@@ -388,13 +478,41 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
             )}
           </div>
 
+          {/* Progress and Summary Stats */}
+          {sessionStats && (
+            <Card className="mb-4">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium">Scraping Progress</h3>
+                  {sessionStats.isActive && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Active
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-sm text-muted-foreground mb-2">
+                  {sessionStats.totalProcessed} of {sessionStats.totalExpected} materials processed
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300" 
+                    style={{ 
+                      width: `${Math.min((sessionStats.totalProcessed / sessionStats.totalExpected) * 100, 100)}%` 
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Summary Stats for stored materials */}
           {!showCurrentResults && materials.length > 0 && (
             <div className="grid grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-4">
                   <div className="text-2xl font-bold">{materials.length}</div>
-                  <div className="text-sm text-muted-foreground">Total Materials</div>
+                  <div className="text-sm text-muted-foreground">Loaded Materials</div>
                 </CardContent>
               </Card>
               <Card>

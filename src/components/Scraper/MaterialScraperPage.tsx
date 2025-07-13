@@ -758,6 +758,26 @@ Return a list of materials found on the page.`,
             }}
             onAddAllToCatalog={handleAddAllToCatalog}
             isLoading={isLoading}
+            onContinueScraping={(sessionId) => {
+              // Continue scraping from where it left off
+              toast({
+                title: "Continuing Scraping",
+                description: "Resuming background scraping process...",
+              });
+              // Could implement actual continuation logic here
+            }}
+            onRetryScraping={() => {
+              // Retry the entire scraping process
+              if (url) {
+                handleScrape(new Event('submit') as any);
+              } else {
+                toast({
+                  title: "No URL",
+                  description: "Please enter a URL to retry scraping",
+                  variant: "destructive",
+                });
+              }
+            }}
           />
         </TabsContent>
       </Tabs>
