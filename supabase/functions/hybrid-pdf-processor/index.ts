@@ -201,26 +201,24 @@ async function processPDFWithPyMuPDF(fileUrl: string): Promise<PyMuPDFResponse> 
   }
 }
 
-// Advanced material detection with cross-page correlation
+// Enhanced material detection with improved patterns and AI integration
 async function detectMaterialsWithCorrelation(textBlocks: PyMuPDFResponse['text_blocks'], images: PyMuPDFResponse['extracted_images']): Promise<any[]> {
   const detectedMaterials = [];
+  
+  // Enhanced material patterns with more comprehensive coverage
   const materialPatterns = {
-    wood: /wood|timber|lumber|hardwood|softwood|plywood|veneer|oak|pine|maple|birch|walnut|janka|grain|stained|polished/i,
-    'stone & marble': /stone|marble|granite|limestone|travertine|slate|quartzite|onyx|sandstone|basalt|veining|honed|brushed|tumbled/i,
-    concrete: /concrete|cement|aggregate|compressive|reinforced|precast|admixture|cured|exposed aggregate|stamped/i,
-    brick: /brick|masonry|clay brick|fire brick|engineering brick|weathered|aged/i,
-    metal: /steel|aluminum|copper|brass|iron|alloy|galvanized|stainless|carbon steel|bronze|brushed|polished|oxidized|patina/i,
-    'mother-of-pearl': /mother-of-pearl|nacre|pearl|abalone|shell|iridescent|lustrous/i,
-    terracotta: /terracotta|terra cotta|clay|earthenware|fired clay|unglazed/i,
-    fabric: /fabric|textile|fiber|yarn|weave|cotton|polyester|nylon|silk|wool|linen|woven texture|pile/i,
-    leather: /leather|hide|skin|cowhide|sheepskin|genuine leather|full grain|top grain|embossed|distressed/i,
-    encaustic: /encaustic|wax|beeswax|pigment|heated wax|encaustic tile|cement tile|translucent|layered/i,
-    resin: /resin|epoxy|polyester resin|acrylic resin|synthetic resin|polymer|glossy|matte|clear|tinted/i,
-    'gold and precious metals': /gold|silver|platinum|precious metal|karat|sterling|fine gold|white gold|hammered|antiqued/i,
-    terrazzo: /terrazzo|aggregate|marble chips|granite chips|cement matrix|epoxy terrazzo|ground|exposed/i,
-    'crackle glaze': /crackle|crackled|crazing|craquelure|glazed|ceramic glaze|fired glaze|fine cracks|aged appearance/i,
-    ceramics: /ceramic|porcelain|tile|glazed|unglazed|vitrified|pei rating|slip resistance|frost resistant/i,
-    glass: /glass|tempered|laminated|float|thermal|safety glass|annealed|frosted|clear|textured|tinted|reflective/i
+    'porcelain_tile': /porcelain|vitrified|ceramic tile|glazed tile|unglazed|rectified|pei rating|slip resistance|frost resistant|porcelain stoneware/i,
+    'natural_stone': /marble|granite|limestone|travertine|slate|quartzite|onyx|sandstone|basalt|natural stone|veining|honed|polished|brushed|tumbled|flamed|bush hammered/i,
+    'engineered_stone': /quartz|engineered stone|composite stone|silestone|caesarstone|compac|artificial stone|quartz surface|engineered quartz/i,
+    'wood_flooring': /hardwood|engineered wood|laminate|luxury vinyl|lvt|lvp|oak|maple|walnut|cherry|bamboo|cork|janka rating|wood plank|timber flooring/i,
+    'concrete_products': /concrete|cement|aggregate|precast|reinforced|exposed aggregate|polished concrete|stamped concrete|concrete tile|cement board/i,
+    'metal_finishes': /stainless steel|aluminum|copper|brass|bronze|zinc|corten|galvanized|powder coated|anodized|brushed metal|polished metal|oxidized|patina/i,
+    'glass_products': /tempered glass|laminated glass|insulated glass|low-e|frosted glass|textured glass|safety glass|thermal glass|glass tile|glass mosaic/i,
+    'fabric_wallcovering': /wallcovering|fabric wallpaper|textile wall|vinyl wallpaper|grasscloth|sisal|jute|linen wallcovering|silk wallcovering|acoustic fabric/i,
+    'resin_surfaces': /solid surface|corian|acrylic surface|polyester resin|epoxy resin|polymer surface|composite surface|resin panel/i,
+    'brick_masonry': /brick|clay brick|fire brick|engineering brick|face brick|common brick|mortar|masonry|brick veneer|thin brick/i,
+    'carpet_rugs': /carpet|rug|carpet tile|broadloom|area rug|wool carpet|nylon carpet|polyester carpet|carpet plank|modular carpet/i,
+    'vinyl_resilient': /vinyl|resilient flooring|sheet vinyl|vinyl tile|luxury vinyl tile|luxury vinyl plank|rubber flooring|linoleum/i
   };
   
   for (const block of textBlocks) {
