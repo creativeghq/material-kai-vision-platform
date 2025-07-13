@@ -32,7 +32,7 @@ interface ScrapedMaterial {
 
 interface ScrapedMaterialTemp {
   id: string;
-  material_data: ScrapedMaterial;
+  material_data: any; // Use any since it comes from database as Json type
   source_url: string;
   scraped_at: string;
   reviewed: boolean;
@@ -80,7 +80,7 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
         .order('scraped_at', { ascending: false });
 
       if (error) throw error;
-      setMaterials(data || []);
+      setMaterials((data || []) as ScrapedMaterialTemp[]);
       console.log('Loaded materials by session:', sessionId, 'Count:', data?.length || 0);
     } catch (error) {
       console.error('Error loading materials by session:', error);
@@ -106,7 +106,7 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
         .limit(50);
 
       if (error) throw error;
-      setMaterials(data || []);
+      setMaterials((data || []) as ScrapedMaterialTemp[]);
       console.log('Loaded unreviewed materials count:', data?.length || 0);
     } catch (error) {
       console.error('Error loading unreviewed materials:', error);

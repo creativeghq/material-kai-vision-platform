@@ -141,17 +141,31 @@ Return a list of materials found on the page.`,
       }
 
       console.log('Scraping completed:', data);
-      setScrapedMaterials(data.data || []);
       
-      // Store sessionId if materials were saved temporarily
-      if (data.sessionId) {
+      if (data.progressive) {
+        // Progressive mode started
+        setScrapedMaterials([]);
         setSessionId(data.sessionId);
+        
+        toast({
+          title: "Progressive Scraping Started",
+          description: `Processing sitemap in background. Check the Review tab to see results as they complete. Session ID: ${data.sessionId?.substring(0, 8)}...`,
+          duration: 8000,
+        });
+      } else {
+        // Single page or immediate results
+        setScrapedMaterials(data.data || []);
+        
+        // Store sessionId if materials were saved temporarily
+        if (data.sessionId) {
+          setSessionId(data.sessionId);
+        }
+        
+        toast({
+          title: "Success",
+          description: `Found ${data.data?.length || 0} materials using ${data.service || options.service}${data.savedTemporary ? ' (saved for review)' : ''}`,
+        });
       }
-      
-      toast({
-        title: "Success",
-        description: `Found ${data.data?.length || 0} materials using ${data.service || options.service}${data.savedTemporary ? ' (saved for review)' : ''}`,
-      });
 
     } catch (error) {
       console.error('Scraping error:', error);
@@ -396,8 +410,9 @@ Return a list of materials found on the page.`,
                   {options.sitemapMode && (
                     <div className="p-3 border rounded bg-blue-50 dark:bg-blue-950/30">
                       <p className="text-sm text-blue-700 dark:text-blue-300">
-                        📄 <strong>Sitemap Mode:</strong> Enter the URL of an XML sitemap (e.g., https://example.com/sitemap.xml) 
-                        to automatically discover and scrape all product pages listed in the sitemap.
+                        📄 <strong>Progressive Sitemap Mode:</strong> Enter the URL of an XML sitemap (e.g., https://example.com/sitemap.xml). 
+                        URLs will be processed one by one in the background, and results will appear in the Review tab as they complete. 
+                        This allows processing of large sitemaps without timeouts.
                       </p>
                     </div>
                   )}
@@ -424,9 +439,10 @@ Return a list of materials found on the page.`,
                      
                      
                       <div className="space-y-4 p-3 border rounded bg-background/50">
-                        <div className="p-3 border rounded bg-blue-50 dark:bg-blue-950/30">
-                          <p className="text-sm text-blue-700 dark:text-blue-300">
-                            ⚡ <strong>No Page Limits:</strong> Will process ALL pages found. Processing happens in batches to prevent timeouts.
+                        <div className="p-3 border rounded bg-green-50 dark:bg-green-950/30">
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            ⚡ <strong>Progressive Processing:</strong> URLs are processed one by one in the background. 
+                            Results appear in the Review tab as they complete. No timeouts, can handle thousands of pages.
                           </p>
                         </div>
                        

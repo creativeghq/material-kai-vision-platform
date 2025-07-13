@@ -111,12 +111,23 @@ Deno.serve(async (req) => {
       let sessionId: string | null = null;
       
       if (sitemapMode) {
-        // Sitemap processing with configurable parameters
-        materials = await processSitemapEnhanced(url, service, {
+        // Progressive sitemap processing - start background job
+        sessionId = await startProgressiveSitemapProcessing(url, service, {
           ...options,
           batchSize,
           maxPages
-        });
+        }, req);
+        
+        // Return immediately with session ID for tracking
+        return {
+          success: true,
+          data: [],
+          totalProcessed: 0,
+          service: service,
+          sessionId: sessionId,
+          message: "Progressive scraping started. Check the review tab to see results as they complete.",
+          progressive: true
+        };
       } else {
         // Single page processing
         if (service === 'jina') {
@@ -128,8 +139,8 @@ Deno.serve(async (req) => {
       
       console.log(`Extracted ${materials.length} materials`);
       
-      // Save to temporary storage if requested
-      if (saveTemporary && materials.length > 0) {
+      // Save to temporary storage if requested (for single page only)
+      if (saveTemporary && materials.length > 0 && !sitemapMode) {
         try {
           sessionId = await saveToTemporaryStorage(req, materials);
           console.log(`Saved to temporary storage with session ID: ${sessionId}`);
@@ -145,7 +156,8 @@ Deno.serve(async (req) => {
         totalProcessed: materials.length,
         service: service,
         sessionId: sessionId,
-        savedTemporary: saveTemporary && sessionId !== null
+        savedTemporary: saveTemporary && sessionId !== null,
+        progressive: false
       };
     };
 
@@ -172,6 +184,178 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// Progressive sitemap processing - runs in background
+async function startProgressiveSitemapProcessing(
+  sitemapUrl: string, 
+  service: 'firecrawl' | 'jina', 
+  options: any,
+  req: Request
+): Promise<string> {
+  console.log('Starting progressive sitemap processing for:', sitemapUrl);
+  
+  // Generate session ID for tracking
+  const sessionId = crypto.randomUUID();
+  
+  // Start background processing (don't await)
+  processProgressiveSitemap(sessionId, sitemapUrl, service, options, req).catch(error => {
+    console.error('Progressive processing error:', error);
+  });
+  
+  return sessionId;
+}
+
+async function processProgressiveSitemap(
+  sessionId: string,
+  sitemapUrl: string, 
+  service: 'firecrawl' | 'jina', 
+  options: any,
+  req: Request
+): Promise<void> {
+  console.log(`[${sessionId}] Starting progressive processing`);
+  
+  try {
+    // Get auth info from request
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header found');
+    }
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials not configured');
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+    
+    // Extract user ID from JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      throw new Error('Authentication failed');
+    }
+    
+    // Fetch and parse sitemap
+    const urls = await parseSitemapSimple(sitemapUrl, options);
+    console.log(`[${sessionId}] Found ${urls.length} URLs in sitemap`);
+    
+    if (urls.length === 0) {
+      console.log(`[${sessionId}] No URLs found in sitemap`);
+      return;
+    }
+    
+    const maxUrls = Math.min(urls.length, options.maxPages || 100);
+    const urlsToProcess = urls.slice(0, maxUrls);
+    
+    console.log(`[${sessionId}] Processing ${urlsToProcess.length} URLs progressively`);
+    
+    let processedCount = 0;
+    let successCount = 0;
+    
+    // Process URLs one by one
+    for (let i = 0; i < urlsToProcess.length; i++) {
+      const url = urlsToProcess[i];
+      const globalIndex = i + 1;
+      
+      console.log(`[${sessionId}][${globalIndex}/${urlsToProcess.length}] Processing: ${url}`);
+      
+      try {
+        const results = service === 'jina' 
+          ? await extractWithJinaSimple(url, options)
+          : await extractWithFirecrawlSimple(url, options);
+        
+        processedCount++;
+        
+        if (results && results.length > 0) {
+          console.log(`[${sessionId}][${globalIndex}] SUCCESS: Found ${results.length} materials`);
+          successCount++;
+          
+          // Save each result immediately to the database
+          for (const material of results) {
+            try {
+              const { error: insertError } = await supabase
+                .from('scraped_materials_temp')
+                .insert({
+                  user_id: user.id,
+                  scraping_session_id: sessionId,
+                  source_url: material.sourceUrl,
+                  material_data: material,
+                  reviewed: false,
+                  approved: null,
+                  scraped_at: new Date().toISOString()
+                });
+              
+              if (insertError) {
+                console.error(`[${sessionId}][${globalIndex}] Database insert error:`, insertError);
+              } else {
+                console.log(`[${sessionId}][${globalIndex}] Saved material: ${material.name}`);
+              }
+            } catch (dbError) {
+              console.error(`[${sessionId}][${globalIndex}] Database error:`, dbError);
+            }
+          }
+        } else {
+          console.log(`[${sessionId}][${globalIndex}] No materials found on this page`);
+        }
+        
+      } catch (error) {
+        console.error(`[${sessionId}][${globalIndex}] ERROR processing ${url}:`, error.message);
+        processedCount++;
+      }
+      
+      // Small delay between requests to be respectful
+      if (i < urlsToProcess.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    console.log(`[${sessionId}] Progressive processing complete:`);
+    console.log(`[${sessionId}] - URLs found: ${urls.length}`);
+    console.log(`[${sessionId}] - URLs processed: ${processedCount}`);
+    console.log(`[${sessionId}] - Successful extractions: ${successCount}`);
+    
+    // Save completion summary
+    const summaryMaterial: MaterialData = {
+      name: `Progressive Scraping Complete - Session ${sessionId}`,
+      description: `Completed progressive scraping of ${processedCount} URLs from sitemap. Found materials on ${successCount} pages. All results have been saved to the review system.`,
+      category: 'System Summary',
+      price: '',
+      images: [],
+      properties: {
+        sessionId: sessionId,
+        totalUrlsFound: urls.length,
+        urlsProcessed: processedCount,
+        successfulExtractions: successCount,
+        service: service,
+        completedAt: new Date().toISOString(),
+        progressiveMode: true
+      },
+      sourceUrl: sitemapUrl,
+      supplier: 'System'
+    };
+    
+    await supabase
+      .from('scraped_materials_temp')
+      .insert({
+        user_id: user.id,
+        scraping_session_id: sessionId,
+        source_url: sitemapUrl,
+        material_data: summaryMaterial,
+        reviewed: false,
+        approved: null,
+        scraped_at: new Date().toISOString()
+      });
+    
+  } catch (error) {
+    console.error(`[${sessionId}] Progressive processing failed:`, error);
+  }
+}
 
 async function processSitemapEnhanced(sitemapUrl: string, service: 'firecrawl' | 'jina', options: any): Promise<MaterialData[]> {
   console.log('Processing sitemap with enhanced options:', sitemapUrl);
