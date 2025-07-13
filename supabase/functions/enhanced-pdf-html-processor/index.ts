@@ -294,39 +294,182 @@ async function analyzePageLayout(page: any, pageNumber: number, width: number, h
   return elements;
 }
 
-// Extract images from page with enhanced metadata
+// Extract actual images from PDF page
 async function extractPageImages(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
   
-  // Simulate image extraction
-  // In a real implementation, this would extract actual images from the PDF
-  
-  const imageCount = Math.floor(Math.random() * 3) + 1; // 1-3 images per page
-  
-  for (let i = 0; i < imageCount; i++) {
-    const imageId = `img_${pageNumber}_${i + 1}`;
-    const imageWidth = 200 + (i * 50);
-    const imageHeight = 150 + (i * 30);
-    const x = 300 + (i * 250);
-    const y = height - 200 - (i * 180);
+  try {
+    console.log(`Extracting images from page ${pageNumber}...`);
     
-    // Generate placeholder image URL
-    const imageUrl = await generateMaterialImagePlaceholder(pageNumber, i, imageWidth, imageHeight);
+    // Get the page's resources to find images
+    const pageNode = page.node;
+    const resources = pageNode.Resources;
     
-    images.push({
-      id: imageId,
-      imageUrl,
-      imageType: 'material_sample',
-      caption: `Material sample ${pageNumber}-${i + 1}`,
-      altText: `High-quality material sample showing texture and finish details`,
-      bbox: { x, y, width: imageWidth, height: imageHeight },
-      pageNumber,
-      proximityScore: 0.85 + (Math.random() * 0.1),
-      associatedChunkIds: [] // Will be populated during chunking
-    });
+    if (resources && resources.XObject) {
+      const xObjects = resources.XObject;
+      console.log(`Found ${Object.keys(xObjects).length} XObjects on page ${pageNumber}`);
+      
+      for (const [name, xObjectRef] of Object.entries(xObjects)) {
+        try {
+          // Dereference the XObject
+          const xObject = pageNode.context.lookup(xObjectRef);
+          
+          if (xObject && xObject.Subtype && xObject.Subtype.name === 'Image') {
+            console.log(`Processing image XObject: ${name}`);
+            
+            // Extract image properties
+            const imageWidth = xObject.Width?.value || 200;
+            const imageHeight = xObject.Height?.value || 150;
+            
+            // Get image data
+            let imageBytes: Uint8Array | null = null;
+            let mimeType = 'image/jpeg'; // default
+            
+            try {
+              // Try to get the image data
+              if (xObject.data) {
+                imageBytes = new Uint8Array(xObject.data);
+              } else if (xObject.bytes) {
+                imageBytes = new Uint8Array(xObject.bytes);
+              } else {
+                // Try to decode the stream
+                const stream = xObject.stream;
+                if (stream) {
+                  imageBytes = new Uint8Array(stream);
+                }
+              }
+              
+              // Determine MIME type from filter
+              if (xObject.Filter) {
+                const filter = Array.isArray(xObject.Filter) ? xObject.Filter[0] : xObject.Filter;
+                if (filter && filter.name) {
+                  switch (filter.name) {
+                    case 'DCTDecode':
+                      mimeType = 'image/jpeg';
+                      break;
+                    case 'FlateDecode':
+                      mimeType = 'image/png';
+                      break;
+                    default:
+                      mimeType = 'image/jpeg';
+                  }
+                }
+              }
+              
+              if (imageBytes && imageBytes.length > 0) {
+                // Upload to Supabase storage
+                const filename = `extracted-img-p${pageNumber}-${name}-${Date.now()}.${mimeType === 'image/png' ? 'png' : 'jpg'}`;
+                const imageUrl = await uploadImageToStorage(imageBytes, filename, mimeType);
+                
+                if (imageUrl) {
+                  const imageId = `extracted_${pageNumber}_${name}`;
+                  images.push({
+                    id: imageId,
+                    imageUrl,
+                    imageType: 'extracted_image',
+                    caption: `Extracted image: ${name} from page ${pageNumber}`,
+                    altText: `Image extracted from PDF showing material or technical details`,
+                    bbox: { x: 50 + (images.length * 100), y: height - 200, width: imageWidth, height: imageHeight },
+                    pageNumber,
+                    proximityScore: 0.95,
+                    associatedChunkIds: []
+                  });
+                  
+                  console.log(`Successfully extracted and uploaded image: ${filename}`);
+                }
+              }
+              
+            } catch (imageProcessError) {
+              console.error(`Error processing image ${name}:`, imageProcessError);
+            }
+          }
+        } catch (xObjectError) {
+          console.error(`Error processing XObject ${name}:`, xObjectError);
+        }
+      }
+    }
+    
+    // If no images were extracted, create a material sample placeholder
+    if (images.length === 0) {
+      console.log(`No images extracted from page ${pageNumber}, generating material sample`);
+      const placeholderUrl = await generateMaterialSampleImage(pageNumber);
+      
+      if (placeholderUrl) {
+        images.push({
+          id: `sample_${pageNumber}`,
+          imageUrl: placeholderUrl,
+          imageType: 'material_sample',
+          caption: `Material sample for page ${pageNumber}`,
+          altText: `Generated material sample showing typical texture and properties`,
+          bbox: { x: 300, y: height - 250, width: 300, height: 200 },
+          pageNumber,
+          proximityScore: 0.8,
+          associatedChunkIds: []
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.error(`Error extracting images from page ${pageNumber}:`, error);
   }
   
   return images;
+}
+
+// Upload extracted image to Supabase storage
+async function uploadImageToStorage(imageBytes: Uint8Array, filename: string, mimeType: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from('material-images')
+      .upload(filename, imageBytes, {
+        contentType: mimeType,
+        upsert: true
+      });
+    
+    if (error) {
+      console.error('Storage upload error:', error);
+      return null;
+    }
+    
+    const { data: urlData } = supabase.storage
+      .from('material-images')
+      .getPublicUrl(filename);
+    
+    return urlData.publicUrl;
+    
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    return null;
+  }
+}
+
+// Generate material sample image as fallback
+async function generateMaterialSampleImage(pageNumber: number): Promise<string | null> {
+  try {
+    const prompt = `High-quality material sample, professional product photography, clean background, detailed texture, page ${pageNumber} specimen`;
+    
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-material-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        material_type: 'building_material',
+        style: 'professional'
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      return result.imageUrl || null;
+    }
+  } catch (error) {
+    console.error('Error generating material sample:', error);
+  }
+  
+  return null;
 }
 
 // Generate HTML for a single page
