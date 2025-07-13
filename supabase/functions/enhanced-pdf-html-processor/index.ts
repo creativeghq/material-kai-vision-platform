@@ -513,16 +513,87 @@ function generateTechnicalTable(materialType: string, pageNumber: number): strin
   return tableHTML;
 }
 
-// Generate material image placeholder
+// Generate actual material image and upload to storage
 async function generateMaterialImagePlaceholder(pageNumber: number, imageIndex: number, width: number, height: number): Promise<string> {
-  const colors = ['#D2B48C', '#A0522D', '#8B4513', '#C0C0C0', '#E6F3FF'];
-  const color = colors[(pageNumber + imageIndex) % colors.length];
-  
+  try {
+    // Define material types and their characteristics
+    const materialTypes = [
+      { name: 'Ceramic Tile', color: '#D2B48C', pattern: 'geometric' },
+      { name: 'Natural Stone', color: '#A0522D', pattern: 'organic' },
+      { name: 'Engineered Wood', color: '#8B4513', pattern: 'linear' },
+      { name: 'Metal Finish', color: '#C0C0C0', pattern: 'brushed' },
+      { name: 'Glass Panel', color: '#E6F3FF', pattern: 'smooth' }
+    ];
+    
+    const material = materialTypes[(pageNumber + imageIndex) % materialTypes.length];
+    
+    // Create a detailed prompt for the material image
+    const prompt = `A high-quality professional photograph of ${material.name.toLowerCase()} material sample. 
+    The sample shows detailed texture, surface finish, and material properties. 
+    Shot in professional lighting with clean white background, suitable for architectural specification. 
+    Material has ${material.pattern} pattern characteristics. 
+    Ultra high resolution, professional material photography, clean and crisp details.`;
+    
+    console.log(`Generating material image for: ${material.name}`);
+    
+    // Generate the image using the existing image generation function
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-material-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        width: Math.min(512, width),
+        height: Math.min(512, height),
+        materialType: material.name
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      if (result.imageUrl) {
+        console.log(`Generated material image: ${result.imageUrl}`);
+        return result.imageUrl;
+      }
+    }
+    
+    // Fallback: Create and upload SVG to storage
+    const fileName = `material-sample-${pageNumber}-${imageIndex}-${Date.now()}.svg`;
+    const svgContent = createMaterialSVG(material, width, height, pageNumber, imageIndex);
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('material-images')
+      .upload(fileName, new Blob([svgContent], { type: 'image/svg+xml' }));
+    
+    if (uploadError) {
+      console.error('Image upload error:', uploadError);
+      return `data:image/svg+xml;base64,${btoa(svgContent)}`;
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('material-images')
+      .getPublicUrl(fileName);
+    
+    return publicUrl;
+    
+  } catch (error) {
+    console.error('Error generating material image:', error);
+    // Return inline SVG as fallback
+    const material = { name: 'Material Sample', color: '#D2B48C', pattern: 'default' };
+    const svgContent = createMaterialSVG(material, width, height, pageNumber, imageIndex);
+    return `data:image/svg+xml;base64,${btoa(svgContent)}`;
+  }
+}
+
+// Create high-quality SVG material sample
+function createMaterialSVG(material: any, width: number, height: number, pageNumber: number, imageIndex: number): string {
   const svg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <pattern id="texture${pageNumber}_${imageIndex}" patternUnits="userSpaceOnUse" width="30" height="30">
-          <rect width="30" height="30" fill="${color}"/>
+          <rect width="30" height="30" fill="${material.color}"/>
           <circle cx="15" cy="15" r="5" fill="rgba(255,255,255,0.3)"/>
           <rect x="5" y="5" width="20" height="20" fill="none" stroke="rgba(0,0,0,0.1)" stroke-width="1"/>
           <line x1="0" y1="15" x2="30" y2="15" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
@@ -531,25 +602,34 @@ async function generateMaterialImagePlaceholder(pageNumber: number, imageIndex: 
         <filter id="shadow${pageNumber}_${imageIndex}">
           <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
         </filter>
+        <linearGradient id="materialGradient${pageNumber}_${imageIndex}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${material.color};stop-opacity:1" />
+          <stop offset="50%" style="stop-color:rgba(255,255,255,0.2);stop-opacity:0.3" />
+          <stop offset="100%" style="stop-color:${material.color};stop-opacity:0.8" />
+        </linearGradient>
       </defs>
-      <rect width="100%" height="100%" fill="url(#texture${pageNumber}_${imageIndex})" filter="url(#shadow${pageNumber}_${imageIndex})"/>
-      <rect width="100%" height="100%" fill="rgba(0,0,0,0.1)"/>
-      <text x="50%" y="30%" text-anchor="middle" font-family="Arial" font-size="16" font-weight="bold" fill="white">
+      <rect width="100%" height="100%" fill="url(#materialGradient${pageNumber}_${imageIndex})" filter="url(#shadow${pageNumber}_${imageIndex})"/>
+      <rect width="100%" height="100%" fill="url(#texture${pageNumber}_${imageIndex})" opacity="0.6"/>
+      <rect x="10" y="10" width="${width-20}" height="${height-20}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" rx="8"/>
+      <text x="50%" y="25%" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="white">
+        ${material.name.toUpperCase()}
+      </text>
+      <text x="50%" y="40%" text-anchor="middle" font-family="Arial" font-size="12" fill="white">
         MATERIAL SAMPLE
       </text>
-      <text x="50%" y="50%" text-anchor="middle" font-family="Arial" font-size="14" fill="white">
-        Page ${pageNumber} - Image ${imageIndex + 1}
+      <text x="50%" y="55%" text-anchor="middle" font-family="Arial" font-size="10" fill="white" opacity="0.8">
+        Page ${pageNumber} - Sample ${imageIndex + 1}
       </text>
-      <text x="50%" y="70%" text-anchor="middle" font-family="Arial" font-size="12" fill="white" opacity="0.8">
-        ${width}x${height}px
+      <text x="50%" y="70%" text-anchor="middle" font-family="Arial" font-size="9" fill="white" opacity="0.7">
+        ${width}×${height} px
       </text>
-      <text x="50%" y="85%" text-anchor="middle" font-family="Arial" font-size="10" fill="white" opacity="0.6">
-        Enhanced HTML Processing
+      <text x="50%" y="85%" text-anchor="middle" font-family="Arial" font-size="8" fill="white" opacity="0.6">
+        ${material.pattern} pattern
       </text>
     </svg>
   `;
   
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return svg;
 }
 
 // Generate embeddings for content chunks
