@@ -229,7 +229,7 @@ export class PDFWorkflowService {
           throw new Error('User not authenticated');
         }
 
-        console.log('Invoking enhanced-pdf-html-processor with:', {
+        console.log('Invoking convertapi-pdf-processor with:', {
           fileUrl: uploadResult.result?.publicUrl,
           originalFilename: file.name,
           userId: user.id
@@ -237,7 +237,7 @@ export class PDFWorkflowService {
 
         let response;
         try {
-          response = await supabase.functions.invoke('enhanced-pdf-html-processor', {
+          response = await supabase.functions.invoke('convertapi-pdf-processor', {
             body: {
               fileUrl: uploadResult.result?.publicUrl,
               originalFilename: file.name,
