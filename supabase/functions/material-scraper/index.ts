@@ -21,6 +21,20 @@ interface JinaExtractRequest {
     useSearch?: boolean;
     searchQuery?: string;
     rerank?: boolean;
+    // Firecrawl-specific targeting options
+    includeTags?: string[];
+    excludeTags?: string[];
+    onlyMainContent?: boolean;
+    waitFor?: number;
+    actions?: Array<{
+      type: string;
+      milliseconds?: number;
+      selector?: string;
+    }>;
+    location?: {
+      country?: string;
+      languages?: string[];
+    };
   };
 }
 
@@ -319,52 +333,77 @@ async function extractWithFirecrawlSimple(url: string, options: any): Promise<Ma
   }
 
   console.log('Using Firecrawl for:', url);
+  console.log('Options:', JSON.stringify(options, null, 2));
 
   try {
-    // First try to scrape with both markdown and extract formats
+    // Build the scrape request with all targeting options
+    const scrapeRequest: any = {
+      url: url,
+      formats: ["markdown", "extract"],
+      timeout: 20000,
+      onlyMainContent: options.onlyMainContent !== false, // Default to true
+      
+      // CSS targeting options
+      includeTags: options.includeTags || [],
+      excludeTags: options.excludeTags || [],
+      
+      // Wait and action options
+      waitFor: options.waitFor || 0,
+      actions: options.actions || [],
+      
+      // Location settings
+      location: options.location || { country: "US" },
+      
+      // Other scraping options
+      blockAds: true,
+      removeBase64Images: true,
+      
+      // Extract configuration with custom prompt
+      extract: {
+        prompt: options.prompt || options.extractionPrompt || 
+          "Extract all product/material information from this page. Look for product names, descriptions, prices, specifications, and any material properties. Include building materials, tiles, flooring, fixtures, furniture, or any construction/design products.",
+        schema: options.schema || {
+          type: "object",
+          properties: {
+            products: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string", description: "Product or material name" },
+                  description: { type: "string", description: "Product description or details" },
+                  price: { type: "string", description: "Price information if available" },
+                  category: { type: "string", description: "Material category (e.g., tiles, wood, metal, etc.)" },
+                  brand: { type: "string", description: "Brand or manufacturer" },
+                  specifications: { type: "object", description: "Technical specifications or properties" },
+                  availability: { type: "string", description: "Stock status or availability" },
+                  images: { type: "array", items: { type: "string" }, description: "Product image URLs" }
+                },
+                required: ["name"]
+              }
+            },
+            page_info: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                images: { type: "array", items: { type: "string" } }
+              }
+            }
+          }
+        }
+      }
+    };
+
+    console.log('Firecrawl request:', JSON.stringify(scrapeRequest, null, 2));
+
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        url: url,
-        formats: ["markdown", "extract"],
-        timeout: 20000,
-        extract: {
-          prompt: "Extract all product/material information from this page. Look for product names, descriptions, prices, specifications, and any material properties. Include building materials, tiles, flooring, fixtures, furniture, or any construction/design products.",
-          schema: {
-            type: "object",
-            properties: {
-              products: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string", description: "Product or material name" },
-                    description: { type: "string", description: "Product description or details" },
-                    price: { type: "string", description: "Price information if available" },
-                    category: { type: "string", description: "Material category (e.g., tiles, wood, metal, etc.)" },
-                    brand: { type: "string", description: "Brand or manufacturer" },
-                    specifications: { type: "object", description: "Technical specifications or properties" },
-                    availability: { type: "string", description: "Stock status or availability" }
-                  },
-                  required: ["name"]
-                }
-              },
-              page_info: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  images: { type: "array", items: { type: "string" } }
-                }
-              }
-            }
-          }
-        }
-      }),
+      body: JSON.stringify(scrapeRequest),
     });
 
     if (!response.ok) {

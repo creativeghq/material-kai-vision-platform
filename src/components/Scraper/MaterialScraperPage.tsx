@@ -100,7 +100,11 @@ Return a list of materials found on the page.`,
           sitemapMode: options.sitemapMode,
           options: {
             ...options,
-            service: options.service
+            service: options.service,
+            // Pass Firecrawl targeting options
+            includeTags: options.cssSelectors, // Map CSS selectors to includeTags
+            onlyMainContent: options.onlyMainContent,
+            waitFor: options.waitFor
           }
         }
       });
