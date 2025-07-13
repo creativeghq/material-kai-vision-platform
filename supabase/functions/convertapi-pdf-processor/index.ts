@@ -455,13 +455,77 @@ serve(async (req) => {
 
     } catch (processingError) {
       console.error('❌ Error during ConvertAPI PDF processing:', processingError);
+      console.error('Processing error details:', {
+        name: processingError instanceof Error ? processingError.name : 'Unknown',
+        message: processingError instanceof Error ? processingError.message : String(processingError),
+        step: 'PDF processing pipeline',
+        timestamp: new Date().toISOString()
+      });
+      
+      // Categorize processing errors with specific guidance
+      let errorCategory = 'PROCESSING_ERROR';
+      let userMessage = 'Failed during PDF processing pipeline.';
+      let troubleshooting: string[] = [];
+      let technicalDetails = processingError instanceof Error ? processingError.message : String(processingError);
+
+      if (processingError instanceof Error) {
+        const errorMsg = processingError.message.toLowerCase();
+        
+        if (errorMsg.includes('convertapi request failed')) {
+          errorCategory = 'CONVERTAPI_REQUEST_FAILED';
+          userMessage = 'ConvertAPI service rejected the PDF conversion request.';
+          troubleshooting = [
+            'Verify the PDF file is not corrupted or password-protected',
+            'Check if the file size is under 25MB limit',
+            'Ensure the PDF contains readable text (not just scanned images)',
+            'Try a different PDF file to test the service',
+            'Check ConvertAPI account credits and service status'
+          ];
+        } else if (errorMsg.includes('no html file')) {
+          errorCategory = 'CONVERSION_FAILED';
+          userMessage = 'PDF to HTML conversion did not produce expected output.';
+          troubleshooting = [
+            'The PDF may be corrupted or in an unsupported format',
+            'Try converting the PDF to a newer format first',
+            'Ensure the PDF has actual content (not just images)',
+            'Contact support with the problematic PDF file'
+          ];
+        } else if (errorMsg.includes('failed to download html')) {
+          errorCategory = 'DOWNLOAD_FAILED';
+          userMessage = 'Could not download the converted HTML from ConvertAPI.';
+          troubleshooting = [
+            'Check your internet connection stability',
+            'Retry the conversion process',
+            'ConvertAPI servers may be temporarily unavailable',
+            'Contact support if the issue persists'
+          ];
+        } else if (errorMsg.includes('failed to upload') || errorMsg.includes('storage')) {
+          errorCategory = 'STORAGE_ERROR';
+          userMessage = 'Failed to save processed files to Supabase storage.';
+          troubleshooting = [
+            'Check your internet connection',
+            'Verify Supabase storage buckets exist and are accessible',
+            'Check storage quota limits',
+            'Retry the upload after a few minutes'
+          ];
+        } else if (errorMsg.includes('knowledge base') || errorMsg.includes('database')) {
+          errorCategory = 'DATABASE_ERROR';
+          userMessage = 'Failed to save document information to the database.';
+          troubleshooting = [
+            'Check database connection and permissions',
+            'Verify user authentication is valid',
+            'Check if the database schema is up to date',
+            'Retry the operation after a few minutes'
+          ];
+        }
+      }
       
       await supabase
         .from('pdf_processing_results')
         .update({
           processing_status: 'failed',
           processing_completed_at: new Date().toISOString(),
-          error_message: processingError instanceof Error ? processingError.message : String(processingError),
+          error_message: `${errorCategory}: ${userMessage} | Technical: ${technicalDetails}`,
           processing_time_ms: Date.now() - startTime
         })
         .eq('id', processingId);
@@ -469,27 +533,126 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: processingError instanceof Error ? processingError.message : String(processingError),
-          errorType: processingError instanceof Error ? processingError.name : typeof processingError,
-          details: `ConvertAPI processing failed: ${processingError instanceof Error ? processingError.message : String(processingError)}`,
+          error: userMessage,
+          errorCategory: errorCategory,
+          technicalDetails: technicalDetails,
+          troubleshooting: troubleshooting,
+          timestamp: new Date().toISOString(),
           processingId,
-          context: 'convertapi_processing_step'
+          context: 'convertapi_processing_step',
+          debugInfo: {
+            step: 'PDF processing pipeline',
+            hasConvertApiKey: !!convertApiKey,
+            hasOpenAiKey: !!openaiApiKey,
+            processingTimeMs: Date.now() - startTime
+          }
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-  } catch (error) {
-    console.error('❌ Top-level error in ConvertAPI PDF processor:', error);
-    
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        errorType: error instanceof Error ? error.name : typeof error,
-        context: 'convertapi_initialization_error'
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
+    } catch (error) {
+      console.error('❌ Top-level error in ConvertAPI PDF processor:', error);
+      console.error('Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Categorize the error for better user guidance
+      let errorCategory = 'UNKNOWN_ERROR';
+      let userMessage = 'An unexpected error occurred during PDF processing.';
+      let troubleshooting: string[] = [];
+      let technicalDetails = error instanceof Error ? error.message : String(error);
+
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        
+        if (errorMsg.includes('convertapi_key') || errorMsg.includes('convertapi key')) {
+          errorCategory = 'API_KEY_MISSING';
+          userMessage = 'ConvertAPI key is not configured properly.';
+          troubleshooting = [
+            'Check that CONVERTAPI_KEY is set in Supabase Edge Function secrets',
+            'Verify the API key is valid and has sufficient credits',
+            'Contact your administrator to configure the API key'
+          ];
+        } else if (errorMsg.includes('convertapi request failed')) {
+          errorCategory = 'CONVERTAPI_REQUEST_FAILED';
+          userMessage = 'ConvertAPI service request failed.';
+          troubleshooting = [
+            'Check if the PDF file is valid and not corrupted',
+            'Verify the file is not password protected',
+            'Try with a smaller PDF file (under 10MB)',
+            'Check ConvertAPI service status and credits'
+          ];
+        } else if (errorMsg.includes('upload') || errorMsg.includes('storage')) {
+          errorCategory = 'STORAGE_ERROR';
+          userMessage = 'Failed to upload or store files in Supabase storage.';
+          troubleshooting = [
+            'Check your internet connection',
+            'Verify Supabase storage buckets are properly configured',
+            'Try uploading a smaller file',
+            'Check if you have sufficient storage quota'
+          ];
+        } else if (errorMsg.includes('embedding') || errorMsg.includes('openai')) {
+          errorCategory = 'EMBEDDING_ERROR';
+          userMessage = 'Failed to generate embeddings for the document.';
+          troubleshooting = [
+            'Check OpenAI API key configuration',
+            'Verify OpenAI API quota and billing',
+            'Try processing a smaller document',
+            'Check if the extracted text is valid'
+          ];
+        } else if (errorMsg.includes('knowledge base') || errorMsg.includes('database')) {
+          errorCategory = 'DATABASE_ERROR';
+          userMessage = 'Failed to save document to the knowledge base.';
+          troubleshooting = [
+            'Check database connection',
+            'Verify user permissions',
+            'Check if the document data is valid',
+            'Try processing again after a few minutes'
+          ];
+        } else if (errorMsg.includes('memory') || errorMsg.includes('limit')) {
+          errorCategory = 'MEMORY_LIMIT';
+          userMessage = 'Document is too large and exceeded memory limits.';
+          troubleshooting = [
+            'Try processing a smaller PDF file (under 5MB)',
+            'Split large documents into smaller sections',
+            'Reduce the page range for processing',
+            'Contact support for processing large documents'
+          ];
+        } else if (errorMsg.includes('timeout') || errorMsg.includes('time')) {
+          errorCategory = 'TIMEOUT_ERROR';
+          userMessage = 'Processing timed out due to document complexity.';
+          troubleshooting = [
+            'Try processing a simpler PDF document',
+            'Reduce the number of pages to process',
+            'Retry the operation',
+            'Contact support for complex documents'
+          ];
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: userMessage,
+          errorCategory: errorCategory,
+          technicalDetails: technicalDetails,
+          troubleshooting: troubleshooting,
+          timestamp: new Date().toISOString(),
+          context: 'convertapi_initialization_error',
+          // Additional debug info
+          debugInfo: {
+            errorType: error instanceof Error ? error.name : typeof error,
+            hasConvertApiKey: !!convertApiKey,
+            hasOpenAiKey: !!openaiApiKey,
+            requestMethod: 'POST',
+            functionName: 'convertapi-pdf-processor'
+          }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 });

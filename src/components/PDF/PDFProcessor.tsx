@@ -38,6 +38,9 @@ interface ProcessingStatus {
   progress?: number;
   result?: ProcessingResult;
   error?: string;
+  errorCategory?: string;
+  troubleshooting?: string[];
+  technicalDetails?: string;
 }
 
 export const PDFProcessor: React.FC = () => {
@@ -151,19 +154,62 @@ export const PDFProcessor: React.FC = () => {
     } catch (error) {
       console.error('PDF processing error:', error);
       
+      let errorMessage = 'Unknown error occurred';
+      let errorCategory = 'UNKNOWN_ERROR';
+      let troubleshooting: string[] = [];
+      let technicalDetails = '';
+
+      // Check if it's an enhanced error response from the edge function
+      if (response?.data && !response.data.success) {
+        errorMessage = response.data.error || 'PDF processing failed';
+        errorCategory = response.data.errorCategory || 'PROCESSING_ERROR';
+        troubleshooting = response.data.troubleshooting || [];
+        technicalDetails = response.data.technicalDetails || '';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+        technicalDetails = error.message;
+        
+        // Add basic troubleshooting for common errors
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorCategory = 'NETWORK_ERROR';
+          troubleshooting = [
+            'Check your internet connection',
+            'Try again in a few minutes',
+            'Verify the PDF file is accessible'
+          ];
+        } else if (error.message.includes('auth')) {
+          errorCategory = 'AUTHENTICATION_ERROR';
+          troubleshooting = [
+            'Please log in again',
+            'Check if your session has expired',
+            'Refresh the page and try again'
+          ];
+        } else if (error.message.includes('upload') || error.message.includes('storage')) {
+          errorCategory = 'STORAGE_ERROR';
+          troubleshooting = [
+            'Check your internet connection',
+            'Verify file size is under 50MB',
+            'Try uploading again'
+          ];
+        }
+      }
+      
       setProcessing(prev => prev.map(p => 
         p.id === processingId 
           ? { 
               ...p, 
               status: 'failed', 
-              error: error instanceof Error ? error.message : 'Unknown error'
+              error: errorMessage,
+              errorCategory,
+              troubleshooting,
+              technicalDetails
             }
           : p
       ));
 
       toast({
-        title: "Processing Failed",
-        description: `Failed to process ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        title: `Processing Failed: ${errorCategory.replace(/_/g, ' ')}`,
+        description: `${errorMessage}${troubleshooting.length > 0 ? ' (See troubleshooting steps below)' : ''}`,
         variant: "destructive",
       });
     } finally {
@@ -338,10 +384,34 @@ export const PDFProcessor: React.FC = () => {
                       )}
                       
                       {item.error && (
-                        <Alert className="mt-2">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>{item.error}</AlertDescription>
-                        </Alert>
+                        <div className="mt-2 space-y-2">
+                          <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                              <div className="font-medium text-sm mb-2">
+                                {item.errorCategory ? `${item.errorCategory.replace(/_/g, ' ')}: ` : ''}{item.error}
+                              </div>
+                              {item.troubleshooting && item.troubleshooting.length > 0 && (
+                                <div className="text-xs space-y-1">
+                                  <div className="font-medium">Troubleshooting Steps:</div>
+                                  <ul className="list-disc list-inside space-y-1 ml-2">
+                                    {item.troubleshooting.map((step, idx) => (
+                                      <li key={idx}>{step}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {item.technicalDetails && (
+                                <details className="mt-2">
+                                  <summary className="text-xs cursor-pointer text-muted-foreground">Technical Details</summary>
+                                  <div className="text-xs mt-1 p-2 bg-muted rounded font-mono">
+                                    {item.technicalDetails}
+                                  </div>
+                                </details>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        </div>
                       )}
                     </div>
                   </div>
