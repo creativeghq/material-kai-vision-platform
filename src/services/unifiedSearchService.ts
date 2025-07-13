@@ -23,18 +23,114 @@ export interface UnifiedSearchResult {
 
 export interface UnifiedSearchResponse {
   success: boolean;
-  query: string;
+  query?: string;
   results: UnifiedSearchResult[];
-  suggestions: {
+  knowledge_results?: any[];
+  suggestions?: {
     materials: string[];
     applications: string[];
     relatedQueries: string[];
   };
-  totalResults: number;
-  processingTime: number;
+  total_results?: number;
+  totalResults?: number;
+  processing_time_ms?: number;
+  processingTime?: number;
+  search_metadata?: any;
+}
+
+export interface UnifiedSearchOptions {
+  includeKnowledge?: boolean;
+  includePDFContent?: boolean;
+  limit?: number;
 }
 
 export class UnifiedSearchService {
+  /**
+   * Search materials with various options
+   */
+  static async searchMaterials(params: {
+    query: string;
+    searchType: 'enhanced_text' | 'specification_match' | 'semantic_search';
+    includeKnowledge?: boolean;
+    includePDFContent?: boolean;
+    limit?: number;
+  }): Promise<UnifiedSearchResponse> {
+    const startTime = Date.now();
+
+    try {
+      if (params.searchType === 'enhanced_text' || params.searchType === 'specification_match') {
+        // Use enhanced vector search
+        const { data, error } = await supabase.functions.invoke('vector-similarity-search', {
+          body: {
+            query: params.query,
+            search_type: 'text',
+            confidence_threshold: params.searchType === 'specification_match' ? 0.8 : 0.6,
+            limit: params.limit || 15
+          }
+        });
+
+        if (error) throw error;
+
+        // Search enhanced knowledge base if requested
+        let knowledgeResults = [];
+        if (params.includePDFContent) {
+          const { data: enhancedKB } = await supabase
+            .from('enhanced_knowledge_base')
+            .select('*')
+            .or(`title.ilike.%${params.query}%,content.ilike.%${params.query}%,search_keywords.cs.{${params.query}}`)
+            .eq('status', 'published')
+            .limit(8);
+
+          knowledgeResults = enhancedKB || [];
+        }
+
+        return {
+          success: true,
+          results: data?.results || [],
+          knowledge_results: knowledgeResults,
+          total_results: (data?.results?.length || 0) + knowledgeResults.length,
+          processing_time_ms: Date.now() - startTime,
+          search_metadata: {
+            query: params.query,
+            search_type: params.searchType,
+            enhanced: true
+          }
+        };
+      }
+
+      // Fallback to basic search
+      const results = await this.search({
+        query: params.query,
+        type: 'text',
+        maxResults: params.limit
+      });
+
+      return {
+        success: true,
+        results: results.results,
+        knowledge_results: [],
+        total_results: results.results.length,
+        processing_time_ms: Date.now() - startTime,
+        search_metadata: {
+          query: params.query,
+          search_type: params.searchType
+        }
+      };
+
+    } catch (error) {
+      console.error('Search materials error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect if query contains specifications
+   */
+  static isSpecificationQuery(query: string): boolean {
+    const specKeywords = ['x', 'mm', 'cm', 'inch', 'resistance', 'fire', 'water', 'slip', 'grade', 'class'];
+    return specKeywords.some(keyword => query.toLowerCase().includes(keyword));
+  }
+
   /**
    * Unified search supporting text, image, and hybrid queries
    * Integrates PDF knowledge base, materials catalog, and vector similarity
