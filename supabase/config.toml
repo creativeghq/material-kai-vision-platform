@@ -56,4 +56,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.material-scraper]
-verify_jwt = false
+verify_jwt = true
