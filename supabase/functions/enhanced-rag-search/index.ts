@@ -84,12 +84,24 @@ serve(async (req) => {
     // Analyze query intent
     const queryIntent = analyzeQueryIntent(query);
 
-    // Search materials catalog (primary source)
+    // Search enhanced knowledge base (primary PDF content source)
+    const { data: knowledgeResults, error: kbError } = await supabase
+      .from('enhanced_knowledge_base')
+      .select('*')
+      .or(`title.ilike.%${query}%,content.ilike.%${query}%,search_keywords.cs.{${query}}`)
+      .eq('status', 'published')
+      .limit(maxResults);
+
+    if (kbError) {
+      console.error('Knowledge base search error:', kbError);
+    }
+
+    // Search materials catalog (secondary source)
     const { data: materialResults, error: matError } = await supabase
       .from('materials_catalog')
       .select('*')
       .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-      .limit(maxResults);
+      .limit(Math.floor(maxResults / 2));
 
     if (matError) {
       console.error('Material search error:', matError);
@@ -106,14 +118,30 @@ serve(async (req) => {
           id, name, description, category, properties
         )
       `)
-      .limit(maxResults);
+      .limit(Math.floor(maxResults / 2));
 
     if (embError) {
       console.error('Embedding search error:', embError);
     }
 
-    // Format results - now materials catalog is the primary knowledge source
+    // Format results - enhanced knowledge base is now the primary source
     const results = {
+      knowledgeBase: (knowledgeResults || []).map(item => ({
+        id: item.id,
+        title: item.title,
+        content: item.content.substring(0, 500) + '...',
+        confidence: (item.confidence_scores?.overall || 0.8),
+        type: 'knowledge_document',
+        source: 'pdf_document',
+        categories: item.material_categories || [],
+        keywords: item.search_keywords || [],
+        metadata: {
+          source_url: item.source_url,
+          technical_complexity: item.technical_complexity,
+          material_categories: item.material_categories,
+          processing_method: item.metadata?.processing_method
+        }
+      })),
       materials: (materialResults || []).map(item => ({
         id: item.id,
         title: item.name,
@@ -142,7 +170,7 @@ serve(async (req) => {
       await supabase.from('search_analytics').insert({
         user_id: userId,
         query_text: query,
-        total_results: results.materials.length + results.embeddedMaterials.length,
+        total_results: results.knowledgeBase.length + results.materials.length + results.embeddedMaterials.length,
         response_time_ms: 150,
         query_processing_time_ms: 50
       });
@@ -156,7 +184,7 @@ serve(async (req) => {
         query: query,
         intent: queryIntent,
         results: results,
-        totalResults: results.materials.length + results.embeddedMaterials.length
+        totalResults: results.knowledgeBase.length + results.materials.length + results.embeddedMaterials.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
