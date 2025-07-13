@@ -299,69 +299,140 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
   const images: DocumentImage[] = [];
   
   try {
-    console.log(`Extracting images from page ${pageNumber}...`);
+    console.log(`=== STARTING IMAGE EXTRACTION for page ${pageNumber} ===`);
+    console.log(`Page dimensions: ${width}x${height}`);
     
     // Extract images using page resources (XObjects)
     const pageNode = page.node;
-    const resources = pageNode?.Resources;
+    console.log(`Page node type: ${typeof pageNode}, exists: ${!!pageNode}`);
     
-    if (resources && resources.XObject) {
+    if (!pageNode) {
+      console.error(`No page node found for page ${pageNumber}`);
+      return images;
+    }
+    
+    const resources = pageNode.Resources;
+    console.log(`Resources type: ${typeof resources}, exists: ${!!resources}`);
+    
+    if (!resources) {
+      console.log(`No resources found on page ${pageNumber}`);
+      return images;
+    }
+    
+    console.log(`Resources keys: ${Object.keys(resources)}`);
+    
+    if (resources.XObject) {
       const xObjects = resources.XObject;
-      console.log(`Found ${Object.keys(xObjects).length} XObjects on page ${pageNumber}`);
+      const xObjectKeys = Object.keys(xObjects);
+      console.log(`Found ${xObjectKeys.length} XObjects on page ${pageNumber}: [${xObjectKeys.join(', ')}]`);
       
       let imageIndex = 0;
       
       for (const [name, xObjectRef] of Object.entries(xObjects)) {
         try {
-          const xObject = pageNode.context.lookup(xObjectRef);
+          console.log(`\n--- Processing XObject: ${name} ---`);
+          console.log(`XObject reference type: ${typeof xObjectRef}`);
           
-          if (xObject && xObject.get('Subtype')?.name === 'Image') {
-            console.log(`Processing image XObject: ${name} on page ${pageNumber}`);
+          const xObject = pageNode.context.lookup(xObjectRef);
+          console.log(`Looked up XObject, type: ${typeof xObject}, exists: ${!!xObject}`);
+          
+          if (!xObject) {
+            console.log(`Failed to lookup XObject ${name}`);
+            continue;
+          }
+          
+          const subtype = xObject.get ? xObject.get('Subtype') : null;
+          console.log(`XObject subtype: ${subtype?.name || 'none'}`);
+          
+          if (xObject && subtype?.name === 'Image') {
+            console.log(`✓ Confirmed ${name} is an Image XObject`);
             
-            // Get image data
+            // Get image properties
             const filter = xObject.get('Filter');
-            const imageWidth = xObject.get('Width')?.value || 200;
-            const imageHeight = xObject.get('Height')?.value || 150;
+            const imageWidth = xObject.get('Width');
+            const imageHeight = xObject.get('Height');
+            const colorSpace = xObject.get('ColorSpace');
+            const bitsPerComponent = xObject.get('BitsPerComponent');
+            
+            console.log(`Image properties for ${name}:`);
+            console.log(`  - Width: ${imageWidth?.value || 'unknown'}`);
+            console.log(`  - Height: ${imageHeight?.value || 'unknown'}`);
+            console.log(`  - Filter: ${filter?.name || Array.isArray(filter) ? filter.map(f => f.name).join(', ') : 'none'}`);
+            console.log(`  - ColorSpace: ${colorSpace?.name || 'unknown'}`);
+            console.log(`  - BitsPerComponent: ${bitsPerComponent?.value || 'unknown'}`);
             
             let imageData: Uint8Array | null = null;
             let mimeType = 'image/jpeg';
             
+            // Try multiple methods to extract image data
+            console.log(`Attempting to extract image data from ${name}...`);
+            
             try {
-              const rawData = xObject.getContents();
-              if (rawData && rawData.length > 0) {
-                imageData = new Uint8Array(rawData);
-                console.log(`Extracted ${imageData.length} bytes from ${name}`);
+              if (xObject.getContents) {
+                console.log(`Trying getContents() method...`);
+                const rawData = xObject.getContents();
+                console.log(`getContents() returned: ${typeof rawData}, length: ${rawData?.length || 0}`);
                 
-                // Determine format based on filter
-                if (filter) {
-                  const filterName = Array.isArray(filter) ? filter[0]?.name : filter.name;
-                  switch (filterName) {
-                    case 'DCTDecode':
-                      mimeType = 'image/jpeg';
-                      break;
-                    case 'FlateDecode':
-                      mimeType = 'image/png';
-                      break;
-                    default:
-                      mimeType = 'image/jpeg';
-                  }
+                if (rawData && rawData.length > 0) {
+                  imageData = new Uint8Array(rawData);
+                  console.log(`✓ Successfully extracted ${imageData.length} bytes using getContents()`);
                 }
+              } else {
+                console.log(`getContents() method not available`);
               }
+              
+              // If getContents failed, try direct data access
+              if (!imageData && xObject.data) {
+                console.log(`Trying direct data property...`);
+                imageData = new Uint8Array(xObject.data);
+                console.log(`✓ Successfully extracted ${imageData.length} bytes using direct data`);
+              }
+              
+              // Try stream access
+              if (!imageData && xObject.bytes) {
+                console.log(`Trying bytes property...`);
+                imageData = new Uint8Array(xObject.bytes);
+                console.log(`✓ Successfully extracted ${imageData.length} bytes using bytes`);
+              }
+              
             } catch (dataError) {
-              console.log(`Could not extract data from XObject ${name}:`, dataError.message);
+              console.error(`Error extracting data from XObject ${name}:`, dataError);
+            }
+            
+            // Determine MIME type from filter
+            if (filter) {
+              const filterName = Array.isArray(filter) ? filter[0]?.name : filter.name;
+              console.log(`Determining MIME type from filter: ${filterName}`);
+              switch (filterName) {
+                case 'DCTDecode':
+                  mimeType = 'image/jpeg';
+                  break;
+                case 'FlateDecode':
+                  mimeType = 'image/png';
+                  break;
+                case 'CCITTFaxDecode':
+                  mimeType = 'image/tiff';
+                  break;
+                default:
+                  mimeType = 'image/jpeg';
+              }
+              console.log(`Set MIME type to: ${mimeType}`);
             }
             
             if (imageData && imageData.length > 100) {
-              const extension = mimeType.split('/')[1];
-              const filename = `extracted-img-p${pageNumber}-${name}-${Date.now()}.${extension}`;
+              console.log(`✓ Image data is valid (${imageData.length} bytes), proceeding with upload...`);
               
-              console.log(`Uploading image: ${filename} (${imageData.length} bytes, ${imageWidth}x${imageHeight})`);
+              const extension = mimeType.split('/')[1];
+              const filename = `pdf-extracted-p${pageNumber}-${name}-${Date.now()}.${extension}`;
+              
+              console.log(`Uploading image: ${filename}`);
               
               const imageUrl = await uploadImageToStorage(imageData, filename, mimeType);
+              console.log(`Upload result: ${imageUrl || 'FAILED'}`);
               
               if (imageUrl) {
                 const imageId = `extracted_${pageNumber}_${imageIndex}`;
-                images.push({
+                const imageObj = {
                   id: imageId,
                   imageUrl,
                   imageType: 'extracted_image',
@@ -370,35 +441,41 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
                   bbox: { 
                     x: 50 + (imageIndex * 120), 
                     y: height - 200 - (imageIndex * 50), 
-                    width: Math.min(imageWidth, 300), 
-                    height: Math.min(imageHeight, 200) 
+                    width: Math.min(imageWidth?.value || 300, 300), 
+                    height: Math.min(imageHeight?.value || 200, 200) 
                   },
                   pageNumber,
                   proximityScore: 0.95,
                   associatedChunkIds: []
-                });
+                };
                 
-                console.log(`Successfully extracted and uploaded image: ${filename} -> ${imageUrl}`);
+                images.push(imageObj);
+                console.log(`✓ Successfully created image object:`, JSON.stringify(imageObj, null, 2));
                 imageIndex++;
+              } else {
+                console.error(`❌ Failed to upload image ${filename}`);
               }
             } else {
-              console.log(`Skipping ${name} - insufficient image data (${imageData?.length || 0} bytes)`);
+              console.log(`❌ Skipping ${name} - insufficient image data (${imageData?.length || 0} bytes)`);
             }
           } else {
-            console.log(`Skipping ${name} - not an image XObject (type: ${xObject?.get('Subtype')?.name || 'unknown'})`);
+            console.log(`❌ Skipping ${name} - not an image XObject (subtype: ${subtype?.name || 'none'})`);
           }
         } catch (xObjectError) {
-          console.error(`Error processing XObject ${name}:`, xObjectError);
+          console.error(`❌ Error processing XObject ${name}:`, xObjectError);
         }
+        
+        console.log(`--- End processing XObject: ${name} ---\n`);
       }
     } else {
-      console.log(`No XObjects found on page ${pageNumber}`);
+      console.log(`❌ No XObjects found on page ${pageNumber}`);
     }
     
-    console.log(`Successfully extracted ${images.length} images from page ${pageNumber}`);
+    console.log(`=== COMPLETED IMAGE EXTRACTION for page ${pageNumber} ===`);
+    console.log(`Total images extracted: ${images.length}`);
     
   } catch (error) {
-    console.error(`Error extracting images from page ${pageNumber}:`, error);
+    console.error(`❌ FATAL ERROR extracting images from page ${pageNumber}:`, error);
   }
   
   return images;
