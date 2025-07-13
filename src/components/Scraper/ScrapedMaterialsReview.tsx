@@ -19,9 +19,20 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+interface ScrapedMaterial {
+  name: string;
+  description?: string;
+  category?: string;
+  price?: string;
+  images: string[];
+  properties: Record<string, any>;
+  sourceUrl: string;
+  supplier?: string;
+}
+
 interface ScrapedMaterialTemp {
   id: string;
-  material_data: any;
+  material_data: ScrapedMaterial;
   source_url: string;
   scraped_at: string;
   reviewed: boolean;
@@ -32,8 +43,8 @@ interface ScrapedMaterialTemp {
 
 interface ScrapedMaterialsReviewProps {
   sessionId?: string | null;
-  currentResults?: any[];
-  onMaterialsUpdate?: (materials: any[]) => void;
+  currentResults?: ScrapedMaterial[];
+  onMaterialsUpdate?: (materials: ScrapedMaterial[]) => void;
   onAddAllToCatalog?: () => void;
   isLoading?: boolean;
 }

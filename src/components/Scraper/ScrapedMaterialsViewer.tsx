@@ -39,9 +39,11 @@ interface ScrapedMaterialsViewerProps {
 }
 
 const materialCategories = [
-  'metals', 'plastics', 'ceramics', 'composites', 'textiles', 
+  'metals', 'plastics', 'ceramics', 'composites', 'textiles',
   'wood', 'glass', 'rubber', 'concrete', 'other'
-];
+] as const;
+
+type MaterialCategory = typeof materialCategories[number];
 
 const effects = [
   'Wood', 'Stone & marble', 'Concrete', 'Brick', 'Metal',
@@ -85,8 +87,8 @@ export const ScrapedMaterialsViewer: React.FC<ScrapedMaterialsViewerProps> = ({
       }
 
       // Prepare material data for database
-      const validCategory = materialCategories.includes(material.category || 'other') 
-        ? (material.category as 'metals' | 'plastics' | 'ceramics' | 'composites' | 'textiles' | 'wood' | 'glass' | 'rubber' | 'concrete' | 'other')
+      const validCategory: MaterialCategory = materialCategories.includes(material.category as MaterialCategory)
+        ? (material.category as MaterialCategory)
         : 'other';
 
       const materialData = {
