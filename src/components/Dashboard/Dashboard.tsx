@@ -1,60 +1,143 @@
 import React from 'react';
-import { Eye, Database, Brain, Grid3X3 } from 'lucide-react';
+import { SearchHub } from './SearchHub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { 
+  FileText, 
+  Database, 
+  Brain, 
+  Sparkles, 
+  Upload,
+  Star,
+  Package,
+  Palette
+} from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to KAI Platform - Your material intelligence hub</p>
+      {/* Hero Section */}
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          Material Intelligence Platform
+        </h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          AI-powered PDF knowledge extraction, intelligent search, and 3D material suggestions
+        </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Materials Recognized</CardTitle>
-            <Eye className="w-4 h-4 text-muted-foreground" />
+      {/* Main Search Interface */}
+      <SearchHub 
+        onMaterialSelect={(materialId) => {
+          console.log('Material selected:', materialId);
+          window.location.href = `/catalog?material=${materialId}`;
+        }}
+        onNavigateToMoodboard={() => {
+          window.location.href = '/moodboard';
+        }}
+        onNavigateTo3D={() => {
+          window.location.href = '/3d';
+        }}
+      />
+
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/pdf-processing'}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <FileText className="h-8 w-8 text-blue-500" />
+              <span className="text-sm text-muted-foreground">Core System</span>
+            </div>
+            <CardTitle className="text-lg">PDF Knowledge</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,247</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Upload and process PDF documents for material intelligence
+            </p>
+            <Button variant="outline" size="sm" className="w-full">
+              <Upload className="h-4 w-4 mr-2" />
+              Upload PDF
+            </Button>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Catalog Items</CardTitle>
-            <Database className="w-4 h-4 text-muted-foreground" />
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/3d'}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <Sparkles className="h-8 w-8 text-purple-500" />
+              <span className="text-sm text-muted-foreground">AI Powered</span>
+            </div>
+            <CardTitle className="text-lg">3D Generation</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8,432</div>
-            <p className="text-xs text-muted-foreground">+248 this week</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Generate 3D designs with intelligent material suggestions
+            </p>
+            <Button variant="outline" size="sm" className="w-full">
+              <Brain className="h-4 w-4 mr-2" />
+              Create Design
+            </Button>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Confidence</CardTitle>
-            <Brain className="w-4 h-4 text-muted-foreground" />
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/catalog'}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <Package className="h-8 w-8 text-green-500" />
+              <span className="text-sm text-muted-foreground">8,432 Items</span>
+            </div>
+            <CardTitle className="text-lg">Material Catalog</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">94.2%</div>
-            <p className="text-xs text-muted-foreground">+2.1% improvement</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Browse comprehensive material database
+            </p>
+            <Button variant="outline" size="sm" className="w-full">
+              <Database className="h-4 w-4 mr-2" />
+              Browse Catalog
+            </Button>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-            <Grid3X3 className="w-4 h-4 text-muted-foreground" />
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => window.location.href = '/moodboard'}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <Palette className="h-8 w-8 text-orange-500" />
+              <span className="text-sm text-muted-foreground">Collections</span>
+            </div>
+            <CardTitle className="text-lg">MoodBoard</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23</div>
-            <p className="text-xs text-muted-foreground">5 completed this week</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Create and manage material collections
+            </p>
+            <Button variant="outline" size="sm" className="w-full">
+              <Star className="h-4 w-4 mr-2" />
+              Create Board
+            </Button>
           </CardContent>
         </Card>
+      </div>
+
+      {/* System Status */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">1,247</div>
+          <div className="text-sm text-muted-foreground">PDFs Processed</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-blue-600">8,432</div>
+          <div className="text-sm text-muted-foreground">Search Queries</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-purple-600">94.2%</div>
+          <div className="text-sm text-muted-foreground">AI Accuracy</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-orange-600">99.8%</div>
+          <div className="text-sm text-muted-foreground">System Uptime</div>
+        </div>
       </div>
     </div>
   );

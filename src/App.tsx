@@ -29,6 +29,8 @@ import { NeRFReconstructionPage } from "./components/NeRF/NeRFReconstructionPage
 import { OCRProcessor } from "./components/OCR/OCRProcessor";
 import { IntegratedRAGManagement } from "./components/Admin/IntegratedRAGManagement";
 import PDFProcessing from "./pages/PDFProcessing";
+import SearchHub from "./pages/SearchHub";
+import { MaterialSuggestionsPanel } from "./components/Admin/MaterialSuggestionsPanel";
 import { MaterialScraperPage } from "./components/Scraper/MaterialScraperPage";
 
 const queryClient = new QueryClient();
@@ -158,6 +160,34 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <PDFProcessing />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/pdf-processing" element={
+              <AuthGuard>
+                <Layout>
+                  <PDFProcessing />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/search-hub" element={
+              <AuthGuard>
+                <Layout>
+                  <SearchHub />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/admin/search-hub" element={
+              <AuthGuard>
+                <Layout>
+                  <SearchHub />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/admin/3d-suggestions" element={
+              <AuthGuard>
+                <Layout>
+                  <MaterialSuggestionsPanel />
                 </Layout>
               </AuthGuard>
             } />

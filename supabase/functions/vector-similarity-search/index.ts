@@ -21,11 +21,56 @@ interface SearchRequest {
   search_type: 'text' | 'image' | 'hybrid';
 }
 
+async function enhanceNaturalLanguageQuery(text: string): Promise<string> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) return text;
+
+  try {
+    // Enhance the query with AI to extract material specifications
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a material specification expert. Extract and expand material properties from user queries. Return only the enhanced query with material properties, dimensions, characteristics, and related technical terms. Be concise but comprehensive.'
+          },
+          {
+            role: 'user',
+            content: `Enhance this material query: "${text}"`
+          }
+        ],
+        max_tokens: 200,
+        temperature: 0.1
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const enhanced = data.choices[0].message.content;
+      console.log(`Enhanced query: "${text}" -> "${enhanced}"`);
+      return enhanced;
+    }
+  } catch (error) {
+    console.log('Query enhancement failed, using original:', error);
+  }
+  
+  return text;
+}
+
 async function generateQueryEmbedding(text: string): Promise<number[]> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured');
   }
+
+  // First enhance the query for better material matching
+  const enhancedQuery = await enhanceNaturalLanguageQuery(text);
 
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
@@ -35,7 +80,7 @@ async function generateQueryEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: 'text-embedding-3-large',
-      input: text
+      input: enhancedQuery
     }),
   });
 
@@ -127,21 +172,47 @@ async function performVectorSearch(
   return results;
 }
 
-async function searchKnowledgeBase(query: string, limit = 5) {
-  // Search in material knowledge base
-  const { data, error } = await supabase
+async function searchEnhancedKnowledgeBase(query: string, limit = 10) {
+  // Search in enhanced knowledge base (prioritizing PDF content)
+  const { data: enhancedResults, error: enhancedError } = await supabase
+    .from('enhanced_knowledge_base')
+    .select('*')
+    .or(`title.ilike.%${query}%,content.ilike.%${query}%,search_keywords.cs.{${query}}`)
+    .eq('status', 'published')
+    .order('relevance_score', { ascending: false })
+    .limit(limit);
+
+  if (enhancedError) {
+    console.error('Enhanced knowledge search error:', enhancedError);
+  }
+
+  // Also search legacy material knowledge
+  const { data: legacyResults, error: legacyError } = await supabase
     .from('material_knowledge')
     .select('*')
     .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
     .order('relevance_score', { ascending: false })
-    .limit(limit);
+    .limit(Math.floor(limit / 2));
 
-  if (error) {
-    console.error('Knowledge search error:', error);
-    return [];
+  if (legacyError) {
+    console.error('Legacy knowledge search error:', legacyError);
   }
 
-  return data || [];
+  // Combine and format results
+  const combined = [
+    ...(enhancedResults || []).map(item => ({
+      ...item,
+      source_type: 'enhanced_pdf',
+      confidence: item.confidence_scores?.overall || 0.8
+    })),
+    ...(legacyResults || []).map(item => ({
+      ...item,
+      source_type: 'legacy_knowledge',
+      confidence: item.relevance_score || 0.5
+    }))
+  ];
+
+  return combined.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
 }
 
 async function processSearch(request: SearchRequest) {
@@ -180,9 +251,9 @@ async function processSearch(request: SearchRequest) {
       request.limit || 10
     );
 
-    // Search knowledge base for additional context
+    // Search enhanced knowledge base for additional context
     const knowledgeResults = request.query ? 
-      await searchKnowledgeBase(request.query, 5) : [];
+      await searchEnhancedKnowledgeBase(request.query, 8) : [];
 
     // Enhance results with additional material data
     const enhancedResults = await Promise.all(

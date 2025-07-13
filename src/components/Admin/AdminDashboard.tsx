@@ -16,7 +16,8 @@ import {
   ArrowLeft,
   Home,
   FileText,
-  Globe
+  Globe,
+  Upload
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -24,117 +25,86 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const adminSections = [
     {
-      title: "API Gateway",
-      description: "Manage API endpoints, access control, and rate limiting",
-      icon: Shield,
-      path: "/admin/api-gateway",
-      status: "active",
-      count: "24 endpoints"
-    },
-    {
-      title: "Analytics Dashboard",
-      description: "AI performance metrics and system analytics",
-      icon: BarChart3,
-      path: "/admin/analytics",
-      status: "active",
-      count: "15 active models"
-    },
-    {
-      title: "Agent ML Coordination", 
-      description: "Monitor agent assignments and ML task distribution",
-      icon: Brain,
-      path: "/admin/agent-ml",
-      status: "processing",
-      count: "8 active tasks"
-    },
-    {
-      title: "Knowledge Base Management",
-      description: "View, edit, and manage knowledge base entries",
-      icon: Database,
-      path: "/admin/knowledge-base",
-      status: "active", 
-      count: "1,247 entries"
-    },
-    {
-      title: "Material Analysis",
-      description: "Advanced material properties and analysis results",
-      icon: Microscope,
-      path: "/admin/material-analysis",
-      status: "active",
-      count: "342 analyses"
-    },
-    {
-      title: "Training & Models",
-      description: "ML model training, CLIP, and classification management",
-      icon: Settings,
-      path: "/admin/training-models",
-      status: "training",
-      count: "3 training"
-    },
-    {
-      title: "System Performance",
-      description: "Processing queues, performance metrics, and monitoring",
-      icon: Activity,
-      path: "/admin/performance", 
-      status: "active",
-      count: "99.8% uptime"
-    },
-    {
-      title: "RAG Management",
-      description: "Enhanced RAG system configuration and optimization",
-      icon: Search,
-      path: "/admin/rag",
-      status: "active",
-      count: "5 providers"
-    },
-    {
-      title: "Metadata Fields",
-      description: "Configure dynamic material metadata fields",
-      icon: Tags,
-      path: "/admin/metadata",
-      status: "active", 
-      count: "23 fields"
-    },
-    {
-      title: "SVBRDF Processing",
-      description: "Standalone SVBRDF material extraction tools",
-      icon: Microscope,
-      path: "/admin/svbrdf",
-      status: "active",
-      count: "Advanced tools"
-    },
-    {
-      title: "NeRF Reconstruction",
-      description: "3D scene reconstruction from images",
-      icon: Brain,
-      path: "/admin/nerf",
-      status: "active",
-      count: "Standalone mode"
-    },
-    {
-      title: "OCR Processing",
-      description: "Text extraction from material images",
-      icon: Search,
-      path: "/admin/ocr",
-      status: "active",
-      count: "Text analysis"
-    },
-    {
-      title: "PDF Processing",
-      description: "Extract materials from PDF catalogs and specifications",
+      title: "PDF Knowledge Base",
+      description: "Upload and process PDF documents for material knowledge extraction",
       icon: FileText,
       path: "/admin/pdf-processing",
       status: "active",
-      count: "Batch processing"
+      count: "Primary system",
+      priority: 1
+    },
+    {
+      title: "Search Hub",
+      description: "Multi-modal search interface with text, image, and hybrid capabilities",
+      icon: Search,
+      path: "/admin/search-hub",
+      status: "active",
+      count: "Enhanced search",
+      priority: 2
+    },
+    {
+      title: "3D Material Suggestions",
+      description: "AI-powered material recommendations for 3D generation",
+      icon: Brain,
+      path: "/admin/3d-suggestions",
+      status: "active",
+      count: "PDF-integrated",
+      priority: 3
     },
     {
       title: "Material Scraper",
-      description: "Web scraping for material supplier websites and catalogs",
+      description: "Scrape material data from websites and external sources",
       icon: Globe,
-      path: "/scraper",
+      path: "/admin/material-scraper",
       status: "active",
-      count: "Firecrawl powered"
+      count: "Web scraping",
+      priority: 4
     },
+    {
+      title: "Knowledge Base Management",
+      description: "Manage enhanced knowledge base entries from PDF processing",
+      icon: Database,
+      path: "/admin/knowledge-base",
+      status: "active", 
+      count: "1,247 entries",
+      priority: 5
+    },
+    {
+      title: "Material Catalog",
+      description: "Browse and manage materials catalog with PDF integration",
+      icon: Tags,
+      path: "/catalog",
+      status: "active",
+      count: "342 materials",
+      priority: 6
+    },
+    {
+      title: "Analytics Dashboard",
+      description: "System performance metrics and usage analytics",
+      icon: BarChart3,
+      path: "/admin/analytics",
+      status: "active",
+      count: "Real-time",
+      priority: 7
+    },
+    {
+      title: "API Gateway",
+      description: "Manage API endpoints and access control",
+      icon: Shield,
+      path: "/admin/api-gateway",
+      status: "active",
+      count: "12 endpoints",
+      priority: 8
+    },
+    {
+      title: "System Performance",
+      description: "Monitor processing queues and system health",
+      icon: Activity,
+      path: "/admin/performance", 
+      status: "active",
+      count: "99.8% uptime",
+      priority: 9
+    }
   ];
 
   const getStatusColor = (status: string) => {
@@ -179,8 +149,39 @@ const AdminDashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
+        {/* Hero Section for PDF Upload */}
+        <Card className="border-2 border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <FileText className="h-6 w-6 text-primary" />
+              PDF Knowledge Base - Core System
+            </CardTitle>
+            <CardDescription className="text-base">
+              Upload PDF documents to extract materials knowledge and enhance the intelligent search system
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <Button asChild size="lg" className="flex items-center gap-2">
+                <Link to="/admin/pdf-processing">
+                  <Upload className="h-5 w-5" />
+                  Upload PDF Documents
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link to="/admin/knowledge-base">
+                  <Database className="h-5 w-5" />
+                  Manage Knowledge Base
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {adminSections.map((section) => {
+          {adminSections
+            .sort((a, b) => (a.priority || 99) - (b.priority || 99))
+            .map((section) => {
             const Icon = section.icon;
             return (
               <Card key={section.path} className="hover:shadow-md transition-shadow">
@@ -221,16 +222,16 @@ const AdminDashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>AI Models</span>
-                  <Badge variant="outline">15 Active</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span>Processing Queue</span>
-                  <Badge variant="outline">8 Tasks</Badge>
+                  <span>PDF Documents</span>
+                  <Badge variant="outline">156 Processed</Badge>
                 </div>
                 <div className="flex justify-between">
                   <span>Knowledge Entries</span>
-                  <Badge variant="outline">1,247</Badge>
+                  <Badge variant="outline">1,247 Active</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>Search Queries</span>
+                  <Badge variant="outline">8,432 Total</Badge>
                 </div>
               </div>
             </CardContent>
@@ -242,10 +243,10 @@ const AdminDashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
-                <div>Material analysis completed</div>
-                <div>CLIP training started</div>
-                <div>New knowledge entry added</div>
-                <div>Agent specialization updated</div>
+                <div>• New PDF processed: Material Specifications v2.1</div>
+                <div>• 3D material suggestions updated</div>
+                <div>• Enhanced search index rebuilt</div>
+                <div>• Knowledge base entries validated</div>
               </div>
             </CardContent>
           </Card>
@@ -256,13 +257,13 @@ const AdminDashboard: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button asChild variant="outline" size="sm" className="w-full">
-                <Link to="/admin/training-models">Start New Training</Link>
+                <Link to="/admin/pdf-processing">Process New PDF</Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="w-full">
-                <Link to="/admin/knowledge-base">Add Knowledge Entry</Link>
+                <Link to="/admin/search-hub">Test Search System</Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="w-full">
-                <Link to="/admin/agent-ml">Monitor Agents</Link>
+                <Link to="/admin/3d-suggestions">Configure 3D Suggestions</Link>
               </Button>
             </CardContent>
           </Card>

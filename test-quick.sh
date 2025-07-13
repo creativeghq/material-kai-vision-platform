@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Quick test of material-scraper function..."
-echo "Note: Set SUPABASE_AUTH_TOKEN environment variable for authenticated requests"
+echo "Material scraper is a public function, no auth needed"
 
 # Simple health check test (public function, no auth needed)
 curl -X POST \
