@@ -10,36 +10,24 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye, Zap, Settings, Brain } from 'lucide-react';
+import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PDFResultsViewer } from './PDFResultsViewer';
 
 interface ProcessingOptions {
-  tileSize: number;
-  overlapPercentage: number;
-  extractStructuredData: boolean;
-  detectMaterials: boolean;
-  processingMethod: 'azure' | 'hybrid' | 'html';
+  extractMaterials: boolean;
+  language: string;
 }
 
 interface ProcessingResult {
   processingId: string;
-  summary: {
-    totalPages: number;
-    tilesExtracted: number;
-    materialsIdentified: number;
-    averageConfidence: number;
-    processingTimeMs: number;
-    azureModel?: string;
-    extractedTables?: number;
-    keyValuePairs?: number;
-    hybridFeatures?: {
-      extractedImages: number;
-      documentStructure: number;
-      materialCorrelations: number;
-      tablesExtracted: number;
-    };
+  knowledgeEntryId: string;
+  confidence: number;
+  processingTimeMs: number;
+  extractedContent: {
+    textLength: number;
+    title: string;
   };
 }
 
@@ -52,27 +40,14 @@ interface ProcessingStatus {
   error?: string;
 }
 
-// Helper function to get processing method display name
-const getProcessingMethodName = (method: 'azure' | 'hybrid' | 'html'): string => {
-  switch (method) {
-    case 'azure': return 'Azure AI';
-    case 'hybrid': return 'Hybrid Python';
-    case 'html': return 'HTML Conversion';
-    default: return 'Unknown';
-  }
-};
-
 export const PDFProcessor: React.FC = () => {
   const { toast } = useToast();
   const [processing, setProcessing] = useState<ProcessingStatus[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [viewingResults, setViewingResults] = useState<string | null>(null);
   const [options, setOptions] = useState<ProcessingOptions>({
-    tileSize: 512,
-    overlapPercentage: 10,
-    extractStructuredData: true,
-    detectMaterials: true,
-    processingMethod: 'hybrid',
+    extractMaterials: true,
+    language: 'en',
   });
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -140,86 +115,20 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
-      // Call the selected PDF processor
-      let processingResult, processingError;
-      
-      if (options.processingMethod === 'html') {
-        console.log('Using HTML Conversion processing...');
-        const htmlResponse = await supabase.functions.invoke('html-pdf-processor', {
-          body: {
-            fileUrl: publicUrl,
-            originalFilename: file.name,
-            fileSize: file.size,
-            userId: user.id,
-            extractionOptions: options
-          }
-        });
-        
-        processingResult = htmlResponse.data;
-        processingError = htmlResponse.error;
-        
-      } else if (options.processingMethod === 'hybrid') {
-        console.log('Using Hybrid Python processing...');
-        const hybridResponse = await supabase.functions.invoke('hybrid-pdf-processor', {
-          body: {
-            fileUrl: publicUrl,
-            originalFilename: file.name,
-            fileSize: file.size,
-            userId: user.id,
-            extractionOptions: options
-          }
-        });
-        
-        processingResult = hybridResponse.data;
-        processingError = hybridResponse.error;
-        
-      } else if (options.processingMethod === 'azure') {
-        console.log('Using Azure Document Intelligence processing...');
-        const azureResponse = await supabase.functions.invoke('azure-pdf-processor', {
-          body: {
-            fileUrl: publicUrl,
-            originalFilename: file.name,
-            fileSize: file.size,
-            userId: user.id,
-            extractionOptions: options
-          }
-        });
-        
-        processingResult = azureResponse.data;
-        processingError = azureResponse.error;
-        
-        // If Azure fails due to size or configuration, fallback to hybrid
-        if (processingError && (
-          processingError.message?.includes('exceeds Azure Document Intelligence limit') ||
-          processingError.message?.includes('API key not configured')
-        )) {
-          console.warn('Azure processing failed, falling back to hybrid processor:', processingError.message);
-          
-          const fallbackResponse = await supabase.functions.invoke('hybrid-pdf-processor', {
-            body: {
-              fileUrl: publicUrl,
-              originalFilename: file.name,
-              fileSize: file.size,
-              userId: user.id,
-              extractionOptions: options
-            }
-          });
-          
-          processingResult = fallbackResponse.data;
-          processingError = fallbackResponse.error;
-          
-          if (!fallbackResponse.error) {
-            toast({
-              title: "Processing Complete (Hybrid Mode)",
-              description: `Azure unavailable, completed with hybrid processing. Found ${fallbackResponse.data.summary.materialsIdentified} materials with advanced features.`,
-              variant: "default",
-            });
-          }
+      // Process using the simplified pdf-processor
+      console.log('Processing PDF with simplified approach...');
+      const response = await supabase.functions.invoke('pdf-processor', {
+        body: {
+          fileUrl: publicUrl,
+          originalFilename: file.name,
+          fileSize: file.size,
+          userId: user.id,
+          options: options
         }
-      }
-
-      if (processingError) {
-        throw new Error(`${getProcessingMethodName(options.processingMethod)} processing failed: ${processingError.message}`);
+      });
+      
+      if (response.error) {
+        throw new Error(`PDF processing failed: ${response.error.message}`);
       }
 
       // Update with successful result
@@ -229,27 +138,14 @@ export const PDFProcessor: React.FC = () => {
               ...p, 
               status: 'completed', 
               progress: 100,
-              result: processingResult
+              result: response.data
             }
           : p
       ));
 
-      const isHtmlProcessing = options.processingMethod === 'html' &&
-        processingResult.summary.htmlFeatures;
-      const isHybridProcessing = options.processingMethod === 'hybrid' &&
-        processingResult.summary.hybridFeatures;
-      const isAzureProcessing = options.processingMethod === 'azure' &&
-        (processingResult.summary.extractedTables !== undefined || processingResult.summary.keyValuePairs !== undefined);
-      
       toast({
-        title: `${getProcessingMethodName(options.processingMethod)} Processing Complete`,
-        description: isHtmlProcessing
-          ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials with ${processingResult.summary.htmlFeatures.extractedImages} images, ${processingResult.summary.htmlFeatures.tablesExtracted} tables, and ${processingResult.summary.htmlFeatures.documentStructure} structure elements via HTML conversion.`
-          : isHybridProcessing
-          ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials with ${processingResult.summary.hybridFeatures.extractedImages} images, ${processingResult.summary.hybridFeatures.materialCorrelations} correlations, and ${processingResult.summary.hybridFeatures.documentStructure} structure elements.`
-          : isAzureProcessing
-          ? `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials, ${processingResult.summary.extractedTables || 0} tables, and ${processingResult.summary.keyValuePairs || 0} key-value pairs.`
-          : `Successfully processed ${file.name}. Found ${processingResult.summary.materialsIdentified} materials using ${options.processingMethod} processing.`,
+        title: "Processing Complete",
+        description: `Successfully processed ${file.name} and added to knowledge base. Text length: ${response.data.extractedContent.textLength} characters`,
       });
 
     } catch (error) {
@@ -319,128 +215,56 @@ export const PDFProcessor: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Intelligent PDF Material Catalog Processor
+            PDF Knowledge Base Processor
           </CardTitle>
            <CardDescription>
-             Upload PDF documents for intelligent analysis. Choose between Azure AI Document Intelligence for advanced structured data extraction or Hybrid Python processing for professional-grade material catalog analysis.
+             Upload PDF documents to extract content and add directly to the knowledge base for AI-powered search and analysis.
            </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Processing Method Selection */}
+          {/* Processing Options */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              <Label className="text-base font-medium">Processing Method</Label>
+              <Brain className="h-4 w-4" />
+              <Label className="text-base font-medium">Processing Options</Label>
             </div>
-            <Select
-              value={options.processingMethod}
-              onValueChange={(value: 'azure' | 'hybrid' | 'html') => setOptions(prev => ({ ...prev, processingMethod: value }))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select processing method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="html">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-green-500" />
-                    <div>
-                      <div className="font-medium">HTML Conversion Processing (NEW)</div>
-                      <div className="text-xs text-muted-foreground">Convert PDF to HTML for superior structure extraction, table parsing, and image detection</div>
-                    </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="hybrid">
-                  <div className="flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-purple-500" />
-                    <div>
-                      <div className="font-medium">Enhanced Hybrid Processing</div>
-                      <div className="text-xs text-muted-foreground">Advanced material detection with enhanced image extraction, 12+ categories, and visual catalog analysis</div>
-                    </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="azure">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-blue-500" />
-                    <div>
-                      <div className="font-medium">Azure AI Document Intelligence</div>
-                      <div className="text-xs text-muted-foreground">Cloud-based processing with table extraction and form recognition (50MB limit)</div>
-                    </div>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            {options.processingMethod === 'html' && (
-              <Alert>
-                <FileText className="h-4 w-4" />
-                <AlertDescription>
-                  HTML conversion processing converts PDF to structured HTML for superior content extraction. Features advanced table parsing, image detection, and DOM-based material analysis with enhanced accuracy.
-                </AlertDescription>
-              </Alert>
-            )}
-            {options.processingMethod === 'hybrid' && (
-              <Alert>
-                <Brain className="h-4 w-4" />
-                <AlertDescription>
-                  Enhanced hybrid processing with advanced material detection patterns covering 12+ material categories including porcelain tile, natural stone, engineered stone, wood flooring, and more. Features enhanced image extraction, visual catalog analysis, and professional-grade material recognition.
-                </AlertDescription>
-              </Alert>
-            )}
-            {options.processingMethod === 'azure' && (
-              <Alert>
-                <Zap className="h-4 w-4" />
-                <AlertDescription>
-                  Azure AI provides cloud-based document intelligence with advanced table and form recognition. File size limit: 50MB.
-                </AlertDescription>
-              </Alert>
-            )}
+            <Alert>
+              <Brain className="h-4 w-4" />
+              <AlertDescription>
+                Simplified PDF processing extracts text content and generates embeddings for intelligent search. The AI agents will analyze and categorize materials on-demand when users search.
+              </AlertDescription>
+            </Alert>
           </div>
 
           <Separator />
 
-          {/* Processing Options */}
+          {/* Simple Options */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="tileSize">Tile Size (pixels)</Label>
-              <Input
-                id="tileSize"
-                type="number"
-                value={options.tileSize}
-                onChange={(e) => setOptions(prev => ({ ...prev, tileSize: parseInt(e.target.value) || 512 }))}
-                min="256"
-                max="1024"
-                step="64"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="overlap">Overlap Percentage</Label>
-              <Input
-                id="overlap"
-                type="number"
-                value={options.overlapPercentage}
-                onChange={(e) => setOptions(prev => ({ ...prev, overlapPercentage: parseInt(e.target.value) || 10 }))}
-                min="0"
-                max="50"
-                step="5"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="extractStructured"
-                checked={options.extractStructuredData}
-                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, extractStructuredData: !!checked }))}
+                id="extractMaterials"
+                checked={options.extractMaterials}
+                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, extractMaterials: !!checked }))}
               />
-              <Label htmlFor="extractStructured">Extract Structured Data</Label>
+              <Label htmlFor="extractMaterials">Enable material analysis hints</Label>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="detectMaterials"
-                checked={options.detectMaterials}
-                onCheckedChange={(checked) => setOptions(prev => ({ ...prev, detectMaterials: !!checked }))}
-              />
-              <Label htmlFor="detectMaterials">Detect Materials</Label>
+            <div className="space-y-2">
+              <Label htmlFor="language">Document Language</Label>
+              <Select
+                value={options.language}
+                onValueChange={(value) => setOptions(prev => ({ ...prev, language: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="es">Spanish</SelectItem>
+                  <SelectItem value="fr">French</SelectItem>
+                  <SelectItem value="de">German</SelectItem>
+                  <SelectItem value="it">Italian</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -460,13 +284,8 @@ export const PDFProcessor: React.FC = () => {
               <div>
                 <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
                  <p className="text-sm text-muted-foreground">
-                    {options.processingMethod === 'html'
-                      ? 'HTML Conversion: Superior structure extraction with advanced table parsing and DOM-based material analysis'
-                      : options.processingMethod === 'hybrid'
-                      ? 'Enhanced Hybrid: Advanced material detection with enhanced image extraction, 12+ categories, and visual catalog analysis'
-                      : 'Azure AI: Up to 50MB per file for advanced cloud analysis'
-                    }
-                  </p>
+                   Intelligent processing: Extract text, generate embeddings, and add to knowledge base for AI-powered analysis
+                 </p>
               </div>
             )}
           </div>
@@ -510,26 +329,11 @@ export const PDFProcessor: React.FC = () => {
                       
                       {item.result && (
                         <div className="text-sm text-muted-foreground mt-2">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          <span>Pages: {item.result.summary.totalPages}</span>
-                          <span>Tiles: {item.result.summary.tilesExtracted}</span>
-                          <span>Materials: {item.result.summary.materialsIdentified}</span>
-                          <span>Confidence: {Math.round(item.result.summary.averageConfidence * 100)}%</span>
-                        </div>
-                        {item.result.summary.hybridFeatures && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1 text-xs">
-                            <span>Images: {item.result.summary.hybridFeatures.extractedImages}</span>
-                            <span>Correlations: {item.result.summary.hybridFeatures.materialCorrelations}</span>
-                            <span>Structure: {item.result.summary.hybridFeatures.documentStructure}</span>
-                            <span>Tables: {item.result.summary.hybridFeatures.tablesExtracted}</span>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <span>Content: {item.result.extractedContent.textLength} chars</span>
+                            <span>Time: {Math.round(item.result.processingTimeMs / 1000)}s</span>
+                            <span>Confidence: {Math.round(item.result.confidence * 100)}%</span>
                           </div>
-                        )}
-                        {item.result.summary.extractedTables !== undefined && !item.result.summary.hybridFeatures && (
-                          <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
-                            <span>Tables: {item.result.summary.extractedTables}</span>
-                            <span>Key-Value Pairs: {item.result.summary.keyValuePairs}</span>
-                          </div>
-                        )}
                         </div>
                       )}
                       
