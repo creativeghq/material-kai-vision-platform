@@ -934,9 +934,11 @@ serve(async (req) => {
       );
     }
 
-    // Verify the JWT token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    // Verify the JWT token - handle both Bearer and direct token formats
+    const token = authHeader.replace('Bearer ', '').trim();
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
+      console.error('Authentication error:', authError);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
