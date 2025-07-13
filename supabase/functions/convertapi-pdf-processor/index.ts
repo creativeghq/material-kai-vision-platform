@@ -397,7 +397,7 @@ serve(async (req) => {
       console.log('💾 Step 6: Storing in knowledge base...');
       const knowledgeEntry = {
         title: `${originalFilename.replace('.pdf', '')} - HTML Document`,
-        content: extractedText, // Store clean text for knowledge base display
+        content: finalHtmlContent, // Store full HTML with local images for rich display
         content_type: 'enhanced_pdf_html', // Match the type expected by HTMLDocumentViewer
         source_url: htmlPublicUrl, // Point to the HTML file, not original PDF
         semantic_tags: ['pdf', 'html', 'convertapi', 'uploaded-content'],
