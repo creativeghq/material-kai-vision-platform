@@ -58,6 +58,7 @@ export const ScrapedMaterialsReview = ({ sessionId }: ScrapedMaterialsReviewProp
 
       if (error) throw error;
       setMaterials(data || []);
+      console.log('Loaded materials by session:', sessionId, 'Count:', data?.length || 0);
     } catch (error) {
       console.error('Error loading materials by session:', error);
       toast({
@@ -72,6 +73,7 @@ export const ScrapedMaterialsReview = ({ sessionId }: ScrapedMaterialsReviewProp
 
   const loadAllUnreviewedMaterials = async () => {
     setLoading(true);
+    console.log('Loading all unreviewed materials...');
     try {
       const { data, error } = await supabase
         .from('scraped_materials_temp')
@@ -82,6 +84,7 @@ export const ScrapedMaterialsReview = ({ sessionId }: ScrapedMaterialsReviewProp
 
       if (error) throw error;
       setMaterials(data || []);
+      console.log('Loaded unreviewed materials count:', data?.length || 0);
     } catch (error) {
       console.error('Error loading unreviewed materials:', error);
       toast({
