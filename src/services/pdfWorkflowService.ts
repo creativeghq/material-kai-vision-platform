@@ -254,15 +254,35 @@ export class PDFWorkflowService {
             }
           });
 
+          console.log('Edge function response status:', response.status);
           console.log('Edge function response:', response);
 
           if (response.error) {
-            console.error('Edge function error:', response.error);
-            throw new Error(`Enhanced PDF processing failed: ${response.error.message}`);
+            console.error('Edge function error details:', response.error);
+            const errorDetails = typeof response.error === 'object' 
+              ? JSON.stringify(response.error, null, 2)
+              : response.error;
+            throw new Error(`convertapi-pdf-processor failed: ${errorDetails}`);
+          }
+
+          if (!response.data) {
+            throw new Error(`convertapi-pdf-processor returned no data. Status: ${response.status}`);
           }
         } catch (error) {
-          console.error('Failed to call edge function:', error);
-          throw new Error(`Failed to send a request to the Edge Function: ${error.message}`);
+          console.error('Failed to call convertapi-pdf-processor edge function:', error);
+          console.error('Error type:', typeof error);
+          console.error('Error details:', error);
+          
+          let errorMessage = 'Unknown error occurred';
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          } else if (typeof error === 'string') {
+            errorMessage = error;
+          } else if (error && typeof error === 'object') {
+            errorMessage = JSON.stringify(error);
+          }
+          
+          throw new Error(`convertapi-pdf-processor edge function failed: ${errorMessage}`);
         }
 
         if (!response.data?.success) {

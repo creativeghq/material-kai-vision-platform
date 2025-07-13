@@ -13,7 +13,11 @@ const supabase = createClient(
 );
 
 const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-const convertApiKey = Deno.env.get('CONVERTAPI_KEY') || '8Z4ZELFGa6ob6c8kQlvyahK1Ea196KKX';
+const convertApiKey = Deno.env.get('CONVERTAPI_KEY');
+
+console.log('🔑 Environment check:');
+console.log('- OpenAI API key:', openaiApiKey ? 'Set' : 'Missing');
+console.log('- ConvertAPI key:', convertApiKey ? 'Set' : 'Missing');
 
 interface ConvertAPIProcessingRequest {
   fileUrl: string;
@@ -325,6 +329,20 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🚀 ConvertAPI PDF processor started');
+    
+    // Check for required environment variables
+    if (!convertApiKey) {
+      console.error('❌ CONVERTAPI_KEY environment variable is missing');
+      return new Response(
+        JSON.stringify({ 
+          error: 'ConvertAPI key not configured',
+          details: 'The CONVERTAPI_KEY environment variable must be set in edge function secrets'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Get the auth header and verify JWT
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
