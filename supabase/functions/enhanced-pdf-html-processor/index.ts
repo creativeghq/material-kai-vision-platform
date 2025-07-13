@@ -301,9 +301,11 @@ async function extractPageImages(page: any, pageNumber: number, width: number, h
   console.log(`=== CREATING PLACEHOLDER IMAGE for page ${pageNumber} ===`);
   
   try {
-    // Create a simple test placeholder using a hardcoded image URL
-    const placeholderUrl = `https://picsum.photos/400/300?random=${pageNumber}`;
-    console.log(`Using test placeholder URL: ${placeholderUrl}`);
+    // Create a placeholder image that we know will work
+    const materialTypes = ['Ceramic Tiles', 'Natural Stone', 'Engineered Wood', 'Metal Finishes', 'Glass Products'];
+    const materialType = materialTypes[pageNumber % materialTypes.length];
+    const placeholderUrl = await generateMaterialImagePlaceholder(pageNumber, 0, 400, 300);
+    console.log(`Generated placeholder URL: ${placeholderUrl}`);
     
     if (placeholderUrl) {
       const imageId = `placeholder_${pageNumber}_0`;
