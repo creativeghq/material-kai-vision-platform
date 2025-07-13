@@ -1,0 +1,99 @@
+%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+/Resources <<
+/Font <<
+/F1 5 0 R
+>>
+>>
+>>
+endobj
+
+4 0 obj
+<<
+/Length 500
+>>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(Material Specification Document) Tj
+0 -24 Td
+(Technical Data Sheet - Advanced Building Materials) Tj
+0 -48 Td
+(Product Information:) Tj
+0 -18 Td
+(- Material Type: High-Performance Ceramic Tiles) Tj
+0 -18 Td
+(- Dimensions: 600x600mm, 800x800mm, 1200x600mm) Tj
+0 -18 Td
+(- Thickness: 8mm, 10mm, 12mm) Tj
+0 -18 Td
+(- Surface Finish: Matt, Polished, Structured) Tj
+0 -36 Td
+(Physical Properties:) Tj
+0 -18 Td
+(- Water Absorption: < 0.5% \(ISO 10545-3\)) Tj
+0 -18 Td
+(- Thermal Expansion: 7.0 x 10^-6/°C) Tj
+0 -18 Td
+(- Flexural Strength: >= 35 N/mm² \(ISO 10545-4\)) Tj
+0 -18 Td
+(- Frost Resistance: Compliant \(ISO 10545-12\)) Tj
+0 -36 Td
+(Technical Standards:) Tj
+0 -18 Td
+(- Classification: Group BIa \(EN 14411\)) Tj
+0 -18 Td
+(- Slip Resistance: R10-R13 \(DIN 51130\)) Tj
+0 -18 Td
+(- PEI Rating: Class 4-5 \(ISO 10545-7\)) Tj
+0 -18 Td
+(- Chemical Resistance: Class A \(ISO 10545-13\)) Tj
+ET
+endstream
+endobj
+
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>
+endobj
+
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000264 00000 n 
+0000000814 00000 n 
+trailer
+<<
+/Size 6
+/Root 1 0 R
+>>
+startxref
+890
+%%EOF
