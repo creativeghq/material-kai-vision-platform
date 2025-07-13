@@ -78,21 +78,34 @@ function extractImageUrls(html: string): string[] {
 // Extract base64 images from HTML
 function extractBase64Images(html: string): Array<{src: string, data: string, type: string}> {
   const base64Images: Array<{src: string, data: string, type: string}> = [];
-  const base64Regex = /<img[^>]+src=["\']data:image\/([^;]+);base64,([^"\']+)["\'][^>]*>/gi;
-  let match;
-  let count = 0;
   
-  while ((match = base64Regex.exec(html)) !== null && count < 5) { // Limit to 5 base64 images
-    const type = match[1]; // png, jpg, etc.
-    const data = match[2]; // base64 data
-    const fullSrc = match[0]; // full img tag
-    
-    base64Images.push({
-      src: fullSrc,
-      data: data,
-      type: type
-    });
-    count++;
+  // More comprehensive regex to find all base64 image data URLs
+  const patterns = [
+    // Standard img src attributes
+    /<img[^>]+src=["\']data:image\/([^;]+);base64,([^"\']+)["\'][^>]*>/gi,
+    // Standalone data URLs that might be in other contexts
+    /data:image\/([^;]+);base64,([^\s"'><]+)/gi
+  ];
+  
+  const foundDataUrls = new Set<string>();
+  
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      const type = match[1]; // png, jpg, etc.
+      const data = match[2]; // base64 data
+      const dataUrl = `data:image/${type};base64,${data}`;
+      
+      // Avoid duplicates
+      if (!foundDataUrls.has(dataUrl)) {
+        foundDataUrls.add(dataUrl);
+        base64Images.push({
+          src: dataUrl, // Store just the data URL for consistent replacement
+          data: data,
+          type: type
+        });
+      }
+    }
   }
   
   console.log(`Found ${base64Images.length} base64 images to convert`);
@@ -437,16 +450,16 @@ serve(async (req) => {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // Process base64 images
-      for (let i = 0; i < Math.min(base64Images.length, 5); i++) { // Limit to 5 base64 images
+      // Process ALL base64 images (removed the limit of 5)
+      for (let i = 0; i < base64Images.length; i++) {
         const base64Image = base64Images[i];
         const processedBase64 = await processBase64Image(base64Image.data, base64Image.type, userId, i);
         if (processedBase64) {
           processedBase64Images.push(processedBase64);
         }
         
-        // Small delay between images
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Small delay between images to avoid overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       console.log(`✅ Processed ${processedImages.length} HTTP images and ${processedBase64Images.length} base64 images successfully`);
@@ -455,12 +468,21 @@ serve(async (req) => {
       console.log('🔄 Step 4: Finalizing HTML content...');
       let finalHtmlContent = replaceImageUrls(htmlContent, processedImages);
       
-      // Replace base64 images with Supabase URLs
+      // More comprehensive base64 image replacement
       for (const base64Image of processedBase64Images) {
+        // Use a global replace to catch all instances of the base64 image
+        const escapedSrc = base64Image.originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         finalHtmlContent = finalHtmlContent.replace(
-          new RegExp(base64Image.originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          new RegExp(escapedSrc, 'g'),
           base64Image.supabaseUrl
         );
+      }
+      
+      // Additional cleanup: find any remaining base64 images and log them
+      const remainingBase64 = finalHtmlContent.match(/data:image\/[^;]+;base64,[^"'\s>]+/g);
+      if (remainingBase64 && remainingBase64.length > 0) {
+        console.warn(`⚠️ Found ${remainingBase64.length} remaining base64 images that weren't replaced`);
+        console.warn('Remaining base64 patterns:', remainingBase64.slice(0, 3)); // Log first 3 for debugging
       }
 
       // Store final HTML in Supabase storage
