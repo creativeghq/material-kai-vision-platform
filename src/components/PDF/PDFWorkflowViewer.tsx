@@ -24,6 +24,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { HTMLDocumentViewer } from './HTMLDocumentViewer';
 
 export interface WorkflowStep {
   id: string;
@@ -63,6 +64,9 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
 }) => {
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const [htmlViewerOpen, setHtmlViewerOpen] = useState(false);
+  const [selectedKnowledgeEntryId, setSelectedKnowledgeEntryId] = useState<string>('');
+  const [selectedDocumentTitle, setSelectedDocumentTitle] = useState<string>('');
 
   const toggleJobExpansion = (jobId: string) => {
     setExpandedJobs(prev => {
@@ -310,16 +314,17 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                       The PDF has been processed into a rich HTML document with preserved layout and extracted images.
                                     </p>
                                     <div className="space-y-2">
-                                    <button 
-                                         onClick={() => {
-                                           console.log('HTML document not yet implemented. Knowledge Entry ID:', step.metadata.knowledgeEntryId);
-                                         }}
-                                         className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-600 underline mr-4 cursor-not-allowed"
-                                         disabled
-                                       >
-                                         <ExternalLink className="h-3 w-3" />
-                                         View HTML Document (Coming Soon)
-                                       </button>
+                                     <button 
+                                          onClick={() => {
+                                            setSelectedKnowledgeEntryId(step.metadata.knowledgeEntryId);
+                                            setSelectedDocumentTitle(step.metadata.title || 'HTML Document');
+                                            setHtmlViewerOpen(true);
+                                          }}
+                                          className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline mr-4"
+                                        >
+                                          <ExternalLink className="h-3 w-3" />
+                                          View HTML Document
+                                        </button>
                                        <button 
                                          onClick={() => {
                                            // Navigate to knowledge base with search filter
@@ -369,6 +374,13 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
           </Card>
         );
       })}
+      
+      <HTMLDocumentViewer
+        isOpen={htmlViewerOpen}
+        onClose={() => setHtmlViewerOpen(false)}
+        knowledgeEntryId={selectedKnowledgeEntryId}
+        documentTitle={selectedDocumentTitle}
+      />
     </div>
   );
 };
