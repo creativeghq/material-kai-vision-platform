@@ -49,51 +49,58 @@ serve(async (req) => {
     
     const sitemapContent = await response.text();
     
-    // Parse XML to extract URLs
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(sitemapContent, 'text/xml');
-    
-    // Check for XML parsing errors
-    const parserError = xmlDoc.querySelector('parsererror');
-    if (parserError) {
-      throw new Error('Invalid XML format in sitemap');
-    }
-    
-    // Handle different sitemap formats
+    // Simple XML parsing without DOMParser (which isn't available in Deno)
     let urls: string[] = [];
     
-    // Standard sitemap format
-    const urlElements = xmlDoc.getElementsByTagName('url');
-    for (let i = 0; i < urlElements.length; i++) {
-      const locElement = urlElements[i].getElementsByTagName('loc')[0];
-      if (locElement && locElement.textContent) {
-        urls.push(locElement.textContent.trim());
-      }
-    }
+    // Extract URLs using regex patterns
+    const locMatches = sitemapContent.match(/<loc[^>]*>(.*?)<\/loc>/gi);
     
-    // If no URLs found, try alternate format (sitemap index or simple loc tags)
-    if (urls.length === 0) {
-      const locElements = xmlDoc.getElementsByTagName('loc');
-      for (let i = 0; i < locElements.length; i++) {
-        if (locElements[i].textContent) {
-          urls.push(locElements[i].textContent.trim());
+    if (locMatches) {
+      for (const locMatch of locMatches) {
+        // Extract the URL from between the tags
+        const urlMatch = locMatch.match(/<loc[^>]*>(.*?)<\/loc>/i);
+        if (urlMatch && urlMatch[1]) {
+          const url = urlMatch[1].trim();
+          // Decode HTML entities
+          const decodedUrl = url
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'");
+          
+          if (decodedUrl.length > 0) {
+            urls.push(decodedUrl);
+          }
         }
       }
     }
     
-    // If still no URLs, try to find sitemap references in sitemap index
+    // If no URLs found with standard format, try to find sitemap references
     if (urls.length === 0) {
-      const sitemapElements = xmlDoc.getElementsByTagName('sitemap');
-      for (let i = 0; i < sitemapElements.length; i++) {
-        const locElement = sitemapElements[i].getElementsByTagName('loc')[0];
-        if (locElement && locElement.textContent) {
-          urls.push(locElement.textContent.trim());
+      const sitemapMatches = sitemapContent.match(/<sitemap[^>]*>.*?<\/sitemap>/gis);
+      if (sitemapMatches) {
+        for (const sitemapMatch of sitemapMatches) {
+          const locMatch = sitemapMatch.match(/<loc[^>]*>(.*?)<\/loc>/i);
+          if (locMatch && locMatch[1]) {
+            const url = locMatch[1].trim();
+            const decodedUrl = url
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'");
+            
+            if (decodedUrl.length > 0) {
+              urls.push(decodedUrl);
+            }
+          }
         }
       }
     }
     
-    // Filter out empty URLs and apply limit
-    urls = urls.filter(url => url.length > 0).slice(0, maxPages);
+    // Apply limit
+    urls = urls.slice(0, maxPages);
     
     console.log(`Found ${urls.length} URLs in sitemap`);
     
