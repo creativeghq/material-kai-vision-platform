@@ -149,37 +149,69 @@ async function processSitemapSimple(sitemapUrl: string, service: 'firecrawl' | '
 }
 
 async function parseSitemapSimple(sitemapUrl: string, options: any): Promise<string[]> {
-  const response = await fetch(sitemapUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch sitemap: ${response.status}`);
-  }
+  console.log('Fetching sitemap:', sitemapUrl);
   
-  const xmlText = await response.text();
-  const urls: string[] = [];
-  
-  // Simple regex to extract URLs from XML
-  const urlMatches = xmlText.match(/<loc>(.*?)<\/loc>/g);
-  if (urlMatches) {
-    for (const match of urlMatches) {
-      const url = match.replace(/<loc>|<\/loc>/g, '');
-      if (url.includes('.xml')) {
-        // Skip nested sitemaps for simplicity
-        continue;
-      }
-      urls.push(url);
+  try {
+    const response = await fetch(sitemapUrl, { 
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MaterialScraper/1.0)' },
+      signal: AbortSignal.timeout(15000) // 15 second timeout
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sitemap: ${response.status} ${response.statusText}`);
     }
+    
+    const xmlText = await response.text();
+    console.log(`Sitemap XML length: ${xmlText.length} characters`);
+    
+    const urls: string[] = [];
+    
+    // More robust XML parsing - handle both <loc> and <url><loc> patterns
+    const urlMatches = xmlText.match(/<loc>\s*([^<]+?)\s*<\/loc>/gi);
+    if (urlMatches) {
+      for (const match of urlMatches) {
+        const url = match.replace(/<\/?loc>/gi, '').trim();
+        
+        // Skip nested sitemaps and invalid URLs
+        if (url.includes('.xml') || !url.startsWith('http')) {
+          continue;
+        }
+        
+        urls.push(url);
+      }
+    }
+    
+    console.log(`Found ${urls.length} URLs in sitemap`);
+    
+    // Apply filtering if provided
+    const includePatterns = options.includePatterns || [];
+    const excludePatterns = options.excludePatterns || [];
+    
+    let filteredUrls = urls;
+    
+    if (includePatterns.length > 0) {
+      filteredUrls = filteredUrls.filter(url => 
+        includePatterns.some((pattern: string) => 
+          url.toLowerCase().includes(pattern.toLowerCase())
+        )
+      );
+    }
+    
+    if (excludePatterns.length > 0) {
+      filteredUrls = filteredUrls.filter(url => 
+        !excludePatterns.some((pattern: string) => 
+          url.toLowerCase().includes(pattern.toLowerCase())
+        )
+      );
+    }
+    
+    console.log(`After filtering: ${filteredUrls.length} URLs`);
+    return filteredUrls;
+    
+  } catch (error) {
+    console.error('Sitemap parsing error:', error);
+    throw new Error(`Failed to parse sitemap: ${error.message}`);
   }
-  
-  // Apply basic filtering
-  const includePatterns = options.includePatterns || ['/product', '/item'];
-  const excludePatterns = options.excludePatterns || ['/cart', '/checkout'];
-  
-  return urls.filter(url => {
-    const includesMatch = includePatterns.length === 0 || 
-                         includePatterns.some((pattern: string) => url.toLowerCase().includes(pattern.toLowerCase()));
-    const excludesMatch = excludePatterns.some((pattern: string) => url.toLowerCase().includes(pattern.toLowerCase()));
-    return includesMatch && !excludesMatch;
-  });
 }
 
 async function extractWithJinaSimple(url: string, options: any): Promise<MaterialData[]> {
