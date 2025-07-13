@@ -123,11 +123,11 @@ Return a list of materials found on the page.`,
       }
 
       console.log('Scraping completed:', data);
-      setScrapedMaterials(data.materials || []);
+      setScrapedMaterials(data.data || []);
       
       toast({
         title: "Success",
-        description: `Found ${data.materials?.length || 0} materials using ${data.service || options.service}`,
+        description: `Found ${data.data?.length || 0} materials using ${data.service || options.service}`,
       });
 
     } catch (error) {
