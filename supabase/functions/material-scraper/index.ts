@@ -121,70 +121,115 @@ async function processSitemapSimple(sitemapUrl: string, service: 'firecrawl' | '
       }];
     }
     
-    // Limit to 3 URLs to prevent timeout
-    const urlsToProcess = urls.slice(0, 3);
-    console.log(`Processing first ${urlsToProcess.length} URLs to prevent timeout`);
+    // Process URLs in batches to prevent timeout
+    const batchSize = 5;
+    const maxUrls = Math.min(urls.length, 20); // Limit to 20 URLs max for performance
+    const urlsToProcess = urls.slice(0, maxUrls);
+    
+    console.log(`Processing ${urlsToProcess.length} URLs in batches of ${batchSize}`);
     
     const allMaterials: MaterialData[] = [];
+    let processedCount = 0;
     
-    // Process URLs sequentially with timeout
-    for (let i = 0; i < urlsToProcess.length; i++) {
-      const url = urlsToProcess[i];
-      console.log(`Processing URL ${i + 1}/${urlsToProcess.length}: ${url}`);
+    // Process URLs in batches
+    for (let i = 0; i < urlsToProcess.length; i += batchSize) {
+      const batch = urlsToProcess.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urlsToProcess.length/batchSize)}: ${batch.length} URLs`);
       
-      try {
-        const results = service === 'jina' 
-          ? await extractWithJinaSimple(url, options)
-          : await extractWithFirecrawlSimple(url, options);
+      // Process batch in parallel for better performance
+      const batchPromises = batch.map(async (url, batchIndex) => {
+        const globalIndex = i + batchIndex + 1;
+        console.log(`[${globalIndex}/${urlsToProcess.length}] Processing: ${url}`);
         
-        if (results && results.length > 0) {
+        try {
+          const results = service === 'jina' 
+            ? await extractWithJinaSimple(url, options)
+            : await extractWithFirecrawlSimple(url, options);
+          
+          processedCount++;
+          
+          if (results && results.length > 0) {
+            console.log(`[${globalIndex}] SUCCESS: Found ${results.length} materials`);
+            return results;
+          } else {
+            console.log(`[${globalIndex}] No materials found on this page`);
+            return [];
+          }
+          
+        } catch (error) {
+          console.error(`[${globalIndex}] ERROR processing ${url}:`, error.message);
+          return [];
+        }
+      });
+      
+      // Wait for batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Flatten and add to all materials
+      for (const results of batchResults) {
+        if (results.length > 0) {
           allMaterials.push(...results);
-          console.log(`URL ${i + 1} done: ${results.length} materials found`);
-        } else {
-          console.log(`URL ${i + 1} done: No materials found`);
         }
-        
-        // Small delay between requests
-        if (i < urlsToProcess.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-      } catch (error) {
-        console.error(`Failed to process URL ${url}:`, error.message);
-        // Continue with next URL
+      }
+      
+      console.log(`Batch complete. Total materials so far: ${allMaterials.length}`);
+      
+      // Small delay between batches to be respectful to the server
+      if (i + batchSize < urlsToProcess.length) {
+        console.log('Waiting 2 seconds before next batch...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
     
-    console.log(`Total materials extracted: ${allMaterials.length}`);
+    console.log(`Sitemap processing complete:`);
+    console.log(`- URLs found: ${urls.length}`);
+    console.log(`- URLs processed: ${processedCount}`);
+    console.log(`- Materials extracted: ${allMaterials.length}`);
     
-    // Add summary note if we have materials
-    if (allMaterials.length > 0 && urlsToProcess.length < urls.length) {
+    // Add summary if we have materials
+    if (allMaterials.length > 0) {
       allMaterials.unshift({
-        name: `Summary: Found ${allMaterials.length} materials from ${urlsToProcess.length} of ${urls.length} URLs`,
-        description: `Successfully extracted ${allMaterials.length} materials. To prevent timeouts, only the first ${urlsToProcess.length} URLs were processed.`,
+        name: `Sitemap Processing Summary`,
+        description: `Successfully extracted ${allMaterials.length} materials from ${processedCount} pages out of ${urls.length} total URLs found in sitemap.`,
         category: 'System Summary',
         price: '',
         images: [],
         properties: {
           totalUrlsFound: urls.length,
-          urlsProcessed: urlsToProcess.length,
-          materialsFound: allMaterials.length - 1 // Exclude this summary from count
+          urlsProcessed: processedCount,
+          materialsFound: allMaterials.length - 1, // Exclude this summary
+          service: service,
+          batchSize: batchSize
         },
         sourceUrl: sitemapUrl,
         supplier: 'System'
       });
-    } else if (allMaterials.length === 0) {
+    } else {
       // If no materials found, return explanatory note
       allMaterials.push({
         name: `No Materials Extracted`,
-        description: `Processed ${urlsToProcess.length} URLs from sitemap but no materials were successfully extracted. The pages may not contain material information or may require different extraction settings.`,
+        description: `Processed ${processedCount} URLs from sitemap but no materials were successfully extracted. This could mean:
+        
+• The pages don't contain product/material information
+• The extraction prompt/selectors need adjustment
+• The pages require different scraping parameters
+• The content is dynamically loaded and needs wait time
+
+Try adjusting the CSS selectors or extraction prompt for better results.`,
         category: 'System Note',
         price: '',
         images: [],
         properties: {
           totalUrlsFound: urls.length,
-          urlsProcessed: urlsToProcess.length,
-          materialsFound: 0
+          urlsProcessed: processedCount,
+          materialsFound: 0,
+          service: service,
+          suggestions: [
+            'Try more specific CSS selectors',
+            'Adjust the extraction prompt',
+            'Increase wait time for dynamic content',
+            'Check if pages require authentication'
+          ]
         },
         sourceUrl: sitemapUrl,
         supplier: 'System'
