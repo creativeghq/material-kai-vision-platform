@@ -57,18 +57,16 @@ function extractTextFromHTML(html: string): string {
   return text.substring(0, 8000); // Limit to 8000 chars to avoid memory issues
 }
 
-// Extract image URLs from HTML (memory optimized)
+// Extract image URLs from HTML (no limits)
 function extractImageUrls(html: string): string[] {
   const imageUrls: string[] = [];
   const imgRegex = /<img[^>]+src=["\']([^"\']+)["\'][^>]*>/gi;
   let match;
-  let count = 0;
   
-  while ((match = imgRegex.exec(html)) !== null && count < 10) { // Limit to 10 images
+  while ((match = imgRegex.exec(html)) !== null) {
     const url = match[1];
     if (url && url.startsWith('http')) {
       imageUrls.push(url);
-      count++;
     }
   }
   
@@ -438,16 +436,16 @@ serve(async (req) => {
       const processedImages: ProcessedImage[] = [];
       const processedBase64Images: Array<{originalSrc: string, supabaseUrl: string, filename: string}> = [];
       
-      // Process HTTP images one at a time to avoid memory issues
-      for (let i = 0; i < Math.min(imageUrls.length, 5); i++) { // Limit to 5 images
+      // Process ALL HTTP images (removed the 5-image limit)
+      for (let i = 0; i < imageUrls.length; i++) {
         const imageUrl = imageUrls[i];
         const processedImage = await downloadAndStoreImage(imageUrl, userId, i);
         if (processedImage) {
           processedImages.push(processedImage);
         }
         
-        // Small delay between images
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Small delay between images to avoid overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       // Process ALL base64 images (removed the limit of 5)
