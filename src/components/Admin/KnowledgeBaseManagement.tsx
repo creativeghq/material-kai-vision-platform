@@ -345,12 +345,12 @@ const KnowledgeBaseManagement: React.FC = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {entry.pdf_url ? (
+                    {entry.metadata?.storage_info?.pdf_storage_url ? (
                       <Button
                         variant="outline"
                         size="sm"
                         className="flex items-center gap-1"
-                        onClick={() => window.open(entry.pdf_url, '_blank')}
+                        onClick={() => window.open(entry.metadata.storage_info.pdf_storage_url, '_blank')}
                       >
                         <ExternalLink className="h-3 w-3" />
                         View PDF
