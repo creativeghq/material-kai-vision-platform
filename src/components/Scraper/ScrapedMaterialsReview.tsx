@@ -171,10 +171,27 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
   const loadMaterialsBySession = async (sessionId: string) => {
     setLoading(true);
     try {
+      // First, get the UUID for this session
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('scraping_sessions')
+        .select('id')
+        .eq('session_id', sessionId)
+        .single();
+
+      if (sessionError) {
+        console.error('Error finding session:', sessionError);
+        throw sessionError;
+      }
+
+      if (!sessionData) {
+        throw new Error('Session not found');
+      }
+
+      // Now query scraped materials using the UUID
       const { data, error } = await supabase
         .from('scraped_materials_temp')
         .select('*')
-        .eq('scraping_session_id', sessionId)
+        .eq('scraping_session_id', sessionData.id)
         .order('scraped_at', { ascending: false });
 
       if (error) throw error;
