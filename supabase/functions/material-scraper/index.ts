@@ -93,6 +93,20 @@ async function processSitemapSimple(sitemapUrl: string, service: 'firecrawl' | '
     const urls = await parseSitemapSimple(sitemapUrl, options);
     console.log(`Found ${urls.length} URLs in sitemap`);
     
+    if (urls.length === 0) {
+      console.log('No URLs found in sitemap');
+      return [{
+        name: 'No URLs Found',
+        description: 'No product URLs were found in the sitemap that match the filtering criteria.',
+        category: 'System Note',
+        price: '',
+        images: [],
+        properties: { totalUrlsFound: 0, urlsProcessed: 0 },
+        sourceUrl: sitemapUrl,
+        supplier: 'System'
+      }];
+    }
+    
     // Limit to 3 URLs to prevent timeout
     const urlsToProcess = urls.slice(0, 3);
     console.log(`Processing first ${urlsToProcess.length} URLs to prevent timeout`);
@@ -109,8 +123,12 @@ async function processSitemapSimple(sitemapUrl: string, service: 'firecrawl' | '
           ? await extractWithJinaSimple(url, options)
           : await extractWithFirecrawlSimple(url, options);
         
-        allMaterials.push(...results);
-        console.log(`URL ${i + 1} done: ${results.length} materials found`);
+        if (results && results.length > 0) {
+          allMaterials.push(...results);
+          console.log(`URL ${i + 1} done: ${results.length} materials found`);
+        } else {
+          console.log(`URL ${i + 1} done: No materials found`);
+        }
         
         // Small delay between requests
         if (i < urlsToProcess.length - 1) {
@@ -123,17 +141,36 @@ async function processSitemapSimple(sitemapUrl: string, service: 'firecrawl' | '
       }
     }
     
-    // Add note about limitation
-    if (urlsToProcess.length < urls.length) {
+    console.log(`Total materials extracted: ${allMaterials.length}`);
+    
+    // Add summary note if we have materials
+    if (allMaterials.length > 0 && urlsToProcess.length < urls.length) {
       allMaterials.unshift({
-        name: `Note: Processed ${urlsToProcess.length} of ${urls.length} URLs`,
-        description: `To prevent timeouts, only the first ${urlsToProcess.length} URLs were processed. Use single page mode for specific URLs.`,
+        name: `Summary: Found ${allMaterials.length} materials from ${urlsToProcess.length} of ${urls.length} URLs`,
+        description: `Successfully extracted ${allMaterials.length} materials. To prevent timeouts, only the first ${urlsToProcess.length} URLs were processed.`,
+        category: 'System Summary',
+        price: '',
+        images: [],
+        properties: {
+          totalUrlsFound: urls.length,
+          urlsProcessed: urlsToProcess.length,
+          materialsFound: allMaterials.length - 1 // Exclude this summary from count
+        },
+        sourceUrl: sitemapUrl,
+        supplier: 'System'
+      });
+    } else if (allMaterials.length === 0) {
+      // If no materials found, return explanatory note
+      allMaterials.push({
+        name: `No Materials Extracted`,
+        description: `Processed ${urlsToProcess.length} URLs from sitemap but no materials were successfully extracted. The pages may not contain material information or may require different extraction settings.`,
         category: 'System Note',
         price: '',
         images: [],
         properties: {
           totalUrlsFound: urls.length,
-          urlsProcessed: urlsToProcess.length
+          urlsProcessed: urlsToProcess.length,
+          materialsFound: 0
         },
         sourceUrl: sitemapUrl,
         supplier: 'System'
