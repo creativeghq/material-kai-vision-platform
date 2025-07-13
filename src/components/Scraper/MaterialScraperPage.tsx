@@ -102,6 +102,28 @@ Return a list of materials found on the page.`,
       
       console.log('User authenticated, calling scraper function...');
       
+      // Create or update scraping session
+      const currentSessionId = `scrape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const { error: sessionError } = await supabase.from('scraping_sessions').insert({
+        user_id: session.user.id,
+        session_id: currentSessionId,
+        source_url: url,
+        scraping_config: {
+          service: options.service,
+          sitemapMode: options.sitemapMode,
+          batchSize: batchSize,
+          maxPages: maxPages,
+          saveTemporary: saveTemporary,
+          options: JSON.parse(JSON.stringify(options)) // Ensure proper JSON serialization
+        } as any, // Cast to bypass strict typing
+        status: 'active'
+      });
+
+      if (sessionError) {
+        console.error('Failed to create scraping session:', sessionError);
+      }
+      
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setProgress(prev => Math.min(prev + 10, 90));
@@ -115,6 +137,7 @@ Return a list of materials found on the page.`,
           batchSize: batchSize,
           maxPages: maxPages,
           saveTemporary: saveTemporary,
+          sessionId: currentSessionId,
           options: {
             ...options,
             service: options.service,
@@ -766,14 +789,49 @@ Return a list of materials found on the page.`,
               });
               // Could implement actual continuation logic here
             }}
-            onRetryScraping={() => {
-              // Retry the entire scraping process
-              if (url) {
-                handleScrape(new Event('submit') as any);
-              } else {
+            onRetryScraping={async () => {
+              // Retry using stored session configuration
+              try {
+                if (sessionId) {
+                  // Get the stored session configuration
+                  const { data: sessionData, error } = await supabase
+                    .from('scraping_sessions')
+                    .select('*')
+                    .eq('session_id', sessionId)
+                    .single();
+                    
+                  if (error || !sessionData) {
+                    toast({
+                      title: "Error",
+                      description: "Could not find session details to retry",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  // Restore the original configuration
+                  const config = sessionData.scraping_config as any;
+                  setUrl(sessionData.source_url);
+                  setBatchSize(config.batchSize || 10);
+                  setMaxPages(config.maxPages || 100);
+                  setSaveTemporary(config.saveTemporary || false);
+                  setOptions(config.options || options);
+                  
+                  // Start the scraping process
+                  const formEvent = { preventDefault: () => {} } as React.FormEvent;
+                  await handleScrape(formEvent);
+                } else {
+                  toast({
+                    title: "No Session",
+                    description: "No session found to retry. Please start a new scraping process.",
+                    variant: "destructive",
+                  });
+                }
+              } catch (error) {
+                console.error('Retry error:', error);
                 toast({
-                  title: "No URL",
-                  description: "Please enter a URL to retry scraping",
+                  title: "Retry Failed",
+                  description: "Could not retry the scraping process",
                   variant: "destructive",
                 });
               }

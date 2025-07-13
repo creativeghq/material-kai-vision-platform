@@ -1871,6 +1871,45 @@ export type Database = {
         }
         Relationships: []
       }
+      scraping_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          materials_processed: number | null
+          scraping_config: Json
+          session_id: string
+          source_url: string
+          status: string
+          total_materials_found: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          materials_processed?: number | null
+          scraping_config?: Json
+          session_id: string
+          source_url: string
+          status?: string
+          total_materials_found?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          materials_processed?: number | null
+          scraping_config?: Json
+          session_id?: string
+          source_url?: string
+          status?: string
+          total_materials_found?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       search_analytics: {
         Row: {
           avg_relevance_score: number | null
