@@ -294,40 +294,174 @@ async function analyzePageLayout(page: any, pageNumber: number, width: number, h
   return elements;
 }
 
-// Extract images from page with enhanced metadata
+// Extract actual images from PDF page using pdf-lib 
 async function extractPageImages(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
   
-  // Simulate image extraction
-  // In a real implementation, this would extract actual images from the PDF
-  
-  const imageCount = Math.floor(Math.random() * 3) + 1; // 1-3 images per page
-  
-  for (let i = 0; i < imageCount; i++) {
-    const imageId = `img_${pageNumber}_${i + 1}`;
-    const imageWidth = 200 + (i * 50);
-    const imageHeight = 150 + (i * 30);
-    const x = 300 + (i * 250);
-    const y = height - 200 - (i * 180);
+  try {
+    console.log(`Extracting images from page ${pageNumber}...`);
     
-    // Generate placeholder image URL
-    const imageUrl = await generateMaterialImagePlaceholder(pageNumber, i, imageWidth, imageHeight);
+    // Get embedded images using pdf-lib's embedded image extraction
+    const pdfDoc = page.doc;
+    const embeddedImages = pdfDoc.getEmbeddedImages ? pdfDoc.getEmbeddedImages() : [];
     
-    images.push({
-      id: imageId,
-      imageUrl,
-      imageType: 'material_sample',
-      caption: `Material sample ${pageNumber}-${i + 1}`,
-      altText: `High-quality material sample showing texture and finish details`,
-      bbox: { x, y, width: imageWidth, height: imageHeight },
-      pageNumber,
-      proximityScore: 0.85 + (Math.random() * 0.1),
-      associatedChunkIds: [] // Will be populated during chunking
-    });
+    console.log(`Found ${embeddedImages.length} embedded images in the document`);
+    
+    for (let i = 0; i < embeddedImages.length; i++) {
+      try {
+        const embeddedImage = embeddedImages[i];
+        console.log(`Processing embedded image ${i + 1}...`);
+        
+        // Get image data and properties
+        let imageData: Uint8Array;
+        let mimeType = 'image/jpeg';
+        
+        if (embeddedImage.type === 'jpg') {
+          imageData = embeddedImage.data;
+          mimeType = 'image/jpeg';
+        } else if (embeddedImage.type === 'png') {
+          imageData = embeddedImage.data;
+          mimeType = 'image/png';
+        } else {
+          // Default to JPEG
+          imageData = embeddedImage.data;
+          mimeType = 'image/jpeg';
+        }
+        
+        if (imageData && imageData.length > 100) {
+          const extension = mimeType.split('/')[1];
+          const filename = `extracted-img-p${pageNumber}-${i + 1}-${Date.now()}.${extension}`;
+          
+          console.log(`Uploading image: ${filename} (${imageData.length} bytes)`);
+          
+          const imageUrl = await uploadImageToStorage(imageData, filename, mimeType);
+          
+          if (imageUrl) {
+            const imageId = `extracted_${pageNumber}_${i}`;
+            images.push({
+              id: imageId,
+              imageUrl,
+              imageType: 'extracted_image',
+              caption: `Material image ${i + 1} from page ${pageNumber}`,
+              altText: `Image extracted from PDF showing material or technical details`,
+              bbox: { 
+                x: 50 + (i * 120), 
+                y: height - 200 - (i * 50), 
+                width: 300, 
+                height: 200 
+              },
+              pageNumber,
+              proximityScore: 0.95,
+              associatedChunkIds: []
+            });
+            
+            console.log(`Successfully extracted and uploaded image: ${filename}`);
+          }
+        } else {
+          console.log(`Skipping image ${i + 1} - insufficient data (${imageData?.length || 0} bytes)`);
+        }
+      } catch (imageError) {
+        console.error(`Error processing embedded image ${i + 1}:`, imageError);
+      }
+    }
+    
+    // If no embedded images found, try alternative extraction using page resources
+    if (images.length === 0) {
+      console.log('No embedded images found, trying page resource extraction...');
+      
+      const pageNode = page.node;
+      const resources = pageNode?.Resources;
+      
+      if (resources && resources.XObject) {
+        const xObjects = resources.XObject;
+        console.log(`Found ${Object.keys(xObjects).length} XObjects on page ${pageNumber}`);
+        
+        let imageIndex = 0;
+        
+        for (const [name, xObjectRef] of Object.entries(xObjects)) {
+          try {
+            const xObject = pageNode.context.lookup(xObjectRef);
+            
+            if (xObject && xObject.get('Subtype')?.name === 'Image') {
+              console.log(`Processing image XObject: ${name} on page ${pageNumber}`);
+              
+              // Try to get raw image data
+              const imageBytes = xObject.getContents();
+              
+              if (imageBytes && imageBytes.length > 100) {
+                const filename = `xobject-img-p${pageNumber}-${name}-${Date.now()}.jpg`;
+                
+                console.log(`Uploading XObject image: ${filename} (${imageBytes.length} bytes)`);
+                
+                const imageUrl = await uploadImageToStorage(imageBytes, filename, 'image/jpeg');
+                
+                if (imageUrl) {
+                  const imageId = `xobject_${pageNumber}_${imageIndex}`;
+                  images.push({
+                    id: imageId,
+                    imageUrl,
+                    imageType: 'xobject_image',
+                    caption: `XObject image from page ${pageNumber}`,
+                    altText: `Image extracted from PDF XObject`,
+                    bbox: { 
+                      x: 50 + (imageIndex * 120), 
+                      y: height - 200 - (imageIndex * 50), 
+                      width: 300, 
+                      height: 200 
+                    },
+                    pageNumber,
+                    proximityScore: 0.9,
+                    associatedChunkIds: []
+                  });
+                  
+                  console.log(`Successfully extracted and uploaded XObject image: ${filename}`);
+                  imageIndex++;
+                }
+              }
+            }
+          } catch (xObjectError) {
+            console.error(`Error processing XObject ${name}:`, xObjectError);
+          }
+        }
+      }
+    }
+    
+    console.log(`Successfully extracted ${images.length} images from page ${pageNumber}`);
+    
+  } catch (error) {
+    console.error(`Error extracting images from page ${pageNumber}:`, error);
   }
   
   return images;
 }
+
+// Upload extracted image to Supabase storage
+async function uploadImageToStorage(imageBytes: Uint8Array, filename: string, mimeType: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from('material-images')
+      .upload(filename, imageBytes, {
+        contentType: mimeType,
+        upsert: true
+      });
+    
+    if (error) {
+      console.error('Storage upload error:', error);
+      return null;
+    }
+    
+    const { data: urlData } = supabase.storage
+      .from('material-images')
+      .getPublicUrl(filename);
+    
+    return urlData.publicUrl;
+    
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    return null;
+  }
+}
+
 
 // Generate HTML for a single page
 async function generatePageHTML(elements: LayoutElement[], images: DocumentImage[], pageNumber: number, width: number, height: number, options: any): Promise<string> {
@@ -513,16 +647,87 @@ function generateTechnicalTable(materialType: string, pageNumber: number): strin
   return tableHTML;
 }
 
-// Generate material image placeholder
+// Generate actual material image and upload to storage
 async function generateMaterialImagePlaceholder(pageNumber: number, imageIndex: number, width: number, height: number): Promise<string> {
-  const colors = ['#D2B48C', '#A0522D', '#8B4513', '#C0C0C0', '#E6F3FF'];
-  const color = colors[(pageNumber + imageIndex) % colors.length];
-  
+  try {
+    // Define material types and their characteristics
+    const materialTypes = [
+      { name: 'Ceramic Tile', color: '#D2B48C', pattern: 'geometric' },
+      { name: 'Natural Stone', color: '#A0522D', pattern: 'organic' },
+      { name: 'Engineered Wood', color: '#8B4513', pattern: 'linear' },
+      { name: 'Metal Finish', color: '#C0C0C0', pattern: 'brushed' },
+      { name: 'Glass Panel', color: '#E6F3FF', pattern: 'smooth' }
+    ];
+    
+    const material = materialTypes[(pageNumber + imageIndex) % materialTypes.length];
+    
+    // Create a detailed prompt for the material image
+    const prompt = `A high-quality professional photograph of ${material.name.toLowerCase()} material sample. 
+    The sample shows detailed texture, surface finish, and material properties. 
+    Shot in professional lighting with clean white background, suitable for architectural specification. 
+    Material has ${material.pattern} pattern characteristics. 
+    Ultra high resolution, professional material photography, clean and crisp details.`;
+    
+    console.log(`Generating material image for: ${material.name}`);
+    
+    // Generate the image using the existing image generation function
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-material-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        width: Math.min(512, width),
+        height: Math.min(512, height),
+        materialType: material.name
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      if (result.imageUrl) {
+        console.log(`Generated material image: ${result.imageUrl}`);
+        return result.imageUrl;
+      }
+    }
+    
+    // Fallback: Create and upload SVG to storage
+    const fileName = `material-sample-${pageNumber}-${imageIndex}-${Date.now()}.svg`;
+    const svgContent = createMaterialSVG(material, width, height, pageNumber, imageIndex);
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('material-images')
+      .upload(fileName, new Blob([svgContent], { type: 'image/svg+xml' }));
+    
+    if (uploadError) {
+      console.error('Image upload error:', uploadError);
+      return `data:image/svg+xml;base64,${btoa(svgContent)}`;
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('material-images')
+      .getPublicUrl(fileName);
+    
+    return publicUrl;
+    
+  } catch (error) {
+    console.error('Error generating material image:', error);
+    // Return inline SVG as fallback
+    const material = { name: 'Material Sample', color: '#D2B48C', pattern: 'default' };
+    const svgContent = createMaterialSVG(material, width, height, pageNumber, imageIndex);
+    return `data:image/svg+xml;base64,${btoa(svgContent)}`;
+  }
+}
+
+// Create high-quality SVG material sample
+function createMaterialSVG(material: any, width: number, height: number, pageNumber: number, imageIndex: number): string {
   const svg = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <pattern id="texture${pageNumber}_${imageIndex}" patternUnits="userSpaceOnUse" width="30" height="30">
-          <rect width="30" height="30" fill="${color}"/>
+          <rect width="30" height="30" fill="${material.color}"/>
           <circle cx="15" cy="15" r="5" fill="rgba(255,255,255,0.3)"/>
           <rect x="5" y="5" width="20" height="20" fill="none" stroke="rgba(0,0,0,0.1)" stroke-width="1"/>
           <line x1="0" y1="15" x2="30" y2="15" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
@@ -531,25 +736,34 @@ async function generateMaterialImagePlaceholder(pageNumber: number, imageIndex: 
         <filter id="shadow${pageNumber}_${imageIndex}">
           <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
         </filter>
+        <linearGradient id="materialGradient${pageNumber}_${imageIndex}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${material.color};stop-opacity:1" />
+          <stop offset="50%" style="stop-color:rgba(255,255,255,0.2);stop-opacity:0.3" />
+          <stop offset="100%" style="stop-color:${material.color};stop-opacity:0.8" />
+        </linearGradient>
       </defs>
-      <rect width="100%" height="100%" fill="url(#texture${pageNumber}_${imageIndex})" filter="url(#shadow${pageNumber}_${imageIndex})"/>
-      <rect width="100%" height="100%" fill="rgba(0,0,0,0.1)"/>
-      <text x="50%" y="30%" text-anchor="middle" font-family="Arial" font-size="16" font-weight="bold" fill="white">
+      <rect width="100%" height="100%" fill="url(#materialGradient${pageNumber}_${imageIndex})" filter="url(#shadow${pageNumber}_${imageIndex})"/>
+      <rect width="100%" height="100%" fill="url(#texture${pageNumber}_${imageIndex})" opacity="0.6"/>
+      <rect x="10" y="10" width="${width-20}" height="${height-20}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" rx="8"/>
+      <text x="50%" y="25%" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="white">
+        ${material.name.toUpperCase()}
+      </text>
+      <text x="50%" y="40%" text-anchor="middle" font-family="Arial" font-size="12" fill="white">
         MATERIAL SAMPLE
       </text>
-      <text x="50%" y="50%" text-anchor="middle" font-family="Arial" font-size="14" fill="white">
-        Page ${pageNumber} - Image ${imageIndex + 1}
+      <text x="50%" y="55%" text-anchor="middle" font-family="Arial" font-size="10" fill="white" opacity="0.8">
+        Page ${pageNumber} - Sample ${imageIndex + 1}
       </text>
-      <text x="50%" y="70%" text-anchor="middle" font-family="Arial" font-size="12" fill="white" opacity="0.8">
-        ${width}x${height}px
+      <text x="50%" y="70%" text-anchor="middle" font-family="Arial" font-size="9" fill="white" opacity="0.7">
+        ${width}×${height} px
       </text>
-      <text x="50%" y="85%" text-anchor="middle" font-family="Arial" font-size="10" fill="white" opacity="0.6">
-        Enhanced HTML Processing
+      <text x="50%" y="85%" text-anchor="middle" font-family="Arial" font-size="8" fill="white" opacity="0.6">
+        ${material.pattern} pattern
       </text>
     </svg>
   `;
   
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return svg;
 }
 
 // Generate embeddings for content chunks
@@ -673,10 +887,10 @@ serve(async (req) => {
       const fullText = layoutElements.flat().map(el => el.content).join(' ');
       const embedding = await generateEmbedding(fullText);
 
-      // Store in enhanced knowledge base
+      // Store HTML content in storage and enhanced knowledge base
       const knowledgeEntry = {
         title: `${originalFilename.replace('.pdf', '')} - Enhanced HTML Document`,
-        content: fullText,
+        content: htmlContent, // Store the full HTML content instead of just text
         content_type: 'enhanced_pdf_html',
         source_url: htmlUrl,
         semantic_tags: ['pdf', 'html-converted', 'layout-aware', 'material-document'],
@@ -707,7 +921,9 @@ serve(async (req) => {
               acc[el.type] = (acc[el.type] || 0) + 1;
               return acc;
             }, {} as Record<string, number>)
-          }
+          },
+          html_url: htmlUrl,
+          html_storage_path: htmlFileName
         },
         created_by: userId,
         last_modified_by: userId,
@@ -715,6 +931,12 @@ serve(async (req) => {
       };
 
       console.log('Storing enhanced content in knowledge base...');
+      console.log('Knowledge entry data:', {
+        title: knowledgeEntry.title,
+        contentLength: knowledgeEntry.content.length,
+        contentType: knowledgeEntry.content_type,
+        status: knowledgeEntry.status
+      });
 
       const { data: knowledgeData, error: knowledgeError } = await supabase
         .from('enhanced_knowledge_base')
@@ -724,7 +946,14 @@ serve(async (req) => {
 
       if (knowledgeError) {
         console.error('Knowledge base insertion error:', knowledgeError);
+        throw new Error(`Failed to store in knowledge base: ${knowledgeError.message}`);
       }
+
+      if (!knowledgeData) {
+        throw new Error('No data returned from knowledge base insertion');
+      }
+
+      console.log('Successfully stored in knowledge base with ID:', knowledgeData.id);
 
       const processingTime = Date.now() - startTime;
 
