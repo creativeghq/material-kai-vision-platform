@@ -294,142 +294,278 @@ async function analyzePageLayout(page: any, pageNumber: number, width: number, h
   return elements;
 }
 
-// Extract actual images from PDF page using pdf-lib 
+// Extract actual images from PDF using PDF.js (more robust than pdf-lib)
 async function extractPageImages(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
   const images: DocumentImage[] = [];
   
   try {
-    console.log(`Extracting images from page ${pageNumber}...`);
+    console.log(`🔍 [DEBUG] Starting enhanced image extraction for page ${pageNumber}...`);
     
-    // Get embedded images using pdf-lib's embedded image extraction
-    const pdfDoc = page.doc;
-    const embeddedImages = pdfDoc.getEmbeddedImages ? pdfDoc.getEmbeddedImages() : [];
-    
-    console.log(`Found ${embeddedImages.length} embedded images in the document`);
-    
-    for (let i = 0; i < embeddedImages.length; i++) {
-      try {
-        const embeddedImage = embeddedImages[i];
-        console.log(`Processing embedded image ${i + 1}...`);
-        
-        // Get image data and properties
-        let imageData: Uint8Array;
-        let mimeType = 'image/jpeg';
-        
-        if (embeddedImage.type === 'jpg') {
-          imageData = embeddedImage.data;
-          mimeType = 'image/jpeg';
-        } else if (embeddedImage.type === 'png') {
-          imageData = embeddedImage.data;
-          mimeType = 'image/png';
-        } else {
-          // Default to JPEG
-          imageData = embeddedImage.data;
-          mimeType = 'image/jpeg';
-        }
-        
-        if (imageData && imageData.length > 100) {
-          const extension = mimeType.split('/')[1];
-          const filename = `extracted-img-p${pageNumber}-${i + 1}-${Date.now()}.${extension}`;
-          
-          console.log(`Uploading image: ${filename} (${imageData.length} bytes)`);
-          
-          const imageUrl = await uploadImageToStorage(imageData, filename, mimeType);
-          
-          if (imageUrl) {
-            const imageId = `extracted_${pageNumber}_${i}`;
-            images.push({
-              id: imageId,
-              imageUrl,
-              imageType: 'extracted_image',
-              caption: `Material image ${i + 1} from page ${pageNumber}`,
-              altText: `Image extracted from PDF showing material or technical details`,
-              bbox: { 
-                x: 50 + (i * 120), 
-                y: height - 200 - (i * 50), 
-                width: 300, 
-                height: 200 
-              },
-              pageNumber,
-              proximityScore: 0.95,
-              associatedChunkIds: []
-            });
-            
-            console.log(`Successfully extracted and uploaded image: ${filename}`);
-          }
-        } else {
-          console.log(`Skipping image ${i + 1} - insufficient data (${imageData?.length || 0} bytes)`);
-        }
-      } catch (imageError) {
-        console.error(`Error processing embedded image ${i + 1}:`, imageError);
-      }
+    // Try to use PDF.js for better image extraction
+    const pdfJsImages = await extractImagesWithPDFJS(page, pageNumber);
+    if (pdfJsImages.length > 0) {
+      images.push(...pdfJsImages);
+      console.log(`✅ PDF.js extracted ${pdfJsImages.length} images from page ${pageNumber}`);
     }
     
-    // If no embedded images found, try alternative extraction using page resources
+    // Fallback: Try pdf-lib approach if PDF.js fails
     if (images.length === 0) {
-      console.log('No embedded images found, trying page resource extraction...');
+      console.log(`🔍 [DEBUG] PDF.js extraction failed, trying pdf-lib fallback...`);
+      const pdfLibImages = await extractImagesWithPDFLib(page, pageNumber, width, height);
+      images.push(...pdfLibImages);
+    }
+    
+    // Final fallback: Try raw XObject extraction
+    if (images.length === 0) {
+      console.log(`🔍 [DEBUG] All methods failed, trying raw XObject extraction...`);
+      const xObjectImages = await extractImagesFromXObjects(page, pageNumber, width, height);
+      images.push(...xObjectImages);
+    }
+    
+    console.log(`✅ Final result: extracted ${images.length} real images from page ${pageNumber}`);
+    
+  } catch (error) {
+    console.error(`❌ Error extracting images from page ${pageNumber}:`, error);
+  }
+  
+  return images;
+}
+
+// Enhanced image extraction using PDF.js approach
+async function extractImagesWithPDFJS(page: any, pageNumber: number): Promise<DocumentImage[]> {
+  const images: DocumentImage[] = [];
+  
+  try {
+    console.log(`🔍 [DEBUG] Attempting PDF.js-style image extraction for page ${pageNumber}...`);
+    
+    // Get the page's content stream
+    const pageNode = page.node;
+    if (!pageNode) {
+      console.log(`🔍 [DEBUG] No page node available for PDF.js extraction`);
+      return images;
+    }
+    
+    // Look for image operators in the content stream
+    const contents = pageNode.Contents;
+    if (contents) {
+      console.log(`🔍 [DEBUG] Found page contents, analyzing for image operators...`);
       
-      const pageNode = page.node;
-      const resources = pageNode?.Resources;
-      
-      if (resources && resources.XObject) {
-        const xObjects = resources.XObject;
-        console.log(`Found ${Object.keys(xObjects).length} XObjects on page ${pageNumber}`);
+      // Try to parse content stream for image references
+      const contentStream = pageNode.context.lookup(contents);
+      if (contentStream) {
+        const streamData = contentStream.getContents();
+        const streamText = new TextDecoder().decode(streamData);
         
-        let imageIndex = 0;
-        
-        for (const [name, xObjectRef] of Object.entries(xObjects)) {
-          try {
-            const xObject = pageNode.context.lookup(xObjectRef);
+        // Look for image drawing operators (Do operator with image references)
+        const imageMatches = streamText.match(/\/(\w+)\s+Do/g);
+        if (imageMatches) {
+          console.log(`🔍 [DEBUG] Found ${imageMatches.length} potential image references:`, imageMatches);
+          
+          const resources = pageNode.Resources;
+          if (resources && resources.XObject) {
+            let imageIndex = 0;
             
-            if (xObject && xObject.get('Subtype')?.name === 'Image') {
-              console.log(`Processing image XObject: ${name} on page ${pageNumber}`);
-              
-              // Try to get raw image data
-              const imageBytes = xObject.getContents();
-              
-              if (imageBytes && imageBytes.length > 100) {
-                const filename = `xobject-img-p${pageNumber}-${name}-${Date.now()}.jpg`;
+            for (const match of imageMatches) {
+              const imageName = match.match(/\/(\w+)/)?.[1];
+              if (imageName && resources.XObject[imageName]) {
+                const imageRef = resources.XObject[imageName];
+                const imageObj = pageNode.context.lookup(imageRef);
                 
-                console.log(`Uploading XObject image: ${filename} (${imageBytes.length} bytes)`);
-                
-                const imageUrl = await uploadImageToStorage(imageBytes, filename, 'image/jpeg');
-                
-                if (imageUrl) {
-                  const imageId = `xobject_${pageNumber}_${imageIndex}`;
-                  images.push({
-                    id: imageId,
-                    imageUrl,
-                    imageType: 'xobject_image',
-                    caption: `XObject image from page ${pageNumber}`,
-                    altText: `Image extracted from PDF XObject`,
-                    bbox: { 
-                      x: 50 + (imageIndex * 120), 
-                      y: height - 200 - (imageIndex * 50), 
-                      width: 300, 
-                      height: 200 
-                    },
-                    pageNumber,
-                    proximityScore: 0.9,
-                    associatedChunkIds: []
-                  });
+                if (imageObj && imageObj.get('Subtype')?.name === 'Image') {
+                  console.log(`🔍 [DEBUG] Processing image: ${imageName}`);
                   
-                  console.log(`Successfully extracted and uploaded XObject image: ${filename}`);
-                  imageIndex++;
+                  const imageData = await extractImageDataFromObject(imageObj, imageName, pageNumber, imageIndex);
+                  if (imageData) {
+                    images.push(imageData);
+                    imageIndex++;
+                  }
                 }
               }
             }
-          } catch (xObjectError) {
-            console.error(`Error processing XObject ${name}:`, xObjectError);
           }
         }
       }
     }
     
-    console.log(`Successfully extracted ${images.length} images from page ${pageNumber}`);
+    console.log(`🔍 [DEBUG] PDF.js-style extraction found ${images.length} images`);
     
   } catch (error) {
-    console.error(`Error extracting images from page ${pageNumber}:`, error);
+    console.error(`Error in PDF.js-style extraction:`, error);
+  }
+  
+  return images;
+}
+
+// Extract image data from PDF object and upload to storage
+async function extractImageDataFromObject(imageObj: any, imageName: string, pageNumber: number, imageIndex: number): Promise<DocumentImage | null> {
+  try {
+    // Get image properties
+    const width = imageObj.get('Width');
+    const height = imageObj.get('Height');
+    const colorSpace = imageObj.get('ColorSpace');
+    const bitsPerComponent = imageObj.get('BitsPerComponent');
+    
+    console.log(`🔍 [DEBUG] Image ${imageName}: ${width}x${height}, ${bitsPerComponent} bits, colorSpace:`, colorSpace?.name);
+    
+    // Get raw image data
+    const imageBytes = imageObj.getContents();
+    
+    if (imageBytes && imageBytes.length > 100) {
+      // Determine image format based on filter
+      const filter = imageObj.get('Filter');
+      let mimeType = 'image/jpeg';
+      let extension = 'jpg';
+      
+      if (filter) {
+        if (filter.name === 'DCTDecode') {
+          mimeType = 'image/jpeg';
+          extension = 'jpg';
+        } else if (filter.name === 'FlateDecode') {
+          mimeType = 'image/png';
+          extension = 'png';
+        }
+      }
+      
+      const filename = `pdf-image-p${pageNumber}-${imageName}-${Date.now()}.${extension}`;
+      console.log(`🔍 [DEBUG] Uploading image: ${filename} (${imageBytes.length} bytes, ${mimeType})`);
+      
+      const imageUrl = await uploadImageToStorage(imageBytes, filename, mimeType);
+      
+      if (imageUrl) {
+        return {
+          id: `pdfjs_${pageNumber}_${imageIndex}`,
+          imageUrl,
+          imageType: 'pdf_extracted',
+          caption: `Image ${imageName} from page ${pageNumber}`,
+          altText: `Image extracted from PDF using enhanced extraction`,
+          bbox: {
+            x: 50 + (imageIndex * 150),
+            y: 200,
+            width: width || 200,
+            height: height || 200
+          },
+          pageNumber,
+          proximityScore: 0.95,
+          associatedChunkIds: []
+        };
+      }
+    } else {
+      console.log(`🔍 [DEBUG] Skipping image ${imageName} - insufficient data (${imageBytes?.length || 0} bytes)`);
+    }
+    
+  } catch (error) {
+    console.error(`Error extracting image data for ${imageName}:`, error);
+  }
+  
+  return null;
+}
+
+// Fallback: pdf-lib approach (original method)
+async function extractImagesWithPDFLib(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
+  const images: DocumentImage[] = [];
+  
+  try {
+    console.log(`🔍 [DEBUG] Trying pdf-lib image extraction...`);
+    
+    const pdfDoc = page.doc;
+    if (pdfDoc && typeof pdfDoc.getEmbeddedImages === 'function') {
+      const embeddedImages = pdfDoc.getEmbeddedImages();
+      console.log(`🔍 [DEBUG] pdf-lib found ${embeddedImages.length} embedded images`);
+      
+      for (let i = 0; i < embeddedImages.length; i++) {
+        const embeddedImage = embeddedImages[i];
+        if (embeddedImage.data && embeddedImage.data.length > 100) {
+          const mimeType = embeddedImage.type === 'png' ? 'image/png' : 'image/jpeg';
+          const extension = embeddedImage.type === 'png' ? 'png' : 'jpg';
+          const filename = `pdflib-img-p${pageNumber}-${i + 1}-${Date.now()}.${extension}`;
+          
+          const imageUrl = await uploadImageToStorage(embeddedImage.data, filename, mimeType);
+          
+          if (imageUrl) {
+            images.push({
+              id: `pdflib_${pageNumber}_${i}`,
+              imageUrl,
+              imageType: 'pdflib_extracted',
+              caption: `PDF-lib image ${i + 1} from page ${pageNumber}`,
+              altText: `Image extracted using pdf-lib`,
+              bbox: {
+                x: 50 + (i * 120),
+                y: height - 200,
+                width: 300,
+                height: 200
+              },
+              pageNumber,
+              proximityScore: 0.9,
+              associatedChunkIds: []
+            });
+          }
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error(`Error in pdf-lib extraction:`, error);
+  }
+  
+  return images;
+}
+
+// Final fallback: Raw XObject extraction
+async function extractImagesFromXObjects(page: any, pageNumber: number, width: number, height: number): Promise<DocumentImage[]> {
+  const images: DocumentImage[] = [];
+  
+  try {
+    console.log(`🔍 [DEBUG] Trying raw XObject extraction...`);
+    
+    const pageNode = page.node;
+    const resources = pageNode?.Resources;
+    
+    if (resources && resources.XObject) {
+      const xObjects = resources.XObject;
+      console.log(`🔍 [DEBUG] Found ${Object.keys(xObjects).length} XObjects`);
+      
+      let imageIndex = 0;
+      
+      for (const [name, xObjectRef] of Object.entries(xObjects)) {
+        try {
+          const xObject = pageNode.context.lookup(xObjectRef);
+          
+          if (xObject && xObject.get('Subtype')?.name === 'Image') {
+            const imageBytes = xObject.getContents();
+            
+            if (imageBytes && imageBytes.length > 100) {
+              const filename = `xobject-img-p${pageNumber}-${name}-${Date.now()}.jpg`;
+              const imageUrl = await uploadImageToStorage(imageBytes, filename, 'image/jpeg');
+              
+              if (imageUrl) {
+                images.push({
+                  id: `xobject_${pageNumber}_${imageIndex}`,
+                  imageUrl,
+                  imageType: 'xobject_extracted',
+                  caption: `XObject ${name} from page ${pageNumber}`,
+                  altText: `Image extracted from PDF XObject`,
+                  bbox: {
+                    x: 50 + (imageIndex * 120),
+                    y: height - 200,
+                    width: 300,
+                    height: 200
+                  },
+                  pageNumber,
+                  proximityScore: 0.85,
+                  associatedChunkIds: []
+                });
+                imageIndex++;
+              }
+            }
+          }
+        } catch (xObjectError) {
+          console.error(`Error processing XObject ${name}:`, xObjectError);
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error(`Error in XObject extraction:`, error);
   }
   
   return images;
