@@ -113,11 +113,12 @@ async function extractPDFText(pdfBuffer: ArrayBuffer): Promise<{ text: string, c
 
 
 // Generate embeddings for the extracted content
-async function generateEmbedding(text: string): Promise<number[] | null> {
+async function generateEmbedding(text: string): Promise<string | null> {
   try {
     if (!openaiApiKey) {
-      // Return a mock embedding if no API key - return as number array
-      return Array.from({length: 1536}, () => Math.random() * 0.1 - 0.05);
+      // Return a mock embedding if no API key - format as vector string
+      const mockEmbedding = Array.from({length: 1536}, () => Math.random() * 0.1 - 0.05);
+      return `[${mockEmbedding.join(',')}]`;
     }
 
     const response = await fetch('https://api.openai.com/v1/embeddings', {
@@ -134,7 +135,8 @@ async function generateEmbedding(text: string): Promise<number[] | null> {
 
     if (response.ok) {
       const result = await response.json();
-      return result.data[0]?.embedding || null;
+      const embedding = result.data[0]?.embedding;
+      return embedding ? `[${embedding.join(',')}]` : null;
     }
 
     return null;
