@@ -115,9 +115,9 @@ export const PDFProcessor: React.FC = () => {
           : p
       ));
 
-      // Process using the simplified pdf-processor
-      console.log('Processing PDF with simplified approach...');
-      const response = await supabase.functions.invoke('pdf-processor', {
+      // Process using the ConvertAPI pdf-processor
+      console.log('Processing PDF with ConvertAPI approach...');
+      const response = await supabase.functions.invoke('convertapi-pdf-processor', {
         body: {
           fileUrl: publicUrl,
           originalFilename: file.name,
@@ -144,8 +144,8 @@ export const PDFProcessor: React.FC = () => {
       ));
 
       toast({
-        title: "Processing Complete",
-        description: `Successfully processed ${file.name} and added to knowledge base. Text length: ${response.data.extractedContent.textLength} characters`,
+        title: "ConvertAPI Processing Complete",
+        description: `Successfully converted ${file.name} to HTML and added to knowledge base. Text: ${response.data.extractedContent.textLength} chars, HTML: ${response.data.extractedContent.htmlLength} chars, Images: ${response.data.conversionInfo.imagesProcessed}`,
       });
 
     } catch (error) {
@@ -218,7 +218,7 @@ export const PDFProcessor: React.FC = () => {
             PDF Knowledge Base Processor
           </CardTitle>
            <CardDescription>
-             Upload PDF documents to extract content and add directly to the knowledge base for AI-powered search and analysis.
+             Upload PDF documents to convert to HTML with ConvertAPI, extract images, and add to the knowledge base for AI-powered search and analysis.
            </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -231,7 +231,7 @@ export const PDFProcessor: React.FC = () => {
             <Alert>
               <Brain className="h-4 w-4" />
               <AlertDescription>
-                Simplified PDF processing extracts text content and generates embeddings for intelligent search. The AI agents will analyze and categorize materials on-demand when users search.
+                ConvertAPI PDF processing converts documents to HTML, downloads all images to local storage, and generates embeddings for intelligent search. The AI agents will analyze and categorize materials on-demand when users search.
               </AlertDescription>
             </Alert>
           </div>
@@ -284,7 +284,7 @@ export const PDFProcessor: React.FC = () => {
               <div>
                 <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
                  <p className="text-sm text-muted-foreground">
-                   Intelligent processing: Extract text, generate embeddings, and add to knowledge base for AI-powered analysis
+                   ConvertAPI processing: Convert PDF to HTML, download images, generate embeddings, and add to knowledge base for AI-powered analysis
                  </p>
               </div>
             )}
