@@ -379,9 +379,9 @@ serve(async (req) => {
       console.log('💾 Step 6: Storing in knowledge base...');
       const knowledgeEntry = {
         title: `${originalFilename.replace('.pdf', '')} - HTML Document`,
-        content: extractedText,
-        content_type: 'pdf_html_document',
-        source_url: fileUrl,
+        content: finalHtmlContent, // Store the final HTML content with local images
+        content_type: 'enhanced_pdf_html', // Match the type expected by HTMLDocumentViewer
+        source_url: htmlPublicUrl, // Point to the HTML file, not original PDF
         semantic_tags: ['pdf', 'html', 'convertapi', 'uploaded-content'],
         language: options.language || 'en',
         technical_complexity: 5,
@@ -390,6 +390,7 @@ serve(async (req) => {
         confidence_scores: {
           conversion: 0.9,
           text_extraction: 0.85,
+          image_processing: processedImages.length > 0 ? 0.8 : 0.0,
           overall: 0.87
         },
         search_keywords: extractedText.split(' ').filter(word => word.length > 3).slice(0, 15),
@@ -411,7 +412,8 @@ serve(async (req) => {
             supabase_url: img.supabaseUrl,
             filename: img.filename,
             size: img.size
-          }))
+          })),
+          text_preview: extractedText.substring(0, 500) // Keep text for search/preview
         },
         created_by: userId,
         last_modified_by: userId,
