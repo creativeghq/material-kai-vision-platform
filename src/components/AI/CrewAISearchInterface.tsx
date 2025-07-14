@@ -5,18 +5,37 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Bot, 
-  Send, 
-  Loader2, 
-  User, 
+import { EnhancedRAGService } from '@/services/enhancedRAGService';
+import { HybridAIService } from '@/services/hybridAIService';
+import { CrewAI3DGenerationAPI } from '@/services/crewai3DGenerationAPI';
+import {
+  Bot,
+  Send,
+  Loader2,
+  User,
   Search,
   Brain,
   Sparkles,
   MessageSquare,
   Lightbulb,
-  Database
+  Database,
+  Paperclip,
+  X,
+  FileImage,
+  FileText,
+  Upload,
+  Settings,
+  Cpu
 } from 'lucide-react';
+
+interface AttachedFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url?: string;
+  preview?: string;
+}
 
 interface Message {
   id: string;
@@ -27,6 +46,57 @@ interface Message {
   suggestions?: string[];
   materials?: any[];
   metadata?: any;
+  attachments?: AttachedFile[];
+}
+
+interface HybridModelConfig {
+  primary: 'openai' | 'claude' | 'vertex';
+  fallback: 'openai' | 'claude' | 'vertex';
+  temperature: number;
+  maxTokens: number;
+  useRAG: boolean;
+  use3DGeneration: boolean;
+  enableRAG: boolean;
+  enable3DGeneration: boolean;
+}
+
+interface RAGResults {
+  knowledgeResults: Array<{
+    id: string;
+    title: string;
+    content: string;
+    relevanceScore: number;
+    source: string;
+  }>;
+  materialResults: Array<{
+    id: string;
+    title: string;
+    content: string;
+    relevanceScore: number;
+    source: string;
+  }>;
+  totalResults: number;
+  searchTime: number;
+}
+
+interface EnhancedContext {
+  previousMessages: Message[];
+  userPreferences: {
+    includeDesignSuggestions: boolean;
+    includeMaterialProperties: boolean;
+    includeApplicationExamples: boolean;
+    use3DGeneration: boolean;
+    useRAG: boolean;
+  };
+  hybridModelConfig: HybridModelConfig;
+  attachments: {
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    url?: string;
+  }[];
+  ragResults?: RAGResults;
 }
 
 interface CrewAISearchInterfaceProps {
@@ -45,7 +115,20 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => crypto.randomUUID());
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [hybridConfig, setHybridConfig] = useState<HybridModelConfig>({
+    primary: 'claude',
+    fallback: 'openai',
+    temperature: 0.7,
+    maxTokens: 4000,
+    useRAG: true,
+    use3DGeneration: true,
+    enableRAG: true,
+    enable3DGeneration: true
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Initialize with welcome message
@@ -67,6 +150,71 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // File handling functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      // Validate file type and size
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv'];
+      
+      if (file.size > maxSize) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is larger than 10MB`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Unsupported file type",
+          description: `${file.name} is not a supported file type`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newFile: AttachedFile = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: URL.createObjectURL(file)
+      };
+
+      // Generate preview for images
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          newFile.preview = e.target?.result as string;
+          setAttachedFiles(prev => [...prev, newFile]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setAttachedFiles(prev => [...prev, newFile]);
+      }
+    });
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachedFile = (fileId: string) => {
+    setAttachedFiles(prev => {
+      const fileToRemove = prev.find(f => f.id === fileId);
+      if (fileToRemove?.url) {
+        URL.revokeObjectURL(fileToRemove.url);
+      }
+      return prev.filter(f => f.id !== fileId);
+    });
+  };
+
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -74,7 +222,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       id: crypto.randomUUID(),
       role: 'user',
       content: input,
-      timestamp: new Date()
+      timestamp: new Date(),
+      attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -88,22 +237,148 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         throw new Error('Please sign in to use the AI assistant');
       }
 
-      console.log('Sending request to enhanced-crewai function...');
+      // Enhanced diagnostic logging
+      console.log('=== Enhanced CrewAI Integration ===');
+      console.log('1. File attachments:', attachedFiles.length > 0 ? `${attachedFiles.length} files attached` : 'No files');
+      console.log('2. Hybrid model config:', hybridConfig);
+      console.log('3. RAG enabled:', hybridConfig.useRAG);
+      console.log('4. 3D generation enabled:', hybridConfig.use3DGeneration);
+      console.log('5. Session context:', sessionId);
+      console.log('6. User input:', { length: input.length, hasAttachments: attachedFiles.length > 0 });
+      console.log('=====================================');
 
-      const { data, error } = await supabase.functions.invoke('enhanced-crewai', {
-        body: {
-          query: input,
-          sessionId: sessionId,
-          context: {
-            previousMessages: messages.slice(-5), // Last 5 messages for context
-            userPreferences: {
-              includeDesignSuggestions: true,
-              includeMaterialProperties: true,
-              includeApplicationExamples: true
-            }
+      // Prepare enhanced context with RAG integration
+      let enhancedContext: EnhancedContext = {
+        previousMessages: messages.slice(-5),
+        userPreferences: {
+          includeDesignSuggestions: true,
+          includeMaterialProperties: true,
+          includeApplicationExamples: true,
+          use3DGeneration: hybridConfig.use3DGeneration,
+          useRAG: hybridConfig.useRAG
+        },
+        hybridModelConfig: hybridConfig,
+        attachments: attachedFiles.map(file => ({
+          id: file.id,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          url: file.url
+        }))
+      };
+
+      // If RAG is enabled, perform knowledge base search first
+      let ragResults: RAGResults | null = null;
+      if (hybridConfig.useRAG && input.trim()) {
+        try {
+          console.log('🧠 Performing RAG search...');
+          const ragResponse = await EnhancedRAGService.search({
+            query: input,
+            context: {
+              projectType: 'interior_design',
+              roomType: 'general',
+              materialCategories: ['all']
+            },
+            searchType: 'hybrid',
+            maxResults: 5,
+            includeRealTime: false
+          });
+
+          if (ragResponse.success) {
+            ragResults = {
+              knowledgeResults: ragResponse.results.knowledgeBase.map(kb => ({
+                id: kb.id,
+                title: kb.title,
+                content: kb.content.substring(0, 500) + '...', // Truncate for context
+                relevanceScore: kb.relevanceScore,
+                source: kb.source
+              })),
+              materialResults: ragResponse.results.materialKnowledge.map(mk => ({
+                id: mk.materialId,
+                title: mk.materialName,
+                content: mk.extractedKnowledge,
+                relevanceScore: mk.relevanceScore,
+                source: 'material_knowledge'
+              })),
+              totalResults: ragResponse.results.knowledgeBase.length + ragResponse.results.materialKnowledge.length,
+              searchTime: ragResponse.performance.totalTime
+            };
+            console.log('✅ RAG search completed:', ragResults);
+            enhancedContext.ragResults = ragResults;
           }
+        } catch (ragError) {
+          console.warn('⚠️ RAG search failed, continuing without:', ragError);
+          // Continue without RAG results
         }
-      });
+      }
+
+      // Determine which AI service to use based on hybrid configuration
+      let data: any, error: any;
+      
+      if (hybridConfig.enableRAG && hybridConfig.primary && hybridConfig.fallback) {
+        console.log('🔄 Using Hybrid AI Service...');
+        try {
+          // Use HybridAIService for enhanced AI processing
+          const hybridResponse = await HybridAIService.processRequest({
+            prompt: input,
+            model: hybridConfig.primary,
+            type: 'general',
+            maxRetries: 2,
+            minimumScore: 0.7
+          });
+
+          if (hybridResponse.success) {
+            // Convert hybrid response to standard format
+            data = {
+              success: true,
+              response: hybridResponse.data || 'Processed using hybrid AI models',
+              thinking: 'Processed using hybrid AI models with fallback support',
+              suggestions: [], // Could be enhanced based on hybrid response
+              materials: [], // Could be enhanced based on hybrid response
+              metadata: {
+                provider: hybridResponse.provider,
+                finalScore: hybridResponse.final_score,
+                processingTime: hybridResponse.total_processing_time_ms,
+                ragEnabled: !!ragResults,
+                attachmentCount: attachedFiles.length,
+                hybridAI: true,
+                attempts: hybridResponse.attempts.length
+              }
+            };
+            error = null;
+          } else {
+            throw new Error(`Hybrid AI failed: No successful response`);
+          }
+        } catch (hybridError) {
+          console.warn('⚠️ Hybrid AI failed, falling back to standard CrewAI:', hybridError);
+          // Fallback to standard CrewAI
+          const response = await supabase.functions.invoke('enhanced-crewai', {
+            body: {
+              query: input,
+              sessionId: sessionId,
+              context: enhancedContext,
+              hybridConfig: hybridConfig,
+              attachments: attachedFiles.length > 0 ? attachedFiles : undefined
+            }
+          });
+          data = response.data;
+          error = response.error;
+        }
+      } else {
+        console.log('🤖 Using standard CrewAI...');
+        // Use standard CrewAI endpoint
+        const response = await supabase.functions.invoke('enhanced-crewai', {
+          body: {
+            query: input,
+            sessionId: sessionId,
+            context: enhancedContext,
+            hybridConfig: hybridConfig,
+            attachments: attachedFiles.length > 0 ? attachedFiles : undefined
+          }
+        });
+        data = response.data;
+        error = response.error;
+      }
 
       if (error) {
         console.error('CrewAI function error:', error);
@@ -116,6 +391,43 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
 
       console.log('CrewAI response:', data);
 
+      // Check if 3D generation is enabled and should be triggered
+      let enhanced3DContent = null;
+      if (hybridConfig.enable3DGeneration && data.response) {
+        try {
+          console.log('🎨 Attempting 3D generation...');
+          // Check if the response contains design-related keywords that would benefit from 3D generation
+          const designKeywords = ['interior', 'room', 'space', 'design', 'layout', 'furniture', 'decor'];
+          const containsDesignContent = designKeywords.some(keyword =>
+            data.response.toLowerCase().includes(keyword)
+          );
+
+          if (containsDesignContent) {
+            const generationResult = await CrewAI3DGenerationAPI.generate3D({
+              prompt: input,
+              room_type: 'general', // Could be extracted from context
+              style: 'modern', // Could be made configurable
+              specific_materials: [] // Could be extracted from attachments or context
+            });
+
+            if (generationResult.success) {
+              enhanced3DContent = {
+                generationId: generationResult.generation_id,
+                imageUrls: generationResult.image_urls,
+                parsedRequest: generationResult.parsed_request,
+                matchedMaterials: generationResult.matched_materials,
+                qualityAssessment: generationResult.quality_assessment,
+                processingTime: generationResult.processing_time_ms
+              };
+              console.log('✅ 3D generation completed:', enhanced3DContent);
+            }
+          }
+        } catch (generationError) {
+          console.warn('⚠️ 3D generation failed:', generationError);
+          // Continue without 3D content
+        }
+      }
+
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -124,10 +436,19 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         thinking: data.thinking,
         suggestions: data.suggestions || [],
         materials: data.materials || [],
-        metadata: data.metadata
+        metadata: {
+          ...data.metadata,
+          ...(enhanced3DContent && {
+            has3DContent: true,
+            designGeneration: enhanced3DContent
+          })
+        }
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Clear attached files after successful send
+      setAttachedFiles([]);
 
       // Show success notification with additional info
       toast({
@@ -335,26 +656,178 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       {/* Input */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-2">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask me about materials, properties, applications, or design ideas..."
-              disabled={isLoading}
-              className="flex-1"
+          <div className="space-y-3">
+            {/* File Attachments Display */}
+            {attachedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-2 bg-muted rounded-md">
+                {attachedFiles.map((file) => (
+                  <div key={file.id} className="flex items-center gap-2 bg-background rounded px-2 py-1 text-sm">
+                    {file.type.startsWith('image/') ? (
+                      <FileImage className="h-3 w-3" />
+                    ) : (
+                      <FileText className="h-3 w-3" />
+                    )}
+                    <span className="truncate max-w-[120px]">{file.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeAttachedFile(file.id)}
+                      className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Settings Panel */}
+            {showSettings && (
+              <div className="p-3 bg-muted rounded-md space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <Cpu className="h-4 w-4" />
+                    AI Configuration
+                  </h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowSettings(false)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-muted-foreground mb-1">Primary Model</label>
+                    <select
+                      value={hybridConfig.primary}
+                      onChange={(e) => setHybridConfig(prev => ({ ...prev, primary: e.target.value as any }))}
+                      className="w-full p-1 rounded border bg-background"
+                    >
+                      <option value="openai">OpenAI GPT</option>
+                      <option value="claude">Claude</option>
+                      <option value="vertex">Vertex AI</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-muted-foreground mb-1">Fallback Model</label>
+                    <select
+                      value={hybridConfig.fallback}
+                      onChange={(e) => setHybridConfig(prev => ({ ...prev, fallback: e.target.value as any }))}
+                      className="w-full p-1 rounded border bg-background"
+                    >
+                      <option value="openai">OpenAI GPT</option>
+                      <option value="claude">Claude</option>
+                      <option value="vertex">Vertex AI</option>
+                    </select>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <label className="block text-muted-foreground mb-1">
+                      Temperature: {hybridConfig.temperature}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={hybridConfig.temperature}
+                      onChange={(e) => setHybridConfig(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                      className="w-full"
+                    />
+                  </div>
+                  
+                  <div className="col-span-2 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="enable-rag"
+                      checked={hybridConfig.enableRAG}
+                      onChange={(e) => setHybridConfig(prev => ({ ...prev, enableRAG: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <label htmlFor="enable-rag" className="text-muted-foreground">
+                      Enable Knowledge Base Search
+                    </label>
+                  </div>
+                  
+                  <div className="col-span-2 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="enable-3d"
+                      checked={hybridConfig.enable3DGeneration}
+                      onChange={(e) => setHybridConfig(prev => ({ ...prev, enable3DGeneration: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <label htmlFor="enable-3d" className="text-muted-foreground">
+                      Enable 3D Generation
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Input Row */}
+            <div className="flex gap-2">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask me about materials, properties, applications, or design ideas..."
+                disabled={isLoading}
+                className="flex-1"
+              />
+              
+              {/* File Attachment Button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                title="Attach files"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              
+              {/* Settings Button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setShowSettings(!showSettings)}
+                disabled={isLoading}
+                title="AI Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+
+              {/* Send Button */}
+              <Button
+                onClick={handleSendMessage}
+                disabled={isLoading || !input.trim()}
+                size="icon"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.txt,.doc,.docx"
+              onChange={handleFileSelect}
+              className="hidden"
             />
-            <Button
-              onClick={handleSendMessage}
-              disabled={isLoading || !input.trim()}
-              size="icon"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
           </div>
           
           <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
