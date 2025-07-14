@@ -28,15 +28,47 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  hybridPDFPipelineAPI, 
-  type ProcessingOptions, 
-  type ProcessingStatus,
-  type ProcessingResults,
-  formatProcessingStatus,
-  getQualityColor,
-  getQualityLabel
-} from '@/services/hybridPDFPipelineAPI';
+// Note: hybridPDFPipelineAPI service will be implemented in future phases
+type ProcessingOptions = {
+  enableLayoutAnalysis?: boolean;
+  enableImageMapping?: boolean;
+};
+
+type ProcessingStatus = {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  currentStep: string;
+  error?: string;
+  processingId?: string;
+  startTime?: string;
+};
+
+type ProcessingResults = {
+  documentId: string;
+  chunks: any[];
+  images: any[];
+  layout: any[];
+  quality: any;
+  summary: any;
+};
+
+// Utility functions (will be moved to service layer in future phases)
+const formatProcessingStatus = (status: ProcessingStatus): string => {
+  const { currentStep, progress } = status;
+  return `${currentStep} (${progress}%)`;
+};
+
+const getQualityColor = (quality: number): string => {
+  if (quality >= 0.8) return 'green';
+  if (quality >= 0.6) return 'yellow';
+  return 'red';
+};
+
+const getQualityLabel = (quality: number): string => {
+  if (quality >= 0.8) return 'Excellent';
+  if (quality >= 0.6) return 'Good';
+  return 'Needs Improvement';
+};
 
 interface EnhancedProcessingOptions extends ProcessingOptions {
   enableLayoutAnalysis: boolean;
