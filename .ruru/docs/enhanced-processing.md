@@ -9,6 +9,63 @@ This document outlines the comprehensive development plan for an enhanced PDF pr
 
 ## 🏗️ Architecture Overview
 
+### 1. Embedding Generation Strategy:
+
+```typescript
+// Frontend - Real-time embedding generation
+import { pipeline } from "@huggingface/transformers";
+
+const embeddingPipeline = await pipeline(
+  "feature-extraction", 
+  "Xenova/clip-vit-base-patch32",
+  { device: "webgpu" }
+);
+```
+
+### 2. Updated Vector Similarity Service:
+
+```typescript
+// Enhanced vectorSimilarityService.ts
+class VectorSimilarityService {
+  // NEW: Local embedding generation
+  async generateLocalEmbedding(imageData: string): Promise<number[]> {
+    // Use @huggingface/transformers locally
+  }
+  
+  // NEW: Hybrid search that combines local + stored embeddings
+  async hybridSearch(query: string, imageData?: string) {
+    // 1. Generate embeddings locally (instant)
+    // 2. Search stored embeddings in database
+    // 3. Optionally enhance with external APIs
+  }
+}
+```
+
+### 3. Processing Pipeline Decision Tree:
+
+```
+User Search Request
+├── Generate Local Embeddings (always, instant)
+├── Search Stored Embeddings (database)
+├── If confidence < threshold:
+    ├── Enhanced OCR (Azure/Google/OpenAI)
+    ├── AI Description (GPT-4V/Claude) 
+    └── Web Search Enhancement (Google/Bing)
+└── Return Results
+```
+
+### 4. Implementation Flow:
+
+- **Phase 1**: Update vectorSimilarityService.ts to support local embeddings
+- **Phase 2**: Create smart routing in search functions  
+- **Phase 3**: Add confidence-based enhancement calls
+
+**This gives us:**
+- Instant local embeddings for all searches
+- Cost-effective primary search
+- Enhanced results when needed via external APIs
+- Seamless user experience
+
 ### Hybrid Vector Similarity System
 
 Our system implements a multi-tiered approach to material recognition and similarity search:
