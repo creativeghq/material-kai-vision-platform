@@ -284,24 +284,24 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
             includeRealTime: false
           });
 
-          if (ragResponse.success) {
+          if (ragResponse.success && ragResponse.results) {
             ragResults = {
-              knowledgeResults: ragResponse.results.knowledgeBase.map(kb => ({
+              knowledgeResults: (ragResponse.results.knowledgeBase || []).map(kb => ({
                 id: kb.id,
                 title: kb.title,
                 content: kb.content.substring(0, 500) + '...', // Truncate for context
                 relevanceScore: kb.relevanceScore,
                 source: kb.source
               })),
-              materialResults: ragResponse.results.materialKnowledge.map(mk => ({
+              materialResults: (ragResponse.results.materialKnowledge || []).map(mk => ({
                 id: mk.materialId,
                 title: mk.materialName,
                 content: mk.extractedKnowledge,
                 relevanceScore: mk.relevanceScore,
                 source: 'material_knowledge'
               })),
-              totalResults: ragResponse.results.knowledgeBase.length + ragResponse.results.materialKnowledge.length,
-              searchTime: ragResponse.performance.totalTime
+              totalResults: (ragResponse.results.knowledgeBase || []).length + (ragResponse.results.materialKnowledge || []).length,
+              searchTime: ragResponse.performance?.totalTime || 0
             };
             console.log('✅ RAG search completed:', ragResults);
             enhancedContext.ragResults = ragResults;
@@ -354,11 +354,15 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           // Fallback to standard CrewAI
           const response = await supabase.functions.invoke('enhanced-crewai', {
             body: {
-              query: input,
-              sessionId: sessionId,
-              context: enhancedContext,
-              hybridConfig: hybridConfig,
-              attachments: attachedFiles.length > 0 ? attachedFiles : undefined
+              user_id: session.user.id,
+              task_type: 'comprehensive_design',
+              input_data: {
+                query: input,
+                sessionId: sessionId,
+                context: enhancedContext,
+                hybridConfig: hybridConfig,
+                attachments: attachedFiles.length > 0 ? attachedFiles : undefined
+              }
             }
           });
           data = response.data;
@@ -369,11 +373,15 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         // Use standard CrewAI endpoint
         const response = await supabase.functions.invoke('enhanced-crewai', {
           body: {
-            query: input,
-            sessionId: sessionId,
-            context: enhancedContext,
-            hybridConfig: hybridConfig,
-            attachments: attachedFiles.length > 0 ? attachedFiles : undefined
+            user_id: session.user.id,
+            task_type: 'comprehensive_design',
+            input_data: {
+              query: input,
+              sessionId: sessionId,
+              context: enhancedContext,
+              hybridConfig: hybridConfig,
+              attachments: attachedFiles.length > 0 ? attachedFiles : undefined
+            }
           }
         });
         data = response.data;
@@ -385,11 +393,27 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         throw new Error(error.message || 'Failed to get AI response');
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'AI processing failed');
+      if (!data || !data.success) {
+        throw new Error(data?.error_message || data?.error || 'AI processing failed');
       }
 
-      console.log('CrewAI response:', data);
+      // Transform CrewAI response to expected format
+      const transformedData = {
+        success: true,
+        response: data.coordinated_result?.content || data.coordinated_result?.analysis || data.coordinated_result || 'Analysis completed successfully',
+        thinking: data.coordination_summary || 'Task processed through CrewAI agent coordination',
+        suggestions: data.coordinated_result?.recommendations || [],
+        materials: data.coordinated_result?.materials || [],
+        metadata: {
+          taskId: data.task_id,
+          processingTime: data.total_processing_time_ms,
+          overallConfidence: data.overall_confidence,
+          agentCount: data.agent_executions?.length || 0,
+          crewAI: true
+        }
+      };
+
+      console.log('CrewAI response:', transformedData);
 
       // Check if 3D generation is enabled and should be triggered
       let enhanced3DContent = null;
@@ -431,13 +455,13 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.response || 'I processed your request successfully.',
+        content: transformedData.response || 'I processed your request successfully.',
         timestamp: new Date(),
-        thinking: data.thinking,
-        suggestions: data.suggestions || [],
-        materials: data.materials || [],
+        thinking: transformedData.thinking,
+        suggestions: transformedData.suggestions || [],
+        materials: transformedData.materials || [],
         metadata: {
-          ...data.metadata,
+          ...transformedData.metadata,
           ...(enhanced3DContent && {
             has3DContent: true,
             designGeneration: enhanced3DContent
