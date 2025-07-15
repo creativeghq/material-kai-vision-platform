@@ -231,16 +231,16 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
       negativePrompt: negativePrompt
     },
     {
-      name: 'DreamShaper',
-      model: 'Lykon/DreamShaper',
-      prompt: `${enhancedPrompt}, interior design, modern architecture, high quality, detailed`,
-      negativePrompt: 'blurry, low quality, distorted, deformed, ugly'
+      name: 'SDXL-Turbo',
+      model: 'stabilityai/sdxl-turbo',
+      prompt: finalPrompt,
+      negativePrompt: negativePrompt
     },
     {
-      name: 'Realistic-Vision',
-      model: 'SG161222/Realistic_Vision_V6.0_B1_noVAE',
-      prompt: `${enhancedPrompt}, photorealistic interior design, high quality, detailed, professional lighting`,
-      negativePrompt: 'blurry, low quality, distorted, deformed, ugly, bad anatomy'
+      name: 'FLUX-Schnell',
+      model: 'black-forest-labs/FLUX.1-schnell',
+      prompt: finalPrompt,
+      negativePrompt: negativePrompt
     }
   ];
 
@@ -250,8 +250,9 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate 5 images using different models
+    // Generate 3 images using different models
     const imageBase64Array = [];
+    console.log(`Starting generation with ${models.length} models:`, models.map(m => m.name));
     
     for (let i = 0; i < models.length; i++) {
       const model = models[i];

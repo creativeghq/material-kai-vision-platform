@@ -89,7 +89,7 @@ export const Designer3DPage: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
-          Generate photorealistic interior designs using 3 different AI models: SDXL-Base, DreamShaper, and Realistic-Vision
+          Generate photorealistic interior designs using 3 different AI models: SDXL-Base, SDXL-Turbo, and FLUX-Schnell
         </p>
       </div>
 
@@ -209,8 +209,8 @@ export const Designer3DPage: React.FC = () => {
                 {/* Model Names */}
                 {[
                   'SDXL-Base',
-                  'DreamShaper',
-                  'Realistic-Vision'
+                  'SDXL-Turbo', 
+                  'FLUX-Schnell'
                 ].map((modelName, index) => (
                   generatedImages[index] && (
                     <div key={index} className="space-y-2">
