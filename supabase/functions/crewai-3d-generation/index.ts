@@ -225,22 +225,22 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   // Define multiple models to test
   const models = [
     {
-      name: 'ArchSketch-LoRA',
-      model: 'dsgnrai/archisketch-v1',
-      prompt: `architectural kitchen elevation drawing, black & white, line art, 2D technical section, ${enhancedPrompt}`,
-      negativePrompt: 'color, perspective, 3D, shadows'
+      name: 'SDXL-Base',
+      model: 'stabilityai/stable-diffusion-xl-base-1.0',
+      prompt: finalPrompt,
+      negativePrompt: negativePrompt
     },
     {
-      name: 'Sketch-Style-XL-LoRA',
-      model: 'Linaqruf/sketch-style-xl-lora',
-      prompt: `sketch style, ${enhancedPrompt}, architectural drawing, line art, detailed sketch`,
-      negativePrompt: 'color, photorealistic, 3D, shadows, blurry'
+      name: 'DreamShaper',
+      model: 'Lykon/DreamShaper',
+      prompt: `${enhancedPrompt}, interior design, modern architecture, high quality, detailed`,
+      negativePrompt: 'blurry, low quality, distorted, deformed, ugly'
     },
     {
-      name: 'ControlNet-Scribble',
-      model: 'controlnet-scribble-sdxl-1.0',
-      prompt: `scribble to image, ${enhancedPrompt}, architectural sketch, line drawing, interior design sketch`,
-      negativePrompt: 'blurry, low quality, distorted'
+      name: 'Realistic-Vision',
+      model: 'SG161222/Realistic_Vision_V6.0_B1_noVAE',
+      prompt: `${enhancedPrompt}, photorealistic interior design, high quality, detailed, professional lighting`,
+      negativePrompt: 'blurry, low quality, distorted, deformed, ugly, bad anatomy'
     }
   ];
 
