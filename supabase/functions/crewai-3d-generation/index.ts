@@ -231,8 +231,8 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
       negativePrompt: negativePrompt
     },
     {
-      name: 'Flux-Schnell',
-      model: 'black-forest-labs/FLUX.1-schnell',
+      name: 'SDXL-Turbo',
+      model: 'stabilityai/sdxl-turbo',
       prompt: finalPrompt,
       negativePrompt: negativePrompt
     },
