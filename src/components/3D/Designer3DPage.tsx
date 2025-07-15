@@ -89,7 +89,7 @@ export const Designer3DPage: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
-          Generate photorealistic interior designs using AI-powered Canopus Architecture model
+          Generate photorealistic interior designs using 5 different AI models including SDXL-ArchSketch, Sketch-Style-XL, and ControlNet-Scribble
         </p>
       </div>
 
@@ -170,16 +170,25 @@ export const Designer3DPage: React.FC = () => {
 
             {generatedImages.length > 0 && (
               <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Button onClick={() => handleDownload(0)} variant="outline" className="flex-1">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Top
-                  </Button>
-                  <Button onClick={() => handleDownload(1)} variant="outline" className="flex-1">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Bottom
-                  </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  {generatedImages.slice(0, 4).map((_, index) => (
+                    <Button 
+                      key={index}
+                      onClick={() => handleDownload(index)} 
+                      variant="outline" 
+                      className="text-xs"
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Model {index + 1}
+                    </Button>
+                  ))}
                 </div>
+                {generatedImages.length > 4 && (
+                  <Button onClick={() => handleDownload(4)} variant="outline" className="w-full">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Model 5
+                  </Button>
+                )}
                 <Button variant="outline" className="w-full">
                   <Share2 className="h-4 w-4 mr-2" />
                   Share
@@ -192,51 +201,38 @@ export const Designer3DPage: React.FC = () => {
         {/* Preview Panel */}
         <Card>
           <CardHeader>
-            <CardTitle>3D Preview - Two Generated Images</CardTitle>
+            <CardTitle>3D Preview - Generated Model Variations</CardTitle>
           </CardHeader>
           <CardContent>
             {generatedImages.length > 0 ? (
               <div className="space-y-6">
-                {/* First Image - Top */}
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Design Variation 1</h4>
-                  <div className="aspect-square w-full overflow-hidden rounded-lg border bg-muted">
-                    <img 
-                      src={generatedImages[0]} 
-                      alt="Generated interior design - variation 1"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.error('Image 1 failed to load:', generatedImages[0]);
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                </div>
-                
-                {/* Second Image - Bottom */}
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Design Variation 2</h4>
-                  <div className="aspect-square w-full overflow-hidden rounded-lg border bg-muted">
-                    {generatedImages[1] ? (
-                      <img 
-                        src={generatedImages[1]} 
-                        alt="Generated interior design - variation 2"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.error('Image 2 failed to load:', generatedImages[1]);
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        <div className="text-center">
-                          <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />
-                          <p className="text-sm">Generating second variation...</p>
-                        </div>
+                {/* Model Names */}
+                {[
+                  'Canopus-Interior-Architecture',
+                  'SDXL-ArchSketch',
+                  'Sketch-Style-XL',
+                  'ControlNet-Scribble',
+                  'SDXL-Base'
+                ].map((modelName, index) => (
+                  generatedImages[index] && (
+                    <div key={index} className="space-y-2">
+                      <h4 className="font-medium text-sm text-muted-foreground">
+                        Model {index + 1}: {modelName}
+                      </h4>
+                      <div className="aspect-square w-full overflow-hidden rounded-lg border bg-muted">
+                        <img 
+                          src={generatedImages[index]} 
+                          alt={`Generated interior design - ${modelName}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.error(`Image ${index + 1} failed to load:`, generatedImages[index]);
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  )
+                ))}
                 
                 {/* 3D Viewer for first image */}
                 <div className="space-y-2">
