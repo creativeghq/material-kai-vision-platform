@@ -225,35 +225,34 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   // Define multiple models to test
   const models = [
     {
-      name: 'Canopus-Interior-Architecture',
-      provider: 'fal-ai',
-      model: 'prithivMLmods/Canopus-Interior-Architecture-0.1',
-      prompt: finalPrompt,
-      negativePrompt: negativePrompt
-    },
-    {
       name: 'SDXL-ArchSketch',
       model: 'stabilityai/stable-diffusion-xl-base-1.0',
       prompt: `architectural ${enhancedPrompt} elevation drawing, black & white, line art, 2D technical section, detailed floor plan, architectural sketch`,
       negativePrompt: 'color, perspective, 3D, shadows, blurry, low quality'
     },
     {
-      name: 'Sketch-Style-XL',
-      model: 'Linaqruf/sketch-style-xl-lora',
-      prompt: `sketch style, ${enhancedPrompt}, architectural drawing, line art, detailed sketch`,
-      negativePrompt: 'color, photorealistic, 3D, shadows, blurry'
-    },
-    {
-      name: 'ControlNet-Scribble',
-      model: 'controlnet-scribble-sdxl-1.0',
-      prompt: `scribble to image, ${enhancedPrompt}, architectural sketch, line drawing, interior design sketch`,
-      negativePrompt: 'blurry, low quality, distorted'
-    },
-    {
       name: 'SDXL-Base',
       model: 'stabilityai/stable-diffusion-xl-base-1.0',
       prompt: finalPrompt,
       negativePrompt: negativePrompt
+    },
+    {
+      name: 'Realistic-Vision',
+      model: 'SG161222/Realistic_Vision_V6.0_B1_noVAE',
+      prompt: `${enhancedPrompt}, photorealistic interior design, high quality, detailed, professional lighting`,
+      negativePrompt: 'blurry, low quality, distorted, deformed, ugly, bad anatomy'
+    },
+    {
+      name: 'DreamShaper',
+      model: 'Lykon/DreamShaper',
+      prompt: `${enhancedPrompt}, interior design, modern architecture, high quality, detailed`,
+      negativePrompt: 'blurry, low quality, distorted, deformed, ugly'
+    },
+    {
+      name: 'Deliberate-V2',
+      model: 'XpucT/Deliberate',
+      prompt: `${enhancedPrompt}, interior design, architectural visualization, high quality, detailed`,
+      negativePrompt: 'blurry, low quality, distorted, deformed, ugly, bad anatomy'
     }
   ];
 
