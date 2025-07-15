@@ -222,33 +222,84 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   }
   finalPrompt += `. ${qualityModifiers}`;
 
+  // Define multiple models to test
+  const models = [
+    {
+      name: 'Canopus-Interior-Architecture',
+      provider: 'fal-ai',
+      model: 'prithivMLmods/Canopus-Interior-Architecture-0.1',
+      prompt: finalPrompt,
+      negativePrompt: negativePrompt
+    },
+    {
+      name: 'SDXL-ArchSketch',
+      model: 'stabilityai/stable-diffusion-xl-base-1.0',
+      prompt: `architectural ${enhancedPrompt} elevation drawing, black & white, line art, 2D technical section, detailed floor plan, architectural sketch`,
+      negativePrompt: 'color, perspective, 3D, shadows, blurry, low quality'
+    },
+    {
+      name: 'Sketch-Style-XL',
+      model: 'Linaqruf/sketch-style-xl-lora',
+      prompt: `sketch style, ${enhancedPrompt}, architectural drawing, line art, detailed sketch`,
+      negativePrompt: 'color, photorealistic, 3D, shadows, blurry'
+    },
+    {
+      name: 'ControlNet-Scribble',
+      model: 'controlnet-scribble-sdxl-1.0',
+      prompt: `scribble to image, ${enhancedPrompt}, architectural sketch, line drawing, interior design sketch`,
+      negativePrompt: 'blurry, low quality, distorted'
+    },
+    {
+      name: 'SDXL-Base',
+      model: 'stabilityai/stable-diffusion-xl-base-1.0',
+      prompt: finalPrompt,
+      negativePrompt: negativePrompt
+    }
+  ];
+
   try {
-    console.log('Generating image with enhanced prompt:', finalPrompt);
+    console.log('Generating images with enhanced prompt:', finalPrompt);
     
     // Use the official Hugging Face Inference client
     const hf = new HfInference(hfToken);
     
-    // Generate 2 images sequentially to avoid stack overflow
+    // Generate 5 images using different models
     const imageBase64Array = [];
     
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < models.length; i++) {
+      const model = models[i];
       try {
-        console.log(`Attempting generation ${i + 1} with fal-ai provider...`);
-        const imageBlob = await hf.textToImage({
-          provider: "fal-ai", 
-          model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
-          inputs: finalPrompt,
-          parameters: { 
-            num_inference_steps: 20,
-            guidance_scale: 7.5,
-            sync_mode: true,
-            width: 1024,
-            height: 1024,
-            seed: Math.floor(Math.random() * 999999),
-            negative_prompt: negativePrompt
-          }
-        });
-        console.log(`HF response blob ${i + 1} size:`, imageBlob.size);
+        console.log(`Attempting generation ${i + 1} with ${model.name}...`);
+        
+        let imageBlob;
+        if (model.provider === 'fal-ai') {
+          imageBlob = await hf.textToImage({
+            provider: "fal-ai", 
+            model: model.model,
+            inputs: model.prompt,
+            parameters: { 
+              num_inference_steps: 20,
+              guidance_scale: 7.5,
+              sync_mode: true,
+              width: 1024,
+              height: 1024,
+              seed: Math.floor(Math.random() * 999999),
+              negative_prompt: model.negativePrompt
+            }
+          });
+        } else {
+          imageBlob = await hf.textToImage({
+            model: model.model,
+            inputs: model.prompt,
+            parameters: {
+              negative_prompt: model.negativePrompt,
+              num_inference_steps: 20,
+              guidance_scale: 7.5
+            }
+          });
+        }
+        
+        console.log(`${model.name} response blob size:`, imageBlob.size);
         
         // Convert blob to base64 safely to avoid stack overflow
         const arrayBuffer = await imageBlob.arrayBuffer();
@@ -257,54 +308,24 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
         // Use a safe base64 conversion method for large images
         let binary = '';
         const chunkSize = 0x8000; // 32KB chunks
-        for (let i = 0; i < uint8Array.length; i += chunkSize) {
-          const chunk = uint8Array.subarray(i, i + chunkSize);
+        for (let j = 0; j < uint8Array.length; j += chunkSize) {
+          const chunk = uint8Array.subarray(j, j + chunkSize);
           binary += String.fromCharCode.apply(null, Array.from(chunk));
         }
         const base64 = btoa(binary);
         imageBase64Array.push(`data:image/png;base64,${base64}`);
         
-      } catch (faliError) {
-        console.error(`fal-ai provider failed for image ${i + 1}, trying fallback model:`, faliError);
-        try {
-          // Fallback to Stable Diffusion XL
-          const imageBlob = await hf.textToImage({
-            model: 'stabilityai/stable-diffusion-xl-base-1.0',
-            inputs: finalPrompt,
-            parameters: {
-              negative_prompt: negativePrompt,
-              num_inference_steps: 20,
-              guidance_scale: 7.5
-            }
-          });
-          console.log(`Fallback response blob ${i + 1} size:`, imageBlob.size);
-          
-          // Convert blob to base64 safely to avoid stack overflow
-          const arrayBuffer = await imageBlob.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
-          
-          // Use a safe base64 conversion method for large images
-          let binary = '';
-          const chunkSize = 0x8000; // 32KB chunks
-          for (let j = 0; j < uint8Array.length; j += chunkSize) {
-            const chunk = uint8Array.subarray(j, j + chunkSize);
-            binary += String.fromCharCode.apply(null, Array.from(chunk));
-          }
-          const base64 = btoa(binary);
-          imageBase64Array.push(`data:image/png;base64,${base64}`);
-          
-        } catch (fallbackError) {
-          console.error(`Both providers failed for image ${i + 1}:`, fallbackError);
-          // For now, add a placeholder or skip this image
-          if (i === 0) {
-            // First image is required, so throw error
-            throw new Error(`Failed to generate first image: ${fallbackError.message}`);
-          }
-          // Second image is optional, just log and continue
-          console.log(`Skipping second image due to error`);
-          break;
-        }
+      } catch (modelError) {
+        console.error(`${model.name} failed for image ${i + 1}:`, modelError);
+        // Continue with next model instead of stopping
+        console.log(`Skipping ${model.name} due to error, continuing with next model`);
+        continue;
       }
+    }
+    
+    // If no images were generated, throw error
+    if (imageBase64Array.length === 0) {
+      throw new Error('All models failed to generate images');
     }
     
     return imageBase64Array;
@@ -365,9 +386,9 @@ async function processGeneration(request: GenerationRequest) {
     ]);
     console.log('Matched materials:', matchedMaterials);
 
-    // CrewAI Agent 3: Generate 2 3D images
+    // CrewAI Agent 3: Generate 5 3D images using different models
     const imageBase64Array = await generate3DImage(parsed.enhanced_prompt, matchedMaterials);
-    console.log('Generated 2 3D images');
+    console.log('Generated multiple 3D images with different models');
 
     // CrewAI Agent 4: Quality validation (validate first image)
     const qualityCheck = await validateQuality(imageBase64Array[0], request.prompt);
