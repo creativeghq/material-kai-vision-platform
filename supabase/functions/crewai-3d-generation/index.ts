@@ -231,16 +231,16 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
       negativePrompt: negativePrompt
     },
     {
-      name: 'SDXL-Turbo',
-      model: 'stabilityai/sdxl-turbo',
+      name: 'Flux-Schnell',
+      model: 'black-forest-labs/FLUX.1-schnell',
       prompt: finalPrompt,
       negativePrompt: negativePrompt
     },
     {
-      name: 'Realistic-Vision',
-      model: 'SG161222/Realistic_Vision_V6.0_B1_noVAE',
-      prompt: `${enhancedPrompt}, photorealistic interior design, high quality, detailed, professional lighting`,
-      negativePrompt: 'blurry, low quality, distorted, deformed, ugly, bad anatomy'
+      name: 'Stable-Diffusion',
+      model: 'runwayml/stable-diffusion-v1-5',
+      prompt: finalPrompt,
+      negativePrompt: negativePrompt
     }
   ];
 
