@@ -147,8 +147,14 @@ export const MaterialSuggestionsPanel: React.FC = () => {
       // Test the 3D generation with current suggestions
       const materialList = suggestions.map(s => s.name).join(', ');
       
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('crewai-3d-generation', {
         body: {
+          user_id: user.id,
           prompt: config.prompt,
           room_type: config.roomType,
           style: config.style,

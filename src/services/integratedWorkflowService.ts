@@ -95,8 +95,14 @@ export class IntegratedWorkflowService {
     enhancements: WorkflowEnhancement;
   }> {
     // Step 1: Generate 3D design
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data: generationResult, error } = await supabase.functions.invoke('crewai-3d-generation', {
       body: {
+        user_id: user.id,
         prompt,
         room_type: options.roomType,
         style: options.style,
