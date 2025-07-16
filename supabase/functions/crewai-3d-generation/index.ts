@@ -961,7 +961,21 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Received 3D generation request');
+    console.log('🚀 Edge function started - checking environment');
+    
+    // Check API keys
+    const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
+    const replicateToken = Deno.env.get('REPLICATE_API_KEY');
+    const openaiToken = Deno.env.get('OPENAI_API_KEY');
+    const anthropicToken = Deno.env.get('ANTHROPIC_API_KEY');
+    
+    console.log('🔑 API Keys status:');
+    console.log(`   Hugging Face: ${hfToken ? '✅ Available' : '❌ Missing'}`);
+    console.log(`   Replicate: ${replicateToken ? '✅ Available' : '❌ Missing'}`);
+    console.log(`   OpenAI: ${openaiToken ? '✅ Available' : '❌ Missing'}`);
+    console.log(`   Anthropic: ${anthropicToken ? '✅ Available' : '❌ Missing'}`);
+    
+    console.log('📨 Received 3D generation request');
     const request: GenerationRequest = await req.json();
     
     console.log('Processing 3D generation request:', JSON.stringify({
