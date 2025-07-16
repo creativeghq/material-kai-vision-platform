@@ -652,17 +652,14 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     await updateWorkflowStep('erayyavuz/interior-ai', 'failed', undefined, error.message);
   }
 
-  // Model 4: jschoormans/comfyui-interior-remodel - FIXED WITH VERSION HASH
+  // Model 4: jschoormans/comfyui-interior-remodel - FIXED WITH CORRECT SCHEMA (image only)
   try {
     console.log("🛠️ Attempting ComfyUI Interior Remodel model...");
+    updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'running');
+    
     const output = await replicate.run("jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce", {
       input: {
-        image: referenceImageUrl,
-        prompt: finalPrompt || "photo of a beautiful living room, modern design, modernist, cozy\nhigh resolution, highly detailed, 4k",
-        output_format: 'webp',
-        output_quality: 80,
-        negative_prompt: "blurry, illustration, distorted, horror",
-        randomise_seeds: true
+        image: referenceImageUrl
       }
     });
     
@@ -670,12 +667,18 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel" });
       console.log("✅ ComfyUI Interior Remodel generation successful:", output[0]);
+      await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'success', output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel" });
       console.log("✅ ComfyUI Interior Remodel generation successful:", output);
+      await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'success', output);
+    } else {
+      console.log("⚠️ ComfyUI Interior Remodel unexpected output format:", typeof output, output);
+      await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'failed', undefined, 'Unexpected output format');
     }
   } catch (error) {
     console.error("❌ ComfyUI Interior Remodel failed:", error.message);
+    await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'failed', undefined, error.message);
   }
 
   // Model 5: julian-at/interiorly-gen1-dev
