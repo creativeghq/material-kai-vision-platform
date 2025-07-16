@@ -245,7 +245,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}} modal>
+    <Dialog open={isOpen} onOpenChange={onClose} modal>
       <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
