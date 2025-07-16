@@ -683,85 +683,132 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
 
 // CrewAI Agent: Orchestrate all image generation services
 async function generate3DImage(enhancedPrompt: string, materials: any[], referenceImageUrl?: string) {
+  console.log("🚀 Starting generate3DImage function");
+  console.log("📝 Enhanced prompt:", enhancedPrompt);
+  console.log("🧱 Materials count:", materials.length);
+  console.log("🖼️ Reference image provided:", !!referenceImageUrl);
+  
   // Enhanced prompt with material details
   let finalPrompt = enhancedPrompt;
   if (materials.length > 0) {
     const materialDescriptions = materials.map(m => `${m.name} (${m.category})`).join(', ');
     finalPrompt += `. Materials: ${materialDescriptions}`;
   }
+  console.log("✨ Final prompt:", finalPrompt);
 
   const allResults: Array<{url: string, modelName: string}> = [];
   
   // If reference image is provided, use image-to-image models primarily
   if (referenceImageUrl) {
-    console.log("Reference image provided, using all models with image-to-image priority");
+    console.log("🖼️ Reference image provided, using all models with image-to-image priority");
     
     const replicateToken = Deno.env.get('REPLICATE_API_KEY');
+    console.log("🔑 Replicate token available:", !!replicateToken);
+    
     if (replicateToken) {
-      const replicate = new Replicate({
-        auth: replicateToken,
-      });
-      
-      // Generate with image-to-image models first (more relevant with reference image)
-      const imageToImageResults = await generateImageToImageModels(finalPrompt, referenceImageUrl, replicate);
-      allResults.push(...imageToImageResults);
-      
-      // Still generate some text-to-image for variety
-      const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
-      allResults.push(...textToImageResults);
+      try {
+        const replicate = new Replicate({
+          auth: replicateToken,
+        });
+        console.log("🤖 Replicate client initialized successfully");
+        
+        // Generate with image-to-image models first (more relevant with reference image)
+        console.log("🎨 Starting image-to-image model generation...");
+        const imageToImageResults = await generateImageToImageModels(finalPrompt, referenceImageUrl, replicate);
+        console.log(`📊 Image-to-image results: ${imageToImageResults.length} images generated`);
+        allResults.push(...imageToImageResults);
+        
+        // Still generate some text-to-image for variety
+        console.log("📝 Starting text-to-image model generation...");
+        const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
+        console.log(`📊 Text-to-image results: ${textToImageResults.length} images generated`);
+        allResults.push(...textToImageResults);
+      } catch (replicateError) {
+        console.error("❌ Replicate generation failed:", replicateError.message);
+        console.error("❌ Replicate full error:", replicateError);
+      }
+    } else {
+      console.error("❌ REPLICATE_API_KEY not found in environment");
     }
     
     // Add Hugging Face models as additional options
+    console.log("🤗 Starting Hugging Face model generation...");
     try {
       const hfResults = await generateHuggingFaceImages(finalPrompt);
+      console.log(`📊 Hugging Face results: ${hfResults.length} images generated`);
       allResults.push(...hfResults);
     } catch (hfError) {
       console.error("❌ Hugging Face generation failed:", hfError.message);
+      console.error("❌ Hugging Face full error:", hfError);
     }
   } else {
     // No reference image - use text-to-image models primarily
-    console.log("No reference image, using text-to-image models primarily");
+    console.log("📝 No reference image, using text-to-image models primarily");
     
     // Start with Hugging Face models (more reliable)
+    console.log("🤗 Starting Hugging Face model generation...");
     try {
       const hfResults = await generateHuggingFaceImages(finalPrompt);
+      console.log(`📊 Hugging Face results: ${hfResults.length} images generated`);
       allResults.push(...hfResults);
     } catch (hfError) {
       console.error("❌ Hugging Face generation failed:", hfError.message);
+      console.error("❌ Hugging Face full error:", hfError);
     }
 
     // Generate with Replicate models
     const replicateToken = Deno.env.get('REPLICATE_API_KEY');
+    console.log("🔑 Replicate token available:", !!replicateToken);
+    
     if (replicateToken) {
-      console.log("Starting Replicate model generations...");
+      console.log("🤖 Starting Replicate model generations...");
       
-      const replicate = new Replicate({
-        auth: replicateToken,
-      });
-      
-      // Generate text-to-image models first
-      const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
-      allResults.push(...textToImageResults);
-      
-      // If we have any base images, use them for image-to-image models
-      if (allResults.length > 0) {
-        // Use the first generated image as base for image-to-image models
-        const baseImageUrl = allResults[0].url;
-        const imageToImageResults = await generateImageToImageModels(finalPrompt, baseImageUrl, replicate);
-        allResults.push(...imageToImageResults);
+      try {
+        const replicate = new Replicate({
+          auth: replicateToken,
+        });
+        console.log("🤖 Replicate client initialized successfully");
+        
+        // Generate text-to-image models first
+        console.log("📝 Starting text-to-image model generation...");
+        const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
+        console.log(`📊 Text-to-image results: ${textToImageResults.length} images generated`);
+        allResults.push(...textToImageResults);
+        
+        // If we have any base images, use them for image-to-image models
+        if (allResults.length > 0) {
+          console.log("🎨 Using first generated image for image-to-image models...");
+          // Use the first generated image as base for image-to-image models
+          const baseImageUrl = allResults[0].url;
+          const imageToImageResults = await generateImageToImageModels(finalPrompt, baseImageUrl, replicate);
+          console.log(`📊 Additional image-to-image results: ${imageToImageResults.length} images generated`);
+          allResults.push(...imageToImageResults);
+        } else {
+          console.log("⚠️ No base images available for image-to-image generation");
+        }
+      } catch (replicateError) {
+        console.error("❌ Replicate generation failed:", replicateError.message);
+        console.error("❌ Replicate full error:", replicateError);
       }
+    } else {
+      console.error("❌ REPLICATE_API_KEY not found in environment");
     }
   }
   
-  // If no images were generated, throw error
+  console.log(`📊 FINAL RESULTS: Generated ${allResults.length} total images`);
+  
+  // If no images were generated, throw error with detailed information
   if (allResults.length === 0) {
-    throw new Error('All image generation services failed');
+    const errorMessage = 'All image generation services failed - no images were produced by any model';
+    console.error("❌ " + errorMessage);
+    console.error("❌ Check individual service logs above for specific failure reasons");
+    throw new Error(errorMessage);
   }
   
-  console.log(`Generated ${allResults.length} images from ${allResults.map(r => r.modelName).join(', ')}`);
+  console.log(`✅ SUCCESS: Generated ${allResults.length} images from ${allResults.map(r => r.modelName).join(', ')}`);
   console.log("📸 Final generation summary:");
   allResults.forEach((result, index) => {
-    console.log(`   ${index + 1}. ✅ ${result.modelName}: ${result.url}`);
+    console.log(`   ${index + 1}. ✅ ${result.modelName}: ${result.url.substring(0, 50)}...`);
   });
   
   return allResults; // Return full objects with url and modelName
