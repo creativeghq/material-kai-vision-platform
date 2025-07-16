@@ -9,7 +9,8 @@ import { ThreeJsViewer } from './ThreeJsViewer';
 import { ImageModal } from './ImageModal';
 import { integratedWorkflowService } from '@/services/integratedWorkflowService';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Wand2, Download, Share2 } from 'lucide-react';
+import { Loader2, Wand2, Download, Share2, Upload, X, ImageIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export const Designer3DPage: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -20,6 +21,9 @@ export const Designer3DPage: React.FC = () => {
   const [generationData, setGenerationData] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Replicate model names that match our edge function
   const modelNames = [
@@ -42,6 +46,52 @@ export const Designer3DPage: React.FC = () => {
     'mid-century', 'traditional', 'rustic', 'mediterranean', 'art-deco'
   ];
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({
+          title: 'File Too Large',
+          description: 'Please select an image smaller than 10MB.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+  };
+
+  const uploadImageToSupabase = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `3d-inputs/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('3d-models')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw new Error(`Upload failed: ${uploadError.message}`);
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('3d-models')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast({
@@ -53,37 +103,58 @@ export const Designer3DPage: React.FC = () => {
     }
 
     setIsGenerating(true);
+    setIsUploading(selectedImage ? true : false);
+    
     try {
-      // Use integrated workflow service for enhanced 3D generation
-      const { generationResult, enhancements } = await integratedWorkflowService.enhanced3DGeneration(prompt, {
-        roomType: roomType || undefined,
-        style: style || undefined
+      let imageUrl: string | undefined;
+      
+      // Upload image to Supabase if provided
+      if (selectedImage) {
+        toast({
+          title: 'Uploading Image',
+          description: 'Uploading your reference image...'
+        });
+        imageUrl = await uploadImageToSupabase(selectedImage);
+        setIsUploading(false);
+      }
+
+      const requestData = {
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        prompt: prompt.trim(),
+        room_type: roomType || undefined,
+        style: style || undefined,
+        reference_image_url: imageUrl // Add the uploaded image URL
+      };
+
+      const response = await supabase.functions.invoke('crewai-3d-generation', {
+        body: requestData
       });
 
-      setGeneratedImages(generationResult.image_urls || []);
-      setGenerationData({
-        ...generationResult,
-        ...(enhancements.nerfReconstruction && {
-          nerf_reconstruction: enhancements.nerfReconstruction.reconstructionId,
-          model_file_url: enhancements.nerfReconstruction.modelFileUrl,
-          mesh_file_url: enhancements.nerfReconstruction.meshFileUrl
-        })
-      });
-      
-      toast({
-        title: '3D Design Generated!',
-        description: `Design created with ${enhancements.nerfReconstruction ? 'NeRF reconstruction' : 'standard processing'}`,
-        variant: 'default'
-      });
-    } catch (error) {
-      console.error('Generation failed:', error);
+      if (response.error) {
+        throw new Error(response.error.message || 'Generation failed');
+      }
+
+      const result = response.data;
+      if (result.success && result.image_urls?.length > 0) {
+        setGeneratedImages(result.image_urls);
+        setGenerationData(result);
+        toast({
+          title: 'Generation Complete!',
+          description: `Generated ${result.image_urls.length} interior designs successfully.`
+        });
+      } else {
+        throw new Error(result.error || 'No images were generated');
+      }
+    } catch (error: any) {
+      console.error('Generation error:', error);
       toast({
         title: 'Generation Failed',
-        description: error instanceof Error ? error.message : 'Failed to generate 3D design',
+        description: error.message || 'Failed to generate 3D interior. Please try again.',
         variant: 'destructive'
       });
     } finally {
       setIsGenerating(false);
+      setIsUploading(false);
     }
   };
 
@@ -146,6 +217,52 @@ export const Designer3DPage: React.FC = () => {
             />
           </div>
 
+          {/* Image Upload Section */}
+          <div>
+            <Label htmlFor="image-upload">Reference Image (Optional)</Label>
+            <div className="mt-1 space-y-2">
+              {!imagePreview ? (
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="image-upload"
+                    className="cursor-pointer flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ImageIcon className="h-8 w-8" />
+                    <span className="text-sm">
+                      Click to upload a reference image
+                    </span>
+                    <span className="text-xs">
+                      Supports JPG, PNG (max 10MB)
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <div className="relative border rounded-lg p-2">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-32 object-cover rounded"
+                  />
+                  <Button
+                    onClick={removeImage}
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-1 right-1"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="room-type">Room Type (Optional)</Label>
@@ -182,14 +299,14 @@ export const Designer3DPage: React.FC = () => {
 
           <Button 
             onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim()}
+            disabled={isGenerating || isUploading || !prompt.trim()}
             className="w-full"
             size="lg"
           >
-            {isGenerating ? (
+            {isGenerating || isUploading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating Designs...
+                {isUploading ? 'Uploading Image...' : 'Generating Designs...'}
               </>
             ) : (
               <>

@@ -21,6 +21,7 @@ interface GenerationRequest {
   room_type?: string;
   style?: string;
   specific_materials?: string[];
+  reference_image_url?: string; // Add support for reference image
 }
 
 // CrewAI Agent: Parse user request with hybrid AI approach
@@ -377,7 +378,7 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
 }
 
 // CrewAI Agent: Orchestrate all image generation services
-async function generate3DImage(enhancedPrompt: string, materials: any[]) {
+async function generate3DImage(enhancedPrompt: string, materials: any[], referenceImageUrl?: string) {
   // Enhanced prompt with material details
   let finalPrompt = enhancedPrompt;
   if (materials.length > 0) {
@@ -387,35 +388,66 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
 
   const allResults: Array<{url: string, modelName: string}> = [];
   
-  try {
-    // First, generate with Hugging Face (reliable base image)
-    console.log("Generating with Hugging Face...");
-    const hfImage = await generateHuggingFaceImage(finalPrompt);
-    allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
-    console.log("Hugging Face generation successful");
-  } catch (hfError) {
-    console.error("Hugging Face generation failed:", hfError);
-  }
-
-  // Generate with Replicate models
-  const replicateToken = Deno.env.get('REPLICATE_API_KEY');
-  if (replicateToken) {
-    console.log("Starting Replicate model generations...");
+  // If reference image is provided, use image-to-image models primarily
+  if (referenceImageUrl) {
+    console.log("Reference image provided, using all models with image-to-image priority");
     
-    const replicate = new Replicate({
-      auth: replicateToken,
-    });
-    
-    // Generate text-to-image models first
-    const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
-    allResults.push(...textToImageResults);
-    
-    // If we have any base images, use them for image-to-image models
-    if (allResults.length > 0) {
-      // Use the first generated image as base for image-to-image models
-      const baseImageUrl = allResults[0].url;
-      const imageToImageResults = await generateImageToImageModels(finalPrompt, baseImageUrl, replicate);
+    const replicateToken = Deno.env.get('REPLICATE_API_KEY');
+    if (replicateToken) {
+      const replicate = new Replicate({
+        auth: replicateToken,
+      });
+      
+      // Generate with image-to-image models first (more relevant with reference image)
+      const imageToImageResults = await generateImageToImageModels(finalPrompt, referenceImageUrl, replicate);
       allResults.push(...imageToImageResults);
+      
+      // Still generate some text-to-image for variety
+      const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
+      allResults.push(...textToImageResults);
+    }
+    
+    // Add Hugging Face as additional option
+    try {
+      const hfImage = await generateHuggingFaceImage(finalPrompt);
+      allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
+    } catch (hfError) {
+      console.error("Hugging Face generation failed:", hfError);
+    }
+  } else {
+    // No reference image - use text-to-image models primarily
+    console.log("No reference image, using text-to-image models primarily");
+    
+    try {
+      // First, generate with Hugging Face (reliable base image)
+      console.log("Generating with Hugging Face...");
+      const hfImage = await generateHuggingFaceImage(finalPrompt);
+      allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
+      console.log("Hugging Face generation successful");
+    } catch (hfError) {
+      console.error("Hugging Face generation failed:", hfError);
+    }
+
+    // Generate with Replicate models
+    const replicateToken = Deno.env.get('REPLICATE_API_KEY');
+    if (replicateToken) {
+      console.log("Starting Replicate model generations...");
+      
+      const replicate = new Replicate({
+        auth: replicateToken,
+      });
+      
+      // Generate text-to-image models first
+      const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
+      allResults.push(...textToImageResults);
+      
+      // If we have any base images, use them for image-to-image models
+      if (allResults.length > 0) {
+        // Use the first generated image as base for image-to-image models
+        const baseImageUrl = allResults[0].url;
+        const imageToImageResults = await generateImageToImageModels(finalPrompt, baseImageUrl, replicate);
+        allResults.push(...imageToImageResults);
+      }
     }
   }
   
@@ -479,7 +511,7 @@ async function processGeneration(request: GenerationRequest) {
     console.log('Matched materials:', matchedMaterials);
 
     // CrewAI Agent 3: Generate multiple 3D images using all integrated models
-    const imageUrls = await generate3DImage(parsed.enhanced_prompt, matchedMaterials);
+    const imageUrls = await generate3DImage(parsed.enhanced_prompt, matchedMaterials, request.reference_image_url);
     console.log(`Generated ${imageUrls.length} images from all integrated models`);
 
     // CrewAI Agent 4: Quality validation (validate first image)
@@ -572,7 +604,10 @@ serve(async (req) => {
     console.log('Received 3D generation request');
     const request: GenerationRequest = await req.json();
     
-    console.log('Processing 3D generation request:', JSON.stringify(request));
+    console.log('Processing 3D generation request:', JSON.stringify({
+      ...request,
+      reference_image_url: request.reference_image_url ? '[IMAGE_PROVIDED]' : '[NO_IMAGE]'
+    }));
 
     // Validate request
     if (!request.user_id || !request.prompt) {
