@@ -46,6 +46,25 @@ export const Designer3DPage: React.FC = () => {
     'mid-century', 'traditional', 'rustic', 'mediterranean', 'art-deco'
   ];
 
+  const prefilledPrompts = [
+    {
+      name: "Interior Room with Plants",
+      prompt: "Interior room of the house with plants, a chair and candles, space to relax, soft lighting, pastel colors, style of ultrafine detail, high quality photo --ar 2:3 --v 5"
+    },
+    {
+      name: "Modern Living Room",
+      prompt: "Modern living room with minimalist furniture, large windows, natural light, neutral colors, clean lines, high-end photography style --ar 16:9 --v 6"
+    },
+    {
+      name: "Cozy Bedroom",
+      prompt: "Cozy bedroom with warm lighting, soft textures, wooden furniture, books, comfortable bedding, intimate atmosphere --ar 4:5 --v 5"
+    },
+    {
+      name: "Luxury Kitchen",
+      prompt: "Luxury kitchen with marble countertops, stainless steel appliances, pendant lighting, island, high-end finishes, professional photography --ar 3:2 --v 6"
+    }
+  ];
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -216,7 +235,21 @@ export const Designer3DPage: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="prompt">Design Prompt</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="prompt">Design Prompt</Label>
+              <Select onValueChange={(value) => setPrompt(value)}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Choose a preset" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {prefilledPrompts.map((preset) => (
+                    <SelectItem key={preset.name} value={preset.prompt}>
+                      {preset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Textarea
               id="prompt"
               value={prompt}
