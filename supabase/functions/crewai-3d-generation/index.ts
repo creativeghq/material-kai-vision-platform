@@ -306,22 +306,23 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
   return results;
 }
 
-// Generate with working Replicate text-to-image models only
+// Generate with YOUR EXACT Replicate text-to-image models only
 async function generateTextToImageModels(prompt: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
   console.log("🎭 Starting text-to-image model generations...");
   console.log("📋 TEXT-TO-IMAGE MODELS TO TEST:");
   console.log("   1. 🏗️ Designer Architecture - davisbrown/designer-architecture");
-  console.log("   2. 🏘️ FLUX Schnell - black-forest-labs/flux-schnell");
-  console.log("   3. 🏺 FLUX Dev - black-forest-labs/flux-dev");
-  console.log("   4. 🏛️ Stable Diffusion XL - stability-ai/sdxl");
-  console.log("   5. 🎨 Playground v2.5 - playgroundai/playground-v2.5-1024px-aesthetic");
+  console.log("   2. 🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora");
+  console.log("   3. 🏺 Realistic Architecture - prithivMLmods/realistic-architecture");
+  console.log("   4. 🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture");
+  console.log("   5. 🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl");
+  console.log("   6. 🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1");
   console.log("------------------------------------------------------");
   
   // Model 1: davisbrown/designer-architecture (requires DESARCH trigger word) - WORKING
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
-    const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
+    const output = await replicate.run("davisbrown/designer-architecture", {
       input: {
         prompt: `Interior DESARCH design, ${prompt}`,
         num_outputs: 1,
@@ -346,113 +347,135 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     console.error("❌ Designer Architecture failed:", error.message);
   }
 
-  // Model 2: Use FLUX Schnell instead of broken prithivMLmods models
+  // Model 2: prithivMLmods/interior-design-sdxl-lora - TRY WITHOUT VERSION HASH FIRST
   try {
-    console.log("🏘️ Attempting FLUX Schnell model...");
-    const output = await replicate.run("black-forest-labs/flux-schnell", {
+    console.log("🏘️ Attempting Interior Design SDXL LoRA model...");
+    const output = await replicate.run("prithivMLmods/interior-design-sdxl-lora", {
       input: {
         prompt: `Interior design, ${prompt}, photorealistic, detailed, high quality`,
         num_outputs: 1,
-        aspect_ratio: "16:9",
-        go_fast: true,
-        megapixels: "1",
-        output_format: "webp",
-        output_quality: 80,
-        num_inference_steps: 4
+        width: 1024,
+        height: 768,
+        guidance_scale: 7.5,
+        num_inference_steps: 25,
+        negative_prompt: "lowres, watermark, text, blurry, deformed"
       }
     });
     
-    console.log("FLUX Schnell raw output:", output);
+    console.log("Interior Design SDXL LoRA raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏘️ FLUX Schnell - black-forest-labs/flux-schnell" });
-      console.log("✅ FLUX Schnell successful:", output[0]);
+      results.push({ url: output[0], modelName: "🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora" });
+      console.log("✅ Interior Design SDXL LoRA successful:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏘️ FLUX Schnell - black-forest-labs/flux-schnell" });
-      console.log("✅ FLUX Schnell successful:", output);
+      results.push({ url: output, modelName: "🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora" });
+      console.log("✅ Interior Design SDXL LoRA successful:", output);
     }
   } catch (error) {
-    console.error("❌ FLUX Schnell failed:", error.message);
+    console.error("❌ Interior Design SDXL LoRA failed:", error.message);
   }
 
-  // Model 3: Use FLUX Dev
+  // Model 3: prithivMLmods/realistic-architecture - TRY WITHOUT VERSION HASH FIRST
   try {
-    console.log("🏺 Attempting FLUX Dev model...");
-    const output = await replicate.run("black-forest-labs/flux-dev", {
+    console.log("🏺 Attempting Realistic Architecture model...");
+    const output = await replicate.run("prithivMLmods/realistic-architecture", {
       input: {
         prompt: `Realistic architecture interior, ${prompt}, professional photography`,
         num_outputs: 1,
-        aspect_ratio: "16:9",
-        guidance_scale: 3.5,
-        num_inference_steps: 28,
-        output_format: "webp",
-        output_quality: 90
+        width: 1024,
+        height: 768,
+        guidance_scale: 7.5,
+        num_inference_steps: 25
       }
     });
     
-    console.log("FLUX Dev raw output:", output);
+    console.log("Realistic Architecture raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏺 FLUX Dev - black-forest-labs/flux-dev" });
-      console.log("✅ FLUX Dev successful:", output[0]);
+      results.push({ url: output[0], modelName: "🏺 Realistic Architecture - prithivMLmods/realistic-architecture" });
+      console.log("✅ Realistic Architecture successful:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏺 FLUX Dev - black-forest-labs/flux-dev" });
-      console.log("✅ FLUX Dev successful:", output);
+      results.push({ url: output, modelName: "🏺 Realistic Architecture - prithivMLmods/realistic-architecture" });
+      console.log("✅ Realistic Architecture successful:", output);
     }
   } catch (error) {
-    console.error("❌ FLUX Dev failed:", error.message);
+    console.error("❌ Realistic Architecture failed:", error.message);
   }
 
-  // Model 4: Use Stable Diffusion XL
+  // Model 4: prithivMLmods/flux-interior-architecture - TRY WITHOUT VERSION HASH FIRST
   try {
-    console.log("🏛️ Attempting Stable Diffusion XL model...");
-    const output = await replicate.run("stability-ai/sdxl:39ed52f2a78e934b3ba6e2a3679fd2b906b9242f54c1c1c9e0e8a1c5039bb72e", {
+    console.log("🏛️ Attempting Flux Interior Architecture model...");
+    const output = await replicate.run("prithivMLmods/flux-interior-architecture", {
       input: {
         prompt: `Interior architecture, ${prompt}, modern design, clean lines`,
         num_outputs: 1,
         width: 1024,
         height: 768,
         guidance_scale: 7.5,
-        num_inference_steps: 25,
-        scheduler: "K_EULER"
+        num_inference_steps: 25
       }
     });
     
-    console.log("Stable Diffusion XL raw output:", output);
+    console.log("Flux Interior Architecture raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ Stable Diffusion XL - stability-ai/sdxl" });
-      console.log("✅ Stable Diffusion XL successful:", output[0]);
+      results.push({ url: output[0], modelName: "🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture" });
+      console.log("✅ Flux Interior Architecture successful:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ Stable Diffusion XL - stability-ai/sdxl" });
-      console.log("✅ Stable Diffusion XL successful:", output);
+      results.push({ url: output, modelName: "🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture" });
+      console.log("✅ Flux Interior Architecture successful:", output);
     }
   } catch (error) {
-    console.error("❌ Stable Diffusion XL failed:", error.message);
+    console.error("❌ Flux Interior Architecture failed:", error.message);
   }
 
-  // Model 5: Use Playground v2.5
+  // Model 5: prithivMLmods/interior-decor-sdxl - TRY WITHOUT VERSION HASH FIRST
   try {
-    console.log("🎨 Attempting Playground v2.5 model...");
-    const output = await replicate.run("playgroundai/playground-v2.5-1024px-aesthetic:a45f82a1382bed5c7aeb861dac7c7d191b0fdf74d8d57c4a0e6ed7d4d0bf7d24", {
+    console.log("🎨 Attempting Interior Decor SDXL model...");
+    const output = await replicate.run("prithivMLmods/interior-decor-sdxl", {
       input: {
         prompt: `Interior decoration, ${prompt}, stylish, elegant, contemporary`,
         num_outputs: 1,
         width: 1024,
         height: 768,
-        guidance_scale: 3,
-        num_inference_steps: 25,
-        scheduler: "K_EULER_ANCESTRAL"
+        guidance_scale: 7.5,
+        num_inference_steps: 25
       }
     });
     
-    console.log("Playground v2.5 raw output:", output);
+    console.log("Interior Decor SDXL raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🎨 Playground v2.5 - playgroundai/playground-v2.5-1024px-aesthetic" });
-      console.log("✅ Playground v2.5 successful:", output[0]);
+      results.push({ url: output[0], modelName: "🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl" });
+      console.log("✅ Interior Decor SDXL successful:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🎨 Playground v2.5 - playgroundai/playground-v2.5-1024px-aesthetic" });
-      console.log("✅ Playground v2.5 successful:", output);
+      results.push({ url: output, modelName: "🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl" });
+      console.log("✅ Interior Decor SDXL successful:", output);
     }
   } catch (error) {
-    console.error("❌ Playground v2.5 failed:", error.message);
+    console.error("❌ Interior Decor SDXL failed:", error.message);
+  }
+
+  // Model 6: prithivMLmods/Canopus-Interior-Architecture-0.1 - YOUR ORIGINAL MODEL
+  try {
+    console.log("🏛️ Attempting Canopus Interior Architecture 0.1 model...");
+    const output = await replicate.run("prithivMLmods/Canopus-Interior-Architecture-0.1", {
+      input: {
+        prompt: `Interior room design, ${prompt}, high quality, photorealistic`,
+        num_outputs: 1,
+        width: 1024,
+        height: 768,
+        guidance_scale: 7.5,
+        num_inference_steps: 25
+      }
+    });
+    
+    console.log("Canopus Interior Architecture 0.1 raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1" });
+      console.log("✅ Canopus Interior Architecture 0.1 successful:", output[0]);
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1" });
+      console.log("✅ Canopus Interior Architecture 0.1 successful:", output);
+    }
+  } catch (error) {
+    console.error("❌ Canopus Interior Architecture 0.1 failed:", error.message);
   }
 
   console.log("📊 TEXT-TO-IMAGE GENERATION SUMMARY:");
@@ -465,17 +488,17 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   return results;
 }
 
-// Generate with working Replicate image-to-image models only
+// Generate with YOUR EXACT Replicate image-to-image models only
 async function generateImageToImageModels(prompt: string, baseImageUrl: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
   console.log("🖼️ Starting image-to-image model generations...");
   console.log("📋 IMAGE-TO-IMAGE MODELS TO TEST:");
   console.log("   1. 🎨 Interior Design AI - adirik/interior-design");
-  console.log("   2. 🏠 FLUX Schnell - black-forest-labs/flux-schnell");
-  console.log("   3. 🏛️ FLUX Dev - black-forest-labs/flux-dev");
+  console.log("   2. 🏠 ControlNet Interior - lllyasviel/control_v11p_sd15_canny");
+  console.log("   3. 🏛️ Architecture Refiner - tencentarc/photomaker");
   console.log("------------------------------------------------------");
 
-  // Model 1: adirik/interior-design (WORKING)
+  // Model 1: adirik/interior-design (WORKING WITH CORRECT HASH)
   try {
     console.log("🎨 Attempting Interior Design AI model...");
     const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
@@ -500,59 +523,57 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.error("❌ Interior Design AI failed:", error.message);
   }
 
-  // Model 2: Use FLUX Schnell for image-to-image
+  // Model 2: ControlNet Interior (for image-guided generation) - TRY WITHOUT VERSION HASH FIRST
   try {
-    console.log("🏠 Attempting FLUX Schnell for image-to-image...");
-    const output = await replicate.run("black-forest-labs/flux-schnell", {
+    console.log("🏠 Attempting ControlNet Interior model...");
+    const output = await replicate.run("lllyasviel/control_v11p_sd15_canny", {
       input: {
+        image: baseImageUrl,
         prompt: `Interior design, ${prompt}, high quality, detailed`,
         num_outputs: 1,
-        aspect_ratio: "16:9",
-        go_fast: true,
-        megapixels: "1",
-        output_format: "webp",
-        output_quality: 80,
-        num_inference_steps: 4
+        guidance_scale: 9,
+        num_inference_steps: 20,
+        controlnet_conditioning_scale: 1.0,
+        low_threshold: 100,
+        high_threshold: 200
       }
     });
     
-    console.log("FLUX Schnell raw output:", output);
+    console.log("ControlNet Interior raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏠 FLUX Schnell - black-forest-labs/flux-schnell" });
-      console.log("✅ FLUX Schnell successful:", output[0]);
+      results.push({ url: output[0], modelName: "🏠 ControlNet Interior - lllyasviel/control_v11p_sd15_canny" });
+      console.log("✅ ControlNet Interior successful:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏠 FLUX Schnell - black-forest-labs/flux-schnell" });
-      console.log("✅ FLUX Schnell successful:", output);
+      results.push({ url: output, modelName: "🏠 ControlNet Interior - lllyasviel/control_v11p_sd15_canny" });
+      console.log("✅ ControlNet Interior successful:", output);
     }
   } catch (error) {
-    console.error("❌ FLUX Schnell failed:", error.message);
+    console.error("❌ ControlNet Interior failed:", error.message);
   }
 
-  // Model 3: Use FLUX Dev for architecture refinement
+  // Model 3: PhotoMaker for architecture refinement - TRY WITHOUT VERSION HASH FIRST
   try {
-    console.log("🏛️ Attempting FLUX Dev for architecture refinement...");
-    const output = await replicate.run("black-forest-labs/flux-dev", {
+    console.log("🏛️ Attempting Architecture Refiner model...");
+    const output = await replicate.run("tencentarc/photomaker", {
       input: {
+        input_image: baseImageUrl,
         prompt: `Interior architecture, ${prompt}, professional photography, realistic lighting`,
-        num_outputs: 1,
-        aspect_ratio: "16:9",
-        guidance_scale: 3.5,
-        num_inference_steps: 28,
-        output_format: "webp",
-        output_quality: 90
+        num_steps: 20,
+        style_strength_ratio: 15,
+        num_outputs: 1
       }
     });
     
-    console.log("FLUX Dev raw output:", output);
+    console.log("Architecture Refiner raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ FLUX Dev - black-forest-labs/flux-dev" });
-      console.log("✅ FLUX Dev successful:", output[0]);
+      results.push({ url: output[0], modelName: "🏛️ Architecture Refiner - tencentarc/photomaker" });
+      console.log("✅ Architecture Refiner successful:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ FLUX Dev - black-forest-labs/flux-dev" });
-      console.log("✅ FLUX Dev successful:", output);
+      results.push({ url: output, modelName: "🏛️ Architecture Refiner - tencentarc/photomaker" });
+      console.log("✅ Architecture Refiner successful:", output);
     }
   } catch (error) {
-    console.error("❌ FLUX Dev failed:", error.message);
+    console.error("❌ Architecture Refiner failed:", error.message);
   }
 
   console.log("📊 IMAGE-TO-IMAGE GENERATION SUMMARY:");
