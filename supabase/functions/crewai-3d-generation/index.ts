@@ -13,11 +13,6 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
   workflowSteps = [
     // Text-to-Image Models
     { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
-    { modelName: 'prithivMLmods/interior-design-sdxl-lora', name: 'Interior Design SDXL LoRA', type: 'text-to-image', status: 'pending' },
-    { modelName: 'prithivMLmods/realistic-architecture', name: 'Realistic Architecture', type: 'text-to-image', status: 'pending' },
-    { modelName: 'prithivMLmods/flux-interior-architecture', name: 'Flux Interior Architecture', type: 'text-to-image', status: 'pending' },
-    { modelName: 'prithivMLmods/interior-decor-sdxl', name: 'Interior Decor SDXL', type: 'text-to-image', status: 'pending' },
-    { modelName: 'prithivMLmods/Canopus-Interior-Architecture-0.1', name: 'Canopus Interior Architecture', type: 'text-to-image', status: 'pending' },
     // Hugging Face Models
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
     { modelName: 'black-forest-labs/FLUX.1-schnell', name: 'FLUX-Schnell', type: 'text-to-image', status: 'pending' },
@@ -395,11 +390,6 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   console.log("🎭 Starting text-to-image model generations...");
   console.log("📋 TEXT-TO-IMAGE MODELS TO TEST:");
   console.log("   1. 🏗️ Designer Architecture - davisbrown/designer-architecture");
-  console.log("   2. 🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora");
-  console.log("   3. 🏺 Realistic Architecture - prithivMLmods/realistic-architecture");
-  console.log("   4. 🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture");
-  console.log("   5. 🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl");
-  console.log("   6. 🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1");
   console.log("------------------------------------------------------");
   
   // Model 1: davisbrown/designer-architecture - FIXED WITH CORRECT VERSION HASH
@@ -435,169 +425,7 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     await updateWorkflowStep('davisbrown/designer-architecture', 'failed', undefined, error.message);
   }
 
-  // Model 2: prithivMLmods/interior-design-sdxl-lora - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🏘️ Attempting Interior Design SDXL LoRA model...");
-    const output = await replicate.run("prithivMLmods/interior-design-sdxl-lora", {
-      input: {
-        prompt: `Interior design, ${prompt}, photorealistic, detailed, high quality`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25,
-        negative_prompt: "lowres, watermark, text, blurry, deformed"
-      }
-    });
-    
-    console.log("Interior Design SDXL LoRA raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora" });
-      console.log("✅ Interior Design SDXL LoRA successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora" });
-      console.log("✅ Interior Design SDXL LoRA successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Interior Design SDXL LoRA failed:", error.message);
-  }
-
-  // Model 3: julian-at/interiorly-gen1-dev - TEXT-TO-IMAGE MODEL (moved from image-to-image section)
-  try {
-    console.log("🏛️ Attempting Interiorly Gen1 Dev model...");
-    updateWorkflowStep('julian-at/interiorly-gen1-dev', 'running');
-    
-    const output = await replicate.run("julian-at/interiorly-gen1-dev:5e3080d1b308e80197b32f0ce638daa8a329d0cf42068739723d8259e44b445e", {
-      input: {
-        width: 1024,
-        height: 1024,
-        prompt: prompt,
-        guidance_scale: 5,
-        num_inference_steps: 35
-      }
-    });
-    
-    console.log("Interiorly Gen1 Dev raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev" });
-      console.log("✅ Interiorly Gen1 Dev generation successful:", output[0]);
-      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'success', output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev" });
-      console.log("✅ Interiorly Gen1 Dev generation successful:", output);
-      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'success', output);
-    } else {
-      console.log("⚠️ Interiorly Gen1 Dev unexpected output format:", typeof output, output);
-      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, 'Unexpected output format');
-    }
-  } catch (error) {
-    console.error("❌ Interiorly Gen1 Dev failed:", error.message);
-    await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, error.message);
-  }
-
-  // Model 4: prithivMLmods/realistic-architecture - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🏺 Attempting Realistic Architecture model...");
-    const output = await replicate.run("prithivMLmods/realistic-architecture", {
-      input: {
-        prompt: `Realistic architecture interior, ${prompt}, professional photography`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Realistic Architecture raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏺 Realistic Architecture - prithivMLmods/realistic-architecture" });
-      console.log("✅ Realistic Architecture successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏺 Realistic Architecture - prithivMLmods/realistic-architecture" });
-      console.log("✅ Realistic Architecture successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Realistic Architecture failed:", error.message);
-  }
-
-  // Model 4: prithivMLmods/flux-interior-architecture - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🏛️ Attempting Flux Interior Architecture model...");
-    const output = await replicate.run("prithivMLmods/flux-interior-architecture", {
-      input: {
-        prompt: `Interior architecture, ${prompt}, modern design, clean lines`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Flux Interior Architecture raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture" });
-      console.log("✅ Flux Interior Architecture successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture" });
-      console.log("✅ Flux Interior Architecture successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Flux Interior Architecture failed:", error.message);
-  }
-
-  // Model 5: prithivMLmods/interior-decor-sdxl - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🎨 Attempting Interior Decor SDXL model...");
-    const output = await replicate.run("prithivMLmods/interior-decor-sdxl", {
-      input: {
-        prompt: `Interior decoration, ${prompt}, stylish, elegant, contemporary`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Interior Decor SDXL raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl" });
-      console.log("✅ Interior Decor SDXL successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl" });
-      console.log("✅ Interior Decor SDXL successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Interior Decor SDXL failed:", error.message);
-  }
-
-  // Model 6: prithivMLmods/Canopus-Interior-Architecture-0.1 - YOUR ORIGINAL MODEL
-  try {
-    console.log("🏛️ Attempting Canopus Interior Architecture 0.1 model...");
-    const output = await replicate.run("prithivMLmods/Canopus-Interior-Architecture-0.1", {
-      input: {
-        prompt: `Interior room design, ${prompt}, high quality, photorealistic`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Canopus Interior Architecture 0.1 raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1" });
-      console.log("✅ Canopus Interior Architecture 0.1 successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1" });
-      console.log("✅ Canopus Interior Architecture 0.1 successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Canopus Interior Architecture 0.1 failed:", error.message);
-  }
+  // No more Replicate text-to-image models - all problematic prithivMLmods models removed
 
   console.log("📊 TEXT-TO-IMAGE GENERATION SUMMARY:");
   console.log(`   ✅ Successfully generated ${results.length} images from text-to-image models`);
