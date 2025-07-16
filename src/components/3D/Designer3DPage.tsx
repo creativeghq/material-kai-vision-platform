@@ -47,20 +47,33 @@ export const Designer3DPage: React.FC = () => {
     checkAdminRole();
   }, []);
 
-  // Working model names that match our edge function (Fixed)
-  const modelNames = [
-    '🎨 Stable Diffusion XL Base 1.0 - stabilityai/stable-diffusion-xl-base-1.0',
-    '⚡ FLUX-Schnell - black-forest-labs/FLUX.1-schnell',
-    '🏠 Interior Design Model - stabilityai/stable-diffusion-2-1',
-    '🏗️ Designer Architecture - davisbrown/designer-architecture',
-    '🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora',
-    '🏺 Realistic Architecture - prithivMLmods/realistic-architecture',
-    '🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture',
-    '🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl',
-    '🎨 Interior Design AI - adirik/interior-design',
-    '🏠 ControlNet Interior - lllyasviel/control_v11p_sd15_canny',
-    '🏛️ Architecture Refiner - tencentarc/photomaker'
-  ];
+  // Available AI models with smart filtering based on input type
+  const availableModels = {
+    textToImage: [
+      { name: '🎨 Stable Diffusion XL Base 1.0', id: 'stabilityai/stable-diffusion-xl-base-1.0', provider: 'huggingface' },
+      { name: '⚡ FLUX-Schnell', id: 'black-forest-labs/FLUX.1-schnell', provider: 'huggingface' },
+      { name: '🏠 Interior Design Model', id: 'stabilityai/stable-diffusion-2-1', provider: 'huggingface' },
+      { name: '🏗️ Designer Architecture', id: 'davisbrown/designer-architecture', provider: 'replicate' },
+      { name: '🎯 Interior Design AI (Text)', id: 'adirik/interior-design', provider: 'replicate' }
+    ],
+    imageToImage: [
+      { name: '🎯 Interior Design AI (Image)', id: 'adirik/interior-design', provider: 'replicate' },
+      { name: '🏡 Interior AI', id: 'erayyavuz/interior-ai', provider: 'replicate' },
+      { name: '🎨 ComfyUI Interior Remodel', id: 'jschoormans/comfyui-interior-remodel', provider: 'replicate' },
+      { name: '🏛️ Interiorly Gen1 Dev', id: 'julian-at/interiorly-gen1-dev', provider: 'replicate' },
+      { name: '🏘️ Interior V2', id: 'jschoormans/interior-v2', provider: 'replicate' },
+      { name: '🚀 Interior Design SDXL', id: 'rocketdigitalai/interior-design-sdxl', provider: 'replicate' }
+    ]
+  };
+
+  // Get filtered models based on whether reference image is provided
+  const getFilteredModels = () => {
+    const textModels = availableModels.textToImage;
+    const imageModels = selectedImage ? availableModels.imageToImage : [];
+    return [...textModels, ...imageModels];
+  };
+
+  const filteredModels = getFilteredModels();
 
   const roomTypes = [
     'living room', 'kitchen', 'bedroom', 'bathroom', 'dining room',
@@ -235,7 +248,7 @@ export const Designer3DPage: React.FC = () => {
           // Generation completed successfully
           const imagesWithModels = data.image_urls.map((url: string, index: number) => ({
             url,
-            modelName: modelNames[index] || `Model ${index + 1}`
+            modelName: filteredModels[index] || `Model ${index + 1}`
           }));
           
           setGeneratedImages(imagesWithModels);
@@ -314,8 +327,16 @@ export const Designer3DPage: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
-          Generate photorealistic interior designs using ALL our integrated AI models:
-          🎨 Stable Diffusion XL, ⚡ FLUX-Schnell, 🏠 Interior Design Model, 🏗️ Designer Architecture, 🏘️ Interior Design SDXL LoRA, 🏺 Realistic Architecture, 🏛️ Flux Interior Architecture, 🎨 Interior Decor SDXL, 🎨 Interior Design AI, 🏠 ControlNet Interior, 🏛️ Architecture Refiner
+          Generate photorealistic interior designs using our AI models.
+          {selectedImage ? (
+            <span className="text-blue-600 font-medium">
+              With reference image: {filteredModels.length} models available ({availableModels.textToImage.length} text-to-image + {availableModels.imageToImage.length} image-to-image)
+            </span>
+          ) : (
+            <span className="text-green-600 font-medium">
+              Text-only mode: {filteredModels.length} models available
+            </span>
+          )}
         </p>
       </div>
 
@@ -545,7 +566,7 @@ export const Designer3DPage: React.FC = () => {
               <div>
                 <h4 className="font-medium mb-1">Models Generated</h4>
                 <p className="text-muted-foreground">
-                  {generatedImages.length} of {modelNames.length} models completed
+                  {generatedImages.length} of {filteredModels.length} models completed
                 </p>
               </div>
             </div>
@@ -571,7 +592,7 @@ export const Designer3DPage: React.FC = () => {
           onComplete={(images) => {
             const imagesWithModels = images.map((url: string, index: number) => ({
               url,
-              modelName: modelNames[index] || `Model ${index + 1}`
+              modelName: filteredModels[index] || `Model ${index + 1}`
             }));
             setGeneratedImages(imagesWithModels);
             setShowWorkflowModal(false);

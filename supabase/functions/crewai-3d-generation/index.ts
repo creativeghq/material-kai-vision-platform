@@ -348,77 +348,159 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
       if (modelConfig.model.includes('FLUX')) {
         console.log(`⚡ Using optimized FLUX parameters for ${modelConfig.model}`);
         
-        // Use a simplified approach for FLUX
-        const response = await fetch(`https://api-inference.huggingface.co/models/${modelConfig.model}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('HUGGING_FACE_ACCESS_TOKEN')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: {
-              num_inference_steps: 1, // Minimum for schnell
-              guidance_scale: 0.0,    // Minimum guidance for schnell
-              width: 1024,
-              height: 1024
+        // Use a simplified approach for FLUX with timeout and retry logic
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
+        try {
+          const response = await fetch(`https://api-inference.huggingface.co/models/${modelConfig.model}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${HF_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              inputs: prompt,
+              parameters: {
+                num_inference_steps: 1, // Minimum for schnell
+                guidance_scale: 0.0,    // Minimum guidance for schnell
+                width: 1024,
+                height: 1024
+              }
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ HF API Error ${response.status}:`, errorText);
+            
+            // Handle specific error cases
+            if (response.status === 503) {
+              throw new Error(`Model ${modelConfig.model} is currently loading. Please try again in a few minutes.`);
+            } else if (response.status === 429) {
+              throw new Error(`Rate limit exceeded for ${modelConfig.model}. Please try again later.`);
+            } else if (response.status === 401) {
+              throw new Error(`Authentication failed. Please check your Hugging Face token.`);
+            } else {
+              throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
             }
-          }),
-        });
+          }
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const blob = await response.blob();
+          
+          // Validate blob
+          if (!blob || blob.size === 0) {
+            throw new Error(`Empty or invalid blob received from ${modelConfig.model}`);
+          }
+          
+          console.log(`📊 Blob size for ${modelConfig.name}: ${blob.size} bytes`);
+          
+          const arrayBuffer = await blob.arrayBuffer();
+          
+          // Enhanced blob processing with error handling
+          if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+            throw new Error(`Failed to convert blob to ArrayBuffer for ${modelConfig.model}`);
+          }
+          
+          // Convert ArrayBuffer to base64 with chunked processing for large images
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const chunkSize = 8192; // Process in 8KB chunks to avoid memory issues
+          let binaryString = '';
+          
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.slice(i, i + chunkSize);
+            for (let j = 0; j < chunk.length; j++) {
+              binaryString += String.fromCharCode(chunk[j]);
+            }
+          }
+          
+          const base64 = btoa(binaryString);
+          const result = `data:image/png;base64,${base64}`;
+          
+          results.push({
+            url: result,
+            modelName: modelConfig.name
+          });
+          console.log(`✅ ${modelConfig.name} generation successful with direct API`);
+          await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
+          
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          throw fetchError;
         }
-
-        const blob = await response.blob();
-        const arrayBuffer = await blob.arrayBuffer();
         
-        // Fix: Convert ArrayBuffer to base64 without spreading large arrays
-        const uint8Array = new Uint8Array(arrayBuffer);
-        let binaryString = '';
-        for (let i = 0; i < uint8Array.length; i++) {
-          binaryString += String.fromCharCode(uint8Array[i]);
-        }
-        const base64 = btoa(binaryString);
-        const result = `data:image/png;base64,${base64}`;
-        
-        results.push({ 
-          url: result, 
-          modelName: modelConfig.name 
-        });
-        console.log(`✅ ${modelConfig.name} generation successful with direct API`);
-        await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
       } else {
-        // Standard HF SDK for other models
-        const image = await hf.textToImage({
-          inputs: prompt,
-          model: modelConfig.model,
-        });
+        // Standard HF SDK for other models with timeout
+        console.log(`🔄 Using HF SDK for ${modelConfig.model}`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout for other models
+        
+        try {
+          const image = await hf.textToImage({
+            inputs: prompt,
+            model: modelConfig.model,
+          });
+          
+          clearTimeout(timeoutId);
 
-        const arrayBuffer = await image.arrayBuffer();
-        
-        // Fix: Convert ArrayBuffer to base64 without spreading large arrays  
-        const uint8Array = new Uint8Array(arrayBuffer);
-        let binaryString = '';
-        for (let i = 0; i < uint8Array.length; i++) {
-          binaryString += String.fromCharCode(uint8Array[i]);
+          const arrayBuffer = await image.arrayBuffer();
+          
+          // Enhanced blob processing with validation
+          if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+            throw new Error(`Failed to get valid image data from ${modelConfig.model}`);
+          }
+          
+          console.log(`📊 Image size for ${modelConfig.name}: ${arrayBuffer.byteLength} bytes`);
+          
+          // Convert ArrayBuffer to base64 with chunked processing
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const chunkSize = 8192; // Process in 8KB chunks
+          let binaryString = '';
+          
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.slice(i, i + chunkSize);
+            for (let j = 0; j < chunk.length; j++) {
+              binaryString += String.fromCharCode(chunk[j]);
+            }
+          }
+          
+          const base64 = btoa(binaryString);
+          const result = `data:image/png;base64,${base64}`;
+          
+          results.push({
+            url: result,
+            modelName: modelConfig.name
+          });
+          console.log(`✅ ${modelConfig.name} generation successful`);
+          await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
+          
+        } catch (sdkError) {
+          clearTimeout(timeoutId);
+          throw sdkError;
         }
-        const base64 = btoa(binaryString);
-        const result = `data:image/png;base64,${base64}`;
-        
-        results.push({ 
-          url: result, 
-          modelName: modelConfig.name 
-        });
-        console.log(`✅ ${modelConfig.name} generation successful`);
-        await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
       }
       
       // Continue to next model to show ALL models
     } catch (error) {
-      console.error(`❌ ${modelConfig.name} failed:`, error.message);
+      const errorMessage = error.message || 'Unknown error occurred';
+      console.error(`❌ ${modelConfig.name} failed:`, errorMessage);
       console.error(`❌ Full error details:`, error);
-      await updateWorkflowStep(modelConfig.model, 'failed', undefined, error.message, Date.now() - startTime);
+      
+      // Enhanced error classification for Hugging Face specific errors
+      let classifiedError = classifyError(error);
+      if (errorMessage.includes('loading')) {
+        classifiedError = { type: 'MODEL_LOADING', severity: 'medium', retryable: true };
+      } else if (errorMessage.includes('Rate limit')) {
+        classifiedError = { type: 'RATE_LIMIT_ERROR', severity: 'medium', retryable: true };
+      } else if (errorMessage.includes('blob') || errorMessage.includes('ArrayBuffer')) {
+        classifiedError = { type: 'BLOB_PROCESSING_ERROR', severity: 'high', retryable: false };
+      }
+      
+      await updateWorkflowStep(modelConfig.model, 'failed', undefined, `${classifiedError.type}: ${errorMessage}`, Date.now() - startTime);
       // Continue to next model on failure
     }
   }
@@ -1078,7 +1160,7 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
         
         // Only run text-to-image models
         console.log("📝 Running text-to-image models...");
-        const textToImageResults = await generateTextToImageModels(finalPrompt, replicate, request.reference_image_url);
+        const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
         console.log(`📊 Text-to-image results: ${textToImageResults.length} images generated`);
         allResults.push(...textToImageResults);
       } catch (replicateError) {
