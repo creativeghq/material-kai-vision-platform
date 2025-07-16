@@ -224,7 +224,159 @@ async function generateHuggingFaceImage(prompt: string): Promise<string> {
   return `data:image/png;base64,${base64}`;
 }
 
-// CrewAI Agent: Generate 3D interior images using both Hugging Face and Replicate
+// Generate with specific Replicate text-to-image models
+async function generateTextToImageModels(prompt: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
+  const results = [];
+  
+  // Model 1: davisbrown/designer-architecture
+  try {
+    console.log("Generating with Designer Architecture...");
+    const output = await replicate.run("davisbrown/designer-architecture", {
+      input: {
+        prompt: prompt,
+        num_outputs: 1,
+        aspect_ratio: "16:9",
+        guidance_scale: 3.5,
+        output_quality: 90
+      }
+    });
+    
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "Designer Architecture" });
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "Designer Architecture" });
+    }
+    console.log("Designer Architecture generation successful");
+  } catch (error) {
+    console.error("Designer Architecture failed:", error);
+  }
+
+  // Model 2: julian-at/interiorly-gen1-dev  
+  try {
+    console.log("Generating with Interiorly Gen1...");
+    const output = await replicate.run("julian-at/interiorly-gen1-dev", {
+      input: {
+        width: 1024,
+        height: 1024,
+        prompt: prompt,
+        guidance_scale: 5,
+        num_inference_steps: 35
+      }
+    });
+    
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "Interiorly Gen1" });
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "Interiorly Gen1" });
+    }
+    console.log("Interiorly Gen1 generation successful");
+  } catch (error) {
+    console.error("Interiorly Gen1 failed:", error);
+  }
+
+  return results;
+}
+
+// Generate with Replicate image-to-image models using a base image
+async function generateImageToImageModels(prompt: string, baseImageUrl: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
+  const results = [];
+
+  // Model 1: adirik/interior-design
+  try {
+    console.log("Generating with Interior Design AI...");
+    const output = await replicate.run("adirik/interior-design", {
+      input: {
+        image: baseImageUrl,
+        prompt: prompt
+      }
+    });
+    
+    if (typeof output === 'string') {
+      results.push({ url: output, modelName: "Interior Design AI" });
+    }
+    console.log("Interior Design AI generation successful");
+  } catch (error) {
+    console.error("Interior Design AI failed:", error);
+  }
+
+  // Model 2: erayyavuz/interior-ai
+  try {
+    console.log("Generating with Interior AI...");
+    const output = await replicate.run("erayyavuz/interior-ai", {
+      input: {
+        input: baseImageUrl,
+        prompt: prompt,
+        negative_prompt: "lowres, watermark, banner, logo, deformed, blurry, blur, out of focus, surreal, ugly",
+        num_inference_steps: 25
+      }
+    });
+    
+    if (typeof output === 'string') {
+      results.push({ url: output, modelName: "Interior AI" });
+    }
+    console.log("Interior AI generation successful");
+  } catch (error) {
+    console.error("Interior AI failed:", error);
+  }
+
+  // Model 3: jschoormans/comfyui-interior-remodel
+  try {
+    console.log("Generating with ComfyUI Interior Remodel...");
+    const output = await replicate.run("jschoormans/comfyui-interior-remodel", {
+      input: {
+        image: baseImageUrl
+      }
+    });
+    
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "ComfyUI Interior Remodel" });
+    }
+    console.log("ComfyUI Interior Remodel generation successful");
+  } catch (error) {
+    console.error("ComfyUI Interior Remodel failed:", error);
+  }
+
+  // Model 4: jschoormans/interior-v2
+  try {
+    console.log("Generating with Interior V2...");
+    const output = await replicate.run("jschoormans/interior-v2", {
+      input: {
+        image: baseImageUrl,
+        max_resolution: 1024,
+        controlnet_conditioning_scale: 0.03
+      }
+    });
+    
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "Interior V2" });
+    }
+    console.log("Interior V2 generation successful");
+  } catch (error) {
+    console.error("Interior V2 failed:", error);
+  }
+
+  // Model 5: rocketdigitalai/interior-design-sdxl
+  try {
+    console.log("Generating with Interior Design SDXL...");
+    const output = await replicate.run("rocketdigitalai/interior-design-sdxl", {
+      input: {
+        image: baseImageUrl,
+        prompt: prompt
+      }
+    });
+    
+    if (typeof output === 'string') {
+      results.push({ url: output, modelName: "Interior Design SDXL" });
+    }
+    console.log("Interior Design SDXL generation successful");
+  } catch (error) {
+    console.error("Interior Design SDXL failed:", error);
+  }
+
+  return results;
+}
+
+// CrewAI Agent: Orchestrate all image generation services
 async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   // Enhanced prompt with material details
   let finalPrompt = enhancedPrompt;
@@ -233,60 +385,47 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     finalPrompt += `. Materials: ${materialDescriptions}`;
   }
 
-  const imageUrls = [];
+  const allResults: Array<{url: string, modelName: string}> = [];
   
   try {
-    // First, generate with Hugging Face (reliable)
+    // First, generate with Hugging Face (reliable base image)
     console.log("Generating with Hugging Face...");
     const hfImage = await generateHuggingFaceImage(finalPrompt);
-    imageUrls.push(hfImage);
+    allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
     console.log("Hugging Face generation successful");
   } catch (hfError) {
     console.error("Hugging Face generation failed:", hfError);
   }
 
-  // Try Replicate models (experimental - most are currently not working)
+  // Generate with Replicate models
   const replicateToken = Deno.env.get('REPLICATE_API_KEY');
   if (replicateToken) {
-    console.log("Attempting Replicate generation...");
+    console.log("Starting Replicate model generations...");
     
     const replicate = new Replicate({
       auth: replicateToken,
     });
     
-    // Use a working Replicate model instead of the broken interior design ones
-    try {
-      const output = await replicate.run("black-forest-labs/flux-schnell", {
-        input: {
-          prompt: finalPrompt,
-          go_fast: true,
-          megapixels: "1",
-          num_outputs: 1,
-          aspect_ratio: "1:1",
-          output_format: "webp",
-          output_quality: 80,
-          num_inference_steps: 4
-        }
-      });
-
-      if (Array.isArray(output) && output.length > 0) {
-        imageUrls.push(output[0]);
-        console.log("Replicate flux-schnell generation successful");
-      } else if (typeof output === 'string') {
-        imageUrls.push(output);
-        console.log("Replicate flux-schnell generation successful");
-      }
-    } catch (replicateError) {
-      console.error("Replicate generation failed:", replicateError);
+    // Generate text-to-image models first
+    const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
+    allResults.push(...textToImageResults);
+    
+    // If we have any base images, use them for image-to-image models
+    if (allResults.length > 0) {
+      // Use the first generated image as base for image-to-image models
+      const baseImageUrl = allResults[0].url;
+      const imageToImageResults = await generateImageToImageModels(finalPrompt, baseImageUrl, replicate);
+      allResults.push(...imageToImageResults);
     }
   }
   
   // If no images were generated, throw error
-  if (imageUrls.length === 0) {
+  if (allResults.length === 0) {
     throw new Error('All image generation services failed');
   }
   
-  return imageUrls;
+  console.log(`Generated ${allResults.length} images from ${allResults.map(r => r.modelName).join(', ')}`);
+  return allResults.map(result => result.url);
 }
 
 // CrewAI Agent: Quality validation and feedback (simplified)
@@ -339,9 +478,9 @@ async function processGeneration(request: GenerationRequest) {
     ]);
     console.log('Matched materials:', matchedMaterials);
 
-    // CrewAI Agent 3: Generate multiple 3D images using Replicate models
+    // CrewAI Agent 3: Generate multiple 3D images using all integrated models
     const imageUrls = await generate3DImage(parsed.enhanced_prompt, matchedMaterials);
-    console.log('Generated multiple 3D images with Replicate models');
+    console.log(`Generated ${imageUrls.length} images from all integrated models`);
 
     // CrewAI Agent 4: Quality validation (validate first image)
     const qualityCheck = await validateQuality(imageUrls[0], request.prompt);
