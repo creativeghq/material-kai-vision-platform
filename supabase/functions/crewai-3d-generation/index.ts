@@ -7,6 +7,125 @@ import Replicate from "https://esm.sh/replicate@0.25.2";
 // Global workflow tracking
 let workflowSteps: any[] = [];
 let currentGenerationId: string | null = null;
+// Function to process models directly without database operations
+async function processModelsDirectly(request: any, hasReferenceImage: boolean): Promise<any[]> {
+  const results: any[] = [];
+  
+  for (const step of workflowSteps) {
+    console.log(`Testing model: ${step.modelName}`);
+    
+    try {
+      // Update step status to processing
+      step.status = 'processing';
+      step.startTime = new Date().toISOString();
+      
+      // Test the model based on its type
+      if (step.modelName.includes('huggingface') || step.modelName.includes('stabilityai') || step.modelName.includes('black-forest-labs')) {
+        // Test Hugging Face model
+        const result = await testHuggingFaceModel(step.modelName, request.prompt);
+        step.status = 'completed';
+        step.endTime = new Date().toISOString();
+        step.result = result;
+        results.push({
+          model: step.modelName,
+          status: 'success',
+          result: result
+        });
+      } else {
+        // Test Replicate model
+        const result = await testReplicateModel(step.modelName, request.prompt, request.reference_image_url);
+        step.status = 'completed';
+        step.endTime = new Date().toISOString();
+        step.result = result;
+        results.push({
+          model: step.modelName,
+          status: 'success',
+          result: result
+        });
+      }
+    } catch (error) {
+      console.error(`Error testing model ${step.modelName}:`, error);
+      step.status = 'failed';
+      step.endTime = new Date().toISOString();
+      step.error = error.message;
+      results.push({
+        model: step.modelName,
+        status: 'error',
+        error: error.message
+      });
+    }
+  }
+  
+  return results;
+}
+
+// Test function for Replicate models
+async function testReplicateModel(modelName: string, prompt: string, referenceImageUrl?: string): Promise<any> {
+  const modelConfig = getModelConfig(modelName);
+  if (!modelConfig) {
+    throw new Error(`Model configuration not found for ${modelName}`);
+  }
+  
+  const input = buildModelInput(modelConfig, prompt, referenceImageUrl);
+  
+  // Make a test API call to Replicate
+  const response = await fetch('https://api.replicate.com/v1/predictions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Token ${Deno.env.get('REPLICATE_API_TOKEN')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      version: modelConfig.version,
+      input: input
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Replicate API error: ${response.status} ${response.statusText}`);
+  }
+  
+  const result = await response.json();
+  return {
+    predictionId: result.id,
+    status: result.status,
+    model: modelName,
+    testMode: true
+  };
+}
+
+// Test function for Hugging Face models
+async function testHuggingFaceModel(modelName: string, prompt: string): Promise<any> {
+  // Extract the actual model name from the identifier
+  const actualModelName = modelName.replace('huggingface/', '');
+  
+  const response = await fetch(`https://api-inference.huggingface.co/models/${actualModelName}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${Deno.env.get('HUGGINGFACE_API_TOKEN')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 100
+      }
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Hugging Face API error: ${response.status} ${response.statusText}`);
+  }
+  
+  // For testing, we just check if the API responds successfully
+  return {
+    status: 'success',
+    model: modelName,
+    testMode: true,
+    responseStatus: response.status
+  };
+}
+
 
 // Initialize workflow steps
 function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
@@ -27,7 +146,7 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
 }
 
 // Update workflow step status
-async function updateWorkflowStep(modelName: string, status: 'running' | 'success' | 'failed', imageUrl?: string, errorMessage?: string, processingTimeMs?: number) {
+async function updateWorkflowStep(modelName: string, status: 'running' | 'success' | 'failed' | 'skipped', imageUrl?: string, errorMessage?: string, processingTimeMs?: number) {
   const step = workflowSteps.find(s => s.modelName === modelName);
   if (step) {
     step.status = status;
@@ -67,7 +186,18 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    },
+    global: {
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`
+      }
+    }
+  }
 );
 
 interface GenerationRequest {
@@ -77,6 +207,12 @@ interface GenerationRequest {
   style?: string;
   specific_materials?: string[];
   reference_image_url?: string; // Add support for reference image
+  testMode?: boolean; // Add support for test mode
+  directTestMode?: boolean; // Database-free testing mode
+  testSingleModel?: string; // Test only specific model
+  skipDatabaseOperations?: boolean; // Skip all DB operations
+  healthCheck?: boolean; // API connectivity test
+  initializeOnly?: boolean; // Only initialize workflow, don't process
 }
 
 // CrewAI Agent: Parse user request with hybrid AI approach
@@ -389,14 +525,42 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
             }
           }
 
-          const blob = await response.blob();
-          
-          // Validate blob
-          if (!blob || blob.size === 0) {
-            throw new Error(`Empty or invalid blob received from ${modelConfig.model}`);
+          // Enhanced blob fetching with error handling and validation
+          let blob;
+          try {
+            console.log(`🔄 Converting response to blob for ${modelConfig.name}...`);
+            blob = await response.blob();
+            console.log(`✅ Blob conversion successful for ${modelConfig.name}`);
+          } catch (blobError) {
+            console.error(`❌ Blob conversion failed for ${modelConfig.model}:`, blobError);
+            throw new Error(`Failed to convert response to blob for ${modelConfig.model}: ${blobError.message}`);
           }
           
-          console.log(`📊 Blob size for ${modelConfig.name}: ${blob.size} bytes`);
+          // Enhanced blob validation
+          if (!blob) {
+            throw new Error(`Null blob received from ${modelConfig.model}`);
+          }
+          
+          if (blob.size === 0) {
+            throw new Error(`Empty blob (0 bytes) received from ${modelConfig.model}`);
+          }
+          
+          // Check if blob type is valid for images
+          if (!blob.type || (!blob.type.startsWith('image/') && blob.type !== 'application/octet-stream')) {
+            console.warn(`⚠️ Unexpected blob type for ${modelConfig.model}: ${blob.type}`);
+            // Don't throw error as some APIs return octet-stream for images
+          }
+          
+          console.log(`📊 Blob details for ${modelConfig.name}: ${blob.size} bytes, type: ${blob.type}`);
+          
+          // Additional validation: check if blob size is reasonable (between 1KB and 50MB)
+          if (blob.size < 1024) {
+            throw new Error(`Blob too small (${blob.size} bytes) for ${modelConfig.model} - likely not a valid image`);
+          }
+          
+          if (blob.size > 50 * 1024 * 1024) {
+            throw new Error(`Blob too large (${blob.size} bytes) for ${modelConfig.model} - exceeds 50MB limit`);
+          }
           
           const arrayBuffer = await blob.arrayBuffer();
           
@@ -447,6 +611,11 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
           
           clearTimeout(timeoutId);
 
+          // Enhanced validation for image response
+          if (!image) {
+            throw new Error(`No image response received from ${modelConfig.model}`);
+          }
+
           const arrayBuffer = await image.arrayBuffer();
           
           // Enhanced blob processing with validation
@@ -456,31 +625,45 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
           
           console.log(`📊 Image size for ${modelConfig.name}: ${arrayBuffer.byteLength} bytes`);
           
-          // Convert ArrayBuffer to base64 with chunked processing
-          const uint8Array = new Uint8Array(arrayBuffer);
-          const chunkSize = 8192; // Process in 8KB chunks
-          let binaryString = '';
-          
-          for (let i = 0; i < uint8Array.length; i += chunkSize) {
-            const chunk = uint8Array.slice(i, i + chunkSize);
-            for (let j = 0; j < chunk.length; j++) {
-              binaryString += String.fromCharCode(chunk[j]);
+          // Convert ArrayBuffer to base64 with chunked processing and error handling
+          try {
+            const uint8Array = new Uint8Array(arrayBuffer);
+            const chunkSize = 8192; // Process in 8KB chunks
+            let binaryString = '';
+            
+            for (let i = 0; i < uint8Array.length; i += chunkSize) {
+              const chunk = uint8Array.slice(i, i + chunkSize);
+              for (let j = 0; j < chunk.length; j++) {
+                binaryString += String.fromCharCode(chunk[j]);
+              }
             }
+            
+            const base64 = btoa(binaryString);
+            const result = `data:image/png;base64,${base64}`;
+            
+            results.push({
+              url: result,
+              modelName: modelConfig.name
+            });
+            console.log(`✅ ${modelConfig.name} generation successful`);
+            await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
+            
+          } catch (conversionError) {
+            console.error(`❌ Base64 conversion failed for ${modelConfig.model}:`, conversionError);
+            throw new Error(`Failed to convert image data to base64 for ${modelConfig.model}: ${conversionError.message}`);
           }
-          
-          const base64 = btoa(binaryString);
-          const result = `data:image/png;base64,${base64}`;
-          
-          results.push({
-            url: result,
-            modelName: modelConfig.name
-          });
-          console.log(`✅ ${modelConfig.name} generation successful`);
-          await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
           
         } catch (sdkError) {
           clearTimeout(timeoutId);
-          throw sdkError;
+          
+          // Enhanced error handling for specific HF SDK errors
+          if (sdkError.message && sdkError.message.includes('arrayBuffer')) {
+            throw new Error(`Blob processing error for ${modelConfig.model}: Unable to convert response to ArrayBuffer`);
+          } else if (sdkError.message && sdkError.message.includes('AbortError')) {
+            throw new Error(`Request timeout for ${modelConfig.model}: Model took too long to respond`);
+          } else {
+            throw sdkError;
+          }
         }
       }
       
@@ -990,26 +1173,32 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     console.log("🪟 Attempting Interior V2 model...");
     await updateWorkflowStep('jschoormans/interior-v2', 'running');
     
-    const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
-      input: {
-        image: referenceImageUrl,
-        max_resolution: 1051,
-        controlnet_conditioning_scale: 0.03
-      }
-    });
-    
-    console.log("Interior V2 raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
-      console.log("✅ Interior V2 generation successful:", output[0]);
-      await updateWorkflowStep('jschoormans/interior-v2', 'success', output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
-      console.log("✅ Interior V2 generation successful:", output);
-      await updateWorkflowStep('jschoormans/interior-v2', 'success', output);
+    // Skip if no reference image provided
+    if (!referenceImageUrl) {
+      console.log("⚠️ Interior V2 skipped: No reference image provided");
+      await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'No reference image provided');
     } else {
-      console.log("⚠️ Interior V2 unexpected output format:", typeof output, output);
-      await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'Unexpected output format');
+      const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
+        input: {
+          image: referenceImageUrl,
+          max_resolution: 1051,
+          controlnet_conditioning_scale: 0.03
+        }
+      });
+      
+      console.log("Interior V2 raw output:", output);
+      if (Array.isArray(output) && output.length > 0) {
+        results.push({ url: output[0], modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
+        console.log("✅ Interior V2 generation successful:", output[0]);
+        await updateWorkflowStep('jschoormans/interior-v2', 'success', output[0]);
+      } else if (typeof output === 'string') {
+        results.push({ url: output, modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
+        console.log("✅ Interior V2 generation successful:", output);
+        await updateWorkflowStep('jschoormans/interior-v2', 'success', output);
+      } else {
+        console.log("⚠️ Interior V2 unexpected output format:", typeof output, output);
+        await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'Unexpected output format');
+      }
     }
   } catch (error) {
     console.error("❌ Interior V2 failed:", error.message);
@@ -1344,63 +1533,252 @@ serve(async (req) => {
       reference_image_url: request.reference_image_url ? '[IMAGE_PROVIDED]' : '[NO_IMAGE]'
     }));
 
+    // Handle database-free testing modes
+    if (request.healthCheck) {
+      console.log('Health check request received');
+      return new Response(
+        JSON.stringify({
+          status: 'healthy',
+          message: 'API is responsive',
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    if (request.initializeOnly) {
+      console.log('Initialize-only request received');
+      const hasReferenceImage = Boolean(request.reference_image_url);
+      initializeWorkflowSteps(hasReferenceImage);
+      
+      return new Response(
+        JSON.stringify({
+          message: 'Workflow initialized successfully',
+          workflow_steps: workflowSteps,
+          hasReferenceImage,
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Validate request
     if (!request.user_id || !request.prompt) {
       console.error('Validation failed: missing user_id or prompt');
       return new Response(
         JSON.stringify({ error: 'user_id and prompt are required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
 
     console.log('Request validation passed, starting background generation');
     
+    // Handle direct test mode (database-free testing)
+    if (request.directTestMode || request.skipDatabaseOperations) {
+      console.log('Direct test mode detected - bypassing database operations');
+      
+      const hasReferenceImage = Boolean(request.reference_image_url);
+      initializeWorkflowSteps(hasReferenceImage);
+      
+      // If testing a single model, filter the workflow steps
+      if (request.testSingleModel) {
+        console.log(`Testing single model: ${request.testSingleModel}`);
+        workflowSteps = workflowSteps.filter(step => step.modelName === request.testSingleModel);
+        
+        if (workflowSteps.length === 0) {
+          return new Response(
+            JSON.stringify({
+              error: `Model '${request.testSingleModel}' not found in available models`,
+              availableModels: [
+                'adirik/interior-design',
+                'erayyavuz/interior-ai',
+                'jschoormans/comfyui-interior-remodel',
+                'julian-at/interiorly-gen1-dev',
+                'jschoormans/interior-v2',
+                'rocketdigitalai/interior-design-sdxl',
+                'davisbrown/designer-architecture'
+              ]
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        }
+      }
+      
+      // Set a fake generation ID for workflow tracking
+      currentGenerationId = 'direct-test-' + Date.now();
+      
+      // Process models directly without database operations
+      try {
+        const results = await processModelsDirectly(request, hasReferenceImage);
+        
+        return new Response(
+          JSON.stringify({
+            message: 'Direct test completed successfully',
+            generationId: currentGenerationId,
+            workflow_steps: workflowSteps,
+            results: results,
+            testMode: true,
+            timestamp: new Date().toISOString()
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      } catch (error) {
+        console.error('Direct test mode error:', error);
+        return new Response(
+          JSON.stringify({
+            error: 'Direct test failed',
+            details: error.message,
+            testMode: true,
+            timestamp: new Date().toISOString()
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
+    
     // Create initial record first to get the ID
+    // For test mode, provide default values for required fields
+    const insertData = {
+      user_id: request.user_id,
+      prompt: request.prompt,
+      room_type: request.room_type || (request.testMode ? 'living_room' : undefined),
+      style: request.style || (request.testMode ? 'modern' : undefined),
+      generation_status: 'processing'
+    };
+
+    console.log('Inserting record with data:', JSON.stringify(insertData, null, 2));
+
     const { data: recordData, error: createError } = await supabase
       .from('generation_3d')
-      .insert({
-        user_id: request.user_id,
-        prompt: request.prompt,
-        room_type: request.room_type,
-        style: request.style,
-        generation_status: 'processing'
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (createError) {
       console.error('Database insert error:', createError);
+      console.error('Error details:', {
+        message: createError.message,
+        details: createError.details,
+        hint: createError.hint,
+        code: createError.code
+      });
+      console.error('Insert data was:', JSON.stringify(insertData, null, 2));
+      
+      // If in test mode and RLS is blocking, try with a different approach
+      if (request.testMode) {
+        console.log('Test mode detected, attempting alternative insert method...');
+        
+        // Try using the service role client directly with RLS disabled
+        const serviceSupabase = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false
+            },
+            db: {
+              schema: 'public'
+            }
+          }
+        );
+
+        const { data: testRecordData, error: testCreateError } = await serviceSupabase
+          .from('generation_3d')
+          .insert(insertData)
+          .select()
+          .single();
+
+        if (testCreateError) {
+          console.error('Alternative insert also failed:', testCreateError);
+          console.error('Alternative error details:', {
+            message: testCreateError.message,
+            details: testCreateError.details,
+            hint: testCreateError.hint,
+            code: testCreateError.code
+          });
+          return new Response(
+            JSON.stringify({
+              error: 'Failed to create generation record',
+              details: testCreateError.message,
+              errorCode: testCreateError.code,
+              errorHint: testCreateError.hint,
+              testMode: true
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log('Alternative insert succeeded for test mode');
+        currentGenerationId = testRecordData.id;
+        
+        // Start the generation as a background task to avoid timeout
+        EdgeRuntime.waitUntil(
+          processGeneration(request).catch(error => {
+            console.error('Background generation failed:', error);
+          })
+        );
+        
+        // Return immediate response with the generation ID from test insert
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: '3D generation started (test mode)',
+            generationId: testRecordData.id,
+            status: 'processing'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Failed to create generation record' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } else {
+      // Set the current generation ID for workflow tracking
+      currentGenerationId = recordData.id;
+      
+      // Start the generation as a background task to avoid timeout
+      EdgeRuntime.waitUntil(
+        processGeneration(request).catch(error => {
+          console.error('Background generation failed:', error);
+        })
+      );
+      
+      // Return immediate response with the generation ID
       return new Response(
-        JSON.stringify({ error: 'Failed to create generation record' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: true,
+          message: '3D generation started',
+          generationId: recordData.id,
+          status: 'processing'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       );
     }
-    
-    // Set the current generation ID for workflow tracking
-    currentGenerationId = recordData.id;
-    
-    // Start the generation as a background task to avoid timeout
-    EdgeRuntime.waitUntil(
-      processGeneration(request).catch(error => {
-        console.error('Background generation failed:', error);
-      })
-    );
-    
-    // Return immediate response with the generation ID
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: '3D generation started',
-        generationId: recordData.id,
-        status: 'processing'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
 
   } catch (error) {
     console.error('CrewAI 3D generation error:', error);

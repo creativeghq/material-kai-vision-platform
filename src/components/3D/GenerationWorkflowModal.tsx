@@ -4,7 +4,9 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CheckCircle, XCircle, Clock, Image, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CheckCircle, XCircle, Clock, Image, AlertCircle, ChevronDown, ChevronRight, Play, Pause, RotateCcw, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WorkflowStep {
@@ -39,6 +41,15 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const [generationData, setGenerationData] = useState<any>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [hasReferenceImage, setHasReferenceImage] = useState(false);
+  
+  // Workflow control state
+  const [isPaused, setIsPaused] = useState(false);
+  const [workflowMode, setWorkflowMode] = useState<'running' | 'paused' | 'ready'>('ready');
+  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
+    'text-to-image': true,
+    'image-to-image': true
+  });
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
 
   // Initialize workflow steps based on actual edge function implementation
   useEffect(() => {
@@ -165,12 +176,14 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         // Check if generation is complete
         if (data.generation_status === 'completed') {
           setIsComplete(true);
+          setShowCompletionDialog(true);
           if (data.image_urls?.length > 0) {
             onComplete(data.image_urls);
-            // Don't auto-close - let admin close manually
+            // Don't auto-close - show completion dialog instead
           }
         } else if (data.generation_status === 'failed') {
           console.error('Generation failed:', data.error_message);
+          setIsComplete(true);
         }
 
       } catch (error) {
@@ -248,6 +261,50 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     }
   };
 
+  // Workflow control functions
+  const handlePauseWorkflow = () => {
+    setIsPaused(true);
+    setWorkflowMode('paused');
+  };
+
+  const handleResumeWorkflow = () => {
+    setIsPaused(false);
+    setWorkflowMode('running');
+  };
+
+  const handleRestartWorkflow = () => {
+    setIsPaused(false);
+    setWorkflowMode('ready');
+    setIsComplete(false);
+    setShowCompletionDialog(false);
+    // Reset all steps to pending
+    setSteps(prevSteps =>
+      prevSteps.map(step => ({
+        ...step,
+        status: 'pending',
+        startTime: undefined,
+        endTime: undefined,
+        imageUrl: undefined,
+        errorMessage: undefined,
+        processingTimeMs: undefined
+      }))
+    );
+    setOverallProgress(0);
+    setCurrentStep('');
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const handleCloseCompletionDialog = () => {
+    setShowCompletionDialog(false);
+    onClose();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal>
       <DialogContent className="max-w-4xl max-h-[80vh]">
@@ -259,6 +316,46 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Workflow Control Buttons */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Workflow Control:</span>
+              {!isPaused ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePauseWorkflow}
+                  className="flex items-center gap-1"
+                >
+                  <Pause className="h-3 w-3" />
+                  Pause
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResumeWorkflow}
+                  className="flex items-center gap-1"
+                >
+                  <Play className="h-3 w-3" />
+                  Resume
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRestartWorkflow}
+                className="flex items-center gap-1"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Restart
+              </Button>
+            </div>
+            <Badge variant={workflowMode === 'running' ? 'default' : workflowMode === 'paused' ? 'secondary' : 'outline'}>
+              {workflowMode === 'running' ? 'Running' : workflowMode === 'paused' ? 'Paused' : 'Ready'}
+            </Badge>
+          </div>
+
           {/* Overall Progress */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -277,94 +374,132 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-3">
               {/* Text-to-Image Section */}
-              <div>
-                <h4 className="font-medium mb-2 text-sm text-muted-foreground">TEXT-TO-IMAGE MODELS</h4>
-                {steps.filter(s => s.modelType === 'text-to-image').map((step, index) => (
-                  <Card key={step.id} className="mb-2">
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {getStatusIcon(step.status)}
-                          <div>
-                            <p className="font-medium text-sm">{step.name}</p>
-                            <p className="text-xs text-muted-foreground">{step.modelName}</p>
+              <Collapsible
+                open={expandedSections['text-to-image']}
+                onOpenChange={() => toggleSection('text-to-image')}
+              >
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-gray-50 rounded border">
+                  <div className="flex items-center gap-2">
+                    {expandedSections['text-to-image'] ?
+                      <ChevronDown className="h-4 w-4" /> :
+                      <ChevronRight className="h-4 w-4" />
+                    }
+                    <h4 className="font-medium text-sm text-muted-foreground">TEXT-TO-IMAGE MODELS</h4>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {steps.filter(s => s.modelType === 'text-to-image').length} models
+                  </Badge>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="space-y-2">
+                    {steps.filter(s => s.modelType === 'text-to-image').map((step, index) => (
+                      <Card key={step.id} className="ml-4">
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {getStatusIcon(step.status)}
+                              <div>
+                                <p className="font-medium text-sm">{step.name}</p>
+                                <p className="text-xs text-muted-foreground">{step.modelName}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {step.processingTimeMs && (
+                                <span className="text-xs text-muted-foreground">
+                                  {Math.round(step.processingTimeMs / 1000)}s
+                                </span>
+                              )}
+                              {getStatusBadge(step.status)}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {step.processingTimeMs && (
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(step.processingTimeMs / 1000)}s
-                            </span>
+
+                          {step.imageUrl && (
+                            <div className="mt-2">
+                              <img
+                                src={step.imageUrl}
+                                alt={`Generated by ${step.name}`}
+                                className="w-full h-32 object-cover rounded border"
+                              />
+                            </div>
                           )}
-                          {getStatusBadge(step.status)}
-                        </div>
-                      </div>
 
-                      {step.imageUrl && (
-                        <div className="mt-2">
-                          <img 
-                            src={step.imageUrl} 
-                            alt={`Generated by ${step.name}`}
-                            className="w-full h-32 object-cover rounded border"
-                          />
-                        </div>
-                      )}
-
-                      {step.errorMessage && (
-                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
-                          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                          <span>{step.errorMessage}</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          {step.errorMessage && (
+                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
+                              <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                              <span>{step.errorMessage}</span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
               {/* Image-to-Image Section */}
-              <div>
-                <h4 className="font-medium mb-2 text-sm text-muted-foreground">IMAGE-TO-IMAGE MODELS</h4>
-                {steps.filter(s => s.modelType === 'image-to-image').map((step, index) => (
-                  <Card key={step.id} className="mb-2">
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {getStatusIcon(step.status)}
-                          <div>
-                            <p className="font-medium text-sm">{step.name}</p>
-                            <p className="text-xs text-muted-foreground">{step.modelName}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {step.processingTimeMs && (
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(step.processingTimeMs / 1000)}s
-                            </span>
-                          )}
-                          {getStatusBadge(step.status)}
-                        </div>
-                      </div>
+              {steps.filter(s => s.modelType === 'image-to-image').length > 0 && (
+                <Collapsible
+                  open={expandedSections['image-to-image']}
+                  onOpenChange={() => toggleSection('image-to-image')}
+                >
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-gray-50 rounded border">
+                    <div className="flex items-center gap-2">
+                      {expandedSections['image-to-image'] ?
+                        <ChevronDown className="h-4 w-4" /> :
+                        <ChevronRight className="h-4 w-4" />
+                      }
+                      <h4 className="font-medium text-sm text-muted-foreground">IMAGE-TO-IMAGE MODELS</h4>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {steps.filter(s => s.modelType === 'image-to-image').length} models
+                    </Badge>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="space-y-2">
+                      {steps.filter(s => s.modelType === 'image-to-image').map((step, index) => (
+                        <Card key={step.id} className="ml-4">
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {getStatusIcon(step.status)}
+                                <div>
+                                  <p className="font-medium text-sm">{step.name}</p>
+                                  <p className="text-xs text-muted-foreground">{step.modelName}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {step.processingTimeMs && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {Math.round(step.processingTimeMs / 1000)}s
+                                  </span>
+                                )}
+                                {getStatusBadge(step.status)}
+                              </div>
+                            </div>
 
-                      {step.imageUrl && (
-                        <div className="mt-2">
-                          <img 
-                            src={step.imageUrl} 
-                            alt={`Generated by ${step.name}`}
-                            className="w-full h-32 object-cover rounded border"
-                          />
-                        </div>
-                      )}
+                            {step.imageUrl && (
+                              <div className="mt-2">
+                                <img
+                                  src={step.imageUrl}
+                                  alt={`Generated by ${step.name}`}
+                                  className="w-full h-32 object-cover rounded border"
+                                />
+                              </div>
+                            )}
 
-                      {step.errorMessage && (
-                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
-                          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                          <span>{step.errorMessage}</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                            {step.errorMessage && (
+                              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
+                                <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                <span>{step.errorMessage}</span>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
           </ScrollArea>
 
