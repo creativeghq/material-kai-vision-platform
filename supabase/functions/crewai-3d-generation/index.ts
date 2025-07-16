@@ -496,7 +496,7 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
       inputParams.input = referenceImageUrl;
     }
     
-    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9", {
+    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5e", {
       input: inputParams
     });
     
@@ -813,7 +813,6 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     console.log("🏠 Attempting Interior AI model...");
     await updateWorkflowStep('erayyavuz/interior-ai', 'running');
     
-    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9", {
     const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5e", {
       input: {
         input: referenceImageUrl,
@@ -910,8 +909,6 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     await updateWorkflowStep('jschoormans/interior-v2', 'running');
     
     const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
-    console.log("🏛️ Attempting Interiorly Gen1 Dev model...");
-    const output = await replicate.run("julian-at/interiorly-gen1-dev:5e3080d1b308e80197b32f0ce638daa8a329d0cf42068739723d8259e44b445e", {
       input: {
         image: referenceImageUrl,
         max_resolution: 1051,
@@ -937,7 +934,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, error.message);
   }
 
-  // Model 6: jschoormans/interior-v2 - FIXED WITH CORRECT SCHEMA
+  // Model 7: rocketdigitalai/interior-design-sdxl - FIXED WITH CORRECT SCHEMA
   try {
     console.log("🪟 Attempting Interior V2 model...");
     updateWorkflowStep('jschoormans/interior-v2', 'running');
