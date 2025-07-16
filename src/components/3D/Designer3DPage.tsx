@@ -27,13 +27,13 @@ export const Designer3DPage: React.FC = () => {
 
   // Replicate model names that match our edge function
   const modelNames = [
-    'Designer Architecture',
-    'Interior Design AI', 
-    'Interior AI',
-    'ComfyUI Interior Remodel',
-    'Interiorly Gen1',
-    'Interior V2',
-    'Interior Design SDXL'
+    '🏗️ Designer Architecture - davisbrown/designer-architecture',
+    '🎨 Interior Design AI - adirik/interior-design', 
+    '🏠 Interior AI - erayyavuz/interior-ai',
+    '🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel',
+    '🎨 Interiorly Gen1 - julian-at/interiorly-gen1-dev',
+    '🔄 Interior V2 - jschoormans/interior-v2',
+    '🎭 Interior Design SDXL - rocketdigitalai/interior-design-sdxl'
   ];
 
   const roomTypes = [
@@ -393,12 +393,12 @@ export const Designer3DPage: React.FC = () => {
                       }}
                     />
                   </div>
-                  <div className="space-y-1">
+                   <div className="space-y-1">
                     <h4 className="font-medium text-sm truncate">
                       {image.modelName || `Model ${index + 1}`}
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      {image.modelName || 'Unknown Model'}
+                      Modern interior with warm lighting and contemporary furniture
                     </p>
                     <Button 
                       onClick={() => handleDownload(index)} 
