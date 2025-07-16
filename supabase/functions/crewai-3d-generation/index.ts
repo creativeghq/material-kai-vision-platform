@@ -17,6 +17,7 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
     { modelName: 'jschoormans/comfyui-interior-remodel', name: 'ComfyUI Interior Remodel', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'julian-at/interiorly-gen1-dev', name: 'Interiorly Gen1 Dev', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'jschoormans/interior-v2', name: 'Interior V2', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'rocketdigitalai/interior-design-sdxl', name: 'Interior Design SDXL', type: 'image-to-image', status: 'pending' },
     { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
     // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
@@ -388,7 +389,8 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
   console.log("   3. 🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel");
   console.log("   4. 🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev");
   console.log("   5. 🏘️ Interior V2 - jschoormans/interior-v2");
-  console.log("   6. 🏗️ Designer Architecture - davisbrown/designer-architecture");
+  console.log("   6. 🚀 Interior Design SDXL - rocketdigitalai/interior-design-sdxl");
+  console.log("   7. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
   
   // Model 1: adirik/interior-design - UNIFIED MODEL (supports both text-to-image and image-to-image)
@@ -598,7 +600,48 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
     await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, error.message);
   }
 
-  // Model 6: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
+  // Model 6: rocketdigitalai/interior-design-sdxl - IMAGE-TO-IMAGE ONLY
+  try {
+    console.log("🚀 Attempting Interior Design SDXL model...");
+    
+    // Skip if no reference image (this model requires an image input)
+    if (!referenceImageUrl || referenceImageUrl === '[NO_IMAGE]') {
+      console.log("⏭️ Skipping Interior Design SDXL - requires reference image");
+      await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'skipped', undefined, 'Requires reference image');
+    } else {
+      updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'running');
+      
+      const inputParams = {
+        image: referenceImageUrl,
+        prompt: prompt || "masterfully designed interior, photorealistic, interior design magazine quality, 8k uhd, highly detailed",
+        depth_strength: 0.8,
+        guidance_scale: 7.5,
+        negative_prompt: "ugly, deformed, noisy, blurry, low quality, glitch, distorted, disfigured, bad proportions, duplicate, out of frame, watermark, signature, text, bad hands, bad anatomy",
+        promax_strength: 0.8,
+        refiner_strength: 0.4,
+        num_inference_steps: 50
+      };
+      
+      const output = await replicate.run("rocketdigitalai/interior-design-sdxl:a3c091059a25590ce2d5ea13651fab63f447f21760e50c358d4b850e844f59ee", {
+        input: inputParams
+      });
+      
+      console.log("Interior Design SDXL raw output:", output);
+      if (typeof output === 'string') {
+        results.push({ url: output, modelName: "🚀 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
+        console.log("✅ Interior Design SDXL successful:", output);
+        await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'success', output);
+      } else {
+        console.log("⚠️ Interior Design SDXL unexpected output format:", typeof output, output);
+        await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'failed', undefined, 'Unexpected output format');
+      }
+    }
+  } catch (error) {
+    console.error("❌ Interior Design SDXL failed:", error.message);
+    await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'failed', undefined, error.message);
+  }
+
+  // Model 7: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
     updateWorkflowStep('davisbrown/designer-architecture', 'running');
