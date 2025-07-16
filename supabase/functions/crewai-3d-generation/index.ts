@@ -206,23 +206,33 @@ async function matchMaterials(materials: string[]) {
 
 // Generate with Hugging Face (reliable fallback)
 async function generateHuggingFaceImage(prompt: string): Promise<string> {
-  console.log("Generating image with Hugging Face, prompt:", prompt);
+  console.log("🤗 Starting Hugging Face generation with prompt:", prompt);
   
   const HF_TOKEN = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
   if (!HF_TOKEN) {
-    throw new Error('HUGGING_FACE_ACCESS_TOKEN is not set');
+    console.error("❌ HUGGING_FACE_ACCESS_TOKEN is not set");
+    throw new Error('HUGGING_FACE_ACCESS_TOKEN is not configured');
   }
 
   const hf = new HfInference(HF_TOKEN);
   
-  const image = await hf.textToImage({
-    inputs: prompt,
-    model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
-  });
+  try {
+    console.log("🤗 Calling Hugging Face API...");
+    const image = await hf.textToImage({
+      inputs: prompt,
+      model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
+    });
 
-  const arrayBuffer = await image.arrayBuffer();
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-  return `data:image/png;base64,${base64}`;
+    console.log("🤗 Hugging Face API response received, converting to base64...");
+    const arrayBuffer = await image.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const result = `data:image/png;base64,${base64}`;
+    console.log("✅ Hugging Face image conversion successful");
+    return result;
+  } catch (error) {
+    console.error("❌ Hugging Face detailed error:", error);
+    throw error;
+  }
 }
 
 // Generate with specific Replicate text-to-image models
@@ -431,10 +441,12 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
     
     // Add Hugging Face as additional option
     try {
+      console.log("🤗 Attempting Hugging Face Canopus model...");
       const hfImage = await generateHuggingFaceImage(finalPrompt);
       allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
+      console.log("✅ Hugging Face Canopus successful");
     } catch (hfError) {
-      console.error("Hugging Face generation failed:", hfError);
+      console.error("❌ Hugging Face generation failed:", hfError.message);
     }
   } else {
     // No reference image - use text-to-image models primarily
@@ -442,12 +454,12 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
     
     try {
       // First, generate with Hugging Face (reliable base image)
-      console.log("Generating with Hugging Face...");
+      console.log("🤗 Attempting Hugging Face Canopus model...");
       const hfImage = await generateHuggingFaceImage(finalPrompt);
       allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
-      console.log("Hugging Face generation successful");
+      console.log("✅ Hugging Face Canopus successful");
     } catch (hfError) {
-      console.error("Hugging Face generation failed:", hfError);
+      console.error("❌ Hugging Face generation failed:", hfError.message);
     }
 
     // Generate with Replicate models
