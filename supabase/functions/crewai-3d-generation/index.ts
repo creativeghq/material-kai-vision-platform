@@ -240,24 +240,52 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
   for (const modelConfig of HUGGINGFACE_MODELS) {
     try {
       console.log(`🤗 Attempting ${modelConfig.name}...`);
-      const image = await hf.textToImage({
-        inputs: prompt,
-        model: modelConfig.model,
-      });
-
-      const arrayBuffer = await image.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      const result = `data:image/png;base64,${base64}`;
       
-      results.push({ 
-        url: result, 
-        modelName: modelConfig.name 
-      });
-      console.log(`✅ ${modelConfig.name} generation successful`);
+      // Special handling for FLUX models
+      if (modelConfig.model.includes('FLUX')) {
+        console.log(`⚡ Using optimized FLUX parameters for ${modelConfig.model}`);
+        const image = await hf.textToImage({
+          inputs: prompt,
+          model: modelConfig.model,
+          parameters: {
+            width: 1024,
+            height: 1024,
+            num_inference_steps: 4,
+            guidance_scale: 1.0
+          }
+        });
+        
+        const arrayBuffer = await image.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const result = `data:image/png;base64,${base64}`;
+        
+        results.push({ 
+          url: result, 
+          modelName: modelConfig.name 
+        });
+        console.log(`✅ ${modelConfig.name} generation successful with FLUX parameters`);
+      } else {
+        // Standard parameters for other models
+        const image = await hf.textToImage({
+          inputs: prompt,
+          model: modelConfig.model,
+        });
+
+        const arrayBuffer = await image.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const result = `data:image/png;base64,${base64}`;
+        
+        results.push({ 
+          url: result, 
+          modelName: modelConfig.name 
+        });
+        console.log(`✅ ${modelConfig.name} generation successful`);
+      }
       
       // Continue to next model to show ALL models
     } catch (error) {
       console.error(`❌ ${modelConfig.name} failed:`, error.message);
+      console.error(`❌ Full error details:`, error);
       // Continue to next model on failure
     }
   }
