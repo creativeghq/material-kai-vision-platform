@@ -225,7 +225,7 @@ export const Designer3DPage: React.FC = () => {
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
           Generate photorealistic interior designs using ALL our integrated AI models:
-          🏛️ Canopus Interior Architecture, 🎨 Stable Diffusion XL, ⚡ FLUX-Dev, 🏗️ Designer Architecture, 🎨 Interior Design AI
+          🏛️ Canopus Interior Architecture, 🎨 Stable Diffusion XL, ⚡ FLUX-Schnell, 🏗️ Designer Architecture, 🏘️ Interior Design SDXL LoRA, 🏺 Realistic Architecture, 🏛️ Flux Interior Architecture, 🎨 Interior Decor SDXL, 🎨 Interior Design AI, 🏠 ControlNet Interior, 🏛️ Architecture Refiner
         </p>
       </div>
 
