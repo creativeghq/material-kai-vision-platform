@@ -25,16 +25,13 @@ export const Designer3DPage: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Replicate model names that match our edge function
+  // Working model names that match our edge function (Updated)
   const modelNames = [
-    '🤗 Hugging Face Canopus - prithivMLmods/Canopus-Interior-Architecture-0.1',
+    '🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1',
+    '🎨 Stable Diffusion XL Base 1.0 - stabilityai/stable-diffusion-xl-base-1.0',
+    '⚡ FLUX-Dev - black-forest-labs/FLUX.1-dev',
     '🏗️ Designer Architecture - davisbrown/designer-architecture',
-    '🎨 Interiorly Gen1 - julian-at/interiorly-gen1-dev',
-    '🎨 Interior Design AI - adirik/interior-design',
-    '🏠 Interior AI - erayyavuz/interior-ai',
-    '🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel',
-    '🔄 Interior V2 - jschoormans/interior-v2',
-    '🎭 Interior Design SDXL - rocketdigitalai/interior-design-sdxl'
+    '🎨 Interior Design AI - adirik/interior-design'
   ];
 
   const roomTypes = [
@@ -227,7 +224,7 @@ export const Designer3DPage: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
-          Generate photorealistic interior designs using 7 specialized Replicate AI models for interior design
+          Generate photorealistic interior designs using Hugging Face and Replicate AI models optimized for interior architecture
         </p>
       </div>
 
