@@ -16,6 +16,7 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
     { modelName: 'erayyavuz/interior-ai', name: 'Interior AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'jschoormans/comfyui-interior-remodel', name: 'ComfyUI Interior Remodel', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'julian-at/interiorly-gen1-dev', name: 'Interiorly Gen1 Dev', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'jschoormans/interior-v2', name: 'Interior V2', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
     // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
@@ -386,7 +387,8 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
   console.log("   2. 🏠 Interior AI - erayyavuz/interior-ai");
   console.log("   3. 🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel");
   console.log("   4. 🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev");
-  console.log("   5. 🏗️ Designer Architecture - davisbrown/designer-architecture");
+  console.log("   5. 🏘️ Interior V2 - jschoormans/interior-v2");
+  console.log("   6. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
   
   // Model 1: adirik/interior-design - UNIFIED MODEL (supports both text-to-image and image-to-image)
@@ -547,7 +549,56 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
     await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, error.message);
   }
 
-  // Model 5: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
+  // Model 5: jschoormans/interior-v2 - UNIFIED MODEL (supports both text-to-image and image-to-image)
+  try {
+    console.log("🏘️ Attempting Interior V2 model...");
+    updateWorkflowStep('jschoormans/interior-v2', 'running');
+    
+    const inputParams: any = {
+      prompt: prompt || "Living room, scandinavian interior, photograph, clean, beautiful, high quality, 8k",
+      strength: 0.999999,
+      guidance_scale: 7,
+      max_resolution: 1051,
+      empty_room_mode: false,
+      negative_prompt: "(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch), open mouth",
+      mask_prompt_window: "window, doorway",
+      mask_prompt_ceiling: "ceiling",
+      num_inference_steps: 30,
+      control_guidance_end: 0.8,
+      control_guidance_start: 0,
+      mask_prompt_furniture: "furniture, couch, table, chair, desk, bed, sofa, cupboard, shelf, cabinet, bookcase, dresser, nightstand, armchair, decoration, plant, flower, pillow, lamp, TV",
+      keep_furniture_structure: false,
+      controlnet_conditioning_scale: 0.03
+    };
+
+    // Add image parameter if reference image is provided (for image-to-image mode)
+    if (referenceImageUrl && referenceImageUrl !== '[NO_IMAGE]') {
+      inputParams.image = referenceImageUrl;
+    }
+    
+    const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
+      input: inputParams
+    });
+    
+    console.log("Interior V2 raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "🏘️ Interior V2 - jschoormans/interior-v2" });
+      console.log("✅ Interior V2 successful:", output[0]);
+      await updateWorkflowStep('jschoormans/interior-v2', 'success', output[0]);
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🏘️ Interior V2 - jschoormans/interior-v2" });
+      console.log("✅ Interior V2 successful:", output);
+      await updateWorkflowStep('jschoormans/interior-v2', 'success', output);
+    } else {
+      console.log("⚠️ Interior V2 unexpected output format:", typeof output, output);
+      await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'Unexpected output format');
+    }
+  } catch (error) {
+    console.error("❌ Interior V2 failed:", error.message);
+    await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, error.message);
+  }
+
+  // Model 6: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
     updateWorkflowStep('davisbrown/designer-architecture', 'running');
