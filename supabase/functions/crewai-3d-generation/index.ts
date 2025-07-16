@@ -681,20 +681,18 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'failed', undefined, error.message);
   }
 
-  // Model 5: julian-at/interiorly-gen1-dev
+  // Model 5: julian-at/interiorly-gen1-dev - FIXED WITH CORRECT SCHEMA (text-to-image)
   try {
     console.log("🏛️ Attempting Interiorly Gen1 Dev model...");
-    const output = await replicate.run("julian-at/interiorly-gen1-dev", {
+    updateWorkflowStep('julian-at/interiorly-gen1-dev', 'running');
+    
+    const output = await replicate.run("julian-at/interiorly-gen1-dev:5e3080d1b308e80197b32f0ce638daa8a329d0cf42068739723d8259e44b445e", {
       input: {
-        image: referenceImageUrl,
+        width: 1024,
+        height: 1024,
         prompt: finalPrompt,
-        model: 'dev',
-        num_inference_steps: 28,
-        guidance_scale: 3,
-        aspect_ratio: '16:9',
-        output_format: 'webp',
-        output_quality: 80,
-        num_outputs: 1
+        guidance_scale: 5,
+        num_inference_steps: 35
       }
     });
     
@@ -702,12 +700,18 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev" });
       console.log("✅ Interiorly Gen1 Dev generation successful:", output[0]);
+      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'success', output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev" });
       console.log("✅ Interiorly Gen1 Dev generation successful:", output);
+      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'success', output);
+    } else {
+      console.log("⚠️ Interiorly Gen1 Dev unexpected output format:", typeof output, output);
+      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, 'Unexpected output format');
     }
   } catch (error) {
     console.error("❌ Interiorly Gen1 Dev failed:", error.message);
+    await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, error.message);
   }
 
   // Model 6: jschoormans/interior-v2 - FIXED WITH VERSION HASH
