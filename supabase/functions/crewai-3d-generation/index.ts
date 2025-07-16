@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 import Replicate from "https://esm.sh/replicate@0.25.2";
 
 
@@ -202,13 +203,29 @@ async function matchMaterials(materials: string[]) {
   }
 }
 
-// CrewAI Agent: Generate 3D interior images using Replicate with interior design models
-async function generate3DImage(enhancedPrompt: string, materials: any[]) {
-  const replicateToken = Deno.env.get('REPLICATE_API_KEY');
-  if (!replicateToken) {
-    throw new Error('Replicate API token not configured');
-  }
+// Generate with Hugging Face (reliable fallback)
+async function generateHuggingFaceImage(prompt: string): Promise<string> {
+  console.log("Generating image with Hugging Face, prompt:", prompt);
   
+  const HF_TOKEN = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
+  if (!HF_TOKEN) {
+    throw new Error('HUGGING_FACE_ACCESS_TOKEN is not set');
+  }
+
+  const hf = new HfInference(HF_TOKEN);
+  
+  const image = await hf.textToImage({
+    inputs: prompt,
+    model: "prithivMLmods/Canopus-Interior-Architecture-0.1",
+  });
+
+  const arrayBuffer = await image.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+  return `data:image/png;base64,${base64}`;
+}
+
+// CrewAI Agent: Generate 3D interior images using both Hugging Face and Replicate
+async function generate3DImage(enhancedPrompt: string, materials: any[]) {
   // Enhanced prompt with material details
   let finalPrompt = enhancedPrompt;
   if (materials.length > 0) {
@@ -216,103 +233,60 @@ async function generate3DImage(enhancedPrompt: string, materials: any[]) {
     finalPrompt += `. Materials: ${materialDescriptions}`;
   }
 
-  // Define Replicate interior design models
-  const models = [
-    {
-      name: 'Designer Architecture',
-      model: 'davisbrown/designer-architecture',
-      input: { prompt: finalPrompt }
-    },
-    {
-      name: 'Interior Design AI',
-      model: 'adirik/interior-design',
-      input: { prompt: finalPrompt }
-    },
-    {
-      name: 'Interior AI',
-      model: 'erayyavuz/interior-ai',
-      input: { prompt: finalPrompt }
-    },
-    {
-      name: 'ComfyUI Interior Remodel',
-      model: 'jschoormans/comfyui-interior-remodel',
-      input: { prompt: finalPrompt }
-    },
-    {
-      name: 'Interiorly Gen1',
-      model: 'julian-at/interiorly-gen1-dev',
-      input: { prompt: finalPrompt }
-    },
-    {
-      name: 'Interior V2',
-      model: 'jschoormans/interior-v2',
-      input: { prompt: finalPrompt }
-    },
-    {
-      name: 'Interior Design SDXL',
-      model: 'rocketdigitalai/interior-design-sdxl',
-      input: { prompt: finalPrompt }
-    }
-  ];
-
+  const imageUrls = [];
+  
   try {
-    console.log('Generating images with Replicate models, prompt:', finalPrompt);
+    // First, generate with Hugging Face (reliable)
+    console.log("Generating with Hugging Face...");
+    const hfImage = await generateHuggingFaceImage(finalPrompt);
+    imageUrls.push(hfImage);
+    console.log("Hugging Face generation successful");
+  } catch (hfError) {
+    console.error("Hugging Face generation failed:", hfError);
+  }
+
+  // Try Replicate models (experimental - most are currently not working)
+  const replicateToken = Deno.env.get('REPLICATE_API_KEY');
+  if (replicateToken) {
+    console.log("Attempting Replicate generation...");
     
     const replicate = new Replicate({
       auth: replicateToken,
     });
     
-    const imageUrls = [];
-    console.log(`Starting generation with ${models.length} models:`, models.map(m => m.name));
-    
-    for (let i = 0; i < models.length; i++) {
-      const modelConfig = models[i];
-      try {
-        console.log(`Attempting generation ${i + 1} with ${modelConfig.name}...`);
-        
-        const output = await replicate.run(modelConfig.model, {
-          input: modelConfig.input
-        });
-        
-        console.log(`${modelConfig.name} response:`, output);
-        
-        // Handle different output formats from Replicate models
-        let imageUrl;
-        if (Array.isArray(output)) {
-          imageUrl = output[0]; // Take first image if array
-        } else if (typeof output === 'string') {
-          imageUrl = output; // Direct URL
-        } else if (output && output.image) {
-          imageUrl = output.image; // Nested image property
-        } else if (output && output.output) {
-          imageUrl = Array.isArray(output.output) ? output.output[0] : output.output;
+    // Use a working Replicate model instead of the broken interior design ones
+    try {
+      const output = await replicate.run("black-forest-labs/flux-schnell", {
+        input: {
+          prompt: finalPrompt,
+          go_fast: true,
+          megapixels: "1",
+          num_outputs: 1,
+          aspect_ratio: "1:1",
+          output_format: "webp",
+          output_quality: 80,
+          num_inference_steps: 4
         }
-        
-        if (imageUrl) {
-          imageUrls.push(imageUrl);
-          console.log(`${modelConfig.name} generated image URL:`, imageUrl);
-        } else {
-          console.log(`${modelConfig.name} returned unexpected output format:`, output);
-        }
-        
-      } catch (modelError) {
-        console.error(`${modelConfig.name} failed for image ${i + 1}:`, modelError);
-        console.log(`Skipping ${modelConfig.name} due to error, continuing with next model`);
-        continue;
+      });
+
+      if (Array.isArray(output) && output.length > 0) {
+        imageUrls.push(output[0]);
+        console.log("Replicate flux-schnell generation successful");
+      } else if (typeof output === 'string') {
+        imageUrls.push(output);
+        console.log("Replicate flux-schnell generation successful");
       }
+    } catch (replicateError) {
+      console.error("Replicate generation failed:", replicateError);
     }
-    
-    // If no images were generated, throw error
-    if (imageUrls.length === 0) {
-      throw new Error('All Replicate models failed to generate images');
-    }
-    
-    return imageUrls;
-    
-  } catch (error) {
-    console.error('3D generation error:', error);
-    throw new Error(`Failed to generate 3D image: ${error.message}`);
   }
+  
+  // If no images were generated, throw error
+  if (imageUrls.length === 0) {
+    throw new Error('All image generation services failed');
+  }
+  
+  return imageUrls;
 }
 
 // CrewAI Agent: Quality validation and feedback (simplified)
