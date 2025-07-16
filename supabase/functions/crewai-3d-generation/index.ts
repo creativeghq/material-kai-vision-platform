@@ -232,19 +232,27 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   // Model 1: davisbrown/designer-architecture (requires DESARCH trigger word)
   try {
     console.log("Generating with Designer Architecture...");
-    const output = await replicate.run("davisbrown/designer-architecture", {
+    const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
       input: {
-        prompt: `DESARCH ${prompt}`,
-        aspect_ratio: "16:9"
+        prompt: `Interior DESARCH design, ${prompt}`,
+        num_outputs: 1,
+        aspect_ratio: "16:9",
+        guidance_scale: 3.5,
+        output_quality: 90,
+        model: "dev"
       }
     });
     
+    console.log("Designer Architecture raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "Designer Architecture" });
+      console.log("Designer Architecture generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "Designer Architecture" });
+      console.log("Designer Architecture generation successful, URL:", output);
+    } else {
+      console.log("Designer Architecture unexpected output format:", typeof output, output);
     }
-    console.log("Designer Architecture generation successful");
   } catch (error) {
     console.error("Designer Architecture failed:", error);
   }
