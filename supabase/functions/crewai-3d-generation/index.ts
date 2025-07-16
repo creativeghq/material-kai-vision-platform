@@ -13,6 +13,7 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
   workflowSteps = [
     // Replicate Models (support both text-to-image and image-to-image)
     { modelName: 'adirik/interior-design', name: 'Interior Design AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'erayyavuz/interior-ai', name: 'Interior AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
     // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
@@ -380,7 +381,8 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
   console.log("🎭 Starting text-to-image model generations...");
   console.log("📋 REPLICATE MODELS TO TEST:");
   console.log("   1. 🏡 Interior Design AI - adirik/interior-design");
-  console.log("   2. 🏗️ Designer Architecture - davisbrown/designer-architecture");
+  console.log("   2. 🏠 Interior AI - erayyavuz/interior-ai");
+  console.log("   3. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
   
   // Model 1: adirik/interior-design - UNIFIED MODEL (supports both text-to-image and image-to-image)
@@ -419,7 +421,43 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
     await updateWorkflowStep('adirik/interior-design', 'failed', undefined, error.message);
   }
 
-  // Model 2: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
+  // Model 2: erayyavuz/interior-ai - UNIFIED MODEL (supports both text-to-image and image-to-image)
+  try {
+    console.log("🏠 Attempting Interior AI model...");
+    updateWorkflowStep('erayyavuz/interior-ai', 'running');
+    
+    const inputParams: any = {
+      prompt: prompt,
+      guidance_scale: 7.5,
+      negative_prompt: "low quality, blurry, watermark, unrealistic",
+      num_inference_steps: 50,
+      strength: 0.8
+    };
+
+    // Add image parameter if reference image is provided (for image-to-image mode)
+    if (referenceImageUrl && referenceImageUrl !== '[NO_IMAGE]') {
+      inputParams.input = referenceImageUrl;
+    }
+    
+    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9", {
+      input: inputParams
+    });
+    
+    console.log("Interior AI raw output:", output);
+    if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🏠 Interior AI - erayyavuz/interior-ai" });
+      console.log("✅ Interior AI successful:", output);
+      await updateWorkflowStep('erayyavuz/interior-ai', 'success', output);
+    } else {
+      console.log("⚠️ Interior AI unexpected output format:", typeof output, output);
+      await updateWorkflowStep('erayyavuz/interior-ai', 'failed', undefined, 'Unexpected output format');
+    }
+  } catch (error) {
+    console.error("❌ Interior AI failed:", error.message);
+    await updateWorkflowStep('erayyavuz/interior-ai', 'failed', undefined, error.message);
+  }
+
+  // Model 3: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
     updateWorkflowStep('davisbrown/designer-architecture', 'running');
