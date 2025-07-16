@@ -397,6 +397,9 @@ export const Designer3DPage: React.FC = () => {
                     <h4 className="font-medium text-sm truncate">
                       {image.modelName || `Model ${index + 1}`}
                     </h4>
+                    <p className="text-xs text-muted-foreground">
+                      {image.modelName || 'Unknown Model'}
+                    </p>
                     <Button 
                       onClick={() => handleDownload(index)} 
                       variant="outline" 
