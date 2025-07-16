@@ -224,7 +224,8 @@ export const Designer3DPage: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
-          Generate photorealistic interior designs using Hugging Face and Replicate AI models optimized for interior architecture
+          Generate photorealistic interior designs using ALL our integrated AI models:
+          🏛️ Canopus Interior Architecture, 🎨 Stable Diffusion XL, ⚡ FLUX-Dev, 🏗️ Designer Architecture, 🎨 Interior Design AI
         </p>
       </div>
 

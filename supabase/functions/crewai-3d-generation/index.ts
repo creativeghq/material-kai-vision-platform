@@ -255,10 +255,7 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
       });
       console.log(`✅ ${modelConfig.name} generation successful`);
       
-      // For primary model, break after success to avoid overwhelming the user
-      if (modelConfig.type === 'primary') {
-        break;
-      }
+      // Continue to next model to show ALL models
     } catch (error) {
       console.error(`❌ ${modelConfig.name} failed:`, error.message);
       // Continue to next model on failure
