@@ -239,6 +239,10 @@ async function generateHuggingFaceImage(prompt: string): Promise<string> {
 async function generateTextToImageModels(prompt: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
   console.log("🎭 Starting text-to-image model generations...");
+  console.log("📋 TEXT-TO-IMAGE MODELS TO TEST:");
+  console.log("   1. 🏗️ Designer Architecture - davisbrown/designer-architecture");
+  console.log("   2. 🎨 Interiorly Gen1 - julian-at/interiorly-gen1-dev");
+  console.log("------------------------------------------------------");
   
   
   // Model 1: davisbrown/designer-architecture (requires DESARCH trigger word)
@@ -271,7 +275,7 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
 
   // Model 2: julian-at/interiorly-gen1-dev (requires INTRLY trigger word)
   try {
-    console.log("Generating with Interiorly Gen1...");
+    console.log("🎨 Attempting Interiorly Gen1 model...");
     const output = await replicate.run("julian-at/interiorly-gen1-dev", {
       input: {
         prompt: `INTRLY ${prompt}`,
@@ -283,27 +287,43 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     console.log("Interiorly Gen1 raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "Interiorly Gen1" });
-      console.log("Interiorly Gen1 generation successful, URL:", output[0]);
+      console.log("✅ Interiorly Gen1 generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interiorly Gen1" });
-      console.log("Interiorly Gen1 generation successful, URL:", output);
+      console.log("✅ Interiorly Gen1 generation successful, URL:", output);
     } else {
-      console.log("Interiorly Gen1 unexpected output format:", typeof output, output);
+      console.log("⚠️ Interiorly Gen1 unexpected output format:", typeof output, output);
     }
   } catch (error) {
-    console.error("Interiorly Gen1 failed:", error);
+    console.error("❌ Interiorly Gen1 failed:", error.message);
   }
 
+  
+  console.log("📊 TEXT-TO-IMAGE GENERATION SUMMARY:");
+  console.log(`   ✅ Successfully generated ${results.length} images from text-to-image models`);
+  results.forEach((result, index) => {
+    console.log(`   ${index + 1}. ✅ ${result.modelName}`);
+  });
+  console.log("------------------------------------------------------");
+  
   return results;
 }
 
 // Generate with Replicate image-to-image models using a base image
 async function generateImageToImageModels(prompt: string, baseImageUrl: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
+  console.log("🖼️ Starting image-to-image model generations...");
+  console.log("📋 IMAGE-TO-IMAGE MODELS TO TEST:");
+  console.log("   1. 🎨 Interior Design AI - adirik/interior-design");
+  console.log("   2. 🏠 Interior AI - erayyavuz/interior-ai");
+  console.log("   3. 🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel");
+  console.log("   4. 🔄 Interior V2 - jschoormans/interior-v2");
+  console.log("   5. 🎭 Interior Design SDXL - rocketdigitalai/interior-design-sdxl");
+  console.log("------------------------------------------------------");
 
   // Model 1: adirik/interior-design
   try {
-    console.log("Generating with Interior Design AI...");
+    console.log("🎨 Attempting Interior Design AI model...");
     const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
       input: {
         image: baseImageUrl,
@@ -318,17 +338,17 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("Interior Design AI raw output:", output);
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interior Design AI" });
-      console.log("Interior Design AI generation successful, URL:", output);
+      console.log("✅ Interior Design AI generation successful, URL:", output);
     } else {
-      console.log("Interior Design AI unexpected output format:", typeof output, output);
+      console.log("⚠️ Interior Design AI unexpected output format:", typeof output, output);
     }
   } catch (error) {
-    console.error("Interior Design AI failed:", error);
+    console.error("❌ Interior Design AI failed:", error.message);
   }
 
   // Model 2: erayyavuz/interior-ai
   try {
-    console.log("Generating with Interior AI...");
+    console.log("🏠 Attempting Interior AI model...");
     const output = await replicate.run("erayyavuz/interior-ai", {
       input: {
         input: baseImageUrl,
@@ -343,17 +363,17 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("Interior AI raw output:", output);
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interior AI" });
-      console.log("Interior AI generation successful, URL:", output);
+      console.log("✅ Interior AI generation successful, URL:", output);
     } else {
-      console.log("Interior AI unexpected output format:", typeof output, output);
+      console.log("⚠️ Interior AI unexpected output format:", typeof output, output);
     }
   } catch (error) {
-    console.error("Interior AI failed:", error);
+    console.error("❌ Interior AI failed:", error.message);
   }
 
   // Model 3: jschoormans/comfyui-interior-remodel
   try {
-    console.log("Generating with ComfyUI Interior Remodel...");
+    console.log("🛠️ Attempting ComfyUI Interior Remodel model...");
     const output = await replicate.run("jschoormans/comfyui-interior-remodel:9eb61c2cd9eec1c05a9b99eb6fd4b85bb50f9ed1a6ab4f6fd319dd41b624a1e3", {
       input: {
         image: baseImageUrl,
@@ -364,18 +384,18 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("ComfyUI Interior Remodel raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "ComfyUI Interior Remodel" });
-      console.log("ComfyUI Interior Remodel generation successful, URL:", output[0]);
+      console.log("✅ ComfyUI Interior Remodel generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "ComfyUI Interior Remodel" });
-      console.log("ComfyUI Interior Remodel generation successful, URL:", output);
+      console.log("✅ ComfyUI Interior Remodel generation successful, URL:", output);
     }
   } catch (error) {
-    console.error("ComfyUI Interior Remodel failed:", error);
+    console.error("❌ ComfyUI Interior Remodel failed:", error.message);
   }
 
   // Model 4: jschoormans/interior-v2
   try {
-    console.log("Generating with Interior V2...");
+    console.log("🔄 Attempting Interior V2 model...");
     const output = await replicate.run("jschoormans/interior-v2:0b6bd966b4a28f0d21ea3bbcfab9e2fb5e59c8c0b94b983df1e5b0b6e8c9f297", {
       input: {
         image: baseImageUrl,
@@ -388,18 +408,18 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("Interior V2 raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "Interior V2" });
-      console.log("Interior V2 generation successful, URL:", output[0]);
+      console.log("✅ Interior V2 generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interior V2" });
-      console.log("Interior V2 generation successful, URL:", output);
+      console.log("✅ Interior V2 generation successful, URL:", output);
     }
   } catch (error) {
-    console.error("Interior V2 failed:", error);
+    console.error("❌ Interior V2 failed:", error.message);
   }
 
   // Model 5: rocketdigitalai/interior-design-sdxl
   try {
-    console.log("Generating with Interior Design SDXL...");
+    console.log("🎭 Attempting Interior Design SDXL model...");
     const output = await replicate.run("rocketdigitalai/interior-design-sdxl:c8c9e76e2c574226b0ee0ad7631ed2c2a7bb4a5b4e66c4a50e062b1d8aa5b7f1", {
       input: {
         image: baseImageUrl,
@@ -413,14 +433,21 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("Interior Design SDXL raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "Interior Design SDXL" });
-      console.log("Interior Design SDXL generation successful, URL:", output[0]);
+      console.log("✅ Interior Design SDXL generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interior Design SDXL" });
-      console.log("Interior Design SDXL generation successful, URL:", output);
+      console.log("✅ Interior Design SDXL generation successful, URL:", output);
     }
   } catch (error) {
-    console.error("Interior Design SDXL failed:", error);
+    console.error("❌ Interior Design SDXL failed:", error.message);
   }
+
+  console.log("📊 IMAGE-TO-IMAGE GENERATION SUMMARY:");
+  console.log(`   ✅ Successfully generated ${results.length} images from image-to-image models`);
+  results.forEach((result, index) => {
+    console.log(`   ${index + 1}. ✅ ${result.modelName}`);
+  });
+  console.log("------------------------------------------------------");
 
   return results;
 }
