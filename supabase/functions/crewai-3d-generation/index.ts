@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.8.0';
+import Replicate from "https://esm.sh/replicate@0.25.2";
 
 
 const corsHeaders = {
@@ -202,121 +202,112 @@ async function matchMaterials(materials: string[]) {
   }
 }
 
-// CrewAI Agent: Generate 3D interior image using Hugging Face with enhanced parameters
+// CrewAI Agent: Generate 3D interior images using Replicate with interior design models
 async function generate3DImage(enhancedPrompt: string, materials: any[]) {
-  const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN');
-  if (!hfToken) {
-    throw new Error('Hugging Face token not configured');
+  const replicateToken = Deno.env.get('REPLICATE_API_KEY');
+  if (!replicateToken) {
+    throw new Error('Replicate API token not configured');
   }
   
-  // Enhanced prompt engineering with trigger words and quality modifiers
-  const triggerWords = "Interior Architecture, Interior Design, Modern Design";
-  const qualityModifiers = "high quality, professional, detailed, contemporary design, photorealistic, professional interior design";
-  const negativePrompt = "blurry, low quality, distorted, deformed, ugly, bad anatomy, bad proportions, dark, poor lighting";
-  
-  // Enhance prompt with material details and trigger words
-  let finalPrompt = `${triggerWords}, ${enhancedPrompt}`;
+  // Enhanced prompt with material details
+  let finalPrompt = enhancedPrompt;
   if (materials.length > 0) {
     const materialDescriptions = materials.map(m => `${m.name} (${m.category})`).join(', ');
     finalPrompt += `. Materials: ${materialDescriptions}`;
   }
-  finalPrompt += `. ${qualityModifiers}`;
 
-  // Define multiple models to test
+  // Define Replicate interior design models
   const models = [
     {
-      name: 'SDXL-Base',
-      model: 'stabilityai/stable-diffusion-xl-base-1.0',
-      prompt: finalPrompt,
-      negativePrompt: negativePrompt
+      name: 'Designer Architecture',
+      model: 'davisbrown/designer-architecture',
+      input: { prompt: finalPrompt }
     },
     {
-      name: 'FLUX-Dev',
-      model: 'black-forest-labs/FLUX.1-dev',
-      prompt: finalPrompt,
-      negativePrompt: negativePrompt
+      name: 'Interior Design AI',
+      model: 'adirik/interior-design',
+      input: { prompt: finalPrompt }
     },
     {
-      name: 'SDXL-Lightning',
-      model: 'ByteDance/SDXL-Lightning',
-      prompt: finalPrompt,
-      negativePrompt: negativePrompt
+      name: 'Interior AI',
+      model: 'erayyavuz/interior-ai',
+      input: { prompt: finalPrompt }
+    },
+    {
+      name: 'ComfyUI Interior Remodel',
+      model: 'jschoormans/comfyui-interior-remodel',
+      input: { prompt: finalPrompt }
+    },
+    {
+      name: 'Interiorly Gen1',
+      model: 'julian-at/interiorly-gen1-dev',
+      input: { prompt: finalPrompt }
+    },
+    {
+      name: 'Interior V2',
+      model: 'jschoormans/interior-v2',
+      input: { prompt: finalPrompt }
+    },
+    {
+      name: 'Interior Design SDXL',
+      model: 'rocketdigitalai/interior-design-sdxl',
+      input: { prompt: finalPrompt }
     }
   ];
 
   try {
-    console.log('Generating images with enhanced prompt:', finalPrompt);
+    console.log('Generating images with Replicate models, prompt:', finalPrompt);
     
-    // Use the official Hugging Face Inference client
-    const hf = new HfInference(hfToken);
+    const replicate = new Replicate({
+      auth: replicateToken,
+    });
     
-    // Generate 3 images using different models
-    const imageBase64Array = [];
+    const imageUrls = [];
     console.log(`Starting generation with ${models.length} models:`, models.map(m => m.name));
     
     for (let i = 0; i < models.length; i++) {
-      const model = models[i];
+      const modelConfig = models[i];
       try {
-        console.log(`Attempting generation ${i + 1} with ${model.name}...`);
+        console.log(`Attempting generation ${i + 1} with ${modelConfig.name}...`);
         
-        let imageBlob;
-        if (model.provider === 'fal-ai') {
-          imageBlob = await hf.textToImage({
-            provider: "fal-ai", 
-            model: model.model,
-            inputs: model.prompt,
-            parameters: { 
-              num_inference_steps: 20,
-              guidance_scale: 7.5,
-              sync_mode: true,
-              width: 1024,
-              height: 1024,
-              seed: Math.floor(Math.random() * 999999),
-              negative_prompt: model.negativePrompt
-            }
-          });
+        const output = await replicate.run(modelConfig.model, {
+          input: modelConfig.input
+        });
+        
+        console.log(`${modelConfig.name} response:`, output);
+        
+        // Handle different output formats from Replicate models
+        let imageUrl;
+        if (Array.isArray(output)) {
+          imageUrl = output[0]; // Take first image if array
+        } else if (typeof output === 'string') {
+          imageUrl = output; // Direct URL
+        } else if (output && output.image) {
+          imageUrl = output.image; // Nested image property
+        } else if (output && output.output) {
+          imageUrl = Array.isArray(output.output) ? output.output[0] : output.output;
+        }
+        
+        if (imageUrl) {
+          imageUrls.push(imageUrl);
+          console.log(`${modelConfig.name} generated image URL:`, imageUrl);
         } else {
-          imageBlob = await hf.textToImage({
-            model: model.model,
-            inputs: model.prompt,
-            parameters: {
-              negative_prompt: model.negativePrompt,
-              num_inference_steps: 20,
-              guidance_scale: 7.5
-            }
-          });
+          console.log(`${modelConfig.name} returned unexpected output format:`, output);
         }
-        
-        console.log(`${model.name} response blob size:`, imageBlob.size);
-        
-        // Convert blob to base64 safely to avoid stack overflow
-        const arrayBuffer = await imageBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        
-        // Use a safe base64 conversion method for large images
-        let binary = '';
-        const chunkSize = 0x8000; // 32KB chunks
-        for (let j = 0; j < uint8Array.length; j += chunkSize) {
-          const chunk = uint8Array.subarray(j, j + chunkSize);
-          binary += String.fromCharCode.apply(null, Array.from(chunk));
-        }
-        const base64 = btoa(binary);
-        imageBase64Array.push(`data:image/png;base64,${base64}`);
         
       } catch (modelError) {
-        console.error(`${model.name} failed for image ${i + 1}:`, modelError);
-        // Continue with next model instead of stopping
-        console.log(`Skipping ${model.name} due to error, continuing with next model`);
+        console.error(`${modelConfig.name} failed for image ${i + 1}:`, modelError);
+        console.log(`Skipping ${modelConfig.name} due to error, continuing with next model`);
         continue;
       }
     }
     
     // If no images were generated, throw error
-    if (imageBase64Array.length === 0) {
-      throw new Error('All models failed to generate images');
+    if (imageUrls.length === 0) {
+      throw new Error('All Replicate models failed to generate images');
     }
     
-    return imageBase64Array;
+    return imageUrls;
     
   } catch (error) {
     console.error('3D generation error:', error);
@@ -374,12 +365,12 @@ async function processGeneration(request: GenerationRequest) {
     ]);
     console.log('Matched materials:', matchedMaterials);
 
-    // CrewAI Agent 3: Generate 5 3D images using different models
-    const imageBase64Array = await generate3DImage(parsed.enhanced_prompt, matchedMaterials);
-    console.log('Generated multiple 3D images with different models');
+    // CrewAI Agent 3: Generate multiple 3D images using Replicate models
+    const imageUrls = await generate3DImage(parsed.enhanced_prompt, matchedMaterials);
+    console.log('Generated multiple 3D images with Replicate models');
 
     // CrewAI Agent 4: Quality validation (validate first image)
-    const qualityCheck = await validateQuality(imageBase64Array[0], request.prompt);
+    const qualityCheck = await validateQuality(imageUrls[0], request.prompt);
     console.log('Quality validation:', qualityCheck);
 
     // Update record with results
@@ -393,7 +384,7 @@ async function processGeneration(request: GenerationRequest) {
           quality_score: qualityCheck.score,
           quality_feedback: qualityCheck.feedback
         },
-        image_urls: imageBase64Array,
+        image_urls: imageUrls,
         material_ids: matchedMaterials.map(m => m.id),
         materials_used: matchedMaterials.map(m => m.name),
         processing_time_ms: Date.now() - startTime,
@@ -424,7 +415,7 @@ async function processGeneration(request: GenerationRequest) {
     return {
       success: true,
       generation_id: generationRecord.id,
-      image_urls: imageBase64Array,
+      image_urls: imageUrls,
       parsed_request: parsed,
       matched_materials: matchedMaterials,
       quality_assessment: qualityCheck,
