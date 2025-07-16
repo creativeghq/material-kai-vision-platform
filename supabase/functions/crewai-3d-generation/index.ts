@@ -1034,33 +1034,48 @@ serve(async (req) => {
       );
     }
 
-    console.log('Request validation passed, calling processGeneration');
+    console.log('Request validation passed, starting background generation');
     
-    try {
-      const result = await processGeneration(request);
-      
+    // Create initial record first to get the ID
+    const { data: recordData, error: createError } = await supabase
+      .from('generation_3d')
+      .insert({
+        user_id: request.user_id,
+        prompt: request.prompt,
+        room_type: request.room_type,
+        style: request.style,
+        generation_status: 'processing'
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Database insert error:', createError);
       return new Response(
-        JSON.stringify(result),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    } catch (processError) {
-      console.error('Process generation failed:', processError);
-      
-      // Return a proper error response instead of throwing
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: '3D generation failed', 
-          details: processError.message 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Failed to create generation record' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    // Start the generation as a background task to avoid timeout
+    EdgeRuntime.waitUntil(
+      processGeneration(request).catch(error => {
+        console.error('Background generation failed:', error);
+      })
+    );
+    
+    // Return immediate response with the generation ID
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: '3D generation started',
+        generationId: recordData.id,
+        status: 'processing'
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
 
   } catch (error) {
     console.error('CrewAI 3D generation error:', error);

@@ -158,32 +158,18 @@ export const Designer3DPage: React.FC = () => {
       }
 
       const result = response.data;
-      console.log("Generation result received:", result);
+      console.log("Generation response received:", result);
       
-      if (result.success && result.images_with_models?.length > 0) {
-        console.log("Using new format with models:", result.images_with_models);
-        setGeneratedImages(result.images_with_models);
-        setGenerationData(result);
+      if (result.success && result.generationId) {
+        // Background task started, poll for results
         toast({
-          title: 'Generation Complete!',
-          description: `Generated ${result.images_with_models.length} interior designs successfully.`
+          title: 'Generation Started',
+          description: 'Your 3D interior is being generated. This may take a few minutes...'
         });
-      } else if (result.success && result.image_urls?.length > 0) {
-        // Fallback for old format
-        console.log("Using fallback format, creating model names:", result.image_urls);
-        const imagesWithModels = result.image_urls.map((url: string, index: number) => ({
-          url,
-          modelName: modelNames[index] || `Model ${index + 1}`
-        }));
-        console.log("Created images with models:", imagesWithModels);
-        setGeneratedImages(imagesWithModels);
-        setGenerationData(result);
-        toast({
-          title: 'Generation Complete!',
-          description: `Generated ${result.image_urls.length} interior designs successfully.`
-        });
+        
+        await pollForResults(result.generationId);
       } else {
-        throw new Error(result.error || 'No images were generated');
+        throw new Error(result.error || 'Failed to start generation');
       }
     } catch (error: any) {
       console.error('Generation error:', error);
@@ -192,10 +178,79 @@ export const Designer3DPage: React.FC = () => {
         description: error.message || 'Failed to generate 3D interior. Please try again.',
         variant: 'destructive'
       });
-    } finally {
       setIsGenerating(false);
       setIsUploading(false);
     }
+  };
+
+  const pollForResults = async (generationId: string) => {
+    const maxAttempts = 60; // 5 minutes with 5-second intervals
+    let attempts = 0;
+    
+    const poll = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('generation_3d')
+          .select('*')
+          .eq('id', generationId)
+          .single();
+
+        if (error) {
+          console.error('Polling error:', error);
+          return;
+        }
+
+        console.log('Polling result:', data);
+
+        if (data.generation_status === 'completed' && data.image_urls?.length > 0) {
+          // Generation completed successfully
+          const imagesWithModels = data.image_urls.map((url: string, index: number) => ({
+            url,
+            modelName: modelNames[index] || `Model ${index + 1}`
+          }));
+          
+          setGeneratedImages(imagesWithModels);
+          setGenerationData(data);
+          setIsGenerating(false);
+          setIsUploading(false);
+          
+          toast({
+            title: 'Generation Complete!',
+            description: `Generated ${data.image_urls.length} interior designs successfully.`
+          });
+          return;
+        } 
+        
+        if (data.generation_status === 'failed') {
+          throw new Error(data.error_message || 'Generation failed');
+        }
+        
+        // Still processing, continue polling
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 5000); // Poll every 5 seconds
+        } else {
+          throw new Error('Generation timed out');
+        }
+      } catch (error: any) {
+        console.error('Polling error:', error);
+        setIsGenerating(false);
+        setIsUploading(false);
+        toast({
+          title: 'Generation Failed',
+          description: error.message || 'Generation failed during processing',
+          variant: 'destructive'
+        });
+      }
+    };
+
+    poll();
+  };
+
+  // Add a function to handle generation cancellation if needed
+  const cancelGeneration = () => {
+    setIsGenerating(false);
+    setIsUploading(false);
   };
 
   const handleImageClick = (index: number) => {
