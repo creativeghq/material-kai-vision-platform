@@ -27,11 +27,12 @@ export const Designer3DPage: React.FC = () => {
 
   // Replicate model names that match our edge function
   const modelNames = [
+    '🤗 Hugging Face Canopus - prithivMLmods/Canopus-Interior-Architecture-0.1',
     '🏗️ Designer Architecture - davisbrown/designer-architecture',
-    '🎨 Interior Design AI - adirik/interior-design', 
+    '🎨 Interiorly Gen1 - julian-at/interiorly-gen1-dev',
+    '🎨 Interior Design AI - adirik/interior-design',
     '🏠 Interior AI - erayyavuz/interior-ai',
     '🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel',
-    '🎨 Interiorly Gen1 - julian-at/interiorly-gen1-dev',
     '🔄 Interior V2 - jschoormans/interior-v2',
     '🎭 Interior Design SDXL - rocketdigitalai/interior-design-sdxl'
   ];
