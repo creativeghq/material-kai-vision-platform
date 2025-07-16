@@ -620,16 +620,16 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     await updateWorkflowStep('adirik/interior-design', 'failed', undefined, error.message);
   }
 
-  // Model 3: erayyavuz/interior-ai - FIXED WITH VERSION HASH
+  // Model 3: erayyavuz/interior-ai - FIXED WITH CORRECT SCHEMA
   try {
     console.log("🏠 Attempting Interior AI model...");
+    updateWorkflowStep('erayyavuz/interior-ai', 'running');
+    
     const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9", {
       input: {
         input: referenceImageUrl,
         prompt: finalPrompt,
-        strength: 0.8,
-        guidance_scale: 7.5,
-        negative_prompt: "low quality, blurry, watermark, unrealistic",
+        negative_prompt: "lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional",
         num_inference_steps: 25
       }
     });
@@ -638,12 +638,18 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "🏠 Interior AI - erayyavuz/interior-ai" });
       console.log("✅ Interior AI generation successful:", output);
+      await updateWorkflowStep('erayyavuz/interior-ai', 'success', output);
     } else if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "🏠 Interior AI - erayyavuz/interior-ai" });
       console.log("✅ Interior AI generation successful:", output[0]);
+      await updateWorkflowStep('erayyavuz/interior-ai', 'success', output[0]);
+    } else {
+      console.log("⚠️ Interior AI unexpected output format:", typeof output, output);
+      await updateWorkflowStep('erayyavuz/interior-ai', 'failed', undefined, 'Unexpected output format');
     }
   } catch (error) {
     console.error("❌ Interior AI failed:", error.message);
+    await updateWorkflowStep('erayyavuz/interior-ai', 'failed', undefined, error.message);
   }
 
   // Model 4: jschoormans/comfyui-interior-remodel - FIXED WITH VERSION HASH
