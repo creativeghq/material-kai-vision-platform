@@ -895,42 +895,16 @@ async function validateQuality(imageBase64: string, originalPrompt: string) {
 }
 
 async function processGeneration(request: GenerationRequest) {
-  console.log('processGeneration started');
+  console.log('🔧 processGeneration started');
   const startTime = Date.now();
-  let generationRecord: any = null;
   
   // Initialize workflow tracking based on whether there's a reference image
   const hasReferenceImage = request.reference_image_url && request.reference_image_url !== '[NO_IMAGE]';
   console.log('Has reference image:', hasReferenceImage);
   initializeWorkflowSteps(hasReferenceImage);
   
-  // Set the current generation ID for workflow tracking (will be passed from serve function)
-  // Note: This will be set when processGeneration is called from the background task
-  
   try {
-    console.log('About to create initial record');
-    // Create initial record
-    const { data: recordData, error: createError } = await supabase
-      .from('generation_3d')
-      .insert({
-        user_id: request.user_id,
-        prompt: request.prompt,
-        room_type: request.room_type,
-        style: request.style,
-        generation_status: 'processing'
-      })
-      .select()
-      .single();
-
-    if (createError) {
-      console.error('Database insert error:', createError);
-      throw new Error(`Failed to create generation record: ${createError.message}`);
-    }
-    
-    generationRecord = recordData;
-    console.log(`Record created successfully: ${generationRecord?.id}`);
-
-    console.log(`Starting 3D generation for record: ${generationRecord.id}`);
+    console.log(`Starting 3D generation for record: ${currentGenerationId}`);
 
     // CrewAI Agent 1: Parse request with hybrid approach
     const parsed = await parseUserRequestHybrid(request.prompt);
@@ -973,7 +947,7 @@ async function processGeneration(request: GenerationRequest) {
         processing_time_ms: Date.now() - startTime,
         updated_at: new Date().toISOString()
       })
-      .eq('id', generationRecord.id);
+      .eq('id', currentGenerationId);
 
     if (updateError) {
       console.error('Failed to update record:', updateError);
@@ -986,7 +960,7 @@ async function processGeneration(request: GenerationRequest) {
         user_id: request.user_id,
         event_type: 'hybrid_3d_generation_completed',
         event_data: {
-          generation_id: generationRecord.id,
+          generation_id: currentGenerationId,
           room_type: parsed.room_type,
           style: parsed.style,
           materials_count: matchedMaterials.length,
@@ -997,7 +971,7 @@ async function processGeneration(request: GenerationRequest) {
 
     return {
       success: true,
-      generation_id: generationRecord.id,
+      generation_id: currentGenerationId,
       image_urls: imageResults.map(r => r.url),
       images_with_models: imageResults, // Include both URL and model name
       parsed_request: parsed,
@@ -1008,10 +982,9 @@ async function processGeneration(request: GenerationRequest) {
 
   } catch (error) {
     console.error('3D generation error in processGeneration:', error);
-    console.log('generationRecord at error time:', generationRecord);
     
     // Update record with error
-    if (generationRecord?.id) {
+    if (currentGenerationId) {
       console.log('Attempting to update record with error');
       try {
         await supabase
@@ -1021,13 +994,13 @@ async function processGeneration(request: GenerationRequest) {
             error_message: error.message,
             processing_time_ms: Date.now() - startTime
           })
-          .eq('id', generationRecord.id);
+          .eq('id', currentGenerationId);
         console.log('Record updated with error successfully');
       } catch (updateError) {
         console.error('Failed to update record with error:', updateError);
       }
     } else {
-      console.log('No generationRecord found, cannot update with error');
+      console.log('No currentGenerationId found, cannot update with error');
     }
 
     throw error;
