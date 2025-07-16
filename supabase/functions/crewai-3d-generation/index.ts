@@ -590,17 +590,15 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
   console.log("   6. 🎯 Interior Design SDXL - rocketdigitalai/interior-design-sdxl");
   console.log("------------------------------------------------------");
 
-  // Model 1: adirik/interior-design - FIXED WITH VERSION HASH
+  // Model 1: adirik/interior-design - FIXED WITH CORRECT SCHEMA (image + prompt only)
   try {
     console.log("🎨 Attempting Interior Design AI model...");
+    updateWorkflowStep('adirik/interior-design', 'running');
+    
     const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
       input: {
         image: referenceImageUrl,
-        prompt: finalPrompt,
-        guidance_scale: 15,
-        prompt_strength: 0.8,
-        num_inference_steps: 50,
-        negative_prompt: "lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional, realistic"
+        prompt: finalPrompt
       }
     });
     
@@ -608,12 +606,18 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "🎨 Interior Design AI - adirik/interior-design" });
       console.log("✅ Interior Design AI generation successful:", output);
+      await updateWorkflowStep('adirik/interior-design', 'success', output);
     } else if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "🎨 Interior Design AI - adirik/interior-design" });
       console.log("✅ Interior Design AI generation successful:", output[0]);
+      await updateWorkflowStep('adirik/interior-design', 'success', output[0]);
+    } else {
+      console.log("⚠️ Interior Design AI unexpected output format:", typeof output, output);
+      await updateWorkflowStep('adirik/interior-design', 'failed', undefined, 'Unexpected output format');
     }
   } catch (error) {
     console.error("❌ Interior Design AI failed:", error.message);
+    await updateWorkflowStep('adirik/interior-design', 'failed', undefined, error.message);
   }
 
   // Model 3: erayyavuz/interior-ai - FIXED WITH VERSION HASH
