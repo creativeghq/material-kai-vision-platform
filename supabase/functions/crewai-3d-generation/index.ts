@@ -11,24 +11,14 @@ let currentGenerationId: string | null = null;
 // Initialize workflow steps
 function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
   workflowSteps = [
-    // Text-to-Image Models
+    // Replicate Models (support both text-to-image and image-to-image)
+    { modelName: 'adirik/interior-design', name: 'Interior Design AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
-    // Hugging Face Models
+    // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
     { modelName: 'black-forest-labs/FLUX.1-schnell', name: 'FLUX-Schnell', type: 'text-to-image', status: 'pending' },
     { modelName: 'stabilityai/stable-diffusion-2-1', name: 'Stable Diffusion 2.1', type: 'text-to-image', status: 'pending' }
   ];
-  
-  // Add image-to-image models if reference image is provided
-  if (hasReferenceImage) {
-    workflowSteps.push(
-      { modelName: 'adirik/interior-design', name: 'Interior Design AI', type: 'image-to-image', status: 'pending' },
-      { modelName: 'erayyavuz/interior-ai', name: 'Interior AI', type: 'image-to-image', status: 'pending' },
-      { modelName: 'jschoormans/comfyui-interior-remodel', name: 'ComfyUI Interior Remodel', type: 'image-to-image', status: 'pending' },
-      { modelName: 'jschoormans/interior-v2', name: 'Interior V2', type: 'image-to-image', status: 'pending' },
-      { modelName: 'rocketdigitalai/interior-design-sdxl', name: 'Interior Design SDXL', type: 'image-to-image', status: 'pending' }
-    );
-  }
 }
 
 // Update workflow step status
@@ -385,14 +375,51 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
 }
 
 // Generate with YOUR EXACT Replicate text-to-image models only
-async function generateTextToImageModels(prompt: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
+async function generateTextToImageModels(prompt: string, replicate: any, referenceImageUrl?: string): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
   console.log("🎭 Starting text-to-image model generations...");
-  console.log("📋 TEXT-TO-IMAGE MODELS TO TEST:");
-  console.log("   1. 🏗️ Designer Architecture - davisbrown/designer-architecture");
+  console.log("📋 REPLICATE MODELS TO TEST:");
+  console.log("   1. 🏡 Interior Design AI - adirik/interior-design");
+  console.log("   2. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
   
-  // Model 1: davisbrown/designer-architecture - FIXED WITH CORRECT VERSION HASH
+  // Model 1: adirik/interior-design - UNIFIED MODEL (supports both text-to-image and image-to-image)
+  try {
+    console.log("🏡 Attempting Interior Design AI model...");
+    updateWorkflowStep('adirik/interior-design', 'running');
+    
+    const inputParams: any = {
+      prompt: prompt,
+      guidance_scale: 15,
+      negative_prompt: "lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional, realistic",
+      num_inference_steps: 50
+    };
+
+    // Add image parameter if reference image is provided
+    if (referenceImageUrl && referenceImageUrl !== '[NO_IMAGE]') {
+      inputParams.image = referenceImageUrl;
+      inputParams.prompt_strength = 0.8;
+    }
+    
+    const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
+      input: inputParams
+    });
+    
+    console.log("Interior Design AI raw output:", output);
+    if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🏡 Interior Design AI - adirik/interior-design" });
+      console.log("✅ Interior Design AI successful:", output);
+      await updateWorkflowStep('adirik/interior-design', 'success', output);
+    } else {
+      console.log("⚠️ Interior Design AI unexpected output format:", typeof output, output);
+      await updateWorkflowStep('adirik/interior-design', 'failed', undefined, 'Unexpected output format');
+    }
+  } catch (error) {
+    console.error("❌ Interior Design AI failed:", error.message);
+    await updateWorkflowStep('adirik/interior-design', 'failed', undefined, error.message);
+  }
+
+  // Model 2: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
     updateWorkflowStep('davisbrown/designer-architecture', 'running');
@@ -425,7 +452,7 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     await updateWorkflowStep('davisbrown/designer-architecture', 'failed', undefined, error.message);
   }
 
-  // No more Replicate text-to-image models - all problematic prithivMLmods models removed
+  // No more problematic models - cleaned up
 
   console.log("📊 TEXT-TO-IMAGE GENERATION SUMMARY:");
   console.log(`   ✅ Successfully generated ${results.length} images from text-to-image models`);
@@ -681,7 +708,7 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
         
         // Only run text-to-image models
         console.log("📝 Running text-to-image models...");
-        const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
+        const textToImageResults = await generateTextToImageModels(finalPrompt, replicate, request.reference_image_url);
         console.log(`📊 Text-to-image results: ${textToImageResults.length} images generated`);
         allResults.push(...textToImageResults);
       } catch (replicateError) {
