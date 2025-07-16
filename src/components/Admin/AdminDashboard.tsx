@@ -52,22 +52,31 @@ const AdminDashboard: React.FC = () => {
       priority: 3
     },
     {
+      title: "3D Model Debugging",
+      description: "Monitor and debug AI model performance for 3D generation",
+      icon: Microscope,
+      path: "/admin/3d-model-debugging",
+      status: "active",
+      count: "7 models",
+      priority: 4
+    },
+    {
       title: "Material Scraper",
       description: "Scrape material data from websites and external sources",
       icon: Globe,
       path: "/admin/material-scraper",
       status: "active",
       count: "Web scraping",
-      priority: 4
+      priority: 5
     },
     {
       title: "Knowledge Base Management",
       description: "Manage enhanced knowledge base entries from PDF processing",
       icon: Database,
       path: "/admin/knowledge-base",
-      status: "active", 
+      status: "active",
       count: "1,247 entries",
-      priority: 5
+      priority: 6
     },
     {
       title: "Analytics Dashboard",
@@ -91,7 +100,7 @@ const AdminDashboard: React.FC = () => {
       title: "System Performance",
       description: "Monitor processing queues and system health",
       icon: Activity,
-      path: "/admin/performance", 
+      path: "/admin/performance",
       status: "active",
       count: "99.8% uptime",
       priority: 9

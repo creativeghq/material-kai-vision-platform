@@ -176,6 +176,52 @@ Respond in JSON format with: room_type, style, materials, features, layout, enha
       enhanced_prompt: prompt
     };
   }
+
+// Enhanced error handling and logging for 3D generation
+function logModelAttempt(modelName: string, status: 'start' | 'success' | 'error', details?: any) {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    model: modelName,
+    status,
+    details: details || {},
+    errorType: details?.error?.name || null,
+    errorMessage: details?.error?.message || null
+  };
+  
+  console.log(`[${timestamp}] 🎯 MODEL ${status.toUpperCase()}: ${modelName}`, details ? JSON.stringify(details, null, 2) : '');
+  
+  // Store in a global log array for debugging
+  if (!(globalThis as any).modelLogs) {
+    (globalThis as any).modelLogs = [];
+  }
+  (globalThis as any).modelLogs.push(logEntry);
+}
+
+function getModelLogs() {
+  return (globalThis as any).modelLogs || [];
+}
+
+function classifyError(error: any): { type: string; severity: 'low' | 'medium' | 'high'; retryable: boolean } {
+  const message = error?.message?.toLowerCase() || '';
+  
+  if (message.includes('version') || message.includes('not found')) {
+    return { type: 'VERSION_ERROR', severity: 'high', retryable: false };
+  }
+  if (message.includes('parameter') || message.includes('input')) {
+    return { type: 'PARAMETER_ERROR', severity: 'high', retryable: false };
+  }
+  if (message.includes('timeout') || message.includes('network')) {
+    return { type: 'NETWORK_ERROR', severity: 'medium', retryable: true };
+  }
+  if (message.includes('rate limit') || message.includes('quota')) {
+    return { type: 'RATE_LIMIT_ERROR', severity: 'medium', retryable: true };
+  }
+  if (message.includes('authentication') || message.includes('unauthorized')) {
+    return { type: 'AUTH_ERROR', severity: 'high', retryable: false };
+  }
+  
+  return { type: 'UNKNOWN_ERROR', severity: 'medium', retryable: false };
 }
 
 // CrewAI Agent: Match materials from our catalog
@@ -326,11 +372,6 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   console.log("🎭 Starting text-to-image model generations...");
   console.log("📋 TEXT-TO-IMAGE MODELS TO TEST:");
   console.log("   1. 🏗️ Designer Architecture - davisbrown/designer-architecture");
-  console.log("   2. 🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora");
-  console.log("   3. 🏺 Realistic Architecture - prithivMLmods/realistic-architecture");
-  console.log("   4. 🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture");
-  console.log("   5. 🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl");
-  console.log("   6. 🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1");
   console.log("------------------------------------------------------");
   
   // Model 1: davisbrown/designer-architecture (requires DESARCH trigger word) - WORKING
@@ -361,137 +402,6 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     console.error("❌ Designer Architecture failed:", error.message);
   }
 
-  // Model 2: prithivMLmods/interior-design-sdxl-lora - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🏘️ Attempting Interior Design SDXL LoRA model...");
-    const output = await replicate.run("prithivMLmods/interior-design-sdxl-lora", {
-      input: {
-        prompt: `Interior design, ${prompt}, photorealistic, detailed, high quality`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25,
-        negative_prompt: "lowres, watermark, text, blurry, deformed"
-      }
-    });
-    
-    console.log("Interior Design SDXL LoRA raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora" });
-      console.log("✅ Interior Design SDXL LoRA successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora" });
-      console.log("✅ Interior Design SDXL LoRA successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Interior Design SDXL LoRA failed:", error.message);
-  }
-
-  // Model 3: prithivMLmods/realistic-architecture - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🏺 Attempting Realistic Architecture model...");
-    const output = await replicate.run("prithivMLmods/realistic-architecture", {
-      input: {
-        prompt: `Realistic architecture interior, ${prompt}, professional photography`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Realistic Architecture raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏺 Realistic Architecture - prithivMLmods/realistic-architecture" });
-      console.log("✅ Realistic Architecture successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏺 Realistic Architecture - prithivMLmods/realistic-architecture" });
-      console.log("✅ Realistic Architecture successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Realistic Architecture failed:", error.message);
-  }
-
-  // Model 4: prithivMLmods/flux-interior-architecture - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🏛️ Attempting Flux Interior Architecture model...");
-    const output = await replicate.run("prithivMLmods/flux-interior-architecture", {
-      input: {
-        prompt: `Interior architecture, ${prompt}, modern design, clean lines`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Flux Interior Architecture raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture" });
-      console.log("✅ Flux Interior Architecture successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture" });
-      console.log("✅ Flux Interior Architecture successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Flux Interior Architecture failed:", error.message);
-  }
-
-  // Model 5: prithivMLmods/interior-decor-sdxl - TRY WITHOUT VERSION HASH FIRST
-  try {
-    console.log("🎨 Attempting Interior Decor SDXL model...");
-    const output = await replicate.run("prithivMLmods/interior-decor-sdxl", {
-      input: {
-        prompt: `Interior decoration, ${prompt}, stylish, elegant, contemporary`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Interior Decor SDXL raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl" });
-      console.log("✅ Interior Decor SDXL successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl" });
-      console.log("✅ Interior Decor SDXL successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Interior Decor SDXL failed:", error.message);
-  }
-
-  // Model 6: prithivMLmods/Canopus-Interior-Architecture-0.1 - YOUR ORIGINAL MODEL
-  try {
-    console.log("🏛️ Attempting Canopus Interior Architecture 0.1 model...");
-    const output = await replicate.run("prithivMLmods/Canopus-Interior-Architecture-0.1", {
-      input: {
-        prompt: `Interior room design, ${prompt}, high quality, photorealistic`,
-        num_outputs: 1,
-        width: 1024,
-        height: 768,
-        guidance_scale: 7.5,
-        num_inference_steps: 25
-      }
-    });
-    
-    console.log("Canopus Interior Architecture 0.1 raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1" });
-      console.log("✅ Canopus Interior Architecture 0.1 successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1" });
-      console.log("✅ Canopus Interior Architecture 0.1 successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Canopus Interior Architecture 0.1 failed:", error.message);
-  }
-
   console.log("📊 TEXT-TO-IMAGE GENERATION SUMMARY:");
   console.log(`   ✅ Successfully generated ${results.length} images from text-to-image models`);
   results.forEach((result, index) => {
@@ -519,7 +429,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
   // Model 1: davisbrown/designer-architecture
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
-    const output = await replicate.run("davisbrown/designer-architecture", {
+    const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt,
@@ -574,7 +484,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
   // Model 3: erayyavuz/interior-ai - FIXED WITH VERSION HASH
   try {
     console.log("🏠 Attempting Interior AI model...");
-    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9", {
+    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5e", {
       input: {
         input: referenceImageUrl,
         prompt: finalPrompt,
@@ -626,7 +536,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
   // Model 5: julian-at/interiorly-gen1-dev
   try {
     console.log("🏛️ Attempting Interiorly Gen1 Dev model...");
-    const output = await replicate.run("julian-at/interiorly-gen1-dev", {
+    const output = await replicate.run("julian-at/interiorly-gen1-dev:5e3080d1b308e80197b32f0ce638daa8a329d0cf42068739723d8259e44b445e", {
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt,

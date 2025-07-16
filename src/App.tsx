@@ -31,6 +31,7 @@ import { IntegratedRAGManagement } from "./components/Admin/IntegratedRAGManagem
 import PDFProcessing from "./pages/PDFProcessing";
 import SearchHub from "./pages/SearchHub";
 import { MaterialSuggestionsPanel } from "./components/Admin/MaterialSuggestionsPanel";
+import ModelDebuggingPanel from "./components/Admin/ModelDebuggingPanel";
 import { MaterialScraperPage } from "./components/Scraper/MaterialScraperPage";
 import { PDFKnowledgeDemo } from "./pages/PDFKnowledgeDemo";
 
@@ -183,6 +184,11 @@ const App = () => (
                 <Layout>
                   <MaterialSuggestionsPanel />
                 </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/admin/3d-model-debugging" element={
+              <AuthGuard>
+                <ModelDebuggingPanel />
               </AuthGuard>
             } />
             <Route path="/scraper" element={
