@@ -228,10 +228,12 @@ async function generateHuggingFaceImage(prompt: string): Promise<string> {
 // Generate with specific Replicate text-to-image models
 async function generateTextToImageModels(prompt: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
+  console.log("🎭 Starting text-to-image model generations...");
+  
   
   // Model 1: davisbrown/designer-architecture (requires DESARCH trigger word)
   try {
-    console.log("Generating with Designer Architecture...");
+    console.log("🏗️ Attempting Designer Architecture model...");
     const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
       input: {
         prompt: `Interior DESARCH design, ${prompt}`,
@@ -246,15 +248,15 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     console.log("Designer Architecture raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "Designer Architecture" });
-      console.log("Designer Architecture generation successful, URL:", output[0]);
+      console.log("✅ Designer Architecture successful:", output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "Designer Architecture" });
-      console.log("Designer Architecture generation successful, URL:", output);
+      console.log("✅ Designer Architecture successful:", output);
     } else {
-      console.log("Designer Architecture unexpected output format:", typeof output, output);
+      console.log("⚠️ Designer Architecture unexpected output format:", typeof output, output);
     }
   } catch (error) {
-    console.error("Designer Architecture failed:", error);
+    console.error("❌ Designer Architecture failed:", error.message);
   }
 
   // Model 2: julian-at/interiorly-gen1-dev (requires INTRLY trigger word)
