@@ -11,6 +11,7 @@ import { integratedWorkflowService } from '@/services/integratedWorkflowService'
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Wand2, Download, Share2, Upload, X, ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { GenerationWorkflowModal } from './GenerationWorkflowModal';
 
 export const Designer3DPage: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -24,6 +25,10 @@ export const Designer3DPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Workflow modal state
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
+  const [currentGenerationId, setCurrentGenerationId] = useState<string>('');
 
   // Working model names that match our edge function (Fixed)
   const modelNames = [
@@ -161,13 +166,11 @@ export const Designer3DPage: React.FC = () => {
       console.log("Generation response received:", result);
       
       if (result.success && result.generationId) {
-        // Background task started, poll for results
-        toast({
-          title: 'Generation Started',
-          description: 'Your 3D interior is being generated. This may take a few minutes...'
-        });
-        
-        await pollForResults(result.generationId);
+        // Show workflow modal and start tracking
+        setCurrentGenerationId(result.generationId);
+        setShowWorkflowModal(true);
+        setIsGenerating(false);
+        setIsUploading(false);
       } else {
         throw new Error(result.error || 'Failed to start generation');
       }
@@ -531,6 +534,25 @@ export const Designer3DPage: React.FC = () => {
         images={modalImages}
         currentIndex={currentImageIndex}
         onNavigate={handleModalNavigate}
+      />
+
+      {/* Generation Workflow Modal */}
+      <GenerationWorkflowModal
+        isOpen={showWorkflowModal}
+        onClose={() => setShowWorkflowModal(false)}
+        generationId={currentGenerationId}
+        onComplete={(images) => {
+          const imagesWithModels = images.map((url: string, index: number) => ({
+            url,
+            modelName: modelNames[index] || `Model ${index + 1}`
+          }));
+          setGeneratedImages(imagesWithModels);
+          setShowWorkflowModal(false);
+          toast({
+            title: 'Generation Complete!',
+            description: `Generated ${images.length} interior designs successfully.`
+          });
+        }}
       />
     </div>
   );

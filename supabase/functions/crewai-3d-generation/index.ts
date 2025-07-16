@@ -4,6 +4,68 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 import Replicate from "https://esm.sh/replicate@0.25.2";
 
+// Global workflow tracking
+let workflowSteps: any[] = [];
+let currentGenerationId: string | null = null;
+
+// Initialize workflow steps
+function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
+  workflowSteps = [
+    // Text-to-Image Models
+    { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
+    { modelName: 'prithivMLmods/interior-design-sdxl-lora', name: 'Interior Design SDXL LoRA', type: 'text-to-image', status: 'pending' },
+    { modelName: 'prithivMLmods/realistic-architecture', name: 'Realistic Architecture', type: 'text-to-image', status: 'pending' },
+    { modelName: 'prithivMLmods/flux-interior-architecture', name: 'Flux Interior Architecture', type: 'text-to-image', status: 'pending' },
+    { modelName: 'prithivMLmods/interior-decor-sdxl', name: 'Interior Decor SDXL', type: 'text-to-image', status: 'pending' },
+    { modelName: 'prithivMLmods/Canopus-Interior-Architecture-0.1', name: 'Canopus Interior Architecture', type: 'text-to-image', status: 'pending' },
+    // Hugging Face Models
+    { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
+    { modelName: 'black-forest-labs/FLUX.1-schnell', name: 'FLUX-Schnell', type: 'text-to-image', status: 'pending' },
+    { modelName: 'stabilityai/stable-diffusion-2-1', name: 'Stable Diffusion 2.1', type: 'text-to-image', status: 'pending' }
+  ];
+  
+  // Add image-to-image models if reference image is provided
+  if (hasReferenceImage) {
+    workflowSteps.push(
+      { modelName: 'adirik/interior-design', name: 'Interior Design AI', type: 'image-to-image', status: 'pending' },
+      { modelName: 'erayyavuz/interior-ai', name: 'Interior AI', type: 'image-to-image', status: 'pending' },
+      { modelName: 'jschoormans/comfyui-interior-remodel', name: 'ComfyUI Interior Remodel', type: 'image-to-image', status: 'pending' },
+      { modelName: 'julian-at/interiorly-gen1-dev', name: 'Interiorly Gen1 Dev', type: 'image-to-image', status: 'pending' },
+      { modelName: 'jschoormans/interior-v2', name: 'Interior V2', type: 'image-to-image', status: 'pending' },
+      { modelName: 'rocketdigitalai/interior-design-sdxl', name: 'Interior Design SDXL', type: 'image-to-image', status: 'pending' }
+    );
+  }
+}
+
+// Update workflow step status
+async function updateWorkflowStep(modelName: string, status: 'running' | 'success' | 'failed', imageUrl?: string, errorMessage?: string, processingTimeMs?: number) {
+  const step = workflowSteps.find(s => s.modelName === modelName);
+  if (step) {
+    step.status = status;
+    step.endTime = new Date().toISOString();
+    if (status === 'running') {
+      step.startTime = new Date().toISOString();
+    }
+    if (imageUrl) step.imageUrl = imageUrl;
+    if (errorMessage) step.errorMessage = errorMessage;
+    if (processingTimeMs) step.processingTimeMs = processingTimeMs;
+  }
+  
+  // Update database with current workflow state
+  if (currentGenerationId) {
+    try {
+      await supabase
+        .from('generation_3d')
+        .update({
+          result_data: { workflow_steps: workflowSteps }
+        })
+        .eq('id', currentGenerationId);
+    } catch (error) {
+      console.error('Failed to update workflow step in database:', error);
+    }
+  }
+}
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -238,8 +300,10 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
   
   // Try each Hugging Face model
   for (const modelConfig of HUGGINGFACE_MODELS) {
+    const startTime = Date.now();
     try {
       console.log(`🤗 Attempting ${modelConfig.name}...`);
+      await updateWorkflowStep(modelConfig.model, 'running');
       
       // Special handling for FLUX models
       if (modelConfig.model.includes('FLUX')) {
@@ -307,12 +371,14 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
           modelName: modelConfig.name 
         });
         console.log(`✅ ${modelConfig.name} generation successful`);
+        await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
       }
       
       // Continue to next model to show ALL models
     } catch (error) {
       console.error(`❌ ${modelConfig.name} failed:`, error.message);
       console.error(`❌ Full error details:`, error);
+      await updateWorkflowStep(modelConfig.model, 'failed', undefined, error.message, Date.now() - startTime);
       // Continue to next model on failure
     }
   }
@@ -863,6 +929,10 @@ async function processGeneration(request: GenerationRequest) {
   console.log('processGeneration started');
   const startTime = Date.now();
   let generationRecord: any = null;
+  
+  // Initialize workflow tracking
+  initializeWorkflowSteps(!!request.reference_image_url);
+  currentGenerationId = null; // Will be set after record creation
   
   try {
     console.log('About to create initial record');
