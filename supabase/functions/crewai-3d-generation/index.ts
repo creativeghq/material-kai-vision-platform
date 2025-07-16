@@ -15,6 +15,7 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
     { modelName: 'adirik/interior-design', name: 'Interior Design AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'erayyavuz/interior-ai', name: 'Interior AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'jschoormans/comfyui-interior-remodel', name: 'ComfyUI Interior Remodel', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'julian-at/interiorly-gen1-dev', name: 'Interiorly Gen1 Dev', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
     // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
@@ -384,7 +385,8 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
   console.log("   1. 🏡 Interior Design AI - adirik/interior-design");
   console.log("   2. 🏠 Interior AI - erayyavuz/interior-ai");
   console.log("   3. 🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel");
-  console.log("   4. 🏗️ Designer Architecture - davisbrown/designer-architecture");
+  console.log("   4. 🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev");
+  console.log("   5. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
   
   // Model 1: adirik/interior-design - UNIFIED MODEL (supports both text-to-image and image-to-image)
@@ -500,7 +502,52 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
     await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'failed', undefined, error.message);
   }
 
-  // Model 4: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
+  // Model 4: julian-at/interiorly-gen1-dev - UNIFIED MODEL (supports both text-to-image and image-to-image)
+  try {
+    console.log("🏛️ Attempting Interiorly Gen1 Dev model...");
+    updateWorkflowStep('julian-at/interiorly-gen1-dev', 'running');
+    
+    const inputParams: any = {
+      prompt: prompt,
+      model: "dev",
+      width: 1024,
+      height: 1024,
+      guidance_scale: 5,
+      num_inference_steps: 35,
+      go_fast: false
+    };
+
+    // Add image parameter if reference image is provided (for image-to-image mode)
+    if (referenceImageUrl && referenceImageUrl !== '[NO_IMAGE]') {
+      inputParams.image = referenceImageUrl;
+      // Remove width/height when using image input as per schema
+      delete inputParams.width;
+      delete inputParams.height;
+    }
+    
+    const output = await replicate.run("julian-at/interiorly-gen1-dev:5e3080d1b308e80197b32f0ce638daa8a329d0cf42068739723d8259e44b445e", {
+      input: inputParams
+    });
+    
+    console.log("Interiorly Gen1 Dev raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev" });
+      console.log("✅ Interiorly Gen1 Dev successful:", output[0]);
+      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'success', output[0]);
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev" });
+      console.log("✅ Interiorly Gen1 Dev successful:", output);
+      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'success', output);
+    } else {
+      console.log("⚠️ Interiorly Gen1 Dev unexpected output format:", typeof output, output);
+      await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, 'Unexpected output format');
+    }
+  } catch (error) {
+    console.error("❌ Interiorly Gen1 Dev failed:", error.message);
+    await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, error.message);
+  }
+
+  // Model 5: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
     updateWorkflowStep('davisbrown/designer-architecture', 'running');
