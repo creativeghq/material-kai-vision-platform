@@ -333,10 +333,10 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   console.log("   6. 🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1");
   console.log("------------------------------------------------------");
   
-  // Model 1: davisbrown/designer-architecture (requires DESARCH trigger word) - WORKING
+  // Model 1: davisbrown/designer-architecture - FIXED WITH CORRECT VERSION HASH
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
-    const output = await replicate.run("davisbrown/designer-architecture", {
+    const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
       input: {
         prompt: `Interior DESARCH design, ${prompt}`,
         num_outputs: 1,
@@ -516,10 +516,10 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
   console.log("   7. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
 
-  // Model 1: davisbrown/designer-architecture
+  // Model 1: davisbrown/designer-architecture - FIXED WITH CORRECT VERSION HASH
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
-    const output = await replicate.run("davisbrown/designer-architecture", {
+    const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt,
@@ -992,7 +992,10 @@ async function processGeneration(request: GenerationRequest) {
 }
 
 serve(async (req) => {
+  console.log('🚀 Edge function invoked - Method:', req.method);
+  
   if (req.method === 'OPTIONS') {
+    console.log('✅ Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -1033,8 +1036,17 @@ serve(async (req) => {
 
     console.log('Request validation passed, calling processGeneration');
     
+    // Add timeout protection to prevent function hanging
+    const TIMEOUT_MS = 30000; // 30 seconds timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Function timeout - processing took too long')), TIMEOUT_MS);
+    });
+    
     try {
-      const result = await processGeneration(request);
+      const result = await Promise.race([
+        processGeneration(request),
+        timeoutPromise
+      ]) as any;
       
       return new Response(
         JSON.stringify(result),
