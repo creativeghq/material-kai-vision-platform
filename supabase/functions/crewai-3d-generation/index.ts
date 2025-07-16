@@ -261,10 +261,10 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     
     console.log("Designer Architecture raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "Designer Architecture" });
+      results.push({ url: output[0], modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
       console.log("✅ Designer Architecture successful:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "Designer Architecture" });
+      results.push({ url: output, modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
       console.log("✅ Designer Architecture successful:", output);
     } else {
       console.log("⚠️ Designer Architecture unexpected output format:", typeof output, output);
@@ -286,10 +286,10 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     
     console.log("Interiorly Gen1 raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "Interiorly Gen1" });
+      results.push({ url: output[0], modelName: "🎨 Interiorly Gen1 - julian-at/interiorly-gen1-dev" });
       console.log("✅ Interiorly Gen1 generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "Interiorly Gen1" });
+      results.push({ url: output, modelName: "🎨 Interiorly Gen1 - julian-at/interiorly-gen1-dev" });
       console.log("✅ Interiorly Gen1 generation successful, URL:", output);
     } else {
       console.log("⚠️ Interiorly Gen1 unexpected output format:", typeof output, output);
@@ -337,7 +337,7 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     
     console.log("Interior Design AI raw output:", output);
     if (typeof output === 'string') {
-      results.push({ url: output, modelName: "Interior Design AI" });
+      results.push({ url: output, modelName: "🎨 Interior Design AI - adirik/interior-design" });
       console.log("✅ Interior Design AI generation successful, URL:", output);
     } else {
       console.log("⚠️ Interior Design AI unexpected output format:", typeof output, output);
@@ -362,7 +362,7 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     
     console.log("Interior AI raw output:", output);
     if (typeof output === 'string') {
-      results.push({ url: output, modelName: "Interior AI" });
+      results.push({ url: output, modelName: "🏠 Interior AI - erayyavuz/interior-ai" });
       console.log("✅ Interior AI generation successful, URL:", output);
     } else {
       console.log("⚠️ Interior AI unexpected output format:", typeof output, output);
@@ -383,10 +383,10 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     
     console.log("ComfyUI Interior Remodel raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "ComfyUI Interior Remodel" });
+      results.push({ url: output[0], modelName: "🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel" });
       console.log("✅ ComfyUI Interior Remodel generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "ComfyUI Interior Remodel" });
+      results.push({ url: output, modelName: "🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel" });
       console.log("✅ ComfyUI Interior Remodel generation successful, URL:", output);
     }
   } catch (error) {
@@ -407,10 +407,10 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     
     console.log("Interior V2 raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "Interior V2" });
+      results.push({ url: output[0], modelName: "🔄 Interior V2 - jschoormans/interior-v2" });
       console.log("✅ Interior V2 generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "Interior V2" });
+      results.push({ url: output, modelName: "🔄 Interior V2 - jschoormans/interior-v2" });
       console.log("✅ Interior V2 generation successful, URL:", output);
     }
   } catch (error) {
@@ -432,10 +432,10 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     
     console.log("Interior Design SDXL raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "Interior Design SDXL" });
+      results.push({ url: output[0], modelName: "🎭 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
       console.log("✅ Interior Design SDXL generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "Interior Design SDXL" });
+      results.push({ url: output, modelName: "🎭 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
       console.log("✅ Interior Design SDXL generation successful, URL:", output);
     }
   } catch (error) {
@@ -486,7 +486,7 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
     try {
       console.log("🤗 Attempting Hugging Face Canopus model...");
       const hfImage = await generateHuggingFaceImage(finalPrompt);
-      allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
+      allResults.push({ url: hfImage, modelName: "🤗 Hugging Face Canopus - prithivMLmods/Canopus-Interior-Architecture-0.1" });
       console.log("✅ Hugging Face Canopus successful");
     } catch (hfError) {
       console.error("❌ Hugging Face generation failed:", hfError.message);
@@ -499,7 +499,7 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
       // First, generate with Hugging Face (reliable base image)
       console.log("🤗 Attempting Hugging Face Canopus model...");
       const hfImage = await generateHuggingFaceImage(finalPrompt);
-      allResults.push({ url: hfImage, modelName: "Hugging Face Canopus" });
+      allResults.push({ url: hfImage, modelName: "🤗 Hugging Face Canopus - prithivMLmods/Canopus-Interior-Architecture-0.1" });
       console.log("✅ Hugging Face Canopus successful");
     } catch (hfError) {
       console.error("❌ Hugging Face generation failed:", hfError.message);
