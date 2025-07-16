@@ -260,20 +260,25 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   // Model 2: julian-at/interiorly-gen1-dev (requires INTRLY trigger word)
   try {
     console.log("Generating with Interiorly Gen1...");
-    const output = await replicate.run("julian-at/interiorly-gen1-dev", {
+    const output = await replicate.run("julian-at/interiorly-gen1-dev:bf9b6e8e3ad37e2a6c2b85e69725994be33c7a38a0af6bb94cf68b13e79f56e7", {
       input: {
         prompt: `INTRLY ${prompt}`,
         aspect_ratio: "16:9",
-        model: "dev"
+        model: "dev",
+        go_fast: false
       }
     });
     
+    console.log("Interiorly Gen1 raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "Interiorly Gen1" });
+      console.log("Interiorly Gen1 generation successful, URL:", output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interiorly Gen1" });
+      console.log("Interiorly Gen1 generation successful, URL:", output);
+    } else {
+      console.log("Interiorly Gen1 unexpected output format:", typeof output, output);
     }
-    console.log("Interiorly Gen1 generation successful");
   } catch (error) {
     console.error("Interiorly Gen1 failed:", error);
   }
@@ -288,17 +293,24 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
   // Model 1: adirik/interior-design
   try {
     console.log("Generating with Interior Design AI...");
-    const output = await replicate.run("adirik/interior-design", {
+    const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
       input: {
         image: baseImageUrl,
-        prompt: prompt
+        prompt: prompt,
+        guidance_scale: 15,
+        prompt_strength: 0.8,
+        num_inference_steps: 50,
+        negative_prompt: "lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional, realistic"
       }
     });
     
+    console.log("Interior Design AI raw output:", output);
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interior Design AI" });
+      console.log("Interior Design AI generation successful, URL:", output);
+    } else {
+      console.log("Interior Design AI unexpected output format:", typeof output, output);
     }
-    console.log("Interior Design AI generation successful");
   } catch (error) {
     console.error("Interior Design AI failed:", error);
   }
@@ -306,19 +318,24 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
   // Model 2: erayyavuz/interior-ai
   try {
     console.log("Generating with Interior AI...");
-    const output = await replicate.run("erayyavuz/interior-ai", {
+    const output = await replicate.run("erayyavuz/interior-ai:d87cbc964a3c65e6bc01ae83f6d035e8c90eaa6db02e9db7a7b7fa9abf72eee9", {
       input: {
         input: baseImageUrl,
         prompt: prompt,
-        negative_prompt: "lowres, watermark, banner, logo, deformed, blurry, blur, out of focus, surreal, ugly",
-        num_inference_steps: 25
+        strength: 0.8,
+        guidance_scale: 7.5,
+        negative_prompt: "low quality, blurry, watermark, unrealistic",
+        num_inference_steps: 50
       }
     });
     
+    console.log("Interior AI raw output:", output);
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interior AI" });
+      console.log("Interior AI generation successful, URL:", output);
+    } else {
+      console.log("Interior AI unexpected output format:", typeof output, output);
     }
-    console.log("Interior AI generation successful");
   } catch (error) {
     console.error("Interior AI failed:", error);
   }
