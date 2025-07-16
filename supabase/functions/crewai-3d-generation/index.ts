@@ -531,10 +531,10 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     console.error("❌ Designer Architecture failed:", error.message);
   }
 
-  // Model 2: adirik/interior-design
+  // Model 2: adirik/interior-design - FIXED WITH VERSION HASH
   try {
     console.log("🎨 Attempting Interior Design AI model...");
-    const output = await replicate.run("adirik/interior-design", {
+    const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt,
@@ -583,10 +583,10 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     console.error("❌ Interior AI failed:", error.message);
   }
 
-  // Model 4: jschoormans/comfyui-interior-remodel
+  // Model 4: jschoormans/comfyui-interior-remodel - FIXED WITH VERSION HASH
   try {
     console.log("🛠️ Attempting ComfyUI Interior Remodel model...");
-    const output = await replicate.run("jschoormans/comfyui-interior-remodel", {
+    const output = await replicate.run("jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce", {
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt || "photo of a beautiful living room, modern design, modernist, cozy\nhigh resolution, highly detailed, 4k",
