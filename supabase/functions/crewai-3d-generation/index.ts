@@ -341,6 +341,7 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
           modelName: modelConfig.name 
         });
         console.log(`✅ ${modelConfig.name} generation successful with direct API`);
+        await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
       } else {
         // Standard HF SDK for other models
         const image = await hf.textToImage({

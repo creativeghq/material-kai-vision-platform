@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface WorkflowStep {
   id: string;
   name: string;
-  status: 'pending' | 'running' | 'success' | 'failed';
+  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
   modelType: 'text-to-image' | 'image-to-image';
   modelName: string;
   startTime?: string;
@@ -38,100 +38,102 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const [overallProgress, setOverallProgress] = useState(0);
   const [generationData, setGenerationData] = useState<any>(null);
   const [isComplete, setIsComplete] = useState(false);
+  const [hasReferenceImage, setHasReferenceImage] = useState(false);
 
-  // Initialize workflow steps
+  // Initialize workflow steps based on actual edge function implementation
   useEffect(() => {
+    if (!generationData) return;
+
+    // Check if reference image is provided
+    const hasRefImage = generationData.prompt && 
+      !generationData.prompt.includes('[NO_IMAGE]') && 
+      generationData.prompt !== '[NO_IMAGE]';
+    
+    setHasReferenceImage(hasRefImage);
+
     const initialSteps: WorkflowStep[] = [
-      // Text-to-Image Models
+      // HuggingFace Models (text-to-image)
       {
-        id: 'step-1',
-        name: 'Designer Architecture',
+        id: 'hf-sdxl',
+        name: '🎨 Stable Diffusion XL Base 1.0',
         status: 'pending',
         modelType: 'text-to-image',
-        modelName: 'davisbrown/designer-architecture'
+        modelName: 'stabilityai/stable-diffusion-xl-base-1.0'
       },
       {
-        id: 'step-2', 
-        name: 'Interior Design SDXL LoRA',
+        id: 'hf-flux',
+        name: '⚡ FLUX-Schnell',
         status: 'pending',
         modelType: 'text-to-image',
-        modelName: 'prithivMLmods/interior-design-sdxl-lora'
+        modelName: 'black-forest-labs/FLUX.1-schnell'
       },
       {
-        id: 'step-3',
-        name: 'Realistic Architecture',
+        id: 'hf-sd2',
+        name: '🏠 Interior Design Model',
         status: 'pending',
         modelType: 'text-to-image',
-        modelName: 'prithivMLmods/realistic-architecture'
+        modelName: 'stabilityai/stable-diffusion-2-1'
       },
+      // Replicate Models
       {
-        id: 'step-4',
-        name: 'Flux Interior Architecture',
+        id: 'rep-unified',
+        name: '🎯 Interior Design AI (Unified)',
         status: 'pending',
-        modelType: 'text-to-image',
-        modelName: 'prithivMLmods/flux-interior-architecture'
-      },
-      {
-        id: 'step-5',
-        name: 'Interior Decor SDXL',
-        status: 'pending',
-        modelType: 'text-to-image',
-        modelName: 'prithivMLmods/interior-decor-sdxl'
-      },
-      {
-        id: 'step-6',
-        name: 'Canopus Interior Architecture',
-        status: 'pending',
-        modelType: 'text-to-image',
-        modelName: 'prithivMLmods/Canopus-Interior-Architecture-0.1'
-      },
-      // Image-to-Image Models (if reference image provided)
-      {
-        id: 'step-7',
-        name: 'Interior Design AI',
-        status: 'pending',
-        modelType: 'image-to-image',
+        modelType: hasRefImage ? 'image-to-image' : 'text-to-image',
         modelName: 'adirik/interior-design'
       },
       {
-        id: 'step-8',
-        name: 'Interior AI',
+        id: 'rep-architecture',
+        name: '🏗️ Designer Architecture',
         status: 'pending',
-        modelType: 'image-to-image',
-        modelName: 'erayyavuz/interior-ai'
-      },
-      {
-        id: 'step-9',
-        name: 'ComfyUI Interior Remodel',
-        status: 'pending',
-        modelType: 'image-to-image',
-        modelName: 'jschoormans/comfyui-interior-remodel'
-      },
-      {
-        id: 'step-10',
-        name: 'Interiorly Gen1 Dev',
-        status: 'pending',
-        modelType: 'image-to-image',
-        modelName: 'julian-at/interiorly-gen1-dev'
-      },
-      {
-        id: 'step-11',
-        name: 'Interior V2',
-        status: 'pending',
-        modelType: 'image-to-image',
-        modelName: 'jschoormans/interior-v2'
-      },
-      {
-        id: 'step-12',
-        name: 'Interior Design SDXL',
-        status: 'pending',
-        modelType: 'image-to-image',
-        modelName: 'rocketdigitalai/interior-design-sdxl'
+        modelType: 'text-to-image',
+        modelName: 'davisbrown/designer-architecture'
       }
     ];
 
+    // Add image-to-image models only if reference image is provided
+    if (hasRefImage) {
+      initialSteps.push(
+        {
+          id: 'rep-interior-ai',
+          name: '🏡 Interior AI',
+          status: 'pending',
+          modelType: 'image-to-image',
+          modelName: 'erayyavuz/interior-ai'
+        },
+        {
+          id: 'rep-comfyui',
+          name: '🎨 ComfyUI Interior Remodel',
+          status: 'pending',
+          modelType: 'image-to-image',
+          modelName: 'jschoormans/comfyui-interior-remodel'
+        },
+        {
+          id: 'rep-interiorly',
+          name: '🏛️ Interiorly Gen1 Dev',
+          status: 'pending',
+          modelType: 'image-to-image',
+          modelName: 'julian-at/interiorly-gen1-dev'
+        },
+        {
+          id: 'rep-interior-v2',
+          name: '🏘️ Interior V2',
+          status: 'pending',
+          modelType: 'image-to-image',
+          modelName: 'jschoormans/interior-v2'
+        },
+        {
+          id: 'rep-sdxl-interior',
+          name: '🚀 Interior Design SDXL',
+          status: 'pending',
+          modelType: 'image-to-image',
+          modelName: 'rocketdigitalai/interior-design-sdxl'
+        }
+      );
+    }
+
     setSteps(initialSteps);
-  }, []);
+  }, [generationData]);
 
   // Poll for generation updates
   useEffect(() => {
@@ -164,10 +166,8 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         if (data.generation_status === 'completed') {
           setIsComplete(true);
           if (data.image_urls?.length > 0) {
-            setTimeout(() => {
-              onComplete(data.image_urls);
-              onClose();
-            }, 2000); // Show completion for 2 seconds before closing
+            onComplete(data.image_urls);
+            // Don't auto-close - let admin close manually
           }
         } else if (data.generation_status === 'failed') {
           console.error('Generation failed:', data.error_message);
@@ -226,6 +226,8 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'skipped':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       default:
         return <div className="h-4 w-4 rounded-full border-2 border-gray-300" />;
     }
@@ -239,6 +241,8 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         return <Badge variant="secondary" className="bg-green-100 text-green-700">Success</Badge>;
       case 'failed':
         return <Badge variant="destructive">Failed</Badge>;
+      case 'skipped':
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">Skipped</Badge>;
       default:
         return <Badge variant="outline">Pending</Badge>;
     }
@@ -364,11 +368,29 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             </div>
           </ScrollArea>
 
+          {/* Generation Status Summary */}
+          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded">
+            <div className="flex items-center justify-between text-sm">
+              <span>Reference Image:</span>
+              <span className={hasReferenceImage ? "text-green-600" : "text-gray-600"}>
+                {hasReferenceImage ? "✓ Provided" : "✗ Not provided"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm mt-1">
+              <span>Models to Run:</span>
+              <span>{steps.length} models</span>
+            </div>
+            <div className="flex items-center justify-between text-sm mt-1">
+              <span>Completed:</span>
+              <span>{steps.filter(s => s.status === 'success').length} successful, {steps.filter(s => s.status === 'failed').length} failed, {steps.filter(s => s.status === 'skipped').length} skipped</span>
+            </div>
+          </div>
+
           {isComplete && (
             <div className="text-center p-4 bg-green-50 border border-green-200 rounded">
               <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
               <p className="font-medium text-green-700">Generation Complete!</p>
-              <p className="text-sm text-green-600">Closing modal and revealing images...</p>
+              <p className="text-sm text-green-600">You can now close this modal to view the generated images.</p>
             </div>
           )}
         </div>
