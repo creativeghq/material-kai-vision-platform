@@ -25,13 +25,19 @@ export const Designer3DPage: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Working model names that match our edge function (Updated)
+  // Working model names that match our edge function (Fixed)
   const modelNames = [
-    '🏛️ Canopus Interior Architecture 0.1 - prithivMLmods/Canopus-Interior-Architecture-0.1',
     '🎨 Stable Diffusion XL Base 1.0 - stabilityai/stable-diffusion-xl-base-1.0',
-    '⚡ FLUX-Dev - black-forest-labs/FLUX.1-dev',
+    '⚡ FLUX-Schnell - black-forest-labs/FLUX.1-schnell',
+    '🏠 Interior Design Model - stabilityai/stable-diffusion-2-1',
     '🏗️ Designer Architecture - davisbrown/designer-architecture',
-    '🎨 Interior Design AI - adirik/interior-design'
+    '🏘️ Interior Design SDXL LoRA - prithivMLmods/interior-design-sdxl-lora',
+    '🏺 Realistic Architecture - prithivMLmods/realistic-architecture',
+    '🏛️ Flux Interior Architecture - prithivMLmods/flux-interior-architecture',
+    '🎨 Interior Decor SDXL - prithivMLmods/interior-decor-sdxl',
+    '🎨 Interior Design AI - adirik/interior-design',
+    '🏠 ControlNet Interior - lllyasviel/control_v11p_sd15_canny',
+    '🏛️ Architecture Refiner - tencentarc/photomaker'
   ];
 
   const roomTypes = [
@@ -225,7 +231,7 @@ export const Designer3DPage: React.FC = () => {
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
           Generate photorealistic interior designs using ALL our integrated AI models:
-          🏛️ Canopus Interior Architecture, 🎨 Stable Diffusion XL, ⚡ FLUX-Schnell, 🏗️ Designer Architecture, 🏘️ Interior Design SDXL LoRA, 🏺 Realistic Architecture, 🏛️ Flux Interior Architecture, 🎨 Interior Decor SDXL, 🎨 Interior Design AI, 🏠 ControlNet Interior, 🏛️ Architecture Refiner
+          🎨 Stable Diffusion XL, ⚡ FLUX-Schnell, 🏠 Interior Design Model, 🏗️ Designer Architecture, 🏘️ Interior Design SDXL LoRA, 🏺 Realistic Architecture, 🏛️ Flux Interior Architecture, 🎨 Interior Decor SDXL, 🎨 Interior Design AI, 🏠 ControlNet Interior, 🏛️ Architecture Refiner
         </p>
       </div>
 
