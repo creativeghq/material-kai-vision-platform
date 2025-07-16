@@ -479,7 +479,12 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
   }
   
   console.log(`Generated ${allResults.length} images from ${allResults.map(r => r.modelName).join(', ')}`);
-  return allResults.map(result => result.url);
+  console.log("📸 Final generation summary:");
+  allResults.forEach((result, index) => {
+    console.log(`   ${index + 1}. ✅ ${result.modelName}: ${result.url}`);
+  });
+  
+  return allResults; // Return full objects with url and modelName
 }
 
 // CrewAI Agent: Quality validation and feedback (simplified)
@@ -533,11 +538,11 @@ async function processGeneration(request: GenerationRequest) {
     console.log('Matched materials:', matchedMaterials);
 
     // CrewAI Agent 3: Generate multiple 3D images using all integrated models
-    const imageUrls = await generate3DImage(parsed.enhanced_prompt, matchedMaterials, request.reference_image_url);
-    console.log(`Generated ${imageUrls.length} images from all integrated models`);
+    const imageResults = await generate3DImage(parsed.enhanced_prompt, matchedMaterials, request.reference_image_url);
+    console.log(`Generated ${imageResults.length} images from all integrated models`);
 
     // CrewAI Agent 4: Quality validation (validate first image)
-    const qualityCheck = await validateQuality(imageUrls[0], request.prompt);
+    const qualityCheck = await validateQuality(imageResults[0]?.url || '', request.prompt);
     console.log('Quality validation:', qualityCheck);
 
     // Update record with results
@@ -549,9 +554,14 @@ async function processGeneration(request: GenerationRequest) {
           parsed_request: parsed,
           matched_materials: matchedMaterials,
           quality_score: qualityCheck.score,
-          quality_feedback: qualityCheck.feedback
+          quality_feedback: qualityCheck.feedback,
+          model_results: imageResults.map(r => ({ 
+            model: r.modelName, 
+            url: r.url, 
+            success: true 
+          }))
         },
-        image_urls: imageUrls,
+        image_urls: imageResults.map(r => r.url),
         material_ids: matchedMaterials.map(m => m.id),
         materials_used: matchedMaterials.map(m => m.name),
         processing_time_ms: Date.now() - startTime,
@@ -582,7 +592,8 @@ async function processGeneration(request: GenerationRequest) {
     return {
       success: true,
       generation_id: generationRecord.id,
-      image_urls: imageUrls,
+      image_urls: imageResults.map(r => r.url),
+      images_with_models: imageResults, // Include both URL and model name
       parsed_request: parsed,
       matched_materials: matchedMaterials,
       quality_assessment: qualityCheck,

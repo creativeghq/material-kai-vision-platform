@@ -17,7 +17,7 @@ export const Designer3DPage: React.FC = () => {
   const [roomType, setRoomType] = useState('');
   const [style, setStyle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<{url: string, modelName: string}[]>([]);
   const [generationData, setGenerationData] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -135,8 +135,20 @@ export const Designer3DPage: React.FC = () => {
       }
 
       const result = response.data;
-      if (result.success && result.image_urls?.length > 0) {
-        setGeneratedImages(result.image_urls);
+      if (result.success && result.images_with_models?.length > 0) {
+        setGeneratedImages(result.images_with_models);
+        setGenerationData(result);
+        toast({
+          title: 'Generation Complete!',
+          description: `Generated ${result.images_with_models.length} interior designs successfully.`
+        });
+      } else if (result.success && result.image_urls?.length > 0) {
+        // Fallback for old format
+        const imagesWithModels = result.image_urls.map((url: string, index: number) => ({
+          url,
+          modelName: modelNames[index] || `Model ${index + 1}`
+        }));
+        setGeneratedImages(imagesWithModels);
         setGenerationData(result);
         toast({
           title: 'Generation Complete!',
@@ -171,17 +183,15 @@ export const Designer3DPage: React.FC = () => {
     }
   };
 
-  const modalImages = generatedImages.map((url, index) => ({
-    url,
-    modelName: modelNames[index] || `Model ${index + 1}`
-  }));
+  const modalImages = generatedImages;
 
   const handleDownload = (imageIndex = 0) => {
     if (!generatedImages.length || !generatedImages[imageIndex]) return;
     
+    const image = generatedImages[imageIndex];
     const link = document.createElement('a');
-    link.href = generatedImages[imageIndex];
-    link.download = `interior-design-${modelNames[imageIndex]?.replace(/\s+/g, '-').toLowerCase() || `model-${imageIndex + 1}`}-${Date.now()}.png`;
+    link.href = image.url;
+    link.download = `interior-design-${image.modelName?.replace(/\s+/g, '-').toLowerCase() || `model-${imageIndex + 1}`}-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -329,25 +339,25 @@ export const Designer3DPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {generatedImages.map((imageUrl, index) => (
+              {generatedImages.map((image, index) => (
                 <div key={index} className="space-y-2">
                   <div 
                     className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                     onClick={() => handleImageClick(index)}
                   >
                     <img 
-                      src={imageUrl} 
-                      alt={`Interior design by ${modelNames[index]}`}
+                      src={image.url} 
+                      alt={`Interior design by ${image.modelName}`}
                       className="w-full h-full object-cover hover:scale-105 transition-transform"
                       onError={(e) => {
-                        console.error(`Image ${index + 1} failed to load:`, imageUrl);
+                        console.error(`Image ${index + 1} failed to load:`, image.url);
                         e.currentTarget.style.display = 'none';
                       }}
                     />
                   </div>
                   <div className="space-y-1">
                     <h4 className="font-medium text-sm truncate">
-                      {modelNames[index] || `Model ${index + 1}`}
+                      {image.modelName || `Model ${index + 1}`}
                     </h4>
                     <Button 
                       onClick={() => handleDownload(index)} 
@@ -376,7 +386,7 @@ export const Designer3DPage: React.FC = () => {
             </p>
           </CardHeader>
           <CardContent>
-            <ThreeJsViewer imageUrl={generatedImages[0]} className="h-96 rounded-lg border" />
+            <ThreeJsViewer imageUrl={generatedImages[0]?.url} className="h-96 rounded-lg border" />
           </CardContent>
         </Card>
       )}
