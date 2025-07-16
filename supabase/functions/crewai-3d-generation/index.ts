@@ -742,21 +742,18 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     }
   } catch (error) {
     console.error("❌ Interior V2 failed:", error.message);
+    await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, error.message);
   }
 
-  // Model 7: rocketdigitalai/interior-design-sdxl - FIXED WITH VERSION HASH
+  // Model 7: rocketdigitalai/interior-design-sdxl - FIXED WITH CORRECT SCHEMA
   try {
     console.log("🎯 Attempting Interior Design SDXL model...");
+    updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'running');
+    
     const output = await replicate.run("rocketdigitalai/interior-design-sdxl:a3c091059a25590ce2d5ea13651fab63f447f21760e50c358d4b850e844f59ee", {
       input: {
         image: referenceImageUrl,
-        prompt: finalPrompt || "masterfully designed interior, photorealistic, interior design magazine quality, 8k uhd, highly detailed",
-        depth_strength: 0.8,
-        guidance_scale: 7.5,
-        negative_prompt: "ugly, deformed, noisy, blurry, low quality, glitch, distorted, disfigured, bad proportions, duplicate, out of frame, watermark, signature, text, bad hands, bad anatomy",
-        promax_strength: 0.8,
-        refiner_strength: 0.4,
-        num_inference_steps: 50
+        prompt: finalPrompt || "masterfully designed interior, photorealistic, interior design magazine quality, 8k uhd, highly detailed"
       }
     });
     
@@ -764,9 +761,11 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "🎯 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
       console.log("✅ Interior Design SDXL generation successful:", output);
+      await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'success', output);
     } else if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "🎯 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
       console.log("✅ Interior Design SDXL generation successful:", output[0]);
+      await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'success', output[0]);
     }
   } catch (error) {
     console.error("❌ Interior Design SDXL failed:", error.message);
