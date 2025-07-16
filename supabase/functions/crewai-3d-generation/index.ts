@@ -14,6 +14,7 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
     // Replicate Models (support both text-to-image and image-to-image)
     { modelName: 'adirik/interior-design', name: 'Interior Design AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'erayyavuz/interior-ai', name: 'Interior AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'jschoormans/comfyui-interior-remodel', name: 'ComfyUI Interior Remodel', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     { modelName: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
     // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
@@ -382,7 +383,8 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
   console.log("📋 REPLICATE MODELS TO TEST:");
   console.log("   1. 🏡 Interior Design AI - adirik/interior-design");
   console.log("   2. 🏠 Interior AI - erayyavuz/interior-ai");
-  console.log("   3. 🏗️ Designer Architecture - davisbrown/designer-architecture");
+  console.log("   3. 🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel");
+  console.log("   4. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
   
   // Model 1: adirik/interior-design - UNIFIED MODEL (supports both text-to-image and image-to-image)
@@ -457,7 +459,48 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
     await updateWorkflowStep('erayyavuz/interior-ai', 'failed', undefined, error.message);
   }
 
-  // Model 3: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
+  // Model 3: jschoormans/comfyui-interior-remodel - UNIFIED MODEL (supports both text-to-image and image-to-image)
+  try {
+    console.log("🎨 Attempting ComfyUI Interior Remodel model...");
+    updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'running');
+    
+    const inputParams: any = {
+      prompt: prompt || "photo of a beautiful living room, modern design, modernist, cozy\nhigh resolution, highly detailed, 4k",
+      output_format: "webp",
+      output_quality: 80,
+      negative_prompt: "blurry, illustration, distorted, horror",
+      randomise_seeds: true,
+      return_temp_files: false
+    };
+
+    // Add image parameter if reference image is provided (for image-to-image mode)
+    if (referenceImageUrl && referenceImageUrl !== '[NO_IMAGE]') {
+      inputParams.image = referenceImageUrl;
+    }
+    
+    const output = await replicate.run("jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce", {
+      input: inputParams
+    });
+    
+    console.log("ComfyUI Interior Remodel raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel" });
+      console.log("✅ ComfyUI Interior Remodel successful:", output[0]);
+      await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'success', output[0]);
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel" });
+      console.log("✅ ComfyUI Interior Remodel successful:", output);
+      await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'success', output);
+    } else {
+      console.log("⚠️ ComfyUI Interior Remodel unexpected output format:", typeof output, output);
+      await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'failed', undefined, 'Unexpected output format');
+    }
+  } catch (error) {
+    console.error("❌ ComfyUI Interior Remodel failed:", error.message);
+    await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'failed', undefined, error.message);
+  }
+
+  // Model 4: davisbrown/designer-architecture - TEXT-TO-IMAGE ONLY
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
     updateWorkflowStep('davisbrown/designer-architecture', 'running');
