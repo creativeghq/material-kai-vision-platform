@@ -269,7 +269,14 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
 
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        
+        // Fix: Convert ArrayBuffer to base64 without spreading large arrays
+        const uint8Array = new Uint8Array(arrayBuffer);
+        let binaryString = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+          binaryString += String.fromCharCode(uint8Array[i]);
+        }
+        const base64 = btoa(binaryString);
         const result = `data:image/png;base64,${base64}`;
         
         results.push({ 
@@ -285,7 +292,14 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
         });
 
         const arrayBuffer = await image.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        
+        // Fix: Convert ArrayBuffer to base64 without spreading large arrays  
+        const uint8Array = new Uint8Array(arrayBuffer);
+        let binaryString = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+          binaryString += String.fromCharCode(uint8Array[i]);
+        }
+        const base64 = btoa(binaryString);
         const result = `data:image/png;base64,${base64}`;
         
         results.push({ 
@@ -557,10 +571,10 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     console.error("❌ Interior Design AI failed:", error.message);
   }
 
-  // Model 3: erayyavuz/interior-ai (NOTE: uses 'input' not 'image' parameter!)
+  // Model 3: erayyavuz/interior-ai - FIXED WITH VERSION HASH
   try {
     console.log("🏠 Attempting Interior AI model...");
-    const output = await replicate.run("erayyavuz/interior-ai", {
+    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9", {
       input: {
         input: referenceImageUrl,
         prompt: finalPrompt,
@@ -638,10 +652,10 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     console.error("❌ Interiorly Gen1 Dev failed:", error.message);
   }
 
-  // Model 6: jschoormans/interior-v2
+  // Model 6: jschoormans/interior-v2 - FIXED WITH VERSION HASH
   try {
     console.log("🪟 Attempting Interior V2 model...");
-    const output = await replicate.run("jschoormans/interior-v2", {
+    const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt || "Living room, scandinavian interior, photograph, clean, beautiful, high quality, 8k",
@@ -665,10 +679,10 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     console.error("❌ Interior V2 failed:", error.message);
   }
 
-  // Model 7: rocketdigitalai/interior-design-sdxl
+  // Model 7: rocketdigitalai/interior-design-sdxl - FIXED WITH VERSION HASH
   try {
     console.log("🎯 Attempting Interior Design SDXL model...");
-    const output = await replicate.run("rocketdigitalai/interior-design-sdxl", {
+    const output = await replicate.run("rocketdigitalai/interior-design-sdxl:a3c091059a25590ce2d5ea13651fab63f447f21760e50c358d4b850e844f59ee", {
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt || "masterfully designed interior, photorealistic, interior design magazine quality, 8k uhd, highly detailed",
