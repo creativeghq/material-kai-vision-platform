@@ -489,7 +489,7 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
 }
 
 // Generate with YOUR EXACT Replicate image-to-image models only
-async function generateImageToImageModels(prompt: string, baseImageUrl: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
+async function generateImageToImageModels(finalPrompt: string, referenceImageUrl: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
   console.log("🖼️ Starting image-to-image model generations...");
   console.log("📋 IMAGE-TO-IMAGE MODELS TO TEST:");
@@ -503,8 +503,8 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("🏗️ Attempting Designer Architecture model...");
     const output = await replicate.run("davisbrown/designer-architecture", {
       input: {
-        image: baseImageUrl,
-        prompt: prompt,
+        image: referenceImageUrl,
+        prompt: finalPrompt,
         model: 'dev',
         num_inference_steps: 28,
         guidance_scale: 3,
@@ -532,8 +532,8 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("🎨 Attempting Interior Design AI model...");
     const output = await replicate.run("adirik/interior-design", {
       input: {
-        image: baseImageUrl,
-        prompt: prompt,
+        image: referenceImageUrl,
+        prompt: finalPrompt,
         guidance_scale: 15,
         prompt_strength: 0.8,
         num_inference_steps: 50,
@@ -555,8 +555,8 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("🏠 Attempting Interior AI model...");
     const output = await replicate.run("erayyavuz/interior-ai", {
       input: {
-        input: baseImageUrl,
-        prompt: prompt,
+        input: referenceImageUrl,
+        prompt: finalPrompt,
         strength: 0.8,
         guidance_scale: 7.5,
         negative_prompt: "low quality, blurry, watermark, unrealistic",
@@ -578,8 +578,8 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("🛠️ Attempting ComfyUI Interior Remodel model...");
     const output = await replicate.run("jschoormans/comfyui-interior-remodel", {
       input: {
-        image: baseImageUrl,
-        prompt: prompt || "photo of a beautiful living room, modern design, modernist, cozy\nhigh resolution, highly detailed, 4k",
+        image: referenceImageUrl,
+        prompt: finalPrompt || "photo of a beautiful living room, modern design, modernist, cozy\nhigh resolution, highly detailed, 4k",
         output_format: 'webp',
         output_quality: 80,
         negative_prompt: "blurry, illustration, distorted, horror",
@@ -601,8 +601,8 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("🏛️ Attempting Interiorly Gen1 Dev model...");
     const output = await replicate.run("julian-at/interiorly-gen1-dev", {
       input: {
-        image: baseImageUrl,
-        prompt: prompt,
+        image: referenceImageUrl,
+        prompt: finalPrompt,
         model: 'dev',
         num_inference_steps: 28,
         guidance_scale: 3,
@@ -627,8 +627,8 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("🪟 Attempting Interior V2 model...");
     const output = await replicate.run("jschoormans/interior-v2", {
       input: {
-        image: baseImageUrl,
-        prompt: prompt || "Living room, scandinavian interior, photograph, clean, beautiful, high quality, 8k",
+        image: referenceImageUrl,
+        prompt: finalPrompt || "Living room, scandinavian interior, photograph, clean, beautiful, high quality, 8k",
         strength: 0.999999,
         guidance_scale: 7,
         negative_prompt: "(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch), open mouth",
@@ -651,8 +651,8 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("🎯 Attempting Interior Design SDXL model...");
     const output = await replicate.run("rocketdigitalai/interior-design-sdxl", {
       input: {
-        image: baseImageUrl,
-        prompt: prompt || "masterfully designed interior, photorealistic, interior design magazine quality, 8k uhd, highly detailed",
+        image: referenceImageUrl,
+        prompt: finalPrompt || "masterfully designed interior, photorealistic, interior design magazine quality, 8k uhd, highly detailed",
         depth_strength: 0.8,
         guidance_scale: 7.5,
         negative_prompt: "ugly, deformed, noisy, blurry, low quality, glitch, distorted, disfigured, bad proportions, duplicate, out of frame, watermark, signature, text, bad hands, bad anatomy",
