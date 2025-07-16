@@ -498,10 +498,39 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
   console.log("   3. 🏛️ Architecture Refiner - tencentarc/photomaker");
   console.log("------------------------------------------------------");
 
-  // Model 1: adirik/interior-design (WORKING WITH CORRECT HASH)
+  // Model 1: davisbrown/designer-architecture
+  try {
+    console.log("🏗️ Attempting Designer Architecture model...");
+    const output = await replicate.run("davisbrown/designer-architecture", {
+      input: {
+        image: baseImageUrl,
+        prompt: prompt,
+        model: 'dev',
+        num_inference_steps: 28,
+        guidance_scale: 3,
+        aspect_ratio: '16:9',
+        output_format: 'webp',
+        output_quality: 80,
+        num_outputs: 1
+      }
+    });
+    
+    console.log("Designer Architecture raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
+      console.log("✅ Designer Architecture generation successful:", output[0]);
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
+      console.log("✅ Designer Architecture generation successful:", output);
+    }
+  } catch (error) {
+    console.error("❌ Designer Architecture failed:", error.message);
+  }
+
+  // Model 2: adirik/interior-design
   try {
     console.log("🎨 Attempting Interior Design AI model...");
-    const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
+    const output = await replicate.run("adirik/interior-design", {
       input: {
         image: baseImageUrl,
         prompt: prompt,
@@ -515,65 +544,131 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
     console.log("Interior Design AI raw output:", output);
     if (typeof output === 'string') {
       results.push({ url: output, modelName: "🎨 Interior Design AI - adirik/interior-design" });
-      console.log("✅ Interior Design AI generation successful, URL:", output);
-    } else {
-      console.log("⚠️ Interior Design AI unexpected output format:", typeof output, output);
+      console.log("✅ Interior Design AI generation successful:", output);
     }
   } catch (error) {
     console.error("❌ Interior Design AI failed:", error.message);
   }
 
-  // Model 2: ControlNet Interior (for image-guided generation) - TRY WITHOUT VERSION HASH FIRST
+  // Model 3: erayyavuz/interior-ai
   try {
-    console.log("🏠 Attempting ControlNet Interior model...");
-    const output = await replicate.run("lllyasviel/control_v11p_sd15_canny", {
+    console.log("🏠 Attempting Interior AI model...");
+    const output = await replicate.run("erayyavuz/interior-ai", {
       input: {
-        image: baseImageUrl,
-        prompt: `Interior design, ${prompt}, high quality, detailed`,
-        num_outputs: 1,
-        guidance_scale: 9,
-        num_inference_steps: 20,
-        controlnet_conditioning_scale: 1.0,
-        low_threshold: 100,
-        high_threshold: 200
+        input: baseImageUrl,
+        prompt: prompt,
+        strength: 0.8,
+        guidance_scale: 7.5,
+        negative_prompt: "low quality, blurry, watermark, unrealistic",
+        num_inference_steps: 50
       }
     });
     
-    console.log("ControlNet Interior raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏠 ControlNet Interior - lllyasviel/control_v11p_sd15_canny" });
-      console.log("✅ ControlNet Interior successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏠 ControlNet Interior - lllyasviel/control_v11p_sd15_canny" });
-      console.log("✅ ControlNet Interior successful:", output);
+    console.log("Interior AI raw output:", output);
+    if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🏠 Interior AI - erayyavuz/interior-ai" });
+      console.log("✅ Interior AI generation successful:", output);
     }
   } catch (error) {
-    console.error("❌ ControlNet Interior failed:", error.message);
+    console.error("❌ Interior AI failed:", error.message);
   }
 
-  // Model 3: PhotoMaker for architecture refinement - TRY WITHOUT VERSION HASH FIRST
+  // Model 4: jschoormans/comfyui-interior-remodel
   try {
-    console.log("🏛️ Attempting Architecture Refiner model...");
-    const output = await replicate.run("tencentarc/photomaker", {
+    console.log("🛠️ Attempting ComfyUI Interior Remodel model...");
+    const output = await replicate.run("jschoormans/comfyui-interior-remodel", {
       input: {
-        input_image: baseImageUrl,
-        prompt: `Interior architecture, ${prompt}, professional photography, realistic lighting`,
-        num_steps: 20,
-        style_strength_ratio: 15,
+        image: baseImageUrl,
+        prompt: prompt || "photo of a beautiful living room, modern design, modernist, cozy\nhigh resolution, highly detailed, 4k",
+        output_format: 'webp',
+        output_quality: 80,
+        negative_prompt: "blurry, illustration, distorted, horror",
+        randomise_seeds: true
+      }
+    });
+    
+    console.log("ComfyUI Interior Remodel raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel" });
+      console.log("✅ ComfyUI Interior Remodel generation successful:", output[0]);
+    }
+  } catch (error) {
+    console.error("❌ ComfyUI Interior Remodel failed:", error.message);
+  }
+
+  // Model 5: julian-at/interiorly-gen1-dev
+  try {
+    console.log("🏛️ Attempting Interiorly Gen1 Dev model...");
+    const output = await replicate.run("julian-at/interiorly-gen1-dev", {
+      input: {
+        image: baseImageUrl,
+        prompt: prompt,
+        model: 'dev',
+        num_inference_steps: 28,
+        guidance_scale: 3,
+        aspect_ratio: '16:9',
+        output_format: 'webp',
+        output_quality: 80,
         num_outputs: 1
       }
     });
     
-    console.log("Architecture Refiner raw output:", output);
+    console.log("Interiorly Gen1 Dev raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏛️ Architecture Refiner - tencentarc/photomaker" });
-      console.log("✅ Architecture Refiner successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏛️ Architecture Refiner - tencentarc/photomaker" });
-      console.log("✅ Architecture Refiner successful:", output);
+      results.push({ url: output[0], modelName: "🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev" });
+      console.log("✅ Interiorly Gen1 Dev generation successful:", output[0]);
     }
   } catch (error) {
-    console.error("❌ Architecture Refiner failed:", error.message);
+    console.error("❌ Interiorly Gen1 Dev failed:", error.message);
+  }
+
+  // Model 6: jschoormans/interior-v2
+  try {
+    console.log("🪟 Attempting Interior V2 model...");
+    const output = await replicate.run("jschoormans/interior-v2", {
+      input: {
+        image: baseImageUrl,
+        prompt: prompt || "Living room, scandinavian interior, photograph, clean, beautiful, high quality, 8k",
+        strength: 0.999999,
+        guidance_scale: 7,
+        negative_prompt: "(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch), open mouth",
+        num_inference_steps: 30,
+        max_resolution: 1536
+      }
+    });
+    
+    console.log("Interior V2 raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
+      console.log("✅ Interior V2 generation successful:", output[0]);
+    }
+  } catch (error) {
+    console.error("❌ Interior V2 failed:", error.message);
+  }
+
+  // Model 7: rocketdigitalai/interior-design-sdxl
+  try {
+    console.log("🎯 Attempting Interior Design SDXL model...");
+    const output = await replicate.run("rocketdigitalai/interior-design-sdxl", {
+      input: {
+        image: baseImageUrl,
+        prompt: prompt || "masterfully designed interior, photorealistic, interior design magazine quality, 8k uhd, highly detailed",
+        depth_strength: 0.8,
+        guidance_scale: 7.5,
+        negative_prompt: "ugly, deformed, noisy, blurry, low quality, glitch, distorted, disfigured, bad proportions, duplicate, out of frame, watermark, signature, text, bad hands, bad anatomy",
+        promax_strength: 0.8,
+        refiner_strength: 0.4,
+        num_inference_steps: 50
+      }
+    });
+    
+    console.log("Interior Design SDXL raw output:", output);
+    if (typeof output === 'string') {
+      results.push({ url: output, modelName: "🎯 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
+      console.log("✅ Interior Design SDXL generation successful:", output);
+    }
+  } catch (error) {
+    console.error("❌ Interior Design SDXL failed:", error.message);
   }
 
   console.log("📊 IMAGE-TO-IMAGE GENERATION SUMMARY:");
