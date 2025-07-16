@@ -1036,17 +1036,8 @@ serve(async (req) => {
 
     console.log('Request validation passed, calling processGeneration');
     
-    // Add timeout protection to prevent function hanging
-    const TIMEOUT_MS = 30000; // 30 seconds timeout
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Function timeout - processing took too long')), TIMEOUT_MS);
-    });
-    
     try {
-      const result = await Promise.race([
-        processGeneration(request),
-        timeoutPromise
-      ]) as any;
+      const result = await processGeneration(request);
       
       return new Response(
         JSON.stringify(result),
