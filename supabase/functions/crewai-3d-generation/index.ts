@@ -229,16 +229,13 @@ async function generateHuggingFaceImage(prompt: string): Promise<string> {
 async function generateTextToImageModels(prompt: string, replicate: any): Promise<Array<{url: string, modelName: string}>> {
   const results = [];
   
-  // Model 1: davisbrown/designer-architecture
+  // Model 1: davisbrown/designer-architecture (requires DESARCH trigger word)
   try {
     console.log("Generating with Designer Architecture...");
     const output = await replicate.run("davisbrown/designer-architecture", {
       input: {
-        prompt: prompt,
-        num_outputs: 1,
-        aspect_ratio: "16:9",
-        guidance_scale: 3.5,
-        output_quality: 90
+        prompt: `DESARCH ${prompt}`,
+        aspect_ratio: "16:9"
       }
     });
     
@@ -252,16 +249,14 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     console.error("Designer Architecture failed:", error);
   }
 
-  // Model 2: julian-at/interiorly-gen1-dev  
+  // Model 2: julian-at/interiorly-gen1-dev (requires INTRLY trigger word)
   try {
     console.log("Generating with Interiorly Gen1...");
     const output = await replicate.run("julian-at/interiorly-gen1-dev", {
       input: {
-        width: 1024,
-        height: 1024,
-        prompt: prompt,
-        guidance_scale: 5,
-        num_inference_steps: 35
+        prompt: `INTRLY ${prompt}`,
+        aspect_ratio: "16:9",
+        model: "dev"
       }
     });
     
