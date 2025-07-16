@@ -272,11 +272,10 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   // Model 2: julian-at/interiorly-gen1-dev (requires INTRLY trigger word)
   try {
     console.log("Generating with Interiorly Gen1...");
-    const output = await replicate.run("julian-at/interiorly-gen1-dev:bf9b6e8e3ad37e2a6c2b85e69725994be33c7a38a0af6bb94cf68b13e79f56e7", {
+    const output = await replicate.run("julian-at/interiorly-gen1-dev", {
       input: {
         prompt: `INTRLY ${prompt}`,
         aspect_ratio: "16:9",
-        model: "dev",
         go_fast: false
       }
     });
@@ -330,7 +329,7 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
   // Model 2: erayyavuz/interior-ai
   try {
     console.log("Generating with Interior AI...");
-    const output = await replicate.run("erayyavuz/interior-ai:d87cbc964a3c65e6bc01ae83f6d035e8c90eaa6db02e9db7a7b7fa9abf72eee9", {
+    const output = await replicate.run("erayyavuz/interior-ai", {
       input: {
         input: baseImageUrl,
         prompt: prompt,
@@ -355,16 +354,21 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
   // Model 3: jschoormans/comfyui-interior-remodel
   try {
     console.log("Generating with ComfyUI Interior Remodel...");
-    const output = await replicate.run("jschoormans/comfyui-interior-remodel", {
+    const output = await replicate.run("jschoormans/comfyui-interior-remodel:9eb61c2cd9eec1c05a9b99eb6fd4b85bb50f9ed1a6ab4f6fd319dd41b624a1e3", {
       input: {
-        image: baseImageUrl
+        image: baseImageUrl,
+        prompt: prompt
       }
     });
     
+    console.log("ComfyUI Interior Remodel raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "ComfyUI Interior Remodel" });
+      console.log("ComfyUI Interior Remodel generation successful, URL:", output[0]);
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "ComfyUI Interior Remodel" });
+      console.log("ComfyUI Interior Remodel generation successful, URL:", output);
     }
-    console.log("ComfyUI Interior Remodel generation successful");
   } catch (error) {
     console.error("ComfyUI Interior Remodel failed:", error);
   }
@@ -372,18 +376,23 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
   // Model 4: jschoormans/interior-v2
   try {
     console.log("Generating with Interior V2...");
-    const output = await replicate.run("jschoormans/interior-v2", {
+    const output = await replicate.run("jschoormans/interior-v2:0b6bd966b4a28f0d21ea3bbcfab9e2fb5e59c8c0b94b983df1e5b0b6e8c9f297", {
       input: {
         image: baseImageUrl,
+        prompt: prompt,
         max_resolution: 1024,
         controlnet_conditioning_scale: 0.03
       }
     });
     
+    console.log("Interior V2 raw output:", output);
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "Interior V2" });
+      console.log("Interior V2 generation successful, URL:", output[0]);
+    } else if (typeof output === 'string') {
+      results.push({ url: output, modelName: "Interior V2" });
+      console.log("Interior V2 generation successful, URL:", output);
     }
-    console.log("Interior V2 generation successful");
   } catch (error) {
     console.error("Interior V2 failed:", error);
   }
@@ -391,17 +400,24 @@ async function generateImageToImageModels(prompt: string, baseImageUrl: string, 
   // Model 5: rocketdigitalai/interior-design-sdxl
   try {
     console.log("Generating with Interior Design SDXL...");
-    const output = await replicate.run("rocketdigitalai/interior-design-sdxl", {
+    const output = await replicate.run("rocketdigitalai/interior-design-sdxl:c8c9e76e2c574226b0ee0ad7631ed2c2a7bb4a5b4e66c4a50e062b1d8aa5b7f1", {
       input: {
         image: baseImageUrl,
-        prompt: prompt
+        prompt: prompt,
+        num_inference_steps: 20,
+        guidance_scale: 7.5,
+        strength: 0.8
       }
     });
     
-    if (typeof output === 'string') {
+    console.log("Interior Design SDXL raw output:", output);
+    if (Array.isArray(output) && output.length > 0) {
+      results.push({ url: output[0], modelName: "Interior Design SDXL" });
+      console.log("Interior Design SDXL generation successful, URL:", output[0]);
+    } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "Interior Design SDXL" });
+      console.log("Interior Design SDXL generation successful, URL:", output);
     }
-    console.log("Interior Design SDXL generation successful");
   } catch (error) {
     console.error("Interior Design SDXL failed:", error);
   }
