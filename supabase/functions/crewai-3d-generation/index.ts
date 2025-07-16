@@ -406,14 +406,15 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
   // Model 1: davisbrown/designer-architecture - FIXED WITH CORRECT VERSION HASH
   try {
     console.log("🏗️ Attempting Designer Architecture model...");
+    updateWorkflowStep('davisbrown/designer-architecture', 'running');
+    
     const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
       input: {
-        prompt: `Interior DESARCH design, ${prompt}`,
+        prompt: `Interior DESARCH design, ${prompt}, simple modern design, open ceiling, windows shining light, beautiful interior, photorealistic`,
         num_outputs: 1,
         aspect_ratio: "16:9",
         guidance_scale: 3.5,
-        output_quality: 90,
-        model: "dev"
+        output_quality: 90
       }
     });
     
@@ -421,14 +422,18 @@ async function generateTextToImageModels(prompt: string, replicate: any): Promis
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
       console.log("✅ Designer Architecture successful:", output[0]);
+      await updateWorkflowStep('davisbrown/designer-architecture', 'success', output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
       console.log("✅ Designer Architecture successful:", output);
+      await updateWorkflowStep('davisbrown/designer-architecture', 'success', output);
     } else {
       console.log("⚠️ Designer Architecture unexpected output format:", typeof output, output);
+      await updateWorkflowStep('davisbrown/designer-architecture', 'failed', undefined, 'Unexpected output format');
     }
   } catch (error) {
     console.error("❌ Designer Architecture failed:", error.message);
+    await updateWorkflowStep('davisbrown/designer-architecture', 'failed', undefined, error.message);
   }
 
   // Model 2: prithivMLmods/interior-design-sdxl-lora - TRY WITHOUT VERSION HASH FIRST
@@ -583,39 +588,9 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
   console.log("   4. 🏛️ Interiorly Gen1 Dev - julian-at/interiorly-gen1-dev");
   console.log("   5. 🪟 Interior V2 - jschoormans/interior-v2");
   console.log("   6. 🎯 Interior Design SDXL - rocketdigitalai/interior-design-sdxl");
-  console.log("   7. 🏗️ Designer Architecture - davisbrown/designer-architecture");
   console.log("------------------------------------------------------");
 
-  // Model 1: davisbrown/designer-architecture - FIXED WITH CORRECT VERSION HASH
-  try {
-    console.log("🏗️ Attempting Designer Architecture model...");
-    const output = await replicate.run("davisbrown/designer-architecture:0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46", {
-      input: {
-        image: referenceImageUrl,
-        prompt: finalPrompt,
-        model: 'dev',
-        num_inference_steps: 28,
-        guidance_scale: 3,
-        aspect_ratio: '16:9',
-        output_format: 'webp',
-        output_quality: 80,
-        num_outputs: 1
-      }
-    });
-    
-    console.log("Designer Architecture raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
-      console.log("✅ Designer Architecture generation successful:", output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🏗️ Designer Architecture - davisbrown/designer-architecture" });
-      console.log("✅ Designer Architecture generation successful:", output);
-    }
-  } catch (error) {
-    console.error("❌ Designer Architecture failed:", error.message);
-  }
-
-  // Model 2: adirik/interior-design - FIXED WITH VERSION HASH
+  // Model 1: adirik/interior-design - FIXED WITH VERSION HASH
   try {
     console.log("🎨 Attempting Interior Design AI model...");
     const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
