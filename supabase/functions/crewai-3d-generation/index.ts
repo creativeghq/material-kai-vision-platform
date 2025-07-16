@@ -714,18 +714,16 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     await updateWorkflowStep('julian-at/interiorly-gen1-dev', 'failed', undefined, error.message);
   }
 
-  // Model 6: jschoormans/interior-v2 - FIXED WITH VERSION HASH
+  // Model 6: jschoormans/interior-v2 - FIXED WITH CORRECT SCHEMA
   try {
     console.log("🪟 Attempting Interior V2 model...");
+    updateWorkflowStep('jschoormans/interior-v2', 'running');
+    
     const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
       input: {
         image: referenceImageUrl,
-        prompt: finalPrompt || "Living room, scandinavian interior, photograph, clean, beautiful, high quality, 8k",
-        strength: 0.999999,
-        guidance_scale: 7,
-        negative_prompt: "(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch), open mouth",
-        num_inference_steps: 30,
-        max_resolution: 1536
+        max_resolution: 1051,
+        controlnet_conditioning_scale: 0.03
       }
     });
     
@@ -733,9 +731,14 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     if (Array.isArray(output) && output.length > 0) {
       results.push({ url: output[0], modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
       console.log("✅ Interior V2 generation successful:", output[0]);
+      await updateWorkflowStep('jschoormans/interior-v2', 'success', output[0]);
     } else if (typeof output === 'string') {
       results.push({ url: output, modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
       console.log("✅ Interior V2 generation successful:", output);
+      await updateWorkflowStep('jschoormans/interior-v2', 'success', output);
+    } else {
+      console.log("⚠️ Interior V2 unexpected output format:", typeof output, output);
+      await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'Unexpected output format');
     }
   } catch (error) {
     console.error("❌ Interior V2 failed:", error.message);
