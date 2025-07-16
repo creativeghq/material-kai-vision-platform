@@ -29,6 +29,23 @@ export const Designer3DPage: React.FC = () => {
   // Workflow modal state
   const [showWorkflowModal, setShowWorkflowModal] = useState(false);
   const [currentGenerationId, setCurrentGenerationId] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  React.useEffect(() => {
+    const checkAdminRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        setIsAdmin(data === true);
+      }
+    };
+    
+    checkAdminRole();
+  }, []);
 
   // Working model names that match our edge function (Fixed)
   const modelNames = [
@@ -166,11 +183,20 @@ export const Designer3DPage: React.FC = () => {
       console.log("Generation response received:", result);
       
       if (result.success && result.generationId) {
-        // Show workflow modal and start tracking
-        setCurrentGenerationId(result.generationId);
-        setShowWorkflowModal(true);
-        setIsGenerating(false);
-        setIsUploading(false);
+        if (isAdmin) {
+          // Show workflow modal for admins
+          setCurrentGenerationId(result.generationId);
+          setShowWorkflowModal(true);
+          setIsGenerating(false);
+          setIsUploading(false);
+        } else {
+          // Regular polling for non-admin users
+          toast({
+            title: 'Generation Started',
+            description: 'Your 3D interior is being generated. This may take a few minutes...'
+          });
+          await pollForResults(result.generationId);
+        }
       } else {
         throw new Error(result.error || 'Failed to start generation');
       }
@@ -536,24 +562,26 @@ export const Designer3DPage: React.FC = () => {
         onNavigate={handleModalNavigate}
       />
 
-      {/* Generation Workflow Modal */}
-      <GenerationWorkflowModal
-        isOpen={showWorkflowModal}
-        onClose={() => setShowWorkflowModal(false)}
-        generationId={currentGenerationId}
-        onComplete={(images) => {
-          const imagesWithModels = images.map((url: string, index: number) => ({
-            url,
-            modelName: modelNames[index] || `Model ${index + 1}`
-          }));
-          setGeneratedImages(imagesWithModels);
-          setShowWorkflowModal(false);
-          toast({
-            title: 'Generation Complete!',
-            description: `Generated ${images.length} interior designs successfully.`
-          });
-        }}
-      />
+      {/* Generation Workflow Modal - Only for Admins */}
+      {isAdmin && (
+        <GenerationWorkflowModal
+          isOpen={showWorkflowModal}
+          onClose={() => setShowWorkflowModal(false)}
+          generationId={currentGenerationId}
+          onComplete={(images) => {
+            const imagesWithModels = images.map((url: string, index: number) => ({
+              url,
+              modelName: modelNames[index] || `Model ${index + 1}`
+            }));
+            setGeneratedImages(imagesWithModels);
+            setShowWorkflowModal(false);
+            toast({
+              title: 'Generation Complete!',
+              description: `Generated ${images.length} interior designs successfully.`
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

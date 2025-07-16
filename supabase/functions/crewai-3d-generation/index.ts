@@ -57,9 +57,13 @@ async function updateWorkflowStep(modelName: string, status: 'running' | 'succes
       await supabase
         .from('generation_3d')
         .update({
-          result_data: { workflow_steps: workflowSteps }
+          result_data: { 
+            workflow_steps: workflowSteps,
+            progress: Math.round((workflowSteps.filter(s => s.status === 'success' || s.status === 'failed').length / workflowSteps.length) * 100)
+          }
         })
         .eq('id', currentGenerationId);
+      console.log(`Updated workflow step: ${modelName} -> ${status}`);
     } catch (error) {
       console.error('Failed to update workflow step in database:', error);
     }
@@ -800,9 +804,9 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
 
   const allResults: Array<{url: string, modelName: string}> = [];
   
-  // If reference image is provided, use image-to-image models primarily
-  if (referenceImageUrl) {
-    console.log("🖼️ Reference image provided, using all models with image-to-image priority");
+  // Determine which models to run based on reference image
+  if (referenceImageUrl && referenceImageUrl !== '[NO_IMAGE]') {
+    console.log("🖼️ Reference image provided, running IMAGE-TO-IMAGE models only");
     
     const replicateToken = Deno.env.get('REPLICATE_API_KEY');
     console.log("🔑 Replicate token available:", !!replicateToken);
@@ -814,17 +818,11 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
         });
         console.log("🤖 Replicate client initialized successfully");
         
-        // Generate with image-to-image models first (more relevant with reference image)
-        console.log("🎨 Starting image-to-image model generation...");
+        // Only run image-to-image models
+        console.log("🎨 Running image-to-image models...");
         const imageToImageResults = await generateImageToImageModels(finalPrompt, referenceImageUrl, replicate);
         console.log(`📊 Image-to-image results: ${imageToImageResults.length} images generated`);
         allResults.push(...imageToImageResults);
-        
-        // Still generate some text-to-image for variety
-        console.log("📝 Starting text-to-image model generation...");
-        const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
-        console.log(`📊 Text-to-image results: ${textToImageResults.length} images generated`);
-        allResults.push(...textToImageResults);
       } catch (replicateError) {
         console.error("❌ Replicate generation failed:", replicateError.message);
         console.error("❌ Replicate full error:", replicateError);
@@ -832,23 +830,12 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
     } else {
       console.error("❌ REPLICATE_API_KEY not found in environment");
     }
-    
-    // Add Hugging Face models as additional options
-    console.log("🤗 Starting Hugging Face model generation...");
-    try {
-      const hfResults = await generateHuggingFaceImages(finalPrompt);
-      console.log(`📊 Hugging Face results: ${hfResults.length} images generated`);
-      allResults.push(...hfResults);
-    } catch (hfError) {
-      console.error("❌ Hugging Face generation failed:", hfError.message);
-      console.error("❌ Hugging Face full error:", hfError);
-    }
   } else {
-    // No reference image - use text-to-image models primarily
-    console.log("📝 No reference image, using text-to-image models primarily");
+    // No reference image - run text-to-image models only
+    console.log("📝 No reference image, running TEXT-TO-IMAGE models only");
     
     // Start with Hugging Face models (more reliable)
-    console.log("🤗 Starting Hugging Face model generation...");
+    console.log("🤗 Running Hugging Face models...");
     try {
       const hfResults = await generateHuggingFaceImages(finalPrompt);
       console.log(`📊 Hugging Face results: ${hfResults.length} images generated`);
@@ -858,12 +845,12 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
       console.error("❌ Hugging Face full error:", hfError);
     }
 
-    // Generate with Replicate models
+    // Generate with Replicate text-to-image models
     const replicateToken = Deno.env.get('REPLICATE_API_KEY');
     console.log("🔑 Replicate token available:", !!replicateToken);
     
     if (replicateToken) {
-      console.log("🤖 Starting Replicate model generations...");
+      console.log("🤖 Running Replicate text-to-image models...");
       
       try {
         const replicate = new Replicate({
@@ -871,23 +858,11 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
         });
         console.log("🤖 Replicate client initialized successfully");
         
-        // Generate text-to-image models first
-        console.log("📝 Starting text-to-image model generation...");
+        // Only run text-to-image models
+        console.log("📝 Running text-to-image models...");
         const textToImageResults = await generateTextToImageModels(finalPrompt, replicate);
         console.log(`📊 Text-to-image results: ${textToImageResults.length} images generated`);
         allResults.push(...textToImageResults);
-        
-        // If we have any base images, use them for image-to-image models
-        if (allResults.length > 0) {
-          console.log("🎨 Using first generated image for image-to-image models...");
-          // Use the first generated image as base for image-to-image models
-          const baseImageUrl = allResults[0].url;
-          const imageToImageResults = await generateImageToImageModels(finalPrompt, baseImageUrl, replicate);
-          console.log(`📊 Additional image-to-image results: ${imageToImageResults.length} images generated`);
-          allResults.push(...imageToImageResults);
-        } else {
-          console.log("⚠️ No base images available for image-to-image generation");
-        }
       } catch (replicateError) {
         console.error("❌ Replicate generation failed:", replicateError.message);
         console.error("❌ Replicate full error:", replicateError);
@@ -930,9 +905,13 @@ async function processGeneration(request: GenerationRequest) {
   const startTime = Date.now();
   let generationRecord: any = null;
   
-  // Initialize workflow tracking
-  initializeWorkflowSteps(!!request.reference_image_url);
-  currentGenerationId = null; // Will be set after record creation
+  // Initialize workflow tracking based on whether there's a reference image
+  const hasReferenceImage = request.reference_image_url && request.reference_image_url !== '[NO_IMAGE]';
+  console.log('Has reference image:', hasReferenceImage);
+  initializeWorkflowSteps(hasReferenceImage);
+  
+  // Set the current generation ID for workflow tracking (will be passed from serve function)
+  // Note: This will be set when processGeneration is called from the background task
   
   try {
     console.log('About to create initial record');
@@ -1126,6 +1105,9 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    // Set the current generation ID for workflow tracking
+    currentGenerationId = recordData.id;
     
     // Start the generation as a background task to avoid timeout
     EdgeRuntime.waitUntil(
