@@ -3,6 +3,12 @@
  * Premium ML capabilities for advanced material processing
  */
 
+import { 
+  INTERIOR_DESIGN_MODELS, 
+  ModelParameterValidator, 
+  ModelConfig 
+} from './replicateModelConfigs';
+
 interface ReplicateConfig {
   apiKey: string;
   baseUrl: string;
@@ -256,6 +262,232 @@ export class ReplicateService {
       console.error('Material property analysis failed:', error);
       return this.fallbackMaterialAnalysis(imageUrl);
     }
+  }
+
+  /**
+   * Generate interior design images using model-specific parameters
+   */
+  async generateInteriorDesign(
+    modelId: string,
+    prompt: string,
+    imageUrl?: string,
+    options: Record<string, any> = {}
+  ): Promise<string | string[]> {
+    const startTime = Date.now();
+
+    try {
+      // Get model configuration
+      const modelConfig = INTERIOR_DESIGN_MODELS[modelId];
+      if (!modelConfig) {
+        throw new Error(`Unsupported interior design model: ${modelId}`);
+      }
+
+      // Prepare base parameters
+      const baseParams: Record<string, any> = {
+        prompt,
+        ...options
+      };
+
+      // Add image parameter if provided (for image-to-image models)
+      if (imageUrl) {
+        baseParams['image'] = imageUrl;
+      }
+
+      // Validate and transform parameters using static method
+      const validatedParams = ModelParameterValidator.validateAndTransformParameters(modelId, baseParams);
+
+      // Create prediction with model-specific version and parameters
+      const prediction = await this.createPrediction({
+        version: modelConfig.version,
+        input: validatedParams
+      });
+
+      const result = await this.waitForCompletion(prediction.id);
+      
+      if (result.status === 'failed') {
+        throw new Error(`Interior design generation failed: ${result.error}`);
+      }
+
+      // Track usage for interior design
+      this.usageTracker.set('interior-design', (this.usageTracker.get('interior-design') || 0) + 1);
+
+      return result.output;
+
+    } catch (error) {
+      console.error(`Interior design generation failed for model ${modelId}:`, error);
+      throw new Error(`Failed to generate interior design: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate interior design with automatic model selection based on requirements
+   */
+  async generateInteriorDesignAuto(
+    prompt: string,
+    imageUrl?: string,
+    requirements: {
+      style?: 'modern' | 'traditional' | 'minimalist' | 'luxury';
+      speed?: 'fast' | 'balanced' | 'quality';
+      type?: 'text-to-image' | 'image-to-image';
+    } = {}
+  ): Promise<{ result: string | string[]; modelUsed: string; processingTime: number }> {
+    const startTime = Date.now();
+
+    // Select best model based on requirements
+    const modelId = this.selectBestInteriorModel(requirements, !!imageUrl);
+    
+    try {
+      const result = await this.generateInteriorDesign(modelId, prompt, imageUrl, {
+        // Add requirement-based parameter adjustments
+        ...(requirements.speed === 'fast' && { num_inference_steps: 20 }),
+        ...(requirements.speed === 'quality' && { num_inference_steps: 50 }),
+        ...(requirements.style === 'luxury' && { guidance_scale: 8.5 }),
+        ...(requirements.style === 'minimalist' && { guidance_scale: 6.0 })
+      });
+
+      return {
+        result,
+        modelUsed: modelId,
+        processingTime: Date.now() - startTime
+      };
+
+    } catch (error) {
+      console.error(`Auto interior design generation failed:`, error);
+      throw new Error(`Failed to generate interior design automatically: ${error.message}`);
+    }
+  }
+
+  /**
+   * Test all interior design models with a standard prompt
+   */
+  async testAllInteriorModels(
+    testPrompt: string = "modern living room with comfortable seating",
+    imageUrl?: string
+  ): Promise<{
+    results: Record<string, { success: boolean; output?: any; error?: string; processingTime: number }>;
+    summary: { total: number; successful: number; failed: number; successRate: number };
+  }> {
+    const results: Record<string, any> = {};
+    const modelIds = Object.keys(INTERIOR_DESIGN_MODELS);
+
+    console.log(`Testing ${modelIds.length} interior design models...`);
+
+    for (const modelId of modelIds) {
+      const startTime = Date.now();
+      console.log(`Testing model: ${modelId}`);
+
+      try {
+        const output = await this.generateInteriorDesign(modelId, testPrompt, imageUrl);
+        results[modelId] = {
+          success: true,
+          output,
+          processingTime: Date.now() - startTime
+        };
+        console.log(`✅ ${modelId}: Success`);
+      } catch (error) {
+        results[modelId] = {
+          success: false,
+          error: error.message,
+          processingTime: Date.now() - startTime
+        };
+        console.log(`❌ ${modelId}: ${error.message}`);
+      }
+    }
+
+    // Calculate summary statistics
+    const successful = Object.values(results).filter((r: any) => r.success).length;
+    const failed = modelIds.length - successful;
+    const successRate = Math.round((successful / modelIds.length) * 100);
+
+    const summary = {
+      total: modelIds.length,
+      successful,
+      failed,
+      successRate
+    };
+
+    console.log(`\nTest Summary: ${successful}/${modelIds.length} models successful (${successRate}%)`);
+
+    return { results, summary };
+  }
+
+  /**
+   * Select the best interior design model based on requirements
+   */
+  private selectBestInteriorModel(
+    requirements: {
+      style?: 'modern' | 'traditional' | 'minimalist' | 'luxury';
+      speed?: 'fast' | 'balanced' | 'quality';
+      type?: 'text-to-image' | 'image-to-image';
+    },
+    hasImage: boolean
+  ): string {
+    // Filter models based on type requirement
+    const availableModels = Object.entries(INTERIOR_DESIGN_MODELS).filter(([_, config]) => {
+      if (requirements.type === 'image-to-image') {
+        return config.capabilities?.includes('image-to-image');
+      }
+      if (requirements.type === 'text-to-image') {
+        return config.capabilities?.includes('text-to-image');
+      }
+      // If no type specified, prefer image-to-image if image provided
+      if (hasImage) {
+        return config.capabilities?.includes('image-to-image');
+      }
+      return true;
+    });
+
+    // If no models match requirements, fall back to working models
+    if (availableModels.length === 0) {
+      const workingModels = Object.entries(INTERIOR_DESIGN_MODELS).filter(([_, config]) => 
+        config.status === 'working'
+      );
+      return workingModels.length > 0 ? workingModels[0][0] : 'julian-at/interiorly-gen1-dev';
+    }
+
+    // Prioritize by status (working > untested > failing)
+    const sortedModels = availableModels.sort(([_, configA], [__, configB]) => {
+      const statusPriority = { working: 3, untested: 2, failing: 1 };
+      const priorityA = statusPriority[configA.status || 'untested'];
+      const priorityB = statusPriority[configB.status || 'untested'];
+      return priorityB - priorityA;
+    });
+
+    // For speed requirements, prefer specific models
+    if (requirements.speed === 'fast') {
+      const fastModel = sortedModels.find(([id]) => 
+        id.includes('comfyui') || id.includes('designer-architecture')
+      );
+      if (fastModel) return fastModel[0];
+    }
+
+    // Return the highest priority model
+    return sortedModels[0][0];
+  }
+
+  /**
+   * Get available interior design models and their capabilities
+   */
+  getInteriorDesignModels(): Record<string, {
+    name: string;
+    description: string;
+    capabilities: string[];
+    status: 'working' | 'failing' | 'untested';
+    lastTested?: string;
+  }> {
+    const models: Record<string, any> = {};
+
+    for (const [modelId, config] of Object.entries(INTERIOR_DESIGN_MODELS)) {
+      models[modelId] = {
+        name: config.name || modelId,
+        description: config.description || 'Interior design AI model',
+        capabilities: config.capabilities || ['text-to-image'],
+        status: config.status || 'untested',
+        lastTested: config.lastTested
+      };
+    }
+
+    return models;
   }
 
   /**

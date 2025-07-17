@@ -32,8 +32,8 @@ async function processModelsDirectly(request: any, hasReferenceImage: boolean): 
           result: result
         });
       } else {
-        // Test Replicate model
-        const result = await testReplicateModel(step.modelName, request.prompt, request.reference_image_url);
+        // Test Replicate model - pass the API token from request if provided
+        const result = await testReplicateModel(step.modelName, request.prompt, request.reference_image_url, request.replicateApiToken);
         step.status = 'completed';
         step.endTime = new Date().toISOString();
         step.result = result;
@@ -60,7 +60,7 @@ async function processModelsDirectly(request: any, hasReferenceImage: boolean): 
 }
 
 // Test function for Replicate models
-async function testReplicateModel(modelName: string, prompt: string, referenceImageUrl?: string): Promise<any> {
+async function testReplicateModel(modelName: string, prompt: string, referenceImageUrl?: string, apiToken?: string): Promise<any> {
   const modelConfig = getModelConfig(modelName);
   if (!modelConfig) {
     throw new Error(`Model configuration not found for ${modelName}`);
@@ -68,11 +68,17 @@ async function testReplicateModel(modelName: string, prompt: string, referenceIm
   
   const input = buildModelInput(modelConfig, prompt, referenceImageUrl);
   
+  // Use provided API token or fall back to environment variable
+  const replicateToken = apiToken || Deno.env.get('REPLICATE_API_TOKEN');
+  if (!replicateToken) {
+    throw new Error('Replicate API token not provided and not found in environment variables');
+  }
+  
   // Make a test API call to Replicate
   const response = await fetch('https://api.replicate.com/v1/predictions', {
     method: 'POST',
     headers: {
-      'Authorization': `Token ${Deno.env.get('REPLICATE_API_TOKEN')}`,
+      'Authorization': `Token ${replicateToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -367,6 +373,7 @@ Respond in JSON format with: room_type, style, materials, features, layout, enha
       enhanced_prompt: prompt
     };
   }
+}
 
 // Enhanced error handling and logging for 3D generation
 function logModelAttempt(modelName: string, status: 'start' | 'success' | 'error', details?: any) {
@@ -441,6 +448,66 @@ async function matchMaterials(materials: string[]) {
   }
 }
 
+// Replicate Models Configuration
+const REPLICATE_MODELS = [
+  {
+    modelName: 'adirik/interior-design',
+    name: 'Interior Design AI',
+    version: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+    type: 'unified', // supports both text-to-image and image-to-image
+    supportsReferenceImage: true,
+    supportsTextOnly: true
+  },
+  {
+    modelName: 'erayyavuz/interior-ai',
+    name: 'Interior AI',
+    version: 'e299c531485aac511610a878ef44b554381355de5e',
+    type: 'unified',
+    supportsReferenceImage: true,
+    supportsTextOnly: true
+  },
+  {
+    modelName: 'jschoormans/comfyui-interior-remodel',
+    name: 'ComfyUI Interior Remodel',
+    version: '2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce',
+    type: 'unified',
+    supportsReferenceImage: true,
+    supportsTextOnly: true
+  },
+  {
+    modelName: 'julian-at/interiorly-gen1-dev',
+    name: 'Interiorly Gen1 Dev',
+    version: '5e3080d1b308e80197b32f0ce638daa8a329d0cf42068739723d8259e44b445e',
+    type: 'unified',
+    supportsReferenceImage: true,
+    supportsTextOnly: true
+  },
+  {
+    modelName: 'jschoormans/interior-v2',
+    name: 'Interior V2',
+    version: '8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7',
+    type: 'unified',
+    supportsReferenceImage: true,
+    supportsTextOnly: true
+  },
+  {
+    modelName: 'rocketdigitalai/interior-design-sdxl',
+    name: 'Interior Design SDXL',
+    version: 'a3c091059a25590ce2d5ea13651fab63f447f21760e50c358d4b850e844f59ee',
+    type: 'image-to-image', // requires reference image
+    supportsReferenceImage: true,
+    supportsTextOnly: false
+  },
+  {
+    modelName: 'davisbrown/designer-architecture',
+    name: 'Designer Architecture',
+    version: '0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46',
+    type: 'text-to-image', // text-to-image only
+    supportsReferenceImage: false,
+    supportsTextOnly: true
+  }
+];
+
 // Hugging Face Models Configuration
 const HUGGINGFACE_MODELS = [
   {
@@ -459,6 +526,111 @@ const HUGGINGFACE_MODELS = [
     type: 'fallback'
   }
 ];
+
+// Get model configuration for Replicate models
+function getModelConfig(modelName: string) {
+  const config = REPLICATE_MODELS.find(model => model.modelName === modelName);
+  if (!config) {
+    console.error(`Model configuration not found for: ${modelName}`);
+    return null;
+  }
+  return config;
+}
+
+// Build model input parameters for Replicate API calls
+function buildModelInput(modelConfig: any, prompt: string, referenceImageUrl?: string) {
+  // Use the test image URL if no reference image is provided
+  const defaultImageUrl = "https://replicate.delivery/pbxt/KhTNuTIKK1F1tvVl8e7mqOlhR3z3D0SAojAMN8BNftCvAubM/bedroom_3.jpg";
+  const imageUrl = referenceImageUrl || defaultImageUrl;
+
+  // Model-specific parameter configurations based on actual Replicate API requirements
+  switch (modelConfig.modelName) {
+    case 'adirik/interior-design':
+      // 6-parameter schema as specified by user
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal",
+        guidance_scale: 15,
+        prompt_strength: 0.8,
+        num_inference_steps: 50
+      };
+    
+    case 'erayyavuz/interior-ai':
+      // Apply same 6-parameter schema
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal",
+        guidance_scale: 15,
+        prompt_strength: 0.8,
+        num_inference_steps: 50
+      };
+    
+    case 'jschoormans/comfyui-interior-remodel':
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res",
+        guidance_scale: 7.5,
+        prompt_strength: 0.8,
+        num_inference_steps: 20
+      };
+    
+    case 'julian-at/interiorly-gen1-dev':
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res",
+        guidance_scale: 7.0,
+        prompt_strength: 0.8,
+        num_inference_steps: 30
+      };
+    
+    case 'jschoormans/interior-v2':
+      // Apply same 6-parameter schema
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal",
+        guidance_scale: 15,
+        prompt_strength: 0.8,
+        num_inference_steps: 50
+      };
+    
+    case 'rocketdigitalai/interior-design-sdxl':
+      // Apply same 6-parameter schema
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal",
+        guidance_scale: 15,
+        prompt_strength: 0.8,
+        num_inference_steps: 50
+      };
+    
+    case 'davisbrown/designer-architecture':
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res",
+        guidance_scale: 7.5,
+        prompt_strength: 0.8,
+        num_inference_steps: 50
+      };
+    
+    default:
+      // Default 6-parameter schema for any unspecified models
+      return {
+        image: imageUrl,
+        prompt: prompt,
+        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res",
+        guidance_scale: 15,
+        prompt_strength: 0.8,
+        num_inference_steps: 50
+      };
+  }
+}
 
 // Generate with Hugging Face models (primary generation method)
 async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: string, modelName: string}>> {

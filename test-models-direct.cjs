@@ -94,7 +94,8 @@ async function testModelDirect(modelName) {
     style: "modern",
     directTestMode: true,  // New flag for database-free testing
     testSingleModel: modelName,  // Test only this model
-    skipDatabaseOperations: true  // Explicitly skip all DB operations
+    skipDatabaseOperations: true,  // Explicitly skip all DB operations
+    replicateApiToken: 'r8_50iVnJOurKyxRHw2w7LvEhLRUFBf1Qn4Ug5WG'  // Test API token
   };
 
   try {
