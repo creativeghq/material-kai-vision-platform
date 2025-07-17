@@ -174,6 +174,36 @@ npx vite-bundle-analyzer dist
 - **Core Web Vitals**: Track LCP, FID, and CLS
 - **Edge Function Performance**: Monitor Supabase edge function latency
 
+### 6. Dependency Management
+
+#### Deprecation Warnings
+The project may show deprecation warnings during installation:
+
+```bash
+npm warn deprecated boolean@3.2.0: Package no longer supported
+npm warn deprecated three-mesh-bvh@0.7.8: Deprecated due to three.js version incompatibility
+```
+
+**Resolution Strategy:**
+- **Non-Critical Warnings**: These warnings don't affect functionality but should be addressed in future updates
+- **Three.js Compatibility**: Update `three-mesh-bvh` to v0.8.0+ when upgrading Three.js dependencies
+- **Boolean Package**: This is likely a transitive dependency that will be resolved when other packages update
+
+#### Dependency Updates
+```bash
+# Check for outdated packages
+npm outdated
+
+# Update non-breaking changes
+npm update
+
+
+# Run automated dependency fix script
+node scripts/fix-dependencies.js
+# For major version updates, review breaking changes first
+npm install three-mesh-bvh@latest
+```
+
 ### 6. Troubleshooting
 
 #### Common Issues
