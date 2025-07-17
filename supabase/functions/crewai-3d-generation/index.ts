@@ -557,66 +557,104 @@ function buildModelInput(modelConfig: any, prompt: string, referenceImageUrl?: s
       };
     
     case 'erayyavuz/interior-ai':
-      // Apply same 6-parameter schema
+      // Model-specific configuration as specified by user
       return {
         image: imageUrl,
         prompt: prompt,
-        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal",
-        guidance_scale: 15,
-        prompt_strength: 0.8,
-        num_inference_steps: 50
+        negative_prompt: "lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional",
+        guidance_scale: 7.5,
+        strength: 0.8,
+        num_inference_steps: 25
       };
     
     case 'jschoormans/comfyui-interior-remodel':
+      // Hybrid model: supports both text-to-image and image-to-image
       return {
         image: imageUrl,
         prompt: prompt,
-        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res",
-        guidance_scale: 7.5,
-        prompt_strength: 0.8,
-        num_inference_steps: 20
+        negative_prompt: "blurry, illustration, distorted, horror",
+        output_format: "webp",
+        output_quality: 80,
+        randomise_seeds: true
       };
     
     case 'julian-at/interiorly-gen1-dev':
       return {
-        image: imageUrl,
         prompt: prompt,
-        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res",
-        guidance_scale: 7.0,
+        image: imageUrl,
+        mask: "", // Will be empty as specified
+        aspect_ratio: "1:1",
+        height: 1024,
+        width: 1024,
         prompt_strength: 0.8,
-        num_inference_steps: 30
+        model: "schnell",
+        num_outputs: 4,
+        num_inference_steps: 35,
+        guidance_scale: 5,
+        output_format: "webp",
+        output_quality: 80,
+        go_fast: false,
+        megapixels: 1,
+        lora_scale: 1,
+        extra_lora_scale: 1
       };
     
     case 'jschoormans/interior-v2':
-      // Apply same 6-parameter schema
+      // Advanced interior-v2 model with comprehensive parameter set
       return {
         image: imageUrl,
         prompt: prompt,
-        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal",
-        guidance_scale: 15,
-        prompt_strength: 0.8,
-        num_inference_steps: 50
+        strength: 0.9999,
+        max_resolution: 1051,
+        keep_furniture_structure: false,
+        controlnet_conditioning_scale: 0.03,
+        control_guidance_start: 0,
+        control_guidance_end: 0.8,
+        num_inference_steps: 30,
+        guidance_scale: 7,
+        control_image: "",
+        inverted_mask_window: "",
+        inverted_mask_ceiling: "",
+        mask_furniture: "",
+        negative_prompt: "(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch), open mouth",
+        mask_prompt_window: "window, doorway",
+        mask_prompt_furniture: "furniture, couch, table, chair, desk, bed, sofa, cupboard, shelf, cabinet, bookcase, dresser, nightstand, armchair, decoration, plant, flower, pillow, lamp, TV",
+        mask_prompt_ceiling: "ceiling",
+        ip_adapter_image: "",
+        empty_room_mode: false
       };
     
     case 'rocketdigitalai/interior-design-sdxl':
-      // Apply same 6-parameter schema
+      // Image-to-image SDXL model with advanced parameters
       return {
         image: imageUrl,
         prompt: prompt,
-        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res, Deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, ugly, disgusting, poorly drawn, childish, mutilated, mangled, old, surreal",
-        guidance_scale: 15,
-        prompt_strength: 0.8,
-        num_inference_steps: 50
+        negative_prompt: "ugly, deformed, noisy, blurry, low quality, glitch, distorted, disfigured, bad proportions, duplicate, out of frame, watermark, signature, text, bad hands, bad anatomy",
+        promax_strength: 0.8,
+        depth_strength: 0.8,
+        num_inference_steps: 50,
+        guidance_scale: 7.5,
+        refiner_strength: 0.4
       };
     
     case 'davisbrown/designer-architecture':
       return {
-        image: imageUrl,
         prompt: prompt,
-        negative_prompt: "blurry, low quality, distorted, deformed, kitsch, ugly, oversaturated, grain, low-res",
-        guidance_scale: 7.5,
+        ...(imageUrl && { image: imageUrl }),
+        mask: "",
+        aspect_ratio: "16:9",
         prompt_strength: 0.8,
-        num_inference_steps: 50
+        model: "schnell",
+        num_outputs: 3,
+        num_inference_steps: 28,
+        guidance_scale: 3.5,
+        output_format: "webp",
+        output_quality: 100,
+        disable_safety_checker: false,
+        go_fast: false,
+        megapixels: 1,
+        lora_scale: 1,
+        extra_lora_scale: 1
       };
     
     default:
