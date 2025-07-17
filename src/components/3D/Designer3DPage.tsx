@@ -47,33 +47,22 @@ export const Designer3DPage: React.FC = () => {
     checkAdminRole();
   }, []);
 
-  // Available AI models with smart filtering based on input type
-  const availableModels = {
-    textToImage: [
-      { name: '🎨 Stable Diffusion XL Base 1.0', id: 'stabilityai/stable-diffusion-xl-base-1.0', provider: 'huggingface' },
-      { name: '⚡ FLUX-Schnell', id: 'black-forest-labs/FLUX.1-schnell', provider: 'huggingface' },
-      { name: '🏠 Interior Design Model', id: 'stabilityai/stable-diffusion-2-1', provider: 'huggingface' },
-      { name: '🏗️ Designer Architecture', id: 'davisbrown/designer-architecture', provider: 'replicate' },
-      { name: '🎯 Interior Design AI (Text)', id: 'adirik/interior-design', provider: 'replicate' }
-    ],
-    imageToImage: [
-      { name: '🎯 Interior Design AI (Image)', id: 'adirik/interior-design', provider: 'replicate' },
-      { name: '🏡 Interior AI', id: 'erayyavuz/interior-ai', provider: 'replicate' },
-      { name: '🎨 ComfyUI Interior Remodel', id: 'jschoormans/comfyui-interior-remodel', provider: 'replicate' },
-      { name: '🏛️ Interiorly Gen1 Dev', id: 'julian-at/interiorly-gen1-dev', provider: 'replicate' },
-      { name: '🏘️ Interior V2', id: 'jschoormans/interior-v2', provider: 'replicate' },
-      { name: '🚀 Interior Design SDXL', id: 'rocketdigitalai/interior-design-sdxl', provider: 'replicate' }
-    ]
-  };
+  // Available AI models - unified list without artificial type separation
+  const availableModels = [
+    { name: '🎨 Stable Diffusion XL Base 1.0', id: 'stabilityai/stable-diffusion-xl-base-1.0', provider: 'huggingface' },
+    { name: '⚡ FLUX-Schnell', id: 'black-forest-labs/FLUX.1-schnell', provider: 'huggingface' },
+    { name: '🏠 Interior Design Model', id: 'stabilityai/stable-diffusion-2-1', provider: 'huggingface' },
+    { name: '🏗️ Designer Architecture', id: 'davisbrown/designer-architecture', provider: 'replicate' },
+    { name: '🎯 Interior Design AI', id: 'adirik/interior-design', provider: 'replicate' },
+    { name: '🏡 Interior AI', id: 'erayyavuz/interior-ai', provider: 'replicate' },
+    { name: '🎨 ComfyUI Interior Remodel', id: 'jschoormans/comfyui-interior-remodel', provider: 'replicate' },
+    { name: '🏛️ Interiorly Gen1 Dev', id: 'julian-at/interiorly-gen1-dev', provider: 'replicate' },
+    { name: '🏘️ Interior V2', id: 'jschoormans/interior-v2', provider: 'replicate' },
+    { name: '🚀 Interior Design SDXL', id: 'rocketdigitalai/interior-design-sdxl', provider: 'replicate' }
+  ];
 
-  // Get filtered models based on whether reference image is provided
-  const getFilteredModels = () => {
-    const textModels = availableModels.textToImage;
-    const imageModels = selectedImage ? availableModels.imageToImage : [];
-    return [...textModels, ...imageModels];
-  };
-
-  const filteredModels = getFilteredModels();
+  // All models are now available regardless of input type
+  const filteredModels = availableModels;
 
   const roomTypes = [
     'living room', 'kitchen', 'bedroom', 'bathroom', 'dining room',
@@ -248,7 +237,7 @@ export const Designer3DPage: React.FC = () => {
           // Generation completed successfully
           const imagesWithModels = data.image_urls.map((url: string, index: number) => ({
             url,
-            modelName: filteredModels[index] || `Model ${index + 1}`
+            modelName: filteredModels[index]?.name || `Model ${index + 1}`
           }));
           
           setGeneratedImages(imagesWithModels);
@@ -330,7 +319,7 @@ export const Designer3DPage: React.FC = () => {
           Generate photorealistic interior designs using our AI models.
           {selectedImage ? (
             <span className="text-blue-600 font-medium">
-              With reference image: {filteredModels.length} models available ({availableModels.textToImage.length} text-to-image + {availableModels.imageToImage.length} image-to-image)
+              All models available: {filteredModels.length} models
             </span>
           ) : (
             <span className="text-green-600 font-medium">
@@ -592,7 +581,7 @@ export const Designer3DPage: React.FC = () => {
           onComplete={(images) => {
             const imagesWithModels = images.map((url: string, index: number) => ({
               url,
-              modelName: filteredModels[index] || `Model ${index + 1}`
+              modelName: filteredModels[index]?.name || `Model ${index + 1}`
             }));
             setGeneratedImages(imagesWithModels);
             setShowWorkflowModal(false);

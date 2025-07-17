@@ -13,7 +13,6 @@ interface WorkflowStep {
   id: string;
   name: string;
   status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
-  modelType: 'text-to-image' | 'image-to-image';
   modelName: string;
   startTime?: string;
   endTime?: string;
@@ -46,8 +45,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const [isPaused, setIsPaused] = useState(false);
   const [workflowMode, setWorkflowMode] = useState<'running' | 'paused' | 'ready'>('ready');
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
-    'text-to-image': true,
-    'image-to-image': true
+    'models': true
   });
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
 
@@ -68,21 +66,18 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         id: 'hf-sdxl',
         name: '🎨 Stable Diffusion XL Base 1.0',
         status: 'pending',
-        modelType: 'text-to-image',
         modelName: 'stabilityai/stable-diffusion-xl-base-1.0'
       },
       {
         id: 'hf-flux',
         name: '⚡ FLUX-Schnell',
         status: 'pending',
-        modelType: 'text-to-image',
         modelName: 'black-forest-labs/FLUX.1-schnell'
       },
       {
         id: 'hf-sd2',
         name: '🏠 Interior Design Model',
         status: 'pending',
-        modelType: 'text-to-image',
         modelName: 'stabilityai/stable-diffusion-2-1'
       },
       // Replicate Models
@@ -90,14 +85,12 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         id: 'rep-unified',
         name: '🎯 Interior Design AI (Unified)',
         status: 'pending',
-        modelType: hasRefImage ? 'image-to-image' : 'text-to-image',
         modelName: 'adirik/interior-design'
       },
       {
         id: 'rep-architecture',
         name: '🏗️ Designer Architecture',
         status: 'pending',
-        modelType: 'text-to-image',
         modelName: 'davisbrown/designer-architecture'
       }
     ];
@@ -109,35 +102,32 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           id: 'rep-interior-ai',
           name: '🏡 Interior AI',
           status: 'pending',
-          modelType: 'image-to-image',
           modelName: 'erayyavuz/interior-ai'
         },
         {
           id: 'rep-comfyui',
           name: '🎨 ComfyUI Interior Remodel',
           status: 'pending',
-          modelType: 'image-to-image',
           modelName: 'jschoormans/comfyui-interior-remodel'
         },
         {
           id: 'rep-interiorly',
           name: '🏛️ Interiorly Gen1 Dev',
           status: 'pending',
-          modelType: 'image-to-image',
           modelName: 'julian-at/interiorly-gen1-dev'
         },
         {
           id: 'rep-interior-v2',
           name: '🏘️ Interior V2',
           status: 'pending',
-          modelType: 'image-to-image',
+          
           modelName: 'jschoormans/interior-v2'
         },
         {
           id: 'rep-sdxl-interior',
           name: '🚀 Interior Design SDXL',
           status: 'pending',
-          modelType: 'image-to-image',
+          
           modelName: 'rocketdigitalai/interior-design-sdxl'
         }
       );
@@ -302,8 +292,24 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
 
   const handleCloseCompletionDialog = () => {
     setShowCompletionDialog(false);
+    // Reset modal state before closing to ensure clean state
+    setIsComplete(false);
+    setSteps([]);
+    setCurrentStep('');
     onClose();
   };
+
+  // Reset modal state when opened to ensure clean state
+  useEffect(() => {
+    if (isOpen) {
+      setIsComplete(false);
+      setShowCompletionDialog(false);
+      setCurrentStep('');
+      setOverallProgress(0);
+      setWorkflowMode('ready');
+      setIsPaused(false);
+    }
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal>
@@ -317,7 +323,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
 
         <div className="space-y-4">
           {/* Workflow Control Buttons */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded">
+          <div className="flex items-center justify-between p-3 bg-background border border-border rounded">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Workflow Control:</span>
               {!isPaused ? (
@@ -373,26 +379,26 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           {/* Generation Steps */}
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-3">
-              {/* Text-to-Image Section */}
+              {/* Unified Models Section */}
               <Collapsible
-                open={expandedSections['text-to-image']}
-                onOpenChange={() => toggleSection('text-to-image')}
+                open={expandedSections['models']}
+                onOpenChange={() => toggleSection('models')}
               >
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-gray-50 rounded border">
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded border">
                   <div className="flex items-center gap-2">
-                    {expandedSections['text-to-image'] ?
+                    {expandedSections['models'] ?
                       <ChevronDown className="h-4 w-4" /> :
                       <ChevronRight className="h-4 w-4" />
                     }
-                    <h4 className="font-medium text-sm text-muted-foreground">TEXT-TO-IMAGE MODELS</h4>
+                    <h4 className="font-medium text-sm text-muted-foreground">GENERATION MODELS</h4>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    {steps.filter(s => s.modelType === 'text-to-image').length} models
+                    {steps.length} models
                   </Badge>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
                   <div className="space-y-2">
-                    {steps.filter(s => s.modelType === 'text-to-image').map((step, index) => (
+                    {steps.map((step, index) => (
                       <Card key={step.id} className="ml-4">
                         <CardContent className="p-3">
                           <div className="flex items-center justify-between">
@@ -435,71 +441,6 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                   </div>
                 </CollapsibleContent>
               </Collapsible>
-
-              {/* Image-to-Image Section */}
-              {steps.filter(s => s.modelType === 'image-to-image').length > 0 && (
-                <Collapsible
-                  open={expandedSections['image-to-image']}
-                  onOpenChange={() => toggleSection('image-to-image')}
-                >
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-gray-50 rounded border">
-                    <div className="flex items-center gap-2">
-                      {expandedSections['image-to-image'] ?
-                        <ChevronDown className="h-4 w-4" /> :
-                        <ChevronRight className="h-4 w-4" />
-                      }
-                      <h4 className="font-medium text-sm text-muted-foreground">IMAGE-TO-IMAGE MODELS</h4>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {steps.filter(s => s.modelType === 'image-to-image').length} models
-                    </Badge>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2">
-                    <div className="space-y-2">
-                      {steps.filter(s => s.modelType === 'image-to-image').map((step, index) => (
-                        <Card key={step.id} className="ml-4">
-                          <CardContent className="p-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                {getStatusIcon(step.status)}
-                                <div>
-                                  <p className="font-medium text-sm">{step.name}</p>
-                                  <p className="text-xs text-muted-foreground">{step.modelName}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {step.processingTimeMs && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {Math.round(step.processingTimeMs / 1000)}s
-                                  </span>
-                                )}
-                                {getStatusBadge(step.status)}
-                              </div>
-                            </div>
-
-                            {step.imageUrl && (
-                              <div className="mt-2">
-                                <img
-                                  src={step.imageUrl}
-                                  alt={`Generated by ${step.name}`}
-                                  className="w-full h-32 object-cover rounded border"
-                                />
-                              </div>
-                            )}
-
-                            {step.errorMessage && (
-                              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
-                                <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                <span>{step.errorMessage}</span>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
             </div>
           </ScrollArea>
 

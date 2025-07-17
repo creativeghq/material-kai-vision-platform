@@ -17,9 +17,9 @@ const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl }) => {
   return (
     <mesh position={[0, 0, 0]}>
       <boxGeometry args={[2, 2, 2]} />
-      <meshStandardMaterial 
-        color="#4F46E5" 
-        transparent 
+      <meshStandardMaterial
+        color="hsl(210 40% 98%)"
+        transparent
         opacity={0.8}
         wireframe={false}
       />
@@ -62,7 +62,7 @@ const Scene: React.FC<{
         /* Fallback placeholder */
         <mesh position={[0, 0, 0]}>
           <boxGeometry args={[2, 2, 2]} />
-          <meshStandardMaterial color="#4F46E5" wireframe />
+          <meshStandardMaterial color="hsl(210 40% 98%)" wireframe />
         </mesh>
       )}
       

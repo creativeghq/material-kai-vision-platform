@@ -50,7 +50,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 relative bg-muted/10">
+        <div className="flex-1 relative bg-background/95">
           <img 
             src={currentImage.url}
             alt={`Interior design by ${currentImage.modelName}`}
