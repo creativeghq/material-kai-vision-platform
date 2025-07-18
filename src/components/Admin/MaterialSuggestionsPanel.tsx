@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 
 interface MaterialSuggestion {
   name: string;
@@ -65,21 +66,24 @@ export const MaterialSuggestionsPanel: React.FC = () => {
     setIsGenerating(true);
     try {
       // Call enhanced RAG search for material suggestions
-      const { data, error } = await supabase.functions.invoke('enhanced-rag-search', {
-        body: {
-          query: `${config.roomType} ${config.style} ${config.prompt}`,
-          action: 'material_suggestions',
-          searchType: 'hybrid',
-          maxResults: config.maxSuggestions,
-          context: {
-            roomType: config.roomType,
-            style: config.style,
-            purpose: '3d_generation'
-          }
+      const apiService = ApiIntegrationService.getInstance();
+      const result = await apiService.executeSupabaseFunction('enhanced-rag-search', {
+        query: `${config.roomType} ${config.style} ${config.prompt}`,
+        action: 'material_suggestions',
+        searchType: 'hybrid',
+        maxResults: config.maxSuggestions,
+        context: {
+          roomType: config.roomType,
+          style: config.style,
+          purpose: '3d_generation'
         }
       });
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to generate suggestions');
+      }
+
+      const data = result.data;
 
       // Process and format suggestions
       const formattedSuggestions: MaterialSuggestion[] = [];
@@ -152,24 +156,27 @@ export const MaterialSuggestionsPanel: React.FC = () => {
         throw new Error('User not authenticated');
       }
 
-      const { data, error } = await supabase.functions.invoke('crewai-3d-generation', {
-        body: {
-          user_id: user.id,
-          prompt: config.prompt,
-          room_type: config.roomType,
-          style: config.style,
-          materials_used: materialList,
-          model: 'test_mode'
-        }
+      const apiService = ApiIntegrationService.getInstance();
+      const result = await apiService.executeSupabaseFunction('crewai-3d-generation', {
+        user_id: user.id,
+        prompt: config.prompt,
+        room_type: config.roomType,
+        style: config.style,
+        materials_used: materialList,
+        model: 'test_mode'
       });
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to test 3D integration');
+      }
+
+      const data = result.data;
 
       setTestResults(prev => [...prev, {
         timestamp: new Date().toISOString(),
         success: true,
         materials_suggested: suggestions.length,
-        processing_time: data.processing_time_ms || 0,
+        processing_time: data?.processing_time_ms || 0,
         result: data
       }]);
 

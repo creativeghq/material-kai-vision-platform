@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { Globe, Loader2, Plus, ArrowRight, Settings, Zap, Brain, FileText, Search, Map, MousePointer } from 'lucide-react';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
 import { SessionDetailView } from './SessionDetailView';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -100,25 +101,24 @@ Return a list of materials found on the page.`);
     try {
       console.log('Parsing sitemap:', url);
       
-      // Use the backend edge function to parse sitemap
-      const { data, error } = await supabase.functions.invoke('parse-sitemap', {
-        body: {
-          sitemapUrl: url,
-          maxPages: maxPages
-        }
+      // Use the centralized API system to parse sitemap
+      const apiService = ApiIntegrationService.getInstance();
+      const result = await apiService.executeSupabaseFunction('parse-sitemap', {
+        sitemapUrl: url,
+        maxPages: maxPages
       });
       
-      if (error) {
-        console.error('Error parsing sitemap:', error);
-        throw new Error(error.message || 'Failed to parse sitemap');
+      if (!result.success) {
+        console.error('Error parsing sitemap:', result.error);
+        throw new Error(result.error?.message || 'Failed to parse sitemap');
       }
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to parse sitemap');
+      if (!result.data?.success) {
+        throw new Error(result.data?.error || 'Failed to parse sitemap');
       }
       
-      console.log(`Found ${data.count} URLs in sitemap`);
-      return data.urls;
+      console.log(`Found ${result.data.count} URLs in sitemap`);
+      return result.data.urls;
       
     } catch (error) {
       console.error('Error parsing sitemap:', error);

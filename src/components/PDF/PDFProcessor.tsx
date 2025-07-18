@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Upload, AlertCircle, CheckCircle, Clock, Eye, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { PDFResultsViewer } from './PDFResultsViewer';
 
 interface ProcessingOptions {
@@ -70,6 +71,7 @@ export const PDFProcessor: React.FC = () => {
 
   const processFile = async (file: File) => {
     const processingId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const apiService = ApiIntegrationService.getInstance();
     
     // Add to processing queue
     setProcessing(prev => [...prev, {
@@ -79,7 +81,7 @@ export const PDFProcessor: React.FC = () => {
       progress: 0
     }]);
 
-    let response: any = null;
+    let result: any = null;
 
     try {
       // Get current user
@@ -89,8 +91,8 @@ export const PDFProcessor: React.FC = () => {
       }
 
       // Update status to processing
-      setProcessing(prev => prev.map(p => 
-        p.id === processingId 
+      setProcessing(prev => prev.map(p =>
+        p.id === processingId
           ? { ...p, status: 'processing', progress: 10 }
           : p
       ));
@@ -114,43 +116,41 @@ export const PDFProcessor: React.FC = () => {
       setUploadProgress(40);
       
       // Update processing status
-      setProcessing(prev => prev.map(p => 
-        p.id === processingId 
+      setProcessing(prev => prev.map(p =>
+        p.id === processingId
           ? { ...p, progress: 50 }
           : p
       ));
 
       // Process using the ConvertAPI pdf-processor
       console.log('Processing PDF with ConvertAPI approach...');
-      response = await supabase.functions.invoke('convertapi-pdf-processor', {
-        body: {
-          fileUrl: publicUrl,
-          originalFilename: file.name,
-          fileSize: file.size,
-          userId: user.id,
-          options: options
-        }
+      result = await apiService.executeSupabaseFunction('convertapi-pdf-processor', {
+        fileUrl: publicUrl,
+        originalFilename: file.name,
+        fileSize: file.size,
+        userId: user.id,
+        options: options
       });
       
-      if (response.error) {
-        throw new Error(`PDF processing failed: ${response.error.message}`);
+      if (!result.success) {
+        throw new Error(`PDF processing failed: ${result.error?.message || 'Unknown error'}`);
       }
 
       // Update with successful result
-      setProcessing(prev => prev.map(p => 
-        p.id === processingId 
-          ? { 
-              ...p, 
-              status: 'completed', 
+      setProcessing(prev => prev.map(p =>
+        p.id === processingId
+          ? {
+              ...p,
+              status: 'completed',
               progress: 100,
-              result: response.data
+              result: result.data
             }
           : p
       ));
 
       toast({
         title: "ConvertAPI Processing Complete",
-        description: `Successfully converted ${file.name} to HTML and added to knowledge base. Text: ${response.data.extractedContent.textLength} chars, HTML: ${response.data.extractedContent.htmlLength} chars, Images: ${response.data.conversionInfo.imagesProcessed}`,
+        description: `Successfully converted ${file.name} to HTML and added to knowledge base. Text: ${result.data?.extractedContent?.textLength} chars, HTML: ${result.data?.extractedContent?.htmlLength} chars, Images: ${result.data?.conversionInfo?.imagesProcessed}`,
       });
 
     } catch (error) {
@@ -162,11 +162,11 @@ export const PDFProcessor: React.FC = () => {
       let technicalDetails = '';
 
       // Check if it's an enhanced error response from the edge function
-      if (response?.data && !response.data.success) {
-        errorMessage = response.data.error || 'PDF processing failed';
-        errorCategory = response.data.errorCategory || 'PROCESSING_ERROR';
-        troubleshooting = response.data.troubleshooting || [];
-        technicalDetails = response.data.technicalDetails || '';
+      if (result && !result.success) {
+        errorMessage = result.error?.message || 'PDF processing failed';
+        errorCategory = result.error?.code || 'PROCESSING_ERROR';
+        troubleshooting = result.error?.details?.troubleshooting || [];
+        technicalDetails = result.error?.details?.technicalDetails || '';
       } else if (error instanceof Error) {
         errorMessage = error.message;
         technicalDetails = error.message;
@@ -196,11 +196,11 @@ export const PDFProcessor: React.FC = () => {
         }
       }
       
-      setProcessing(prev => prev.map(p => 
-        p.id === processingId 
-          ? { 
-              ...p, 
-              status: 'failed', 
+      setProcessing(prev => prev.map(p =>
+        p.id === processingId
+          ? {
+              ...p,
+              status: 'failed',
               error: errorMessage,
               errorCategory,
               troubleshooting,

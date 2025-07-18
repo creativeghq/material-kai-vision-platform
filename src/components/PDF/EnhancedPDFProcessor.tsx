@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 // Note: hybridPDFPipelineAPI service will be implemented in future phases
 type ProcessingOptions = {
   enableLayoutAnalysis?: boolean;
@@ -124,6 +125,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
 
   const processFile = async (file: File) => {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const apiService = ApiIntegrationService.getInstance();
     
     // Add to processing queue
     const newJob: ProcessingJob = {
@@ -167,38 +169,36 @@ export const EnhancedPDFProcessor: React.FC = () => {
       updateJobStatus(jobId, 'processing', 30, 'Creating document record...');
 
       // Create document record first using the original PDF processor
-      const response = await supabase.functions.invoke('pdf-processor', {
-        body: {
-          fileUrl: publicUrl,
-          originalFilename: file.name,
-          fileSize: file.size,
-          userId: user.id,
-          options: {
-            extractMaterials: options.enableLayoutAnalysis,
-            language: 'en'
-          }
+      const result = await apiService.executeSupabaseFunction('pdf-processor', {
+        fileUrl: publicUrl,
+        originalFilename: file.name,
+        fileSize: file.size,
+        userId: user.id,
+        options: {
+          extractMaterials: options.enableLayoutAnalysis,
+          language: 'en'
         }
       });
       
-      if (response.error) {
-        console.error('PDF processor response error:', response.error);
-        throw new Error(`Document creation failed: ${response.error.message}`);
+      if (!result.success) {
+        console.error('PDF processor response error:', result.error);
+        throw new Error(`Document creation failed: ${result.error?.message || 'Unknown error'}`);
       }
 
-      console.log('PDF processor response:', response.data);
+      console.log('PDF processor response:', result.data);
       
       // Check if the PDF processor was successful
-      if (!response.data?.success) {
-        const errorMsg = response.data?.error || response.data?.message || 'PDF processor did not complete successfully';
+      if (!result.data?.success) {
+        const errorMsg = result.data?.error || result.data?.message || 'PDF processor did not complete successfully';
         console.error('PDF processor failed:', errorMsg);
         throw new Error(`PDF processing failed: ${errorMsg}`);
       }
       
       // Use knowledgeEntryId if available, otherwise use processingId as fallback
-      const documentId = response.data?.knowledgeEntryId || response.data?.processingId;
+      const documentId = result.data?.knowledgeEntryId || result.data?.processingId;
       
       if (!documentId) {
-        console.error('No document ID found in response:', response.data);
+        console.error('No document ID found in response:', result.data);
         throw new Error('Document was not properly added to knowledge base. Please try again.');
       }
       

@@ -5,11 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  RefreshCw, 
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  RefreshCw,
   Search,
   ExternalLink,
   AlertCircle
@@ -90,11 +91,13 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
   };
 
   const retryPage = async (pageId: string) => {
+    const apiService = ApiIntegrationService.getInstance();
+    
     try {
       // Reset page status to pending
       await supabase
         .from('scraping_pages')
-        .update({ 
+        .update({
           status: 'pending',
           error_message: null,
           started_at: null,
@@ -105,19 +108,17 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
       // Trigger single page processing
       const page = pages.find(p => p.id === pageId);
       if (page) {
-        const { error } = await supabase.functions.invoke('scrape-single-page', {
-          body: {
-            pageUrl: page.url,
-            sessionId: sessionId,
-            pageId: pageId,
-            options: {
-              service: 'firecrawl',
-              retryAttempt: page.retry_count + 1
-            }
+        const result = await apiService.executeSupabaseFunction('scrape-single-page', {
+          pageUrl: page.url,
+          sessionId: sessionId,
+          pageId: pageId,
+          options: {
+            service: 'firecrawl',
+            retryAttempt: page.retry_count + 1
           }
         });
 
-        if (error) throw error;
+        if (!result.success) throw new Error(result.error?.message || 'Unknown error');
       }
 
       toast({

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { PDFExportOptions } from './PDFExportOptions';
 
 interface PDFTile {
@@ -207,20 +208,19 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
 
   const performAIAnalysis = async (tiles: ReviewedTile[]) => {
-    const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
-      body: {
-        materials: tiles.map(tile => ({
-          id: tile.id,
-          text: tile.corrected_text || tile.extracted_text,
-          material_type: tile.corrected_material_type || tile.material_type,
-          structured_data: tile.structured_data,
-          image_url: tile.image_url
-        }))
-      }
+    const apiService = ApiIntegrationService.getInstance();
+    const result = await apiService.executeSupabaseFunction('hybrid-material-analysis', {
+      materials: tiles.map(tile => ({
+        id: tile.id,
+        text: tile.corrected_text || tile.extracted_text,
+        material_type: tile.corrected_material_type || tile.material_type,
+        structured_data: tile.structured_data,
+        image_url: tile.image_url
+      }))
     });
 
-    if (error) throw error;
-    return data;
+    if (!result.success) throw new Error(result.error?.message || 'AI analysis failed');
+    return result.data;
   };
 
 
@@ -233,16 +233,15 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         Properties: ${JSON.stringify(tile.structured_data || {})}. 
         Clean, professional material sample visualization, white background, detailed texture.`;
 
-        const { data, error } = await supabase.functions.invoke('generate-material-image', {
-          body: { 
-            prompt,
-            material_type: tile.corrected_material_type || tile.material_type,
-            tile_id: tile.id
-          }
+        const apiService = ApiIntegrationService.getInstance();
+        const result = await apiService.executeSupabaseFunction('generate-material-image', {
+          prompt,
+          material_type: tile.corrected_material_type || tile.material_type,
+          tile_id: tile.id
         });
 
-        if (error) throw error;
-        images.push({ tile_id: tile.id, image_url: data.image_url });
+        if (!result.success) throw new Error(result.error?.message || 'Image generation failed');
+        images.push({ tile_id: tile.id, image_url: result.data?.image_url });
       } catch (error) {
         console.error(`Image generation failed for tile ${tile.id}:`, error);
       }

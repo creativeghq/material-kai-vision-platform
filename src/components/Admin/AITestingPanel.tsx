@@ -19,6 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 
 interface TestResult {
   provider: string;
@@ -69,19 +70,20 @@ export const AITestingPanel: React.FC = () => {
       }
 
       // Test hybrid analysis
-      const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
-        body: {
-          file_id: testFile.id,
-          analysis_type: 'comprehensive',
-          include_similar: false,
-          minimum_score: 0.5,
-          max_retries: 2
-        }
+      const apiService = ApiIntegrationService.getInstance();
+      const result = await apiService.executeSupabaseFunction('hybrid-material-analysis', {
+        file_id: testFile.id,
+        analysis_type: 'comprehensive',
+        include_similar: false,
+        minimum_score: 0.5,
+        max_retries: 2
       });
 
-      if (error) {
-        throw new Error(`Hybrid analysis failed: ${error.message}`);
+      if (!result.success) {
+        throw new Error(`Hybrid analysis failed: ${result.error?.message || 'Unknown error'}`);
       }
+
+      const data = result.data;
 
       // Process results
       const testResults: TestResult[] = [];
@@ -128,22 +130,23 @@ export const AITestingPanel: React.FC = () => {
     setTesting(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('crewai-3d-generation', {
-        body: {
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          prompt: testPrompt,
-          room_type: 'living room',
-          style: 'modern'
-        }
+      const apiService = ApiIntegrationService.getInstance();
+      const result = await apiService.executeSupabaseFunction('crewai-3d-generation', {
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        prompt: testPrompt,
+        room_type: 'living room',
+        style: 'modern'
       });
 
-      if (error) {
-        throw new Error(`3D generation failed: ${error.message}`);
+      if (!result.success) {
+        throw new Error(`3D generation failed: ${result.error?.message || 'Unknown error'}`);
       }
+
+      const data = result.data;
 
       toast({
         title: '3D Generation Test Completed',
-        description: `Generation completed in ${(data.processing_time_ms / 1000).toFixed(2)}s`,
+        description: `Generation completed in ${(data?.processing_time_ms / 1000).toFixed(2)}s`,
         variant: 'default'
       });
 

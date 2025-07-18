@@ -11,6 +11,7 @@ import { integratedWorkflowService } from '@/services/integratedWorkflowService'
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Wand2, Download, Share2, Upload, X, ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { GenerationWorkflowModal } from './GenerationWorkflowModal';
 
 export const Designer3DPage: React.FC = () => {
@@ -173,21 +174,15 @@ export const Designer3DPage: React.FC = () => {
         reference_image_url: imageUrl // Add the uploaded image URL
       };
 
-      const response = await supabase.functions.invoke('crewai-3d-generation', {
-        body: requestData
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Generation failed');
-      }
-
-      const result = response.data;
+      // Use the new centralized API integration service
+      const apiService = ApiIntegrationService.getInstance();
+      const result = await apiService.executeSupabaseFunction('crewai-3d-generation', requestData);
       console.log("Generation response received:", result);
       
-      if (result.success && result.generationId) {
+      if (result.success && result.data?.generationId) {
         if (isAdmin) {
           // Show workflow modal for admins
-          setCurrentGenerationId(result.generationId);
+          setCurrentGenerationId(result.data.generationId);
           setShowWorkflowModal(true);
           setIsGenerating(false);
           setIsUploading(false);
@@ -197,10 +192,10 @@ export const Designer3DPage: React.FC = () => {
             title: 'Generation Started',
             description: 'Your 3D interior is being generated. This may take a few minutes...'
           });
-          await pollForResults(result.generationId);
+          await pollForResults(result.data.generationId);
         }
       } else {
-        throw new Error(result.error || 'Failed to start generation');
+        throw new Error(result.error?.message || 'Failed to start generation');
       }
     } catch (error: any) {
       console.error('Generation error:', error);
@@ -532,17 +527,8 @@ export const Designer3DPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {generatedImages.map((image, index) => {
-                console.log(`🖼️ Rendering image ${index + 1}:`, {
-                  index,
-                  url: image.url,
-                  modelName: image.modelName,
-                  urlLength: image.url?.length,
-                  isValidUrl: image.url && image.url.startsWith('http')
-                });
-                
-                return (
-                  <div key={index} className="space-y-2">
+              {generatedImages.map((image, index) => (
+                <div key={index} className="space-y-2">
                     <div
                       className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                       onClick={() => handleImageClick(index)}
@@ -558,13 +544,13 @@ export const Designer3DPage: React.FC = () => {
                           console.error(`❌ Image ${index + 1} failed to load:`, {
                             url: image.url,
                             modelName: image.modelName,
-                            error: e.currentTarget.error
+                            error: 'Failed to load image'
                           });
                           e.currentTarget.style.display = 'none';
                         }}
                       />
                     </div>
-                   <div className="space-y-1">
+                    <div className="space-y-1">
                     <h4 className="font-medium text-sm truncate">
                       {image.modelName || `Model ${index + 1}`}
                     </h4>
@@ -580,9 +566,9 @@ export const Designer3DPage: React.FC = () => {
                       <Download className="h-3 w-3 mr-1" />
                       Download
                     </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </CardContent>
         </Card>

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { EnhancedRAGService } from '@/services/enhancedRAGService';
 import { HybridAIService } from '@/services/hybridAIService';
 import { CrewAI3DGenerationAPI } from '@/services/crewai3DGenerationAPI';
@@ -352,27 +353,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         } catch (hybridError) {
           console.warn('⚠️ Hybrid AI failed, falling back to standard CrewAI:', hybridError);
           // Fallback to standard CrewAI
-          const response = await supabase.functions.invoke('enhanced-crewai', {
-            body: {
-              user_id: session.user.id,
-              task_type: 'comprehensive_design',
-              input_data: {
-                query: input,
-                sessionId: sessionId,
-                context: enhancedContext,
-                hybridConfig: hybridConfig,
-                attachments: attachedFiles.length > 0 ? attachedFiles : undefined
-              }
-            }
-          });
-          data = response.data;
-          error = response.error;
-        }
-      } else {
-        console.log('🤖 Using standard CrewAI...');
-        // Use standard CrewAI endpoint
-        const response = await supabase.functions.invoke('enhanced-crewai', {
-          body: {
+          const apiService = ApiIntegrationService.getInstance();
+          const response = await apiService.executeSupabaseFunction('enhanced-crewai', {
             user_id: session.user.id,
             task_type: 'comprehensive_design',
             input_data: {
@@ -382,6 +364,23 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
               hybridConfig: hybridConfig,
               attachments: attachedFiles.length > 0 ? attachedFiles : undefined
             }
+          });
+          data = response.data;
+          error = response.error;
+        }
+      } else {
+        console.log('🤖 Using standard CrewAI...');
+        // Use standard CrewAI endpoint
+        const apiService = ApiIntegrationService.getInstance();
+        const response = await apiService.executeSupabaseFunction('enhanced-crewai', {
+          user_id: session.user.id,
+          task_type: 'comprehensive_design',
+          input_data: {
+            query: input,
+            sessionId: sessionId,
+            context: enhancedContext,
+            hybridConfig: hybridConfig,
+            attachments: attachedFiles.length > 0 ? attachedFiles : undefined
           }
         });
         data = response.data;

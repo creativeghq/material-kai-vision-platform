@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { ArrowLeft, Play, Pause, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { PageQueueViewer } from './PageQueueViewer';
@@ -101,14 +102,15 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
         .eq('id', sessionId);
 
       // Start processing by calling our new processing logic
-      const { data, error } = await supabase.functions.invoke('scrape-session-manager', {
-        body: {
-          sessionId: sessionId,
-          action: 'start'
-        }
+      const apiService = ApiIntegrationService.getInstance();
+      const result = await apiService.executeSupabaseFunction('scrape-session-manager', {
+        sessionId: sessionId,
+        action: 'start'
       });
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to start scraping');
+      }
 
       toast({
         title: "Success",
@@ -118,7 +120,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       console.error('Error starting processing:', error);
       toast({
         title: "Error",
-        description: "Failed to start scraping",
+        description: error instanceof Error ? error.message : "Failed to start scraping",
         variant: "destructive",
       });
     } finally {
