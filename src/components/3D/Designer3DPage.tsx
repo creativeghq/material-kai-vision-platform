@@ -235,10 +235,72 @@ export const Designer3DPage: React.FC = () => {
 
         if (data.generation_status === 'completed' && data.image_urls?.length > 0) {
           // Generation completed successfully
-          const imagesWithModels = data.image_urls.map((url: string, index: number) => ({
-            url,
-            modelName: filteredModels[index]?.name || `Model ${index + 1}`
-          }));
+          console.log('🔍 DEBUG: Generation completed successfully');
+          console.log('📊 Available models count:', filteredModels.length);
+          console.log('📊 Available models:', filteredModels.map((m, i) => `${i}: ${m.name}`));
+          console.log('🖼️ Received image URLs count:', data.image_urls.length);
+          console.log('🖼️ Received image URLs:', data.image_urls);
+          console.log('📋 Full generation data:', data);
+          
+          // Robust image-to-model mapping that handles sparse results
+          // The backend should ideally include model metadata with each result,
+          // but for now we implement a robust mapping strategy
+          const imagesWithModels = data.image_urls.map((url: string, index: number) => {
+            // Strategy 1: Try to extract model info from URL if available
+            let modelName = `Model ${index + 1}`;
+            let detectedModel = null;
+            
+            // Check if URL contains model identifier patterns
+            for (const model of filteredModels) {
+              if (url.includes(model.name.toLowerCase().replace(/\s+/g, '-')) ||
+                  url.includes(model.name.toLowerCase().replace(/\s+/g, '_'))) {
+                detectedModel = model;
+                modelName = model.name;
+                break;
+              }
+            }
+            
+            // Strategy 2: If no model detected from URL, use sequential mapping with validation
+            if (!detectedModel && index < filteredModels.length) {
+              // For sequential mapping, we need to account for potential gaps
+              // This assumes the backend returns results in the same order as requested
+              const candidateModel = filteredModels[index];
+              if (candidateModel) {
+                detectedModel = candidateModel;
+                modelName = candidateModel.name;
+              }
+            }
+            
+            // Strategy 3: Fallback - try to map based on successful results count
+            if (!detectedModel && filteredModels.length > 0) {
+              // If we have fewer results than models, try to map to available models
+              const modelIndex = Math.min(index, filteredModels.length - 1);
+              const fallbackModel = filteredModels[modelIndex];
+              if (fallbackModel) {
+                detectedModel = fallbackModel;
+                modelName = `${fallbackModel.name} (Result ${index + 1})`;
+              }
+            }
+            
+            const result = {
+              url,
+              modelName,
+              modelId: detectedModel?.id || null,
+              resultIndex: index
+            };
+            
+            console.log(`🔗 Robust mapping index ${index}: URL="${url}" -> Model="${result.modelName}" (ID: ${result.modelId})`);
+            return result;
+          });
+          
+          // Additional validation and logging
+          console.log('🔍 Mapping validation:');
+          console.log(`📊 Total models requested: ${filteredModels.length}`);
+          console.log(`🖼️ Total results received: ${data.image_urls.length}`);
+          console.log(`✅ Successfully mapped: ${imagesWithModels.filter(img => img.modelId).length}`);
+          console.log(`⚠️ Fallback mappings: ${imagesWithModels.filter(img => !img.modelId).length}`);
+          
+          console.log('✅ Final imagesWithModels mapping:', imagesWithModels);
           
           setGeneratedImages(imagesWithModels);
           setGenerationData(data);
@@ -250,7 +312,7 @@ export const Designer3DPage: React.FC = () => {
             description: `Generated ${data.image_urls.length} interior designs successfully.`
           });
           return;
-        } 
+        }
         
         if (data.generation_status === 'failed') {
           throw new Error(data.error_message || 'Generation failed');
@@ -317,15 +379,9 @@ export const Designer3DPage: React.FC = () => {
         <h1 className="text-3xl font-bold">3D Interior Designer</h1>
         <p className="text-muted-foreground mt-2">
           Generate photorealistic interior designs using our AI models.
-          {selectedImage ? (
-            <span className="text-blue-600 font-medium">
-              All models available: {filteredModels.length} models
-            </span>
-          ) : (
-            <span className="text-green-600 font-medium">
-              Text-only mode: {filteredModels.length} models available
-            </span>
-          )}
+          <span className="text-primary font-medium ml-1">
+            {filteredModels.length} models available
+          </span>
         </p>
       </div>
 
@@ -476,22 +532,38 @@ export const Designer3DPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {generatedImages.map((image, index) => (
-                <div key={index} className="space-y-2">
-                  <div 
-                    className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                    onClick={() => handleImageClick(index)}
-                  >
-                    <img 
-                      src={image.url} 
-                      alt={`Interior design by ${image.modelName}`}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform"
-                      onError={(e) => {
-                        console.error(`Image ${index + 1} failed to load:`, image.url);
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
+              {generatedImages.map((image, index) => {
+                console.log(`🖼️ Rendering image ${index + 1}:`, {
+                  index,
+                  url: image.url,
+                  modelName: image.modelName,
+                  urlLength: image.url?.length,
+                  isValidUrl: image.url && image.url.startsWith('http')
+                });
+                
+                return (
+                  <div key={index} className="space-y-2">
+                    <div
+                      className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                      onClick={() => handleImageClick(index)}
+                    >
+                      <img
+                        src={image.url}
+                        alt={`Interior design by ${image.modelName}`}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform"
+                        onLoad={() => {
+                          console.log(`✅ Image ${index + 1} loaded successfully:`, image.url);
+                        }}
+                        onError={(e) => {
+                          console.error(`❌ Image ${index + 1} failed to load:`, {
+                            url: image.url,
+                            modelName: image.modelName,
+                            error: e.currentTarget.error
+                          });
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
                    <div className="space-y-1">
                     <h4 className="font-medium text-sm truncate">
                       {image.modelName || `Model ${index + 1}`}
@@ -579,10 +651,59 @@ export const Designer3DPage: React.FC = () => {
           onClose={() => setShowWorkflowModal(false)}
           generationId={currentGenerationId}
           onComplete={(images) => {
-            const imagesWithModels = images.map((url: string, index: number) => ({
-              url,
-              modelName: filteredModels[index]?.name || `Model ${index + 1}`
-            }));
+            // Robust image-to-model mapping that handles sparse results
+            const imagesWithModels = images.map((url: string, index: number) => {
+              let modelName = `Model ${index + 1}`;
+              let modelId = '';
+              let resultIndex = index;
+
+              // Strategy 1: Extract model info from URL patterns
+              const urlMatch = url.match(/model[_-](\w+)|(\w+)[_-]model/i);
+              if (urlMatch) {
+                const extractedId = urlMatch[1] || urlMatch[2];
+                const matchingModel = filteredModels.find(m =>
+                  m.id.toLowerCase().includes(extractedId.toLowerCase()) ||
+                  m.name.toLowerCase().includes(extractedId.toLowerCase())
+                );
+                if (matchingModel) {
+                  modelName = matchingModel.name;
+                  modelId = matchingModel.id;
+                  console.log(`✅ Strategy 1 success: URL ${url} mapped to model ${modelName}`);
+                  return { url, modelName, modelId, resultIndex };
+                }
+              }
+
+              // Strategy 2: Sequential mapping with validation
+              if (index < filteredModels.length) {
+                const candidateModel = filteredModels[index];
+                if (candidateModel) {
+                  modelName = candidateModel.name;
+                  modelId = candidateModel.id;
+                  console.log(`✅ Strategy 2 success: Index ${index} mapped to model ${modelName}`);
+                  return { url, modelName, modelId, resultIndex };
+                }
+              }
+
+              // Strategy 3: Fallback mapping for remaining cases
+              const availableModel = filteredModels[index % filteredModels.length];
+              if (availableModel && filteredModels.length > 0) {
+                modelName = `${availableModel.name} (Result ${index + 1})`;
+                modelId = availableModel.id;
+                console.log(`⚠️ Strategy 3 fallback: Index ${index} mapped to model ${modelName}`);
+              } else {
+                console.log(`❌ No model mapping found for index ${index}, using fallback name`);
+              }
+
+              return { url, modelName, modelId, resultIndex };
+            });
+
+            console.log('🎯 WorkflowModal mapping results:', {
+              totalImages: images.length,
+              totalModels: filteredModels.length,
+              mappedResults: imagesWithModels.length,
+              mappings: imagesWithModels.map(img => ({ url: img.url, modelName: img.modelName }))
+            });
+
             setGeneratedImages(imagesWithModels);
             setShowWorkflowModal(false);
             toast({

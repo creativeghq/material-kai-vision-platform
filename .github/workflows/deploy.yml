@@ -1,71 +1,35 @@
-name: Deploy to Vercel
+name: Deploy Supabase Functions
 
 on:
   push:
-    branches: [main, develop]
-  pull_request:
     branches: [main]
-
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    paths:
+      - 'supabase/**'
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
-          node-version: '18'
-          cache: 'npm'
+          version: latest
 
-      - name: Install dependencies
-        run: |
-          npm ci --legacy-peer-deps
-          echo "Dependencies installed with legacy peer deps to handle deprecation warnings"
-
-      - name: Run tests
-        run: npm test -- --run
-        continue-on-error: true
-
-      - name: Build project
-        run: npm run build
+      - name: Deploy functions
+        run: supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
         env:
-          CI: false
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }} --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Project Artifacts
-        run: vercel build ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy Project Artifacts to Vercel
-        run: vercel deploy ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Comment PR with Preview URL
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { execSync } = require('child_process');
-            try {
-              const url = execSync('vercel ls --token=${{ secrets.VERCEL_TOKEN }} | grep ${{ github.sha }} | awk "{print $2}"', { encoding: 'utf8' }).trim();
-              if (url) {
-                github.rest.issues.createComment({
-                  issue_number: context.issue.number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: `🚀 **Preview deployment ready!**\n\n📱 **Preview URL:** https://${url}\n\n*Deployed from commit: ${context.sha.substring(0, 7)}*`
-                });
-              }
-            } catch (error) {
-              console.log('Could not get preview URL:', error.message);
-            }
+      - name: Trigger Vercel deployment
+        if: success()
+        run: |
+          if [ -n "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
+            curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+            echo "✅ Vercel deployment triggered"
+          else
+            echo "⚠️ VERCEL_DEPLOY_HOOK not configured"
+          fi

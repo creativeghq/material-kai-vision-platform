@@ -968,7 +968,7 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
 
     // Add image parameter if reference image is provided (for image-to-image mode)
     if (referenceImageUrl && referenceImageUrl !== '[NO_IMAGE]') {
-      inputParams.input = referenceImageUrl;
+      inputParams.image = referenceImageUrl;
     }
     
     const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5e", {
@@ -1231,7 +1231,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
       input: {
         image: referenceImageUrl,
         prompt: finalPrompt,
-        model: 'dev',
+        model: 'schnell',
         num_inference_steps: 28,
         guidance_scale: 3,
         aspect_ratio: '16:9',
@@ -1356,7 +1356,8 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     
     const output = await replicate.run("jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce", {
       input: {
-        image: referenceImageUrl
+        image: referenceImageUrl,
+        prompt: finalPrompt
       }
     });
     
@@ -1378,72 +1379,40 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
     await updateWorkflowStep('jschoormans/comfyui-interior-remodel', 'failed', undefined, error.message);
   }
 
-  // Model 6: jschoormans/interior-v2 - FIXED WITH CORRECT SCHEMA
+  // Model 6: rocketdigitalai/interior-design-sdxl - FIXED WITH CORRECT SCHEMA
   try {
-    console.log("🪟 Attempting Interior V2 model...");
-    await updateWorkflowStep('jschoormans/interior-v2', 'running');
+    console.log("🚀 Attempting Interior Design SDXL model...");
+    await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'running');
     
     // Skip if no reference image provided
     if (!referenceImageUrl) {
-      console.log("⚠️ Interior V2 skipped: No reference image provided");
-      await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'No reference image provided');
+      console.log("⚠️ Interior Design SDXL skipped: No reference image provided");
+      await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'failed', undefined, 'No reference image provided');
     } else {
-      const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
-        input: {
-          image: referenceImageUrl,
-          max_resolution: 1051,
-          controlnet_conditioning_scale: 0.03
-        }
+      // Use buildModelInput to get correct parameters
+      const inputParams = buildModelInput('rocketdigitalai/interior-design-sdxl', referenceImageUrl, finalPrompt);
+      
+      const output = await replicate.run("rocketdigitalai/interior-design-sdxl:a3c091059a25590ce2d5ea13651fab63f447f21760e50c358d4b850e844f59ee", {
+        input: inputParams
       });
       
-      console.log("Interior V2 raw output:", output);
+      console.log("Interior Design SDXL raw output:", output);
       if (Array.isArray(output) && output.length > 0) {
-        results.push({ url: output[0], modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
-        console.log("✅ Interior V2 generation successful:", output[0]);
-        await updateWorkflowStep('jschoormans/interior-v2', 'success', output[0]);
+        results.push({ url: output[0], modelName: "🚀 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
+        console.log("✅ Interior Design SDXL generation successful:", output[0]);
+        await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'success', output[0]);
       } else if (typeof output === 'string') {
-        results.push({ url: output, modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
-        console.log("✅ Interior V2 generation successful:", output);
-        await updateWorkflowStep('jschoormans/interior-v2', 'success', output);
+        results.push({ url: output, modelName: "🚀 Interior Design SDXL - rocketdigitalai/interior-design-sdxl" });
+        console.log("✅ Interior Design SDXL generation successful:", output);
+        await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'success', output);
       } else {
-        console.log("⚠️ Interior V2 unexpected output format:", typeof output, output);
-        await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'Unexpected output format');
+        console.log("⚠️ Interior Design SDXL unexpected output format:", typeof output, output);
+        await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'failed', undefined, 'Unexpected output format');
       }
     }
   } catch (error) {
-    console.error("❌ Interior V2 failed:", error.message);
-    await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, error.message);
-  }
-
-  // Model 7: rocketdigitalai/interior-design-sdxl - FIXED WITH CORRECT SCHEMA
-  try {
-    console.log("🪟 Attempting Interior V2 model...");
-    updateWorkflowStep('jschoormans/interior-v2', 'running');
-    
-    const output = await replicate.run("jschoormans/interior-v2:8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7", {
-      input: {
-        image: referenceImageUrl,
-        max_resolution: 1051,
-        controlnet_conditioning_scale: 0.03
-      }
-    });
-    
-    console.log("Interior V2 raw output:", output);
-    if (Array.isArray(output) && output.length > 0) {
-      results.push({ url: output[0], modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
-      console.log("✅ Interior V2 generation successful:", output[0]);
-      await updateWorkflowStep('jschoormans/interior-v2', 'success', output[0]);
-    } else if (typeof output === 'string') {
-      results.push({ url: output, modelName: "🪟 Interior V2 - jschoormans/interior-v2" });
-      console.log("✅ Interior V2 generation successful:", output);
-      await updateWorkflowStep('jschoormans/interior-v2', 'success', output);
-    } else {
-      console.log("⚠️ Interior V2 unexpected output format:", typeof output, output);
-      await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, 'Unexpected output format');
-    }
-  } catch (error) {
-    console.error("❌ Interior V2 failed:", error.message);
-    await updateWorkflowStep('jschoormans/interior-v2', 'failed', undefined, error.message);
+    console.error("❌ Interior Design SDXL failed:", error.message);
+    await updateWorkflowStep('rocketdigitalai/interior-design-sdxl', 'failed', undefined, error.message);
   }
 
   // Model 7: rocketdigitalai/interior-design-sdxl - FIXED WITH CORRECT SCHEMA
