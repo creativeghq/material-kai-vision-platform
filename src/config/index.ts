@@ -68,6 +68,13 @@ export class ApiConfigManager {
   }
 
   /**
+   * Get a specific API configuration by type
+   */
+  public static getApiConfigByType<T extends ApiConfig>(type: string): T | null {
+    return apiRegistry.getApiConfigByType<T>(type);
+  }
+
+  /**
    * Get all API configurations of a specific type
    */
   public static getApisByType<T extends ApiConfig>(type: string): T[] {

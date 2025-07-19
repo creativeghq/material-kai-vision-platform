@@ -69,7 +69,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
     public readonly apiType: string,
     public readonly modelId?: string
   ) {
-    const config = ApiConfigManager.getApiConfig(apiType);
+    const config = ApiConfigManager.getApiConfigByType(apiType);
     if (!config) {
       throw new Error(`API configuration not found for type: ${apiType}`);
     }
