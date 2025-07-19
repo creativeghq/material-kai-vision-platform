@@ -30,9 +30,6 @@ export function initializeApiConfigurations(): void {
   
   // Register Hugging Face API configuration
   apiRegistry.registerApi(huggingfaceConfig);
-  
-  console.log('✅ API configurations initialized successfully');
-  console.log(`📊 Registered ${apiRegistry.getAllConfigs().length} API configurations`);
 }
 
 // Export the singleton registry instance
@@ -87,15 +84,12 @@ export class ApiConfigManager {
     const config = apiRegistry.getApiConfigByType<T>(type);
     
     if (!config) {
-      console.warn(`⚠️ API configuration not found for type: ${type}`);
-      console.warn(`Available types: ${apiRegistry.getAllConfigs().map(c => c.type).join(', ')}`);
       return null;
     }
 
     // Validate configuration has required fields
     const validation = this.validateConfigurationFields(config);
     if (!validation.isValid) {
-      console.error(`❌ Invalid configuration for ${type}:`, validation.errors);
       throw new ConfigurationError(type, validation.missingFields,
         `Configuration for ${type} is missing required fields: ${validation.missingFields.join(', ')}`);
     }
@@ -237,7 +231,6 @@ export class ApiConfigManager {
     try {
       return this.getApiConfigByType<T>(type);
     } catch (error) {
-      console.warn(`Failed to get configuration for ${type}:`, error);
       return null;
     }
   }
@@ -249,24 +242,15 @@ export class ApiConfigManager {
     initializeApiConfigurations();
     
     const validation = this.validateEnvironment();
-    if (!validation.valid) {
-      console.warn('⚠️ Missing environment variables:', validation.missing);
-      console.warn('Some API integrations may not work properly');
-    }
-
-    const summary = this.getConfigSummary();
-    console.log('📋 Configuration Summary:', summary);
+    // Silently handle missing environment variables in production
+    // Configuration summary and validation details are available via getConfigSummary() and validateEnvironment()
   }
 }
 
 // Auto-initialize when module is imported (can be disabled if needed)
 // Initialize in all environments except during testing
 if (process.env.NODE_ENV !== 'test') {
-  console.log('🔧 CONFIG DEBUG: Initializing API configurations...');
-  console.log('🔧 CONFIG DEBUG: process.env.NODE_ENV:', process.env.NODE_ENV);
   ApiConfigManager.initialize();
-} else {
-  console.log('🔧 CONFIG DEBUG: ❌ Initialization skipped - test environment detected');
 }
 
 export default ApiConfigManager;

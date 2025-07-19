@@ -210,6 +210,7 @@ interface GenerationRequest {
   user_id: string;
   prompt: string;
   room_type?: string;
+  roomType?: string; // Support camelCase from frontend
   style?: string;
   specific_materials?: string[];
   reference_image_url?: string; // Add support for reference image
@@ -1835,10 +1836,11 @@ serve(async (req) => {
     
     // Create initial record first to get the ID
     // For test mode, provide default values for required fields
+    // Map camelCase frontend fields to snake_case database fields
     const insertData = {
       user_id: request.user_id,
       prompt: request.prompt,
-      room_type: request.room_type || (request.testMode ? 'living_room' : undefined),
+      room_type: request.room_type || request.roomType || (request.testMode ? 'living_room' : undefined),
       style: request.style || (request.testMode ? 'modern' : undefined),
       generation_status: 'processing'
     };
