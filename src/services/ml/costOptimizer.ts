@@ -4,6 +4,19 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
+interface CostOptimizerServiceConfig extends ServiceConfig {
+  monthlyBudget: number;
+  warningThreshold: number; // Percentage of budget
+  emergencyThreshold: number; // Percentage of budget
+  costPerProvider: Record<string, number>;
+  analysisInterval: number; // Analysis interval in milliseconds
+  enableCaching: boolean;
+  cacheExpirationMs: number;
+  enableBudgetAlerts: boolean;
+  enableOptimizationInsights: boolean;
+}
 
 interface CostConfig {
   monthlyBudget: number;
@@ -45,15 +58,16 @@ interface CacheStrategy {
   hit_rate: number;
 }
 
-export class CostOptimizer {
-  private static instance: CostOptimizer;
-  private config: CostConfig;
+export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   private usageCache = new Map<string, UsageMetrics[]>();
   private lastAnalysis = 0;
-  private analysisInterval = 3600000; // 1 hour
 
-  constructor() {
-    this.config = {
+  protected constructor(config?: Partial<CostOptimizerServiceConfig>) {
+    const defaultConfig: CostOptimizerServiceConfig = {
+      name: 'CostOptimizer',
+      version: '1.0.0',
+      environment: 'production',
+      enabled: true,
       monthlyBudget: 500, // $500/month default
       warningThreshold: 75, // 75% of budget
       emergencyThreshold: 90, // 90% of budget
@@ -63,15 +77,63 @@ export class CostOptimizer {
         replicate: 0.05,
         client: 0.0,
         anthropic: 0.003
+      },
+      analysisInterval: 3600000, // 1 hour
+      enableCaching: true,
+      cacheExpirationMs: 300000, // 5 minutes
+      enableBudgetAlerts: true,
+      enableOptimizationInsights: true,
+      healthCheck: {
+        enabled: true,
+        interval: 30000,
+        timeout: 5000
       }
+    };
+
+    super({ ...defaultConfig, ...config });
+  }
+
+  // Getter for backward compatibility
+  private get config(): CostConfig {
+    return {
+      monthlyBudget: this.getConfig().monthlyBudget,
+      warningThreshold: this.getConfig().warningThreshold,
+      emergencyThreshold: this.getConfig().emergencyThreshold,
+      costPerProvider: this.getConfig().costPerProvider
     };
   }
 
-  static getInstance(): CostOptimizer {
-    if (!CostOptimizer.instance) {
-      CostOptimizer.instance = new CostOptimizer();
+  static createInstance(config?: Partial<CostOptimizerServiceConfig>): CostOptimizer {
+    return new CostOptimizer(config);
+  }
+
+  protected async doInitialize(): Promise<void> {
+    // Test Supabase connection
+    const { error } = await supabase.from('analytics_events').select('count').limit(1);
+    if (error) {
+      throw new Error(`Failed to connect to analytics database: ${error.message}`);
     }
-    return CostOptimizer.instance;
+
+    // Initialize usage cache
+    this.usageCache.clear();
+    this.lastAnalysis = 0;
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    // Check Supabase connection
+    const { error } = await supabase.from('analytics_events').select('count').limit(1);
+    if (error) {
+      throw new Error(`Analytics database connection failed: ${error.message}`);
+    }
+
+    // Check if budget configuration is valid
+    if (this.config.monthlyBudget <= 0) {
+      throw new Error('Invalid budget configuration: monthly budget must be positive');
+    }
+
+    if (this.config.warningThreshold >= this.config.emergencyThreshold) {
+      throw new Error('Invalid threshold configuration: warning threshold must be less than emergency threshold');
+    }
   }
 
   /**

@@ -1,53 +1,63 @@
 import { pipeline } from '@huggingface/transformers';
 import { MLResult, ImageClassificationResult } from './types';
 import { DeviceDetector } from './deviceDetector';
+import { BaseService, ServiceConfig } from '../base/BaseService';
 
-export class ImageClassifierService {
+// Configuration interface for ImageClassifierService
+interface ImageClassifierServiceConfig extends ServiceConfig {
+  modelName?: string;
+  device?: string;
+  enableProgressCallback?: boolean;
+}
+
+export class ImageClassifierService extends BaseService<ImageClassifierServiceConfig> {
   private classifier: any = null;
-  private isInitializing = false;
-  private initializationPromise: Promise<void> | null = null;
 
-  async initialize(): Promise<void> {
-    if (this.isInitializing || this.initializationPromise) {
-      return this.initializationPromise!;
-    }
-
-    this.isInitializing = true;
-    this.initializationPromise = this._initialize();
-    
-    try {
-      await this.initializationPromise;
-    } finally {
-      this.isInitializing = false;
-    }
-  }
-
-  private async _initialize(): Promise<void> {
+  protected async doInitialize(): Promise<void> {
     try {
       console.log('Initializing image classification model...');
       
+      const modelName = this.config.modelName || 'onnx-community/mobilenetv4_conv_small.e2400_r224_in1k';
+      const device = this.config.device || DeviceDetector.getOptimalDevice();
+      
       this.classifier = await pipeline(
         'image-classification',
-        'onnx-community/mobilenetv4_conv_small.e2400_r224_in1k',
-        { 
-          device: DeviceDetector.getOptimalDevice(),
-          progress_callback: (progress: any) => {
-            console.log('Image classifier loading:', Math.round(progress.progress * 100) + '%');
-          }
+        modelName,
+        {
+          device: device as any, // Type assertion to handle device type mismatch
+          progress_callback: this.config.enableProgressCallback ? (progress: any) => {
+            console.log(`Image classifier loading: ${Math.round(progress.progress * 100)}%`);
+          } : undefined
         }
       );
 
-      console.log('Image classification model initialized');
+      console.log('Image classification model initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize image classifier:', error);
-      throw new Error(`Image classifier initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = `Image classifier initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error(errorMessage, error);
+      throw new Error(errorMessage);
+    }
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    try {
+      if (!this.classifier) {
+        throw new Error('Image classifier not available');
+      }
+
+      // Perform a simple health check by checking if the classifier is available
+      // We don't run an actual classification to avoid unnecessary computation
+      if (!(typeof this.classifier === 'function' || (this.classifier && typeof this.classifier.call === 'function'))) {
+        throw new Error('Image classifier is not callable');
+      }
+    } catch (error) {
+      console.warn('Image classifier health check failed', error);
+      throw error;
     }
   }
 
   async classify(imageSource: string | File | Blob): Promise<MLResult> {
-    const startTime = performance.now();
-    
-    try {
+    return this.executeOperation(async () => {
       await this.initialize();
       
       if (!this.classifier) {
@@ -55,34 +65,68 @@ export class ImageClassifierService {
       }
 
       const results = await this.classifier(imageSource) as ImageClassificationResult[];
-      const processingTime = performance.now() - startTime;
 
       return {
         success: true,
         data: results,
         confidence: results[0]?.score || 0,
-        processingTime: Math.round(processingTime)
+        processingTime: 0 // Will be set by executeOperation
       };
-    } catch (error) {
-      const processingTime = performance.now() - startTime;
-      console.error('Image classification failed:', error);
-      
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Classification failed',
-        processingTime: Math.round(processingTime)
-      };
-    }
-  }
-
-  isInitialized(): boolean {
-    return !!this.classifier;
+    }, 'classify');
   }
 
   getModelInfo(): { name: string; initialized: boolean } {
+    const modelName = this.config.modelName || 'mobilenetv4_conv_small.e2400_r224_in1k';
     return {
-      name: 'mobilenetv4_conv_small.e2400_r224_in1k',
-      initialized: this.isInitialized()
+      name: modelName,
+      initialized: this.isInitialized
     };
   }
+
+  async getClassificationStatus(): Promise<{
+    modelName: string;
+    initialized: boolean;
+    health: string;
+    totalClassifications: number;
+    averageProcessingTime: number;
+  }> {
+    const metrics = this.getMetrics();
+    const health = await this.getHealth();
+    const modelName = this.config.modelName || 'mobilenetv4_conv_small.e2400_r224_in1k';
+    
+    return {
+      modelName,
+      initialized: this.isInitialized,
+      health: health.status,
+      totalClassifications: metrics.requestCount,
+      averageProcessingTime: metrics.averageLatency
+    };
+  }
+
+  // Static factory method for standardized instantiation
+  static createInstance(config: Partial<ImageClassifierServiceConfig> = {}): ImageClassifierService {
+    const defaultConfig: ImageClassifierServiceConfig = {
+      name: 'ImageClassifierService',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      modelName: 'onnx-community/mobilenetv4_conv_small.e2400_r224_in1k',
+      enableProgressCallback: true,
+      timeout: 30000,
+      retries: 3,
+      rateLimit: {
+        requestsPerMinute: 60
+      },
+      healthCheck: {
+        enabled: true,
+        interval: 300000 // 5 minutes
+      },
+      ...config
+    };
+
+    return new ImageClassifierService(defaultConfig);
+  }
 }
+
+// Export singleton instance for backward compatibility
+export const imageClassifierService = ImageClassifierService.getInstance<ImageClassifierService>();

@@ -1,3 +1,4 @@
+import { BaseService, ServiceConfig } from './base/BaseService';
 import { ResponseValidator } from './responseValidator';
 
 export interface AIProvider {
@@ -31,17 +32,34 @@ export interface HybridResponse {
   total_processing_time_ms: number;
 }
 
-export class HybridAIService {
-  private static readonly PROVIDERS: AIProvider[] = [
+export interface HybridAIServiceConfig extends ServiceConfig {
+  providers: AIProvider[];
+  defaultMinScore: number;
+  defaultMaxRetries: number;
+  enableValidation: boolean;
+}
+
+export class HybridAIService extends BaseService<HybridAIServiceConfig> {
+  private readonly PROVIDERS: AIProvider[] = [
     { name: 'openai', priority: 1, available: true },
     { name: 'claude', priority: 2, available: true }
   ];
 
-  private static readonly DEFAULT_MIN_SCORE = 0.7;
-  private static readonly DEFAULT_MAX_RETRIES = 2;
+  private readonly DEFAULT_MIN_SCORE = 0.7;
+  private readonly DEFAULT_MAX_RETRIES = 2;
+
+  protected async doInitialize(): Promise<void> {
+    // Initialize providers and validation
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    if (!this.PROVIDERS.some(p => p.available)) {
+      throw new Error('No AI providers available');
+    }
+  }
 
   // Main hybrid processing function
-  static async processRequest(request: HybridRequest): Promise<HybridResponse> {
+  async processRequest(request: HybridRequest): Promise<HybridResponse> {
     const startTime = Date.now();
     const attempts: HybridResponse['attempts'] = [];
     const minimumScore = request.minimumScore ?? this.DEFAULT_MIN_SCORE;
@@ -69,17 +87,17 @@ export class HybridAIService {
         let result: any;
         switch (provider.name) {
           case 'openai':
-            result = await this.callOpenAI(request);
+            result = await HybridAIService.callOpenAI(request);
             break;
           case 'claude':
-            result = await this.callClaude(request);
+            result = await HybridAIService.callClaude(request);
             break;
           default:
             throw new Error(`Unknown provider: ${provider.name}`);
         }
 
         // Validate the response
-        const validation = this.validateResponse(result, request);
+        const validation = HybridAIService.validateResponse(result, request);
         const processingTime = Date.now() - attemptStart;
 
         attempts.push({

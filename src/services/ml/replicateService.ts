@@ -8,13 +8,14 @@ import {
   ModelParameterValidator, 
   ModelConfig 
 } from './replicateModelConfigs';
+import { BaseService, ServiceConfig } from '../base/BaseService';
+import { ApiRegistry } from '../../config/apiConfig';
 
-interface ReplicateConfig {
-  apiKey: string;
-  baseUrl: string;
-  maxRetries: number;
-  retryDelay: number;
-  timeout: number;
+interface ReplicateServiceConfig extends ServiceConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  maxRetries?: number;
+  retryDelay?: number;
 }
 
 interface ReplicatePrediction {
@@ -63,27 +64,66 @@ interface MaterialProperties {
   confidence: number;
 }
 
-export class ReplicateService {
-  private config: ReplicateConfig;
+export class ReplicateService extends BaseService<ReplicateServiceConfig> {
+  private apiKey: string | null = null;
   private usageTracker = new Map<string, number>();
 
-  constructor(apiKey: string) {
-    this.config = {
-      apiKey,
-      baseUrl: 'https://api.replicate.com/v1',
-      maxRetries: 3,
-      retryDelay: 2000,
-      timeout: 300000 // 5 minutes
-    };
+  constructor(config: ReplicateServiceConfig) {
+    super(config);
+  }
+
+  protected async doInitialize(): Promise<void> {
+    // Try to get API key from config first, then from centralized config
+    this.apiKey = this.config.apiKey || await this.getApiKeyFromCentralizedConfig();
+    
+    if (!this.apiKey) {
+      throw new Error('Replicate API key not configured');
+    }
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    if (!this.apiKey) {
+      throw new Error('Service not properly initialized - missing API key');
+    }
+
+    // Simple health check by testing the API endpoint
+    const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Token ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Replicate API health check failed: ${response.status}`);
+    }
+  }
+
+  private async getApiKeyFromCentralizedConfig(): Promise<string | null> {
+    try {
+      const apiRegistry = ApiRegistry.getInstance<ApiRegistry>();
+      const replicateConfig = apiRegistry.getApiConfigByType('replicate');
+      
+      if (replicateConfig) {
+        const envConfig = replicateConfig.environment[this.config.environment];
+        return envConfig?.apiKey || null;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Could not get Replicate API key from centralized config:', error);
+      return null;
+    }
   }
 
   /**
    * Extract SVBRDF maps from material image
    */
   async extractSVBRDF(imageUrl: string): Promise<SVBRDFMaps> {
-    const startTime = Date.now();
+    return this.executeOperation(async () => {
+      const startTime = Date.now();
 
-    try {
       const prediction = await this.createPrediction({
         version: "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
         input: {
@@ -110,20 +150,16 @@ export class ReplicateService {
         confidence: 0.85, // High confidence for Replicate results
         processing_time: Date.now() - startTime
       };
-
-    } catch (error) {
-      console.error('SVBRDF extraction failed:', error);
-      throw new Error(`Failed to extract SVBRDF: ${error.message}`);
-    }
+    }, 'extractSVBRDF');
   }
 
   /**
    * Estimate depth from single image using MiDaS
    */
   async estimateDepth(imageUrl: string): Promise<DepthEstimation> {
-    const startTime = Date.now();
+    return this.executeOperation(async () => {
+      const startTime = Date.now();
 
-    try {
       const prediction = await this.createPrediction({
         version: "intel-isl/midas:8cf3c64a16df9d965b10421ca6adec9c6f6b8a18",
         input: {
@@ -144,18 +180,14 @@ export class ReplicateService {
         max_depth: 10.0,
         processing_time: Date.now() - startTime
       };
-
-    } catch (error) {
-      console.error('Depth estimation failed:', error);
-      throw new Error(`Failed to estimate depth: ${error.message}`);
-    }
+    }, 'estimateDepth');
   }
 
   /**
    * Generate high-quality material variations
    */
   async generateMaterialVariations(imageUrl: string, count: number = 4): Promise<string[]> {
-    try {
+    return this.executeOperation(async () => {
       const prediction = await this.createPrediction({
         version: "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
         input: {
@@ -174,18 +206,14 @@ export class ReplicateService {
       }
 
       return Array.isArray(result.output) ? result.output : [result.output];
-
-    } catch (error) {
-      console.error('Material variation generation failed:', error);
-      throw new Error(`Failed to generate variations: ${error.message}`);
-    }
+    }, 'generateMaterialVariations');
   }
 
   /**
    * Enhance material image quality
    */
   async enhanceImageQuality(imageUrl: string): Promise<string> {
-    try {
+    return this.executeOperation(async () => {
       const prediction = await this.createPrediction({
         version: "tencentarc/gfpgan:9283608cc6b7be6b65a8e44983db012355fde4132009bf99d976b2f0896856a3",
         input: {
@@ -202,18 +230,14 @@ export class ReplicateService {
       }
 
       return result.output;
-
-    } catch (error) {
-      console.error('Image enhancement failed:', error);
-      throw new Error(`Failed to enhance image: ${error.message}`);
-    }
+    }, 'enhanceImageQuality');
   }
 
   /**
    * Remove background from material images
    */
   async removeBackground(imageUrl: string): Promise<string> {
-    try {
+    return this.executeOperation(async () => {
       const prediction = await this.createPrediction({
         version: "cjwbw/rembg:fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003",
         input: {
@@ -228,40 +252,37 @@ export class ReplicateService {
       }
 
       return result.output;
-
-    } catch (error) {
-      console.error('Background removal failed:', error);
-      throw new Error(`Failed to remove background: ${error.message}`);
-    }
+    }, 'removeBackground');
   }
 
   /**
    * Analyze material properties using advanced models
    */
   async analyzeMaterialProperties(imageUrl: string): Promise<MaterialProperties> {
-    try {
-      // Use a custom material analysis model (would need to be deployed to Replicate)
-      const prediction = await this.createPrediction({
-        version: "custom/material-analyzer:latest",
-        input: {
-          image: imageUrl,
-          analysis_type: "comprehensive"
-        }
-      });
+    return this.executeOperation(async () => {
+      try {
+        // Use a custom material analysis model (would need to be deployed to Replicate)
+        const prediction = await this.createPrediction({
+          version: "custom/material-analyzer:latest",
+          input: {
+            image: imageUrl,
+            analysis_type: "comprehensive"
+          }
+        });
 
-      const result = await this.waitForCompletion(prediction.id);
-      
-      if (result.status === 'failed') {
-        // Fallback to basic analysis if custom model fails
+        const result = await this.waitForCompletion(prediction.id);
+        
+        if (result.status === 'failed') {
+          // Fallback to basic analysis if custom model fails
+          return this.fallbackMaterialAnalysis(imageUrl);
+        }
+
+        return result.output;
+      } catch (error) {
+        console.error('Material property analysis failed:', error);
         return this.fallbackMaterialAnalysis(imageUrl);
       }
-
-      return result.output;
-
-    } catch (error) {
-      console.error('Material property analysis failed:', error);
-      return this.fallbackMaterialAnalysis(imageUrl);
-    }
+    }, 'analyzeMaterialProperties');
   }
 
   /**
@@ -273,9 +294,9 @@ export class ReplicateService {
     imageUrl?: string,
     options: Record<string, any> = {}
   ): Promise<string | string[]> {
-    const startTime = Date.now();
+    return this.executeOperation(async () => {
+      const startTime = Date.now();
 
-    try {
       // Get model configuration
       const modelConfig = INTERIOR_DESIGN_MODELS[modelId];
       if (!modelConfig) {
@@ -312,11 +333,7 @@ export class ReplicateService {
       this.usageTracker.set('interior-design', (this.usageTracker.get('interior-design') || 0) + 1);
 
       return result.output;
-
-    } catch (error) {
-      console.error(`Interior design generation failed for model ${modelId}:`, error);
-      throw new Error(`Failed to generate interior design: ${error.message}`);
-    }
+    }, 'generateInteriorDesign');
   }
 
   /**
@@ -331,12 +348,12 @@ export class ReplicateService {
       type?: 'text-to-image' | 'image-to-image';
     } = {}
   ): Promise<{ result: string | string[]; modelUsed: string; processingTime: number }> {
-    const startTime = Date.now();
+    return this.executeOperation(async () => {
+      const startTime = Date.now();
 
-    // Select best model based on requirements
-    const modelId = this.selectBestInteriorModel(requirements, !!imageUrl);
-    
-    try {
+      // Select best model based on requirements
+      const modelId = this.selectBestInteriorModel(requirements, !!imageUrl);
+      
       const result = await this.generateInteriorDesign(modelId, prompt, imageUrl, {
         // Add requirement-based parameter adjustments
         ...(requirements.speed === 'fast' && { num_inference_steps: 20 }),
@@ -350,11 +367,7 @@ export class ReplicateService {
         modelUsed: modelId,
         processingTime: Date.now() - startTime
       };
-
-    } catch (error) {
-      console.error(`Auto interior design generation failed:`, error);
-      throw new Error(`Failed to generate interior design automatically: ${error.message}`);
-    }
+    }, 'generateInteriorDesignAuto');
   }
 
   /**
@@ -367,48 +380,50 @@ export class ReplicateService {
     results: Record<string, { success: boolean; output?: any; error?: string; processingTime: number }>;
     summary: { total: number; successful: number; failed: number; successRate: number };
   }> {
-    const results: Record<string, any> = {};
-    const modelIds = Object.keys(INTERIOR_DESIGN_MODELS);
+    return this.executeOperation(async () => {
+      const results: Record<string, any> = {};
+      const modelIds = Object.keys(INTERIOR_DESIGN_MODELS);
 
-    console.log(`Testing ${modelIds.length} interior design models...`);
+      console.log(`Testing ${modelIds.length} interior design models...`);
 
-    for (const modelId of modelIds) {
-      const startTime = Date.now();
-      console.log(`Testing model: ${modelId}`);
+      for (const modelId of modelIds) {
+        const startTime = Date.now();
+        console.log(`Testing model: ${modelId}`);
 
-      try {
-        const output = await this.generateInteriorDesign(modelId, testPrompt, imageUrl);
-        results[modelId] = {
-          success: true,
-          output,
-          processingTime: Date.now() - startTime
-        };
-        console.log(`✅ ${modelId}: Success`);
-      } catch (error) {
-        results[modelId] = {
-          success: false,
-          error: error.message,
-          processingTime: Date.now() - startTime
-        };
-        console.log(`❌ ${modelId}: ${error.message}`);
+        try {
+          const output = await this.generateInteriorDesign(modelId, testPrompt, imageUrl);
+          results[modelId] = {
+            success: true,
+            output,
+            processingTime: Date.now() - startTime
+          };
+          console.log(`✅ ${modelId}: Success`);
+        } catch (error) {
+          results[modelId] = {
+            success: false,
+            error: error.message,
+            processingTime: Date.now() - startTime
+          };
+          console.log(`❌ ${modelId}: ${error.message}`);
+        }
       }
-    }
 
-    // Calculate summary statistics
-    const successful = Object.values(results).filter((r: any) => r.success).length;
-    const failed = modelIds.length - successful;
-    const successRate = Math.round((successful / modelIds.length) * 100);
+      // Calculate summary statistics
+      const successful = Object.values(results).filter((r: any) => r.success).length;
+      const failed = modelIds.length - successful;
+      const successRate = Math.round((successful / modelIds.length) * 100);
 
-    const summary = {
-      total: modelIds.length,
-      successful,
-      failed,
-      successRate
-    };
+      const summary = {
+        total: modelIds.length,
+        successful,
+        failed,
+        successRate
+      };
 
-    console.log(`\nTest Summary: ${successful}/${modelIds.length} models successful (${successRate}%)`);
+      console.log(`\nTest Summary: ${successful}/${modelIds.length} models successful (${successRate}%)`);
 
-    return { results, summary };
+      return { results, summary };
+    }, 'testAllInteriorModels');
   }
 
   /**
@@ -502,14 +517,10 @@ export class ReplicateService {
     const totalRequests = Array.from(this.usageTracker.values()).reduce((sum, count) => sum + count, 0);
     const requestsByType = Object.fromEntries(this.usageTracker);
     
-    // Estimate costs based on Replicate pricing
-    const costPerRequest = 0.05; // Average $0.05 per request
-    const estimatedCost = totalRequests * costPerRequest;
-
     return {
       totalRequests,
       requestsByType,
-      estimatedCost,
+      estimatedCost: totalRequests * 0.05, // Rough estimate
       averageProcessingTime: 30000 // 30 seconds average
     };
   }
@@ -518,94 +529,73 @@ export class ReplicateService {
    * Cancel a running prediction
    */
   async cancelPrediction(predictionId: string): Promise<void> {
-    try {
-      await fetch(`${this.config.baseUrl}/predictions/${predictionId}/cancel`, {
+    return this.executeOperation(async () => {
+      const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions/${predictionId}/cancel`, {
         method: 'POST',
         headers: {
-          'Authorization': `Token ${this.config.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json'
         }
       });
-    } catch (error) {
-      console.error('Failed to cancel prediction:', error);
-    }
+
+      if (!response.ok) {
+        throw new Error(`Failed to cancel prediction: ${response.status} ${response.statusText}`);
+      }
+    }, 'cancelPrediction');
   }
 
   // Private helper methods
 
   private async createPrediction(request: any): Promise<ReplicatePrediction> {
-    const response = await fetch(`${this.config.baseUrl}/predictions`, {
+    const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${this.config.apiKey}`,
+        'Authorization': `Token ${this.apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(request)
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Replicate API error: ${response.status} - ${error}`);
+      throw new Error(`Replicate API error: ${response.status} ${response.statusText}`);
     }
 
-    const prediction = await response.json();
-    
-    // Track usage
-    const modelType = request.version.split('/')[1] || 'unknown';
-    this.usageTracker.set(modelType, (this.usageTracker.get(modelType) || 0) + 1);
-
-    return prediction;
+    return await response.json();
   }
 
   private async waitForCompletion(predictionId: string): Promise<ReplicatePrediction> {
-    const startTime = Date.now();
-    let retryCount = 0;
+    const maxAttempts = this.config.maxRetries || 60; // 5 minutes with 5-second intervals
+    const retryDelay = this.config.retryDelay || 5000;
 
-    while (retryCount < this.config.maxRetries) {
-      try {
-        // Check timeout
-        if (Date.now() - startTime > this.config.timeout) {
-          await this.cancelPrediction(predictionId);
-          throw new Error('Processing timeout exceeded');
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions/${predictionId}`, {
+        headers: {
+          'Authorization': `Token ${this.apiKey}`,
+          'Content-Type': 'application/json'
         }
+      });
 
-        const response = await fetch(`${this.config.baseUrl}/predictions/${predictionId}`, {
-          headers: {
-            'Authorization': `Token ${this.config.apiKey}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to get prediction status: ${response.status}`);
-        }
-
-        const prediction = await response.json();
-
-        if (prediction.status === 'succeeded' || prediction.status === 'failed') {
-          return prediction;
-        }
-
-        // Wait before polling again
-        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
-        retryCount++;
-
-      } catch (error) {
-        console.error(`Polling attempt ${retryCount + 1} failed:`, error);
-        retryCount++;
-        
-        if (retryCount >= this.config.maxRetries) {
-          throw error;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
+      if (!response.ok) {
+        throw new Error(`Failed to get prediction status: ${response.status} ${response.statusText}`);
       }
+
+      const prediction: ReplicatePrediction = await response.json();
+
+      if (prediction.status === 'succeeded' || prediction.status === 'failed' || prediction.status === 'canceled') {
+        return prediction;
+      }
+
+      // Wait before next attempt
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
 
-    throw new Error('Maximum retry attempts exceeded');
+    throw new Error(`Prediction ${predictionId} timed out after ${maxAttempts} attempts`);
   }
 
   private parseSVBRDFOutput(output: any): Partial<SVBRDFMaps> {
-    if (Array.isArray(output)) {
+    // Parse the output to extract different map types
+    // This is a simplified implementation - actual parsing would depend on the model output format
+    if (Array.isArray(output) && output.length >= 4) {
       return {
         albedo_map: output[0],
         normal_map: output[1],
@@ -613,29 +603,50 @@ export class ReplicateService {
         metallic_map: output[3]
       };
     }
-    
-    return {
-      albedo_map: output
-    };
+    return {};
   }
 
   private async fallbackMaterialAnalysis(imageUrl: string): Promise<MaterialProperties> {
-    // Simple fallback analysis
+    // Fallback analysis with default values
     return {
       material_type: 'unknown',
       properties: {
         roughness: 0.5,
-        metallic: 0.1,
+        metallic: 0.0,
         specular: 0.5,
         transparency: 0.0
       },
       confidence: 0.3
     };
   }
+
+  /**
+   * Create a standardized service instance
+   */
+  static createInstance(config: Partial<ReplicateServiceConfig> = {}): ReplicateService {
+    const defaultConfig: ReplicateServiceConfig = {
+      name: 'replicate-service',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      timeout: 300000, // 5 minutes
+      retries: 3,
+      rateLimit: {
+        requestsPerMinute: 10 // Conservative rate limit for Replicate
+      },
+      healthCheck: {
+        enabled: true,
+        interval: 600000, // 10 minutes
+        timeout: 30000
+      },
+      baseUrl: 'https://api.replicate.com/v1',
+      maxRetries: 60,
+      retryDelay: 5000,
+      ...config
+    };
+
+    return new ReplicateService(defaultConfig);
+  }
 }
 
-// Export a configured instance
-export const replicateService = new ReplicateService(
-  // Would get from environment/secrets in production
-  process.env.REPLICATE_API_KEY || ''
-);
+export default ReplicateService;

@@ -2,9 +2,7 @@ import { StandardizedApiClient, StandardizedApiResponse } from './standardizedAp
 import { ReplicateApiClient } from './replicateApiClient';
 import { HuggingFaceApiClient } from './huggingFaceApiClient';
 import { SupabaseApiClient } from './supabaseApiClient';
-import { replicateConfig } from '../../config/apis/replicateConfig';
-import { huggingfaceConfig } from '../../config/apis/huggingfaceConfig';
-import { supabaseConfig } from '../../config/apis/supabaseConfig';
+import { ApiRegistry, ReplicateApiConfig, HuggingFaceApiConfig, SupabaseApiConfig } from '../../config/apiConfig';
 
 /**
  * Centralized API Client Factory Implementation
@@ -28,44 +26,55 @@ class CentralizedApiClientFactory {
   }
 
   private initializeClients(): void {
+    const apiRegistry = ApiRegistry.getInstance();
+
     // Register Replicate clients for all configured models
-    const replicateModels = Object.keys(replicateConfig.models);
-    replicateModels.forEach(modelId => {
-      const modelConfig = replicateConfig.models[modelId];
-      if (modelConfig) {
-        this.registerClient(
-          'replicate',
-          modelId,
-          new ReplicateApiClient(modelId)
-        );
-      }
-    });
+    const replicateConfig = apiRegistry.getApiConfigByType<ReplicateApiConfig>('replicate');
+    if (replicateConfig && replicateConfig.models) {
+      const replicateModels = Object.keys(replicateConfig.models);
+      replicateModels.forEach(modelId => {
+        const modelConfig = replicateConfig.models[modelId];
+        if (modelConfig) {
+          this.registerClient(
+            'replicate',
+            modelId,
+            new ReplicateApiClient(modelId)
+          );
+        }
+      });
+    }
 
     // Register Hugging Face clients for all configured models
-    const huggingFaceModels = Object.keys(huggingfaceConfig.models);
-    huggingFaceModels.forEach(modelId => {
-      const modelConfig = huggingfaceConfig.models[modelId];
-      if (modelConfig) {
-        this.registerClient(
-          'huggingface',
-          modelId,
-          new HuggingFaceApiClient(modelId)
-        );
-      }
-    });
+    const huggingfaceConfig = apiRegistry.getApiConfigByType<HuggingFaceApiConfig>('huggingface');
+    if (huggingfaceConfig && huggingfaceConfig.models) {
+      const huggingFaceModels = Object.keys(huggingfaceConfig.models);
+      huggingFaceModels.forEach(modelId => {
+        const modelConfig = huggingfaceConfig.models[modelId];
+        if (modelConfig) {
+          this.registerClient(
+            'huggingface',
+            modelId,
+            new HuggingFaceApiClient(modelId)
+          );
+        }
+      });
+    }
 
     // Register Supabase clients for all configured functions
-    const supabaseFunctions = Object.keys(supabaseConfig.functions);
-    supabaseFunctions.forEach(functionName => {
-      const functionConfig = supabaseConfig.functions[functionName];
-      if (functionConfig) {
-        this.registerClient(
-          'supabase',
-          functionName,
-          new SupabaseApiClient(functionName)
-        );
-      }
-    });
+    const supabaseConfig = apiRegistry.getApiConfigByType<SupabaseApiConfig>('supabase');
+    if (supabaseConfig && supabaseConfig.functions) {
+      const supabaseFunctions = Object.keys(supabaseConfig.functions);
+      supabaseFunctions.forEach(functionName => {
+        const functionConfig = supabaseConfig.functions[functionName];
+        if (functionConfig) {
+          this.registerClient(
+            'supabase',
+            functionName,
+            new SupabaseApiClient(functionName)
+          );
+        }
+      });
+    }
   }
 
   /**
@@ -93,13 +102,18 @@ class CentralizedApiClientFactory {
    * Get all available models for a specific API type
    */
   public getAvailableModels(apiType: string): string[] {
+    const apiRegistry = ApiRegistry.getInstance();
+    
     switch (apiType) {
       case 'replicate':
-        return Object.keys(replicateConfig.models);
+        const replicateConfig = apiRegistry.getApiConfigByType<ReplicateApiConfig>('replicate');
+        return replicateConfig ? Object.keys(replicateConfig.models) : [];
       case 'huggingface':
-        return Object.keys(huggingfaceConfig.models);
+        const huggingfaceConfig = apiRegistry.getApiConfigByType<HuggingFaceApiConfig>('huggingface');
+        return huggingfaceConfig ? Object.keys(huggingfaceConfig.models) : [];
       case 'supabase':
-        return Object.keys(supabaseConfig.functions);
+        const supabaseConfig = apiRegistry.getApiConfigByType<SupabaseApiConfig>('supabase');
+        return supabaseConfig ? Object.keys(supabaseConfig.functions) : [];
       default:
         return [];
     }
@@ -109,13 +123,18 @@ class CentralizedApiClientFactory {
    * Get model configuration for validation and parameter building
    */
   public getModelConfig(apiType: string, modelId: string) {
+    const apiRegistry = ApiRegistry.getInstance();
+    
     switch (apiType) {
       case 'replicate':
-        return replicateConfig.models[modelId] || null;
+        const replicateConfig = apiRegistry.getApiConfigByType<ReplicateApiConfig>('replicate');
+        return replicateConfig?.models[modelId] || null;
       case 'huggingface':
-        return huggingfaceConfig.models[modelId] || null;
+        const huggingfaceConfig = apiRegistry.getApiConfigByType<HuggingFaceApiConfig>('huggingface');
+        return huggingfaceConfig?.models[modelId] || null;
       case 'supabase':
-        return supabaseConfig.functions[modelId] || null;
+        const supabaseConfig = apiRegistry.getApiConfigByType<SupabaseApiConfig>('supabase');
+        return supabaseConfig?.functions[modelId] || null;
       default:
         return null;
     }

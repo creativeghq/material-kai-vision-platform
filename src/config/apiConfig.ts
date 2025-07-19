@@ -1,11 +1,16 @@
 /**
  * Centralized API Configuration Management
- * 
+ *
  * This system manages all API configurations in a centralized way while
  * preserving each API's unique requirements and parameter schemas.
  */
 
 import { z } from 'zod';
+import { Singleton } from '../core/patterns/Singleton';
+import type { HuggingFaceApiConfig } from './apis/huggingfaceConfig';
+import { replicateConfig } from './apis/replicateConfig';
+import { supabaseConfig } from './apis/supabaseConfig';
+import { huggingfaceConfig } from './apis/huggingfaceConfig';
 
 // Environment configuration
 export interface EnvironmentConfig {
@@ -72,18 +77,6 @@ export interface OpenAIApiConfig extends BaseApiConfig {
   };
 }
 
-// Hugging Face API specific configuration
-export interface HuggingFaceApiConfig extends BaseApiConfig {
-  type: 'huggingface';
-  models: {
-    [modelId: string]: {
-      inputSchema: z.ZodSchema;
-      outputSchema: z.ZodSchema;
-      pipeline?: string;
-      task?: string;
-    };
-  };
-}
 
 // Union type for all API configurations
 export type ApiConfig = 
@@ -93,20 +86,29 @@ export type ApiConfig =
   | HuggingFaceApiConfig;
 
 // API Registry - centralized store for all API configurations
-export class ApiRegistry {
-  private static instance: ApiRegistry;
+export class ApiRegistry extends Singleton {
   private configs: Map<string, ApiConfig> = new Map();
   private environment: keyof EnvironmentConfig;
 
-  private constructor() {
+  protected constructor() {
+    super();
     this.environment = this.detectEnvironment();
+    this.initialize();
   }
 
-  public static getInstance(): ApiRegistry {
-    if (!ApiRegistry.instance) {
-      ApiRegistry.instance = new ApiRegistry();
-    }
-    return ApiRegistry.instance;
+  protected initialize(): void {
+    // Register all API configurations
+    this.registerApi(replicateConfig);
+    this.registerApi(supabaseConfig);
+    this.registerApi(huggingfaceConfig);
+
+    console.log(`✅ API Registry initialized with ${this.configs.size} configurations for environment: ${this.environment}`);
+  }
+
+  protected cleanup(): void {
+    // Clear all configurations and reset state
+    this.configs.clear();
+    console.log('🧹 API Registry cleaned up');
   }
 
   private detectEnvironment(): keyof EnvironmentConfig {
@@ -125,6 +127,18 @@ export class ApiRegistry {
 
   public getApiConfig<T extends ApiConfig>(name: string): T | null {
     return (this.configs.get(name) as T) || null;
+  }
+
+  /**
+   * Get a specific API configuration by type
+   */
+  public getApiConfigByType<T extends ApiConfig>(type: string): T | null {
+    for (const config of this.configs.values()) {
+      if (config.type === type) {
+        return config as T;
+      }
+    }
+    return null;
   }
 
   public getAllConfigs(): ApiConfig[] {
@@ -193,4 +207,4 @@ export class ApiConfigUtils {
 }
 
 // Export singleton instance
-export const apiRegistry = ApiRegistry.getInstance();
+export const apiRegistry = ApiRegistry.getInstance<ApiRegistry>();

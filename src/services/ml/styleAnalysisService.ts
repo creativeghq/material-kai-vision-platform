@@ -1,5 +1,7 @@
 import { MLResult } from './types';
 import { DeviceDetector } from './deviceDetector';
+import { BaseService, ServiceConfig } from '../base/BaseService';
+import { ApiRegistry } from '../../config/apiConfig';
 
 export interface StyleAnalysisResult {
   primaryStyle: string;
@@ -32,18 +34,78 @@ export interface StyleAnalysisOptions {
   targetRooms?: string[];
 }
 
+export interface StyleAnalysisServiceConfig extends ServiceConfig {
+  maxImageSize?: number;
+  enableAdvancedFeatures?: boolean;
+  defaultTargetRooms?: string[];
+  enableBrowserOptimizations?: boolean;
+}
+
 /**
  * Client-side style analysis service using computer vision and color analysis
  */
-export class StyleAnalysisService {
+export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig> {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
 
-  constructor() {
+  protected constructor(config: StyleAnalysisServiceConfig) {
+    super(config);
     if (typeof document !== 'undefined') {
       this.canvas = document.createElement('canvas');
       this.ctx = this.canvas.getContext('2d');
     }
+  }
+
+  protected async doInitialize(): Promise<void> {
+    // Initialize canvas if in browser environment
+    if (typeof document !== 'undefined' && !this.canvas) {
+      this.canvas = document.createElement('canvas');
+      this.ctx = this.canvas.getContext('2d');
+    }
+
+    // Validate browser capabilities
+    if (typeof document !== 'undefined') {
+      if (!this.canvas || !this.ctx) {
+        throw new Error('Canvas not supported in this browser environment');
+      }
+    }
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    // Check canvas availability in browser environment
+    if (typeof document !== 'undefined') {
+      if (!this.canvas || !this.ctx) {
+        throw new Error('Canvas context not available');
+      }
+    }
+
+    // Test basic canvas operations
+    if (this.canvas && this.ctx) {
+      try {
+        this.canvas.width = 1;
+        this.canvas.height = 1;
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(0, 0, 1, 1);
+      } catch (error) {
+        throw new Error(`Canvas operations failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  }
+
+  static createInstance(config?: Partial<StyleAnalysisServiceConfig>): StyleAnalysisService {
+    const defaultConfig: StyleAnalysisServiceConfig = {
+      name: 'StyleAnalysisService',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      maxImageSize: 512,
+      enableAdvancedFeatures: true,
+      defaultTargetRooms: ['living_room', 'bedroom', 'kitchen', 'bathroom', 'office'],
+      enableBrowserOptimizations: true
+    };
+
+    const finalConfig = { ...defaultConfig, ...config };
+    return new StyleAnalysisService(finalConfig);
   }
 
   /**
@@ -434,4 +496,4 @@ export class StyleAnalysisService {
   }
 }
 
-export const styleAnalysisService = new StyleAnalysisService();
+export const styleAnalysisService = StyleAnalysisService.createInstance();

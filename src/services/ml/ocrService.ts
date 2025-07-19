@@ -1,4 +1,5 @@
 import { MLResult, TextEmbeddingResult } from './types';
+import { BaseService, ServiceConfig } from '../base/BaseService';
 
 export interface OCRResult {
   text: string;
@@ -26,19 +27,66 @@ export interface OCROptions {
   detectLanguage?: boolean;
 }
 
-export class OCRService {
-  private static isSupported(): boolean {
+interface OCRServiceConfig extends ServiceConfig {
+  defaultLanguage?: string;
+  enableStructuredData?: boolean;
+  fallbackToCanvas?: boolean;
+}
+
+export class OCRService extends BaseService<OCRServiceConfig> {
+  private isSupported: boolean = false;
+
+  constructor(config: OCRServiceConfig) {
+    super(config);
+  }
+
+  protected async doInitialize(): Promise<void> {
+    // Check browser support for OCR capabilities
+    this.isSupported = this.checkBrowserSupport();
+    
+    if (!this.isSupported) {
+      console.warn('OCR capabilities limited in this browser environment');
+    }
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    if (!this.isSupported) {
+      throw new Error('OCR not supported in this browser environment');
+    }
+
+    // Test basic canvas functionality
+    try {
+      if (typeof window !== 'undefined') {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Canvas context not available');
+        }
+      }
+    } catch (error) {
+      throw new Error('Canvas functionality not available for OCR processing');
+    }
+  }
+
+  private checkBrowserSupport(): boolean {
+    if (typeof window === 'undefined') {
+      return false; // Server-side environment
+    }
+    
     return 'createImageBitmap' in window && 'OffscreenCanvas' in window;
   }
 
-  static async extractText(
+  /**
+   * Extract text from image file
+   */
+  async extractText(
     imageFile: File,
     options: OCROptions = {}
   ): Promise<MLResult> {
-    const startTime = performance.now();
+    return this.executeOperation(async () => {
+      const startTime = performance.now();
 
-    try {
-      if (!this.isSupported()) {
+      if (!this.isSupported) {
         throw new Error('OCR not supported in this browser');
       }
 
@@ -67,7 +115,7 @@ export class OCRService {
           text: fullText,
           confidence: blocks.reduce((avg, block) => avg + block.confidence, 0) / blocks.length,
           blocks,
-          language: options.language || 'en',
+          language: options.language || this.config.defaultLanguage || 'en',
           processingTime: performance.now() - startTime
         };
 
@@ -79,40 +127,119 @@ export class OCRService {
       }
 
       // Fallback to basic canvas-based text extraction
-      const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context not available');
+      if (this.config.fallbackToCanvas !== false) {
+        const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas context not available');
 
-      ctx.drawImage(imageBitmap, 0, 0);
-      
-      // Simple text detection using image analysis
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const extractedText = this.analyzeImageForText(imageData);
+        ctx.drawImage(imageBitmap, 0, 0);
+        
+        // Simple text detection using image analysis
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const extractedText = this.analyzeImageForText(imageData);
 
-      const ocrResult: OCRResult = {
-        text: extractedText,
-        confidence: 0.7, // Lower confidence for fallback method
-        language: options.language || 'en',
-        processingTime: performance.now() - startTime
-      };
+        const ocrResult: OCRResult = {
+          text: extractedText,
+          confidence: 0.7, // Lower confidence for fallback method
+          language: options.language || this.config.defaultLanguage || 'en',
+          processingTime: performance.now() - startTime
+        };
 
-      return {
-        success: true,
-        data: ocrResult,
-        processingTime: performance.now() - startTime
-      };
+        return {
+          success: true,
+          data: ocrResult,
+          processingTime: performance.now() - startTime
+        };
+      }
 
-    } catch (error) {
-      console.error('OCR Service Error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'OCR processing failed',
-        processingTime: performance.now() - startTime
-      };
-    }
+      throw new Error('No OCR method available');
+    }, 'extractText');
   }
 
-  private static analyzeImageForText(imageData: ImageData): string {
+  /**
+   * Detect language from text
+   */
+  async detectLanguage(text: string): Promise<string> {
+    return this.executeOperation(async () => {
+      // Simple language detection based on character patterns
+      const patterns = {
+        en: /^[a-zA-Z\s\d\.,!?;:'"()-]+$/,
+        es: /[ñáéíóúü]/i,
+        fr: /[àâäéèêëïîôöùûüÿç]/i,
+        de: /[äöüß]/i,
+        it: /[àèéìíîòóù]/i
+      };
+
+      for (const [lang, pattern] of Object.entries(patterns)) {
+        if (pattern.test(text)) {
+          return lang;
+        }
+      }
+
+      return this.config.defaultLanguage || 'en'; // Default to configured language or English
+    }, 'detectLanguage');
+  }
+
+  /**
+   * Extract structured data from OCR result
+   */
+  async extractStructuredData(ocrResult: OCRResult): Promise<any> {
+    return this.executeOperation(async () => {
+      const { text } = ocrResult;
+      
+      // Extract common material document patterns
+      const patterns = {
+        materialId: /(?:Material\s+ID|Product\s+Code|SKU)[:\s]+([A-Z0-9-]+)/i,
+        certification: /(?:Certificate|Certification|Standard)[:\s]+([A-Z0-9-\s]+)/i,
+        composition: /(?:Composition|Material)[:\s]+([^,\n]+)/i,
+        thickness: /(?:Thickness|Thick)[:\s]+([\d.]+\s*(?:mm|cm|inches?))/i,
+        dimensions: /(?:Dimensions|Size)[:\s]+([\d.\s]+(?:x|×)\s*[\d.\s]+(?:\s*(?:mm|cm|inches?))?)/i,
+        manufacturer: /(?:Manufacturer|Made\s+by|Brand)[:\s]+([^,\n]+)/i,
+        dateCode: /(?:Date|Manufactured|Prod\.?\s+Date)[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i
+      };
+
+      const extractedData: any = {};
+
+      for (const [key, pattern] of Object.entries(patterns)) {
+        const match = text.match(pattern);
+        if (match && match[1]) {
+          extractedData[key] = match[1].trim();
+        }
+      }
+
+      return extractedData;
+    }, 'extractStructuredData');
+  }
+
+  /**
+   * Get OCR service status and capabilities
+   */
+  getStatus(): { supported: boolean; features: string[] } {
+    const features = [];
+    
+    if (typeof window !== 'undefined') {
+      if ('TextDetector' in window) {
+        features.push('Native Text Detection');
+      }
+      if ('createImageBitmap' in window) {
+        features.push('Image Processing');
+      }
+      if ('OffscreenCanvas' in window) {
+        features.push('Canvas Processing');
+      }
+    } else {
+      features.push('Server-side Environment');
+    }
+
+    return {
+      supported: this.isSupported,
+      features
+    };
+  }
+
+  // Private helper methods
+
+  private analyzeImageForText(imageData: ImageData): string {
     // Basic text detection heuristics
     // This is a simplified approach - in production you'd use more sophisticated algorithms
     const { data, width, height } = imageData;
@@ -141,70 +268,36 @@ export class OCRService {
     return '';
   }
 
-  static async detectLanguage(text: string): Promise<string> {
-    // Simple language detection based on character patterns
-    const patterns = {
-      en: /^[a-zA-Z\s\d\.,!?;:'"()-]+$/,
-      es: /[ñáéíóúü]/i,
-      fr: /[àâäéèêëïîôöùûüÿç]/i,
-      de: /[äöüß]/i,
-      it: /[àèéìíîòóù]/i
+  /**
+   * Create a standardized service instance
+   */
+  static createInstance(config: Partial<OCRServiceConfig> = {}): OCRService {
+    const defaultConfig: OCRServiceConfig = {
+      name: 'ocr-service',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      timeout: 30000,
+      retries: 2,
+      rateLimit: {
+        requestsPerMinute: 30
+      },
+      healthCheck: {
+        enabled: true,
+        interval: 300000, // 5 minutes
+        timeout: 10000
+      },
+      defaultLanguage: 'en',
+      enableStructuredData: true,
+      fallbackToCanvas: true,
+      ...config
     };
 
-    for (const [lang, pattern] of Object.entries(patterns)) {
-      if (pattern.test(text)) {
-        return lang;
-      }
-    }
-
-    return 'en'; // Default to English
-  }
-
-  static async extractStructuredData(ocrResult: OCRResult): Promise<any> {
-    const { text } = ocrResult;
-    
-    // Extract common material document patterns
-    const patterns = {
-      materialId: /(?:Material\s+ID|Product\s+Code|SKU)[:\s]+([A-Z0-9-]+)/i,
-      certification: /(?:Certificate|Certification|Standard)[:\s]+([A-Z0-9-\s]+)/i,
-      composition: /(?:Composition|Material)[:\s]+([^,\n]+)/i,
-      thickness: /(?:Thickness|Thick)[:\s]+([\d.]+\s*(?:mm|cm|inches?))/i,
-      dimensions: /(?:Dimensions|Size)[:\s]+([\d.\s]+(?:x|×)\s*[\d.\s]+(?:\s*(?:mm|cm|inches?))?)/i,
-      manufacturer: /(?:Manufacturer|Made\s+by|Brand)[:\s]+([^,\n]+)/i,
-      dateCode: /(?:Date|Manufactured|Prod\.?\s+Date)[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i
-    };
-
-    const extractedData: any = {};
-
-    for (const [key, pattern] of Object.entries(patterns)) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        extractedData[key] = match[1].trim();
-      }
-    }
-
-    return extractedData;
-  }
-
-  static getStatus(): { supported: boolean; features: string[] } {
-    const features = [];
-    
-    if ('TextDetector' in window) {
-      features.push('Native Text Detection');
-    }
-    if ('createImageBitmap' in window) {
-      features.push('Image Processing');
-    }
-    if ('OffscreenCanvas' in window) {
-      features.push('Canvas Processing');
-    }
-
-    return {
-      supported: this.isSupported(),
-      features
-    };
+    return new OCRService(defaultConfig);
   }
 }
 
-// Export singleton instance
-export const ocrService = new OCRService();
+// Export singleton instance for backward compatibility
+export const ocrService = OCRService.createInstance();
+
+export default OCRService;

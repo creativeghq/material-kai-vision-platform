@@ -2,7 +2,20 @@ import { clientMLService, MLResult } from './clientMLService';
 import { serverMLService, ServerMLResult } from './serverMLService';
 import { DeviceDetector } from './deviceDetector';
 import { supabase } from '@/integrations/supabase/client';
-import { huggingFaceService } from './huggingFaceService';
+import { HuggingFaceService } from './huggingFaceService';
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
+export interface HybridMLServiceConfig extends ServiceConfig {
+  preferServerSide: boolean;
+  fallbackToClient: boolean;
+  confidenceThreshold: number;
+  useAIVision: boolean;
+  maxFileSize: number; // in MB
+  maxFiles: number;
+  enableHybridProcessing: boolean;
+  enableDeviceDetection: boolean;
+  enablePerformanceOptimization: boolean;
+}
 
 export interface HybridMLOptions {
   preferServerSide?: boolean;
@@ -22,7 +35,7 @@ export interface HybridMLResult extends MLResult {
  * Hybrid ML service that intelligently chooses between client and server processing
  * based on file characteristics, device capabilities, and user preferences
  */
-export class HybridMLService {
+export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   private readonly DEFAULT_OPTIONS: Required<HybridMLOptions> = {
     preferServerSide: false,
     fallbackToClient: true,
@@ -31,6 +44,84 @@ export class HybridMLService {
     maxFileSize: 5, // 5MB
     maxFiles: 10
   };
+
+  protected async doInitialize(): Promise<void> {
+    // Initialize dependent services
+    try {
+      const huggingFaceService = HuggingFaceService.getInstance<HuggingFaceService>();
+      await huggingFaceService.initialize();
+    } catch (error) {
+      console.warn('HuggingFace service initialization failed:', error);
+    }
+
+    // Validate device capabilities
+    const deviceInfo = DeviceDetector.getDeviceInfo();
+    if (!deviceInfo.supportsWebGPU && this.config?.preferServerSide === false) {
+      console.warn('WebGPU not supported, server-side processing recommended');
+    }
+
+    // Test server availability if configured
+    if (this.config?.enableHybridProcessing) {
+      const serverAvailable = await this.checkServerAvailability();
+      if (!serverAvailable) {
+        console.warn('Server-side processing not available, falling back to client-side only');
+      }
+    }
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    if (!this.config) {
+      throw new Error('HybridMLService configuration not found');
+    }
+
+    // Check configuration validity
+    if (this.config.maxFileSize <= 0 || this.config.maxFiles <= 0) {
+      throw new Error('Invalid file size or count limits in configuration');
+    }
+
+    if (this.config.confidenceThreshold < 0 || this.config.confidenceThreshold > 1) {
+      throw new Error('Invalid confidence threshold in configuration');
+    }
+
+    // Check dependent services
+    const clientStatus = clientMLService.getStatus();
+    if (!clientStatus.initialized && !this.config.preferServerSide) {
+      throw new Error('Client ML service not initialized and server preference not set');
+    }
+
+    // Test basic functionality
+    const deviceInfo = DeviceDetector.getDeviceInfo();
+    if (!deviceInfo.supportsWebGPU && !this.config.fallbackToClient) {
+      throw new Error('No WebGPU support and fallback disabled');
+    }
+  }
+
+  /**
+   * Create a new HybridMLService instance with standardized configuration
+   */
+  static createInstance(config?: Partial<HybridMLServiceConfig>): HybridMLService {
+    const defaultConfig: HybridMLServiceConfig = {
+      name: 'HybridMLService',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      timeout: 60000, // 60 seconds for ML processing
+      retries: 2,
+      preferServerSide: false,
+      fallbackToClient: true,
+      confidenceThreshold: 0.6,
+      useAIVision: true,
+      maxFileSize: 5, // 5MB
+      maxFiles: 10,
+      enableHybridProcessing: true,
+      enableDeviceDetection: true,
+      enablePerformanceOptimization: true
+    };
+
+    const finalConfig = { ...defaultConfig, ...config };
+    const instance = new HybridMLService(finalConfig);
+    return instance;
+  }
 
   /**
    * Analyze materials using the optimal processing method
@@ -205,6 +296,7 @@ export class HybridMLService {
         
         // Fallback to HuggingFace if client confidence is low
         console.log('Client confidence low, trying HuggingFace...');
+        const huggingFaceService = HuggingFaceService.getInstance<HuggingFaceService>();
         await huggingFaceService.initialize();
         
         const [materialResults, styleResults] = await Promise.all([
@@ -464,4 +556,4 @@ export class HybridMLService {
   }
 }
 
-export const hybridMLService = new HybridMLService();
+export const hybridMLService = HybridMLService.createInstance();

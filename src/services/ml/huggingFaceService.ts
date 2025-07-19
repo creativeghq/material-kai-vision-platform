@@ -1,9 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
+import { BaseService, ServiceConfig } from '../base/BaseService';
+import { ApiRegistry } from '../../config/apiConfig';
 
-interface HuggingFaceConfig {
-  model: string;
+interface HuggingFaceServiceConfig extends ServiceConfig {
   apiKey?: string;
-  endpoint?: string;
+  defaultModel?: string;
+  baseUrl?: string;
 }
 
 interface ModelResult {
@@ -30,8 +32,7 @@ interface FeatureExtractionResult {
   model: string;
 }
 
-export class HuggingFaceService {
-  private static instance: HuggingFaceService;
+export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   private apiKey: string | null = null;
   
   // Recommended models for different tasks
@@ -46,19 +47,55 @@ export class HuggingFaceService {
     SENTIMENT_ANALYSIS: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
   };
 
-  private constructor() {}
-
-  static getInstance(): HuggingFaceService {
-    if (!HuggingFaceService.instance) {
-      HuggingFaceService.instance = new HuggingFaceService();
-    }
-    return HuggingFaceService.instance;
+  constructor(config: HuggingFaceServiceConfig) {
+    super(config);
   }
 
-  async initialize(apiKey?: string): Promise<void> {
-    this.apiKey = apiKey || await this.getApiKeyFromEdgeFunction();
+  protected async doInitialize(): Promise<void> {
+    // Try to get API key from config first, then from centralized config, then from edge function
+    this.apiKey = this.config.apiKey || 
+                  await this.getApiKeyFromCentralizedConfig() ||
+                  await this.getApiKeyFromEdgeFunction();
+    
     if (!this.apiKey) {
       throw new Error('HuggingFace API key not configured');
+    }
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    if (!this.apiKey) {
+      throw new Error('Service not properly initialized - missing API key');
+    }
+
+    // Simple health check by testing a lightweight model endpoint
+    const response = await fetch('https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ inputs: 'health check' })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HuggingFace API health check failed: ${response.status}`);
+    }
+  }
+
+  private async getApiKeyFromCentralizedConfig(): Promise<string | null> {
+    try {
+      const apiRegistry = ApiRegistry.getInstance();
+      const hfConfig = apiRegistry.getApiConfigByType('huggingface');
+      
+      if (hfConfig) {
+        const envConfig = hfConfig.environment[this.config.environment];
+        return envConfig?.apiKey || null;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Could not get HuggingFace API key from centralized config:', error);
+      return null;
     }
   }
 
@@ -80,200 +117,149 @@ export class HuggingFaceService {
     }
   }
 
-  async classifyMaterial(imageData: string | File, options: Partial<HuggingFaceConfig> = {}): Promise<ClassificationResult[]> {
-    const config = {
-      model: options.model || HuggingFaceService.MODELS.MATERIAL_CLASSIFICATION,
-      ...options
+  // Public API methods with standardized error handling and metrics
+
+  /**
+   * Classify material from image data
+   */
+  async classifyMaterial(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<ClassificationResult[]> {
+    return this.executeOperation(async () => {
+      const model = options.defaultModel || HuggingFaceService.MODELS.MATERIAL_CLASSIFICATION;
+      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      return this.parseClassificationResult(result);
+    }, 'classifyMaterial');
+  }
+
+  /**
+   * Generate text embedding
+   */
+  async generateTextEmbedding(text: string, options: Partial<HuggingFaceServiceConfig> = {}): Promise<number[]> {
+    return this.executeOperation(async () => {
+      const model = options.defaultModel || HuggingFaceService.MODELS.TEXT_EMBEDDING;
+      const result = await this.callHuggingFaceAPI(model, { inputs: text });
+      return result.embeddings || result;
+    }, 'generateTextEmbedding');
+  }
+
+  /**
+   * Extract image features
+   */
+  async extractImageFeatures(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<FeatureExtractionResult> {
+    return this.executeOperation(async () => {
+      const model = options.defaultModel || HuggingFaceService.MODELS.FEATURE_EXTRACTION;
+      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      return {
+        features: result.features || result,
+        model
+      };
+    }, 'extractImageFeatures');
+  }
+
+  /**
+   * Analyze image style
+   */
+  async analyzeImageStyle(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<ClassificationResult[]> {
+    return this.executeOperation(async () => {
+      const model = options.defaultModel || HuggingFaceService.MODELS.STYLE_ANALYSIS;
+      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      return this.parseClassificationResult(result);
+    }, 'analyzeImageStyle');
+  }
+
+  /**
+   * Process OCR on image
+   */
+  async processOCR(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<string> {
+    return this.executeOperation(async () => {
+      const model = options.defaultModel || HuggingFaceService.MODELS.OCR_PROCESSING;
+      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      return result.generated_text || result.text || '';
+    }, 'processOCR');
+  }
+
+  /**
+   * Detect materials in image
+   */
+  async detectMaterials(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<ClassificationResult[]> {
+    return this.executeOperation(async () => {
+      const model = options.defaultModel || HuggingFaceService.MODELS.MATERIAL_DETECTION;
+      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      return this.parseClassificationResult(result);
+    }, 'detectMaterials');
+  }
+
+  // Private helper methods
+
+  private async callHuggingFaceAPI(model: string, payload: any): Promise<any> {
+    if (!this.apiKey) {
+      throw new Error('HuggingFace API key not available');
+    }
+
+    const baseUrl = this.config.baseUrl || 'https://api-inference.huggingface.co';
+    const url = `${baseUrl}/models/${model}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HuggingFace API error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  private parseClassificationResult(result: any): ClassificationResult[] {
+    if (Array.isArray(result)) {
+      return result.map(item => ({
+        label: item.label || item.class || 'unknown',
+        score: item.score || item.confidence || 0
+      }));
+    }
+    
+    if (result.label && typeof result.score === 'number') {
+      return [{ label: result.label, score: result.score }];
+    }
+    
+    return [];
+  }
+
+  /**
+   * Get available models for different tasks
+   */
+  static getAvailableModels(): Record<string, string> {
+    return { ...HuggingFaceService.MODELS };
+  }
+
+  /**
+   * Create a standardized service instance
+   */
+  static createInstance(config: Partial<HuggingFaceServiceConfig> = {}): HuggingFaceService {
+    const defaultConfig: HuggingFaceServiceConfig = {
+      name: 'huggingface-service',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      timeout: 30000,
+      retries: 3,
+      rateLimit: {
+        requestsPerMinute: 60
+      },
+      healthCheck: {
+        enabled: true,
+        interval: 300000, // 5 minutes
+        timeout: 10000
+      },
+      ...config
     };
 
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'classify_material',
-          imageData,
-          config
-        }
-      });
-
-      if (error) throw error;
-      return data.results || [];
-    } catch (error) {
-      console.error('Material classification error:', error);
-      throw new Error(`Material classification failed: ${error.message}`);
-    }
-  }
-
-  async generateTextEmbedding(text: string, options: Partial<HuggingFaceConfig> = {}): Promise<number[]> {
-    const config = {
-      model: options.model || HuggingFaceService.MODELS.TEXT_EMBEDDING,
-      ...options
-    };
-
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'generate_embedding',
-          text,
-          config
-        }
-      });
-
-      if (error) throw error;
-      return data.embedding || [];
-    } catch (error) {
-      console.error('Text embedding error:', error);
-      throw new Error(`Text embedding failed: ${error.message}`);
-    }
-  }
-
-  async extractImageFeatures(imageData: string | File, options: Partial<HuggingFaceConfig> = {}): Promise<FeatureExtractionResult> {
-    const config = {
-      model: options.model || HuggingFaceService.MODELS.FEATURE_EXTRACTION,
-      ...options
-    };
-
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'extract_features',
-          imageData,
-          config
-        }
-      });
-
-      if (error) throw error;
-      return data.result;
-    } catch (error) {
-      console.error('Feature extraction error:', error);
-      throw new Error(`Feature extraction failed: ${error.message}`);
-    }
-  }
-
-  async analyzeImageStyle(imageData: string | File, options: Partial<HuggingFaceConfig> = {}): Promise<ClassificationResult[]> {
-    const config = {
-      model: options.model || HuggingFaceService.MODELS.STYLE_ANALYSIS,
-      ...options
-    };
-
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'analyze_style',
-          imageData,
-          config
-        }
-      });
-
-      if (error) throw error;
-      return data.results || [];
-    } catch (error) {
-      console.error('Style analysis error:', error);
-      throw new Error(`Style analysis failed: ${error.message}`);
-    }
-  }
-
-  async processOCR(imageData: string | File, options: Partial<HuggingFaceConfig> = {}): Promise<string> {
-    const config = {
-      model: options.model || HuggingFaceService.MODELS.OCR_PROCESSING,
-      ...options
-    };
-
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'process_ocr',
-          imageData,
-          config
-        }
-      });
-
-      if (error) throw error;
-      return data.text || '';
-    } catch (error) {
-      console.error('OCR processing error:', error);
-      throw new Error(`OCR processing failed: ${error.message}`);
-    }
-  }
-
-  async detectMaterials(imageData: string | File, options: Partial<HuggingFaceConfig> = {}): Promise<ClassificationResult[]> {
-    const config = {
-      model: options.model || HuggingFaceService.MODELS.MATERIAL_DETECTION,
-      ...options
-    };
-
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'detect_materials',
-          imageData,
-          config
-        }
-      });
-
-      if (error) throw error;
-      return data.results || [];
-    } catch (error) {
-      console.error('Material detection error:', error);
-      throw new Error(`Material detection failed: ${error.message}`);
-    }
-  }
-
-  async batchProcess(requests: Array<{
-    action: string;
-    data: any;
-    config?: Partial<HuggingFaceConfig>;
-  }>): Promise<any[]> {
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'batch_process',
-          requests
-        }
-      });
-
-      if (error) throw error;
-      return data.results || [];
-    } catch (error) {
-      console.error('Batch processing error:', error);
-      throw new Error(`Batch processing failed: ${error.message}`);
-    }
-  }
-
-  async getModelInfo(modelName: string): Promise<any> {
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: {
-          action: 'get_model_info',
-          modelName
-        }
-      });
-
-      if (error) throw error;
-      return data.modelInfo;
-    } catch (error) {
-      console.error('Model info error:', error);
-      throw new Error(`Failed to get model info: ${error.message}`);
-    }
-  }
-
-  // Utility method to check service availability
-  async healthCheck(): Promise<boolean> {
-    try {
-      const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: { action: 'health_check' }
-      });
-
-      return !error && data?.status === 'healthy';
-    } catch (error) {
-      console.error('HuggingFace service health check failed:', error);
-      return false;
-    }
-  }
-
-  // Get available models
-  getAvailableModels(): typeof HuggingFaceService.MODELS {
-    return HuggingFaceService.MODELS;
+    return new HuggingFaceService(defaultConfig);
   }
 }
 
-export const huggingFaceService = HuggingFaceService.getInstance();
+export default HuggingFaceService;

@@ -1,6 +1,7 @@
 import { MLResult, MaterialAnalysisResult, ImageClassificationResult } from './types';
 import { ImageClassifierService } from './imageClassifier';
 import { TextEmbedderService } from './textEmbedder';
+import { BaseService, ServiceConfig } from '../base/BaseService';
 
 export interface MaterialProperties {
   // Physical Properties
@@ -102,20 +103,67 @@ export interface MaterialAnalysisOptions {
   applicationContext?: string;
 }
 
-export class MaterialAnalyzerService {
-  private imageClassifier = new ImageClassifierService();
-  private textEmbedder = new TextEmbedderService();
+interface MaterialAnalyzerServiceConfig extends ServiceConfig {
+  enableAdvancedAnalysis?: boolean;
+  knowledgeBaseSize?: number;
+  defaultAnalysisDepth?: 'basic' | 'standard' | 'comprehensive';
+  enableVisualAnalysis?: boolean;
+}
+
+export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerServiceConfig> {
+  private imageClassifier: ImageClassifierService;
+  private textEmbedder: TextEmbedderService;
   private static knowledgeBase = new Map<string, Partial<MaterialProperties>>();
   
-  static {
-    // Initialize with basic material property templates
-    MaterialAnalyzerService.initializeKnowledgeBase();
+  constructor(config: MaterialAnalyzerServiceConfig) {
+    super(config);
+    this.imageClassifier = new ImageClassifierService();
+    this.textEmbedder = new TextEmbedderService();
   }
 
+  protected async doInitialize(): Promise<void> {
+    // Initialize knowledge base if not already done
+    if (MaterialAnalyzerService.knowledgeBase.size === 0) {
+      MaterialAnalyzerService.initializeKnowledgeBase();
+    }
+
+    // Initialize dependent services
+    await Promise.all([
+      this.imageClassifier.initialize(),
+      this.textEmbedder.initialize()
+    ]);
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    // Check if dependent services are healthy
+    if (!this.imageClassifier.isInitialized()) {
+      throw new Error('Image classifier service not initialized');
+    }
+
+    if (!this.textEmbedder.isInitialized()) {
+      throw new Error('Text embedder service not initialized');
+    }
+
+    // Check knowledge base
+    if (MaterialAnalyzerService.knowledgeBase.size === 0) {
+      throw new Error('Material knowledge base not initialized');
+    }
+
+    // Test basic functionality
+    if (this.config.enableVisualAnalysis && typeof window !== 'undefined') {
+      if (!('createImageBitmap' in window) || !('OffscreenCanvas' in window)) {
+        throw new Error('Visual analysis capabilities not available in this environment');
+      }
+    }
+  }
+
+  /**
+   * Analyze material from image and optional description
+   */
   async analyzeMaterial(imageSource: string | File | Blob, description?: string): Promise<MLResult> {
-    const startTime = performance.now();
-    
-    try {
+    return this.executeOperation(async () => {
+      const startTime = performance.now();
+      
       const imageAnalysis = await this.imageClassifier.classify(imageSource);
       let textAnalysis = null;
 
@@ -141,25 +189,26 @@ export class MaterialAnalyzerService {
         confidence: imageAnalysis.confidence,
         processingTime: Math.round(processingTime)
       };
-    } catch (error) {
-      const processingTime = performance.now() - startTime;
-      console.error('Material analysis failed:', error);
-      
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Material analysis failed',
-        processingTime: Math.round(processingTime)
-      };
-    }
+    }, 'analyzeMaterial');
   }
 
+  /**
+   * Perform advanced material property analysis
+   */
   async analyzeAdvancedProperties(
     imageFile: File,
-    options: MaterialAnalysisOptions = { analysisDepth: 'standard', focusAreas: [] }
+    options: MaterialAnalysisOptions = { 
+      analysisDepth: this.config.defaultAnalysisDepth || 'standard', 
+      focusAreas: [] 
+    }
   ): Promise<MLResult> {
-    const startTime = performance.now();
+    return this.executeOperation(async () => {
+      const startTime = performance.now();
 
-    try {
+      if (!this.config.enableAdvancedAnalysis) {
+        throw new Error('Advanced analysis is disabled in service configuration');
+      }
+
       // Create image bitmap for analysis
       const imageBitmap = await createImageBitmap(imageFile);
       
@@ -196,16 +245,56 @@ export class MaterialAnalyzerService {
         data: result,
         processingTime: performance.now() - startTime
       };
-
-    } catch (error) {
-      console.error('Advanced Material Analysis Error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Advanced material analysis failed',
-        processingTime: performance.now() - startTime
-      };
-    }
+    }, 'analyzeAdvancedProperties');
   }
+
+  /**
+   * Preload models for better performance
+   */
+  async preloadModels(): Promise<void> {
+    return this.executeOperation(async () => {
+      await Promise.all([
+        this.imageClassifier.initialize(),
+        this.textEmbedder.initialize()
+      ]);
+    }, 'preloadModels');
+  }
+
+  /**
+   * Get service status including dependent services
+   */
+  getAnalysisStatus(): { 
+    initialized: boolean; 
+    models: Array<{ name: string; initialized: boolean }>;
+    knowledgeBaseSize: number;
+    capabilities: string[];
+  } {
+    const capabilities = [];
+    
+    if (this.config.enableAdvancedAnalysis) {
+      capabilities.push('Advanced Analysis');
+    }
+    
+    if (this.config.enableVisualAnalysis) {
+      capabilities.push('Visual Analysis');
+    }
+    
+    if (typeof window !== 'undefined' && 'createImageBitmap' in window) {
+      capabilities.push('Image Processing');
+    }
+
+    return {
+      initialized: this.imageClassifier.isInitialized() && this.textEmbedder.isInitialized(),
+      models: [
+        this.imageClassifier.getModelInfo(),
+        this.textEmbedder.getModelInfo()
+      ],
+      knowledgeBaseSize: MaterialAnalyzerService.knowledgeBase.size,
+      capabilities
+    };
+  }
+
+  // Private helper methods
 
   private extractMaterialType(classificationResults: ImageClassificationResult[]): string {
     if (!classificationResults || classificationResults.length === 0) {
@@ -236,19 +325,6 @@ export class MaterialAnalyzerService {
     }
 
     return 'other';
-  }
-
-  async preloadModels(): Promise<void> {
-    try {
-      await Promise.all([
-        this.imageClassifier.initialize(),
-        this.textEmbedder.initialize()
-      ]);
-      console.log('Material analyzer models preloaded successfully');
-    } catch (error) {
-      console.error('Failed to preload material analyzer models:', error);
-      throw error;
-    }
   }
 
   private static initializeKnowledgeBase() {
@@ -357,6 +433,10 @@ export class MaterialAnalyzerService {
     confidence: number;
     visualFeatures: any;
   }> {
+    if (!this.config.enableVisualAnalysis) {
+      throw new Error('Visual analysis is disabled in service configuration');
+    }
+
     const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas context not available');
@@ -791,16 +871,37 @@ export class MaterialAnalyzerService {
     return suggestions.length > 0 ? suggestions : ['Material meets current requirements'];
   }
 
-  getStatus(): { 
-    initialized: boolean; 
-    models: Array<{ name: string; initialized: boolean }>;
-  } {
-    return {
-      initialized: this.imageClassifier.isInitialized() && this.textEmbedder.isInitialized(),
-      models: [
-        this.imageClassifier.getModelInfo(),
-        this.textEmbedder.getModelInfo()
-      ]
+  /**
+   * Create a standardized service instance
+   */
+  static createInstance(config: Partial<MaterialAnalyzerServiceConfig> = {}): MaterialAnalyzerService {
+    const defaultConfig: MaterialAnalyzerServiceConfig = {
+      name: 'material-analyzer-service',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      timeout: 30000,
+      retries: 2,
+      rateLimit: {
+        requestsPerMinute: 20
+      },
+      healthCheck: {
+        enabled: true,
+        interval: 300000, // 5 minutes
+        timeout: 10000
+      },
+      enableAdvancedAnalysis: true,
+      knowledgeBaseSize: 100,
+      defaultAnalysisDepth: 'standard',
+      enableVisualAnalysis: true,
+      ...config
     };
+
+    return new MaterialAnalyzerService(defaultConfig);
   }
 }
+
+// Export singleton instance for backward compatibility
+export const materialAnalyzerService = MaterialAnalyzerService.createInstance();
+
+export default MaterialAnalyzerService;

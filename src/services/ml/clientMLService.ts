@@ -3,15 +3,97 @@ import { ImageClassifierService } from './imageClassifier';
 import { TextEmbedderService } from './textEmbedder';
 import { MaterialAnalyzerService } from './materialAnalyzer';
 import { DeviceDetector } from './deviceDetector';
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
+/**
+ * Configuration interface for ClientMLService
+ */
+interface ClientMLServiceConfig extends ServiceConfig {
+  enableImageClassification?: boolean;
+  enableTextEmbedding?: boolean;
+  enableMaterialAnalysis?: boolean;
+  preloadModelsOnInit?: boolean;
+  deviceOptimization?: boolean;
+  maxConcurrentOperations?: number;
+  enableCaching?: boolean;
+  cacheExpirationMs?: number;
+}
 
 /**
  * Main orchestrator for client-side ML operations
  * Provides a unified interface for all ML capabilities
  */
-class ClientMLService {
-  private imageClassifier = new ImageClassifierService();
-  private textEmbedder = new TextEmbedderService();
-  private materialAnalyzer = new MaterialAnalyzerService();
+class ClientMLService extends BaseService<ClientMLServiceConfig> {
+  private imageClassifier?: ImageClassifierService;
+  private textEmbedder?: TextEmbedderService;
+  private materialAnalyzer?: MaterialAnalyzerService;
+
+  protected constructor(config: ClientMLServiceConfig) {
+    super(config);
+  }
+
+  /**
+   * Factory method to create ClientMLService instance
+   */
+  static createInstance(config: Partial<ClientMLServiceConfig> = {}): ClientMLService {
+    const defaultConfig: ClientMLServiceConfig = {
+      name: 'ClientMLService',
+      version: '1.0.0',
+      enableImageClassification: true,
+      enableTextEmbedding: true,
+      enableMaterialAnalysis: true,
+      preloadModelsOnInit: false,
+      deviceOptimization: true,
+      maxConcurrentOperations: 3,
+      enableCaching: true,
+      cacheExpirationMs: 300000, // 5 minutes
+      ...config
+    };
+    return new ClientMLService(defaultConfig);
+  }
+
+  /**
+   * Initialize the service and its dependencies
+   */
+  protected async doInitialize(): Promise<void> {
+    // Initialize sub-services based on configuration
+    if (this.config.enableImageClassification) {
+      this.imageClassifier = new ImageClassifierService();
+    }
+    
+    if (this.config.enableTextEmbedding) {
+      this.textEmbedder = new TextEmbedderService();
+    }
+    
+    if (this.config.enableMaterialAnalysis) {
+      this.materialAnalyzer = new MaterialAnalyzerService();
+    }
+
+    // Preload models if configured
+    if (this.config.preloadModelsOnInit) {
+      await this.preloadModels();
+    }
+  }
+
+  /**
+   * Perform health check on the service
+   */
+  protected async doHealthCheck(): Promise<void> {
+    // Check device capabilities
+    const deviceInfo = DeviceDetector.getDeviceInfo();
+    if (!deviceInfo.webgl && !deviceInfo.webgpu) {
+      throw new Error('No suitable ML acceleration available (WebGL/WebGPU)');
+    }
+
+    // Check sub-services if they exist
+    if (this.imageClassifier && !this.imageClassifier.isInitialized()) {
+      throw new Error('Image classifier service not properly initialized');
+    }
+    
+    if (this.textEmbedder && !this.textEmbedder.isInitialized()) {
+      throw new Error('Text embedder service not properly initialized');
+    }
+  }
 
   /**
    * Classify an image using the image classification model

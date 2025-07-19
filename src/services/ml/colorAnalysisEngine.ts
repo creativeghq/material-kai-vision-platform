@@ -3,6 +3,18 @@
  * Advanced color analysis and organization system
  */
 
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
+interface ColorAnalysisServiceConfig extends ServiceConfig {
+  maxImageSize: number;
+  maxSamples: number;
+  enableAdvancedAnalysis: boolean;
+  enableCulturalAssociations: boolean;
+  enablePsychologicalProfile: boolean;
+  enablePaletteRecommendations: boolean;
+  enableBrowserOptimizations: boolean;
+}
+
 interface ColorAnalysisResult {
   dominantColors: Color[];
   colorHarmony: ColorHarmony;
@@ -68,37 +80,157 @@ interface ColorPalette {
   harmony: number;
 }
 
-export class ColorAnalysisEngine {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig> {
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private isBrowserEnvironment: boolean = false;
 
-  constructor() {
-    this.canvas = document.createElement('canvas');
-    this.ctx = this.canvas.getContext('2d')!;
+  protected async doInitialize(): Promise<void> {
+    // Check if we're in a browser environment
+    this.isBrowserEnvironment = typeof window !== 'undefined' && typeof document !== 'undefined';
+    
+    if (this.isBrowserEnvironment) {
+      try {
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        if (!this.ctx) {
+          throw new Error('Failed to get 2D rendering context');
+        }
+        
+        // Test canvas functionality
+        this.canvas.width = 1;
+        this.canvas.height = 1;
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(0, 0, 1, 1);
+        
+      } catch (error) {
+        console.warn('Canvas initialization failed, some features may be limited:', error);
+        this.canvas = null;
+        this.ctx = null;
+      }
+    }
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    if (this.isBrowserEnvironment && (!this.canvas || !this.ctx)) {
+      throw new Error('Canvas context not available for color analysis');
+    }
+    
+    // Verify configuration
+    if (!this.config) {
+      throw new Error('ColorAnalysisEngine configuration not found');
+    }
+    
+    if (this.config.maxImageSize <= 0 || this.config.maxSamples <= 0) {
+      throw new Error('Invalid configuration values for image processing');
+    }
+  }
+
+  /**
+   * Create a new ColorAnalysisEngine instance with standardized configuration
+   */
+  static createInstance(config?: Partial<ColorAnalysisServiceConfig>): ColorAnalysisEngine {
+    const defaultConfig: ColorAnalysisServiceConfig = {
+      name: 'ColorAnalysisEngine',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      timeout: 30000,
+      retries: 3,
+      maxImageSize: 400,
+      maxSamples: 1000,
+      enableAdvancedAnalysis: true,
+      enableCulturalAssociations: true,
+      enablePsychologicalProfile: true,
+      enablePaletteRecommendations: true,
+      enableBrowserOptimizations: true
+    };
+
+    const finalConfig = { ...defaultConfig, ...config };
+    const instance = new ColorAnalysisEngine(finalConfig);
+    return instance;
   }
 
   /**
    * Comprehensive color analysis of an image
    */
   async analyzeImage(imageFile: File): Promise<ColorAnalysisResult> {
-    const imageData = await this.loadImageData(imageFile);
-    
-    const dominantColors = await this.extractDominantColors(imageData, 8);
-    const colorHarmony = this.analyzeColorHarmony(dominantColors);
-    const colorCategories = this.categorizeColors(dominantColors);
-    const culturalAssociations = this.getCulturalAssociations(dominantColors);
-    const psychologicalProfile = this.analyzePsychologicalProfile(dominantColors);
-    const paletteRecommendations = this.generatePaletteRecommendations(dominantColors);
+    return this.executeOperation(async () => {
+      if (!this.isBrowserEnvironment) {
+        throw new Error('Color analysis requires browser environment for canvas operations');
+      }
 
-    return {
-      dominantColors,
-      colorHarmony,
-      colorCategories,
-      colorSpaces: this.convertColorSpaces(dominantColors[0]),
-      culturalAssociations,
-      psychologicalProfile,
-      paletteRecommendations
-    };
+      const imageData = await this.loadImageData(imageFile);
+      
+      const dominantColors = await this.extractDominantColors(imageData, this.config?.maxSamples || 8);
+      const colorHarmony = this.analyzeColorHarmony(dominantColors);
+      const colorCategories = this.categorizeColors(dominantColors);
+      
+      let culturalAssociations: CulturalAssociation[] = [];
+      let psychologicalProfile: PsychologicalProfile;
+      let paletteRecommendations: ColorPalette[] = [];
+
+      if (this.config?.enableCulturalAssociations) {
+        culturalAssociations = this.getCulturalAssociations(dominantColors);
+      }
+
+      if (this.config?.enablePsychologicalProfile) {
+        psychologicalProfile = this.analyzePsychologicalProfile(dominantColors);
+      } else {
+        psychologicalProfile = {
+          emotions: [],
+          mood: 'neutral',
+          energy: 0,
+          formality: 0,
+          warmth: 0,
+          trustworthiness: 0
+        };
+      }
+
+      if (this.config?.enablePaletteRecommendations) {
+        paletteRecommendations = this.generatePaletteRecommendations(dominantColors);
+      }
+
+      return {
+        dominantColors,
+        colorHarmony,
+        colorCategories,
+        colorSpaces: this.convertColorSpaces(dominantColors[0]),
+        culturalAssociations,
+        psychologicalProfile,
+        paletteRecommendations
+      };
+    }, 'analyzeImage');
+  }
+
+  /**
+   * Get color analysis status and capabilities
+   */
+  async getAnalysisStatus(): Promise<{
+    canvasAvailable: boolean;
+    browserEnvironment: boolean;
+    configuredFeatures: string[];
+    maxImageSize: number;
+    maxSamples: number;
+  }> {
+    return this.executeOperation(async () => {
+      const configuredFeatures: string[] = [];
+      
+      if (this.config?.enableAdvancedAnalysis) configuredFeatures.push('advancedAnalysis');
+      if (this.config?.enableCulturalAssociations) configuredFeatures.push('culturalAssociations');
+      if (this.config?.enablePsychologicalProfile) configuredFeatures.push('psychologicalProfile');
+      if (this.config?.enablePaletteRecommendations) configuredFeatures.push('paletteRecommendations');
+      if (this.config?.enableBrowserOptimizations) configuredFeatures.push('browserOptimizations');
+
+      return {
+        canvasAvailable: !!(this.canvas && this.ctx),
+        browserEnvironment: this.isBrowserEnvironment,
+        configuredFeatures,
+        maxImageSize: this.config?.maxImageSize || 400,
+        maxSamples: this.config?.maxSamples || 1000
+      };
+    }, 'getAnalysisStatus');
   }
 
   /**
@@ -592,4 +724,4 @@ export class ColorAnalysisEngine {
   }
 }
 
-export const colorAnalysisEngine = new ColorAnalysisEngine();
+export const colorAnalysisEngine = ColorAnalysisEngine.createInstance();
