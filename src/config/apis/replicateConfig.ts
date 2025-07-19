@@ -91,7 +91,7 @@ export const replicateConfig: ReplicateApiConfig = {
   name: 'replicate',
   type: 'replicate',
   baseUrl: 'https://api.replicate.com/v1',
-  apiKey: process.env.REPLICATE_API_TOKEN,
+  apiKey: typeof window === 'undefined' ? process.env.REPLICATE_API_TOKEN : undefined,
   timeout: 300000, // 5 minutes for image generation
   retryAttempts: 3,
   rateLimit: {

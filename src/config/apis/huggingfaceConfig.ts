@@ -32,7 +32,7 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
   name: 'Hugging Face Inference API',
   type: 'huggingface',
   baseUrl: 'https://api-inference.huggingface.co',
-  apiKey: process.env.HUGGINGFACE_API_TOKEN,
+  apiKey: typeof window === 'undefined' ? process.env.HUGGINGFACE_API_TOKEN : undefined,
   timeout: 60000, // 60 seconds for model inference
   retryAttempts: 2,
   rateLimit: {
