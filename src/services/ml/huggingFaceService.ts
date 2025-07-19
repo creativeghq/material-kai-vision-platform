@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { BaseService, ServiceConfig } from '../base/BaseService';
-import { ApiRegistry } from '../../config/apiConfig';
+import { apiRegistry } from '../../config/apiConfig';
 
 interface HuggingFaceServiceConfig extends ServiceConfig {
   apiKey?: string;
@@ -84,8 +84,8 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
 
   private async getApiKeyFromCentralizedConfig(): Promise<string | null> {
     try {
-      const apiRegistry = ApiRegistry.getInstance();
-      const hfConfig = apiRegistry.getApiConfigByType('huggingface');
+      const apiRegistryInstance = apiRegistry;
+      const hfConfig = apiRegistryInstance.getApiConfigByType('huggingface');
       
       if (hfConfig) {
         const envConfig = hfConfig.environment[this.config.environment];
@@ -261,5 +261,8 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
     return new HuggingFaceService(defaultConfig);
   }
 }
+
+// Create a default instance for convenience
+export const huggingFaceService = HuggingFaceService.createInstance();
 
 export default HuggingFaceService;
