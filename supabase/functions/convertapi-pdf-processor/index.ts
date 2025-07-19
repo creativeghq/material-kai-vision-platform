@@ -27,6 +27,7 @@ interface ConvertAPIProcessingRequest {
   options?: {
     extractMaterials?: boolean;
     language?: string;
+    maxPages?: number; // Maximum pages to process (0 = all pages, default: 50)
   };
 }
 
@@ -333,6 +334,37 @@ serve(async (req) => {
       // STEP 1: Call ConvertAPI for HTML conversion
       console.log('📄 Step 1: Converting PDF to HTML with ConvertAPI...');
       
+      // Configure page range - allow processing of entire PDF or limit based on options
+      const maxPages = options?.maxPages ?? 50; // Default to 50 pages, configurable
+      const shouldLimitPages = maxPages > 0;
+      
+      console.log(`📄 Processing PDF pages: ${shouldLimitPages ? `1-${maxPages}` : 'all pages'}`);
+      
+      const convertApiParams = [
+        {
+          Name: 'File',
+          FileValue: {
+            Url: fileUrl
+          }
+        },
+        {
+          Name: 'EmbedCss',
+          Value: true
+        },
+        {
+          Name: 'EmbedImages',
+          Value: false // We'll handle images separately
+        }
+      ];
+      
+      // Only add PageRange if we want to limit pages
+      if (shouldLimitPages) {
+        convertApiParams.push({
+          Name: 'PageRange',
+          Value: `1-${maxPages}` as any
+        });
+      }
+      
       const response = await fetch('https://v2.convertapi.com/convert/pdf/to/html', {
         method: 'POST',
         headers: {
@@ -340,26 +372,7 @@ serve(async (req) => {
           'Authorization': `Bearer ${convertApiKey}`,
         },
         body: JSON.stringify({
-          Parameters: [
-            {
-              Name: 'File',
-              FileValue: {
-                Url: fileUrl
-              }
-            },
-            {
-              Name: 'PageRange',
-              Value: '1-10' // Limit to first 10 pages to avoid memory issues
-            },
-            {
-              Name: 'EmbedCss',
-              Value: true
-            },
-            {
-              Name: 'EmbedImages',
-              Value: false // We'll handle images separately
-            }
-          ]
+          Parameters: convertApiParams
         })
       });
 
