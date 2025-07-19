@@ -396,18 +396,8 @@ const KnowledgeBaseManagement: React.FC = () => {
                         <ExternalLink className="h-3 w-3" />
                         View PDF
                       </Button>
-                    ) : entry.source_url ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-1"
-                        onClick={() => window.open(entry.source_url, '_blank')}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Source
-                      </Button>
                     ) : (
-                      <span className="text-sm text-muted-foreground">No link</span>
+                      <span className="text-sm text-muted-foreground">No PDF</span>
                     )}
                   </TableCell>
                   <TableCell>

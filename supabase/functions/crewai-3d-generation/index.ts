@@ -136,14 +136,17 @@ async function testHuggingFaceModel(modelName: string, prompt: string): Promise<
 // Initialize workflow steps
 function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
   workflowSteps = [
-    // Replicate Models (support both text-to-image and image-to-image)
-    { modelName: 'adirik/interior-design', model: 'adirik/interior-design', name: 'Interior Design AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
-    { modelName: 'erayyavuz/interior-ai', model: 'erayyavuz/interior-ai', name: 'Interior AI', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
-    { modelName: 'jschoormans/comfyui-interior-remodel', model: 'jschoormans/comfyui-interior-remodel', name: 'ComfyUI Interior Remodel', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
-    { modelName: 'julian-at/interiorly-gen1-dev', model: 'julian-at/interiorly-gen1-dev', name: 'Interiorly Gen1 Dev', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
-    { modelName: 'jschoormans/interior-v2', model: 'jschoormans/interior-v2', name: 'Interior V2', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
-    { modelName: 'rocketdigitalai/interior-design-sdxl', model: 'rocketdigitalai/interior-design-sdxl', name: 'Interior Design SDXL', type: 'image-to-image', status: 'pending' },
-    { modelName: 'davisbrown/designer-architecture', model: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: 'text-to-image', status: 'pending' },
+    // Replicate Models (matching frontend validation schema)
+    { modelName: 'lucataco/interior-design', model: 'lucataco/interior-design', name: 'Lucataco Interior Design', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'adirik/flux-cinestill', model: 'adirik/flux-cinestill', name: 'Flux Cinestill', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'black-forest-labs/flux-schnell', model: 'black-forest-labs/flux-schnell', name: 'FLUX Schnell', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'stability-ai/stable-diffusion-3-medium', model: 'stability-ai/stable-diffusion-3-medium', name: 'Stable Diffusion 3 Medium', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'bytedance/sdxl-lightning-4step', model: 'bytedance/sdxl-lightning-4step', name: 'SDXL Lightning 4-Step', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'playgroundai/playground-v2.5-1024px-aesthetic', model: 'playgroundai/playground-v2.5-1024px-aesthetic', name: 'Playground V2.5 Aesthetic', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'threestudio-project/threestudio', model: 'threestudio-project/threestudio', name: 'ThreeStudio 3D', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'adirik/interior-design', model: 'adirik/interior-design', name: 'Adirik Interior Design', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'davisbrown/designer-architecture', model: 'davisbrown/designer-architecture', name: 'Designer Architecture', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
+    { modelName: 'rocketdigitalai/interior-design-sdxl', model: 'rocketdigitalai/interior-design-sdxl', name: 'Interior Design SDXL', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', model: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
     { modelName: 'black-forest-labs/FLUX.1-schnell', model: 'black-forest-labs/FLUX.1-schnell', name: 'FLUX-Schnell', type: 'text-to-image', status: 'pending' },

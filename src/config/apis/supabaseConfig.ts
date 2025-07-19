@@ -41,7 +41,7 @@ const crewai3DGenerationInputSchema = z.object({
     'stabilityai/stable-diffusion-xl-base-1.0',
     'black-forest-labs/FLUX.1-schnell',
     'stabilityai/stable-diffusion-2-1',
-  ]),
+  ]).optional(),
   image_url: z.string().url("Valid image URL is required").optional(),
   room_type: z.string().optional(),
   style: z.string().optional(),
