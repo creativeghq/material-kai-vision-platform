@@ -58,6 +58,19 @@ export type {
   EnvironmentConfig,
 } from './apiConfig';
 
+// Custom error class for configuration issues
+export class ConfigurationError extends Error {
+  public readonly configType: string;
+  public readonly missingFields: string[];
+
+  constructor(configType: string, missingFields: string[], message?: string) {
+    super(message || `Configuration error for ${configType}: missing fields ${missingFields.join(', ')}`);
+    this.name = 'ConfigurationError';
+    this.configType = configType;
+    this.missingFields = missingFields;
+  }
+}
+
 // Convenience functions for common operations
 export class ApiConfigManager {
   /**
@@ -71,7 +84,23 @@ export class ApiConfigManager {
    * Get a specific API configuration by type
    */
   public static getApiConfigByType<T extends ApiConfig>(type: string): T | null {
-    return apiRegistry.getApiConfigByType<T>(type);
+    const config = apiRegistry.getApiConfigByType<T>(type);
+    
+    if (!config) {
+      console.warn(`⚠️ API configuration not found for type: ${type}`);
+      console.warn(`Available types: ${apiRegistry.getAllConfigs().map(c => c.type).join(', ')}`);
+      return null;
+    }
+
+    // Validate configuration has required fields
+    const validation = this.validateConfigurationFields(config);
+    if (!validation.isValid) {
+      console.error(`❌ Invalid configuration for ${type}:`, validation.errors);
+      throw new ConfigurationError(type, validation.missingFields,
+        `Configuration for ${type} is missing required fields: ${validation.missingFields.join(', ')}`);
+    }
+
+    return config;
   }
 
   /**
@@ -140,6 +169,77 @@ export class ApiConfigManager {
       environment: apiRegistry.getEnvironment(),
       validation: this.validateEnvironment(),
     };
+  }
+
+  /**
+   * Validate that a configuration has all required fields
+   */
+  private static validateConfigurationFields(config: ApiConfig): {
+    isValid: boolean;
+    errors: string[];
+    missingFields: string[];
+  } {
+    const errors: string[] = [];
+    const missingFields: string[] = [];
+
+    // Basic validation - all configs should have these
+    if (!config.name) {
+      errors.push('Missing configuration name');
+      missingFields.push('name');
+    }
+    if (!config.type) {
+      errors.push('Missing configuration type');
+      missingFields.push('type');
+    }
+
+    // Type-specific validation
+    switch (config.type) {
+      case 'replicate':
+        // Replicate configs need API key (server-side only)
+        if (typeof window === 'undefined' && !config.apiKey) {
+          errors.push('Missing Replicate API key (server-side)');
+          missingFields.push('apiKey');
+        }
+        break;
+      
+      case 'supabase':
+        const supabaseConfig = config as any;
+        if (!supabaseConfig.projectUrl) {
+          errors.push('Missing Supabase project URL');
+          missingFields.push('projectUrl');
+        }
+        if (!supabaseConfig.anonKey) {
+          errors.push('Missing Supabase anonymous key');
+          missingFields.push('anonKey');
+        }
+        break;
+      
+      case 'huggingface':
+        // HuggingFace configs need API key (server-side only)
+        if (typeof window === 'undefined' && !config.apiKey) {
+          errors.push('Missing HuggingFace API key (server-side)');
+          missingFields.push('apiKey');
+        }
+        break;
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      missingFields
+    };
+  }
+
+  /**
+   * Get a safe configuration that won't throw errors
+   */
+  public static getSafeApiConfigByType<T extends ApiConfig>(type: string): T | null {
+    try {
+      return this.getApiConfigByType<T>(type);
+    } catch (error) {
+      console.warn(`Failed to get configuration for ${type}:`, error);
+      return null;
+    }
   }
 
   /**
