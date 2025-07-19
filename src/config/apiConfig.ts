@@ -12,6 +12,9 @@ import { replicateConfig } from './apis/replicateConfig';
 import { supabaseConfig } from './apis/supabaseConfig';
 import { huggingfaceConfig } from './apis/huggingfaceConfig';
 
+// Re-export the HuggingFaceApiConfig type for use in other modules
+export type { HuggingFaceApiConfig };
+
 // Environment configuration
 export interface EnvironmentConfig {
   development: boolean;
@@ -90,7 +93,7 @@ export class ApiRegistry extends Singleton {
   private configs: Map<string, ApiConfig> = new Map();
   private environment: keyof EnvironmentConfig;
 
-  protected constructor() {
+  public constructor() {
     super();
     this.environment = this.detectEnvironment();
     this.initialize();
@@ -207,4 +210,4 @@ export class ApiConfigUtils {
 }
 
 // Export singleton instance
-export const apiRegistry = ApiRegistry.getInstance<ApiRegistry>();
+export const apiRegistry = ApiRegistry.getInstance();

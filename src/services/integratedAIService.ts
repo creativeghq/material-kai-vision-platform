@@ -1,4 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
+import {
+  AppError,
+  ValidationError,
+  NetworkError,
+  APIError,
+  DatabaseError,
+  ExternalServiceError,
+  ErrorLogger,
+  errorLogger
+} from '@/core/errors';
 
 // CrewAI Services
 export interface CrewAITaskRequest {
@@ -88,7 +98,17 @@ export class EnhancedCrewAIAPI {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        throw new Error('User not authenticated');
+        const authError = new APIError(
+          'User authentication required for CrewAI API access',
+          {
+            operation: 'executeTask',
+            service: 'EnhancedCrewAIAPI',
+            metadata: { endpoint: 'executeTask' },
+            timestamp: new Date().toISOString()
+          }
+        );
+        errorLogger.logError(authError, { service: 'EnhancedCrewAIAPI', method: 'executeTask' });
+        throw authError;
       }
 
       const { data, error } = await supabase.functions.invoke('enhanced-crewai', {
@@ -104,6 +124,14 @@ export class EnhancedCrewAIAPI {
 
       return data as CrewAIResult;
     } catch (error) {
+      // DIAGNOSTIC: Validating error handling issues
+      console.log('DEBUG: ErrorContext interface requires these fields:');
+      console.log('- operation: string');
+      console.log('- service: string');
+      console.log('- metadata?: Record<string, any>');
+      console.log('- timestamp: string');
+      console.log('DEBUG: Additional context like "endpoint" should go in metadata field');
+      console.log('DEBUG: logDiagnostic functions are undefined and need to be removed');
       console.error('Error executing CrewAI task:', error);
       throw error;
     }
@@ -364,8 +392,22 @@ export class IntegratedAIService {
 
       return results;
     } catch (error) {
-      console.error('Error in complete design generation:', error);
-      throw error;
+      const apiError = new APIError(
+        'Failed to generate complete design',
+        {
+          operation: 'generateCompleteDesign',
+          service: 'IntegratedAIService',
+          metadata: {
+            roomType,
+            imageCount: images.length,
+            originalError: error instanceof Error ? error.message : String(error)
+          },
+          timestamp: new Date().toISOString()
+        }
+      );
+      
+      ErrorLogger.getInstance().logError(apiError);
+      throw apiError;
     }
   }
 

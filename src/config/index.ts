@@ -80,14 +80,17 @@ export class ApiConfigManager {
   public static validateEnvironment(): { valid: boolean; missing: string[] } {
     const missing: string[] = [];
     const configs = apiRegistry.getAllConfigs();
+    const isServerSide = typeof window === 'undefined';
 
     configs.forEach(config => {
-      if (config.type === 'replicate' && !config.apiKey) {
+      // Only validate private API keys on server-side
+      if (config.type === 'replicate' && isServerSide && !config.apiKey) {
         missing.push('REPLICATE_API_TOKEN');
       }
       
       if (config.type === 'supabase') {
         const supabaseConfig = config as any;
+        // Public environment variables should always be available
         if (!supabaseConfig.projectUrl) {
           missing.push('NEXT_PUBLIC_SUPABASE_URL');
         }
@@ -96,7 +99,8 @@ export class ApiConfigManager {
         }
       }
       
-      if (config.type === 'huggingface' && !config.apiKey) {
+      // Only validate private API keys on server-side
+      if (config.type === 'huggingface' && isServerSide && !config.apiKey) {
         missing.push('HUGGINGFACE_API_TOKEN');
       }
     });
