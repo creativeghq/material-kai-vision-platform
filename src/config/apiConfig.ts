@@ -136,11 +136,35 @@ export class ApiRegistry extends Singleton {
    * Get a specific API configuration by type
    */
   public getApiConfigByType<T extends ApiConfig>(type: string): T | null {
+    console.log(`🔍 DEBUG: Looking for API config with type: "${type}"`);
+    console.log(`🔍 DEBUG: Available configs:`, Array.from(this.configs.keys()));
+    console.log(`🔍 DEBUG: Config types:`, Array.from(this.configs.values()).map(c => c.type));
+    
     for (const config of this.configs.values()) {
-      if (config.type === type) {
+      // Normalize both strings for comparison to handle case sensitivity and whitespace
+      const configType = config.type?.toLowerCase().trim();
+      const searchType = type?.toLowerCase().trim();
+      
+      console.log(`🔍 DEBUG: Comparing "${configType}" === "${searchType}"`);
+      
+      if (configType === searchType) {
+        console.log(`✅ DEBUG: Found config for type "${type}":`, config.name);
         return config as T;
       }
     }
+    
+    console.log(`❌ DEBUG: No config found for type "${type}"`);
+    console.log(`❌ DEBUG: Available types:`, Array.from(this.configs.values()).map(c => `"${c.type}"`));
+    
+    // Additional error handling: suggest similar types
+    const availableTypes = Array.from(this.configs.values()).map(c => c.type?.toLowerCase().trim());
+    const searchTypeLower = type?.toLowerCase().trim();
+    const similarTypes = availableTypes.filter(t => t && t.includes(searchTypeLower));
+    
+    if (similarTypes.length > 0) {
+      console.log(`💡 DEBUG: Did you mean one of these types?`, similarTypes);
+    }
+    
     return null;
   }
 
