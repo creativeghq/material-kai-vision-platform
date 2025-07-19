@@ -9,8 +9,23 @@ interface HuggingFaceServiceConfig extends ServiceConfig {
 }
 
 interface ModelResult {
-  outputs: any[];
+  outputs: ClassificationOutput[] | EmbeddingOutput[] | TextOutput[] | number[] | number[][];
   error?: string;
+}
+
+// Specific output types for different model responses
+interface ClassificationOutput {
+  label: string;
+  score: number;
+}
+
+interface EmbeddingOutput {
+  embedding?: number[];
+  embeddings?: number[][];
+}
+
+interface TextOutput {
+  generated_text: string;
 }
 
 interface EmbeddingResult {
@@ -35,16 +50,16 @@ interface FeatureExtractionResult {
 export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   private apiKey: string | null = null;
   
-  // Recommended models for different tasks
+  // Recommended models for different tasks - corrected mappings
   private static readonly MODELS = {
-    MATERIAL_CLASSIFICATION: 'microsoft/DialoGPT-medium',
-    TEXT_EMBEDDING: 'sentence-transformers/all-MiniLM-L6-v2',
-    IMAGE_CLASSIFICATION: 'google/vit-base-patch16-224',
-    FEATURE_EXTRACTION: 'facebook/bart-large',
-    MATERIAL_DETECTION: 'microsoft/resnet-50',
-    STYLE_ANALYSIS: 'openai/clip-vit-base-patch32',
-    OCR_PROCESSING: 'microsoft/trocr-base-printed',
-    SENTIMENT_ANALYSIS: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+    MATERIAL_CLASSIFICATION: 'google/vit-base-patch16-224', // Vision model for image classification
+    TEXT_EMBEDDING: 'sentence-transformers/all-MiniLM-L6-v2', // Correct for embeddings
+    IMAGE_CLASSIFICATION: 'google/vit-base-patch16-224', // Vision Transformer for images
+    FEATURE_EXTRACTION: 'sentence-transformers/all-MiniLM-L6-v2', // Text feature extraction
+    MATERIAL_DETECTION: 'facebook/detr-resnet-50', // Object detection model
+    STYLE_ANALYSIS: 'openai/clip-vit-base-patch32', // CLIP for image-text understanding
+    OCR_PROCESSING: 'microsoft/trocr-base-printed', // Correct for OCR
+    SENTIMENT_ANALYSIS: 'cardiffnlp/twitter-roberta-base-sentiment-latest' // Correct for sentiment
   };
 
   constructor(config: HuggingFaceServiceConfig) {
@@ -125,7 +140,8 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   async classifyMaterial(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<ClassificationResult[]> {
     return this.executeOperation(async () => {
       const model = options.defaultModel || HuggingFaceService.MODELS.MATERIAL_CLASSIFICATION;
-      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      const processedInput = await this.processImageInput(imageData);
+      const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
       return this.parseClassificationResult(result);
     }, 'classifyMaterial');
   }
@@ -147,7 +163,8 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   async extractImageFeatures(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<FeatureExtractionResult> {
     return this.executeOperation(async () => {
       const model = options.defaultModel || HuggingFaceService.MODELS.FEATURE_EXTRACTION;
-      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      const processedInput = await this.processImageInput(imageData);
+      const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
       return {
         features: result.features || result,
         model
@@ -161,7 +178,8 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   async analyzeImageStyle(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<ClassificationResult[]> {
     return this.executeOperation(async () => {
       const model = options.defaultModel || HuggingFaceService.MODELS.STYLE_ANALYSIS;
-      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      const processedInput = await this.processImageInput(imageData);
+      const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
       return this.parseClassificationResult(result);
     }, 'analyzeImageStyle');
   }
@@ -172,7 +190,8 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   async processOCR(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<string> {
     return this.executeOperation(async () => {
       const model = options.defaultModel || HuggingFaceService.MODELS.OCR_PROCESSING;
-      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      const processedInput = await this.processImageInput(imageData);
+      const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
       return result.generated_text || result.text || '';
     }, 'processOCR');
   }
@@ -183,12 +202,48 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   async detectMaterials(imageData: string | File, options: Partial<HuggingFaceServiceConfig> = {}): Promise<ClassificationResult[]> {
     return this.executeOperation(async () => {
       const model = options.defaultModel || HuggingFaceService.MODELS.MATERIAL_DETECTION;
-      const result = await this.callHuggingFaceAPI(model, { inputs: imageData });
+      const processedInput = await this.processImageInput(imageData);
+      const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
       return this.parseClassificationResult(result);
     }, 'detectMaterials');
   }
 
   // Private helper methods
+
+  private async processImageInput(imageData: string | File): Promise<string> {
+    if (typeof imageData === 'string') {
+      // Validate base64 string format
+      if (!imageData.startsWith('data:image/') && !this.isValidBase64(imageData)) {
+        throw new Error('Invalid image data format. Expected base64 string or data URL.');
+      }
+      return imageData;
+    }
+    
+    if (imageData instanceof File) {
+      // Validate file type
+      if (!imageData.type.startsWith('image/')) {
+        throw new Error(`Invalid file type: ${imageData.type}. Expected image file.`);
+      }
+      
+      // Convert File to base64
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read image file'));
+        reader.readAsDataURL(imageData);
+      });
+    }
+    
+    throw new Error('Invalid image input type. Expected string or File.');
+  }
+
+  private isValidBase64(str: string): boolean {
+    try {
+      return btoa(atob(str)) === str;
+    } catch {
+      return false;
+    }
+  }
 
   private async callHuggingFaceAPI(model: string, payload: any): Promise<any> {
     if (!this.apiKey) {
