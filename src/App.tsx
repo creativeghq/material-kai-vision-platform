@@ -6,12 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AuthGuard } from "@/components/Layout/AuthGuard";
 
-// 🔧 DEBUG: Force import and initialization of API configurations
-console.log('🔧 APP DEBUG: Importing configuration module...');
-import { initializeApiConfigurations, apiRegistry } from "@/config";
-console.log('🔧 APP DEBUG: Configuration module imported, forcing initialization...');
-initializeApiConfigurations();
-console.log('🔧 APP DEBUG: Forced initialization complete. Registry has', apiRegistry.getAllConfigs().length, 'configurations');
+// Import configuration to ensure initialization
+import "@/config";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
