@@ -153,8 +153,16 @@ export class ApiConfigManager {
 }
 
 // Auto-initialize when module is imported (can be disabled if needed)
+console.log('🔧 CONFIG DEBUG: Checking initialization conditions...');
+console.log('🔧 CONFIG DEBUG: typeof window:', typeof window);
+console.log('🔧 CONFIG DEBUG: process.env.NODE_ENV:', process.env.NODE_ENV);
+
 if (typeof window !== 'undefined' || process.env.NODE_ENV !== 'test') {
+  console.log('🔧 CONFIG DEBUG: Conditions met, calling ApiConfigManager.initialize()');
   ApiConfigManager.initialize();
+} else {
+  console.log('🔧 CONFIG DEBUG: ❌ Conditions NOT met - initialization skipped!');
+  console.log('🔧 CONFIG DEBUG: This is likely the cause of "API configuration not found for type: huggingface"');
 }
 
 export default ApiConfigManager;
