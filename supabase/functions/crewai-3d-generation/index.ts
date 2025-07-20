@@ -211,6 +211,7 @@ const supabase = createClient(
 interface GenerationRequest {
   user_id: string;
   prompt: string;
+  model?: string; // Add support for model selection from frontend
   room_type?: string;
   roomType?: string; // Support camelCase from frontend
   style?: string;

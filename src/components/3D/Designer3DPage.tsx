@@ -51,7 +51,7 @@ export const Designer3DPage: React.FC = () => {
   // Available AI models - unified list without artificial type separation
   const availableModels = [
     { name: '🎨 Stable Diffusion XL Base 1.0', id: 'stabilityai/stable-diffusion-xl-base-1.0', provider: 'huggingface' },
-    { name: '⚡ FLUX-Schnell', id: 'black-forest-labs/FLUX.1-schnell', provider: 'huggingface' },
+    { name: '⚡ FLUX-Schnell', id: 'black-forest-labs/flux-schnell', provider: 'replicate' },
     { name: '🏠 Interior Design Model', id: 'stabilityai/stable-diffusion-2-1', provider: 'huggingface' },
     { name: '🏗️ Designer Architecture', id: 'davisbrown/designer-architecture', provider: 'replicate' },
     { name: '🎯 Interior Design AI', id: 'adirik/interior-design', provider: 'replicate' },
@@ -180,22 +180,19 @@ export const Designer3DPage: React.FC = () => {
 
       // Define models that require images vs text-only models
       const imageRequiredModels = [
-        'lucataco/interior-design',
-        'adirik/flux-cinestill',
         'adirik/interior-design',
         'davisbrown/designer-architecture',
+        'erayyavuz/interior-ai',
+        'jschoormans/comfyui-interior-remodel',
         'rocketdigitalai/interior-design-sdxl'
       ];
       
       const textOnlyModels = [
         'black-forest-labs/flux-schnell',
-        'stability-ai/stable-diffusion-3-medium',
-        'bytedance/sdxl-lightning-4step',
-        'playgroundai/playground-v2.5-1024px-aesthetic',
-        'threestudio-project/threestudio',
         'stabilityai/stable-diffusion-xl-base-1.0',
-        'black-forest-labs/FLUX.1-schnell',
-        'stabilityai/stable-diffusion-2-1'
+        'stabilityai/stable-diffusion-2-1',
+        'julian-at/interiorly-gen1-dev',
+        'jschoormans/interior-v2'
       ];
 
       // Determine which model to use based on whether we have an image
