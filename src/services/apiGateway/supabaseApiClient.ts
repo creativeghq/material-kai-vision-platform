@@ -105,25 +105,40 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
       const url = SupabaseConfigUtils.buildFunctionUrl(params.functionName);
       const requestOptions = this.buildRequestOptions(params, timeout);
 
-      const response = await fetch(url, requestOptions);
+      try {
+        const response = await fetch(url, requestOptions);
 
-      if (!response.ok) {
-        await this.handleErrorResponse(response);
-      }
-
-      const data = await response.json();
-
-      return {
-        success: true,
-        data: data as SupabaseResponse,
-        metadata: {
-          apiType: 'supabase',
-          modelId: params.functionName,
-          timestamp: new Date().toISOString(),
-          requestId: `supabase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          statusCode: response.status
+        // Clear timeout on successful response
+        const timeoutId = (requestOptions.signal as any)?._timeoutId;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
         }
-      };
+
+        if (!response.ok) {
+          await this.handleErrorResponse(response);
+        }
+
+        const data = await response.json();
+
+        return {
+          success: true,
+          data: data as SupabaseResponse,
+          metadata: {
+            apiType: 'supabase',
+            modelId: params.functionName,
+            timestamp: new Date().toISOString(),
+            requestId: `supabase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            statusCode: response.status
+          }
+        };
+      } catch (error) {
+        // Clear timeout on error as well
+        const timeoutId = (requestOptions.signal as any)?._timeoutId;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        throw error;
+      }
     }, { maxAttempts: retryAttempts });
   }
 
@@ -133,6 +148,11 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+    // Store timeout ID on the signal for cleanup
+    (controller.signal as any)._timeoutId = timeoutId;
+
+    // For Supabase Edge Functions, we send the function parameters directly
+    // The function name is already included in the URL via buildFunctionUrl()
     return {
       method: 'POST',
       headers,
