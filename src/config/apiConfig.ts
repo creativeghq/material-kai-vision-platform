@@ -142,10 +142,7 @@ export class ApiRegistry extends Singleton {
       const configType = config.type?.toLowerCase().trim();
       const searchType = type?.toLowerCase().trim();
       
-      console.log(`🔍 DEBUG: Comparing "${configType}" === "${searchType}"`);
-      
       if (configType === searchType) {
-        console.log(`✅ DEBUG: Found config for type "${type}":`, config.name);
         return config as T;
       }
     }
