@@ -174,16 +174,8 @@ class CentralizedApiClientFactory {
     modelId: string,
     params: TParams
   ): Promise<StandardizedApiResponse<TResponse>> {
-    // === API CLIENT FACTORY DEBUG START ===
-    console.log('🏭 ApiClientFactory.executeApiCall called');
-    console.log('🎯 API Type:', apiType);
-    console.log('🆔 Model ID:', modelId);
-    console.log('📦 Params:', JSON.stringify(params, null, 2));
-    
     const client = this.getClient(apiType, modelId);
     if (!client) {
-      console.log('❌ No client found for', `${apiType}:${modelId}`);
-      console.log('=== API CLIENT FACTORY DEBUG END ===');
       return {
         success: false,
         error: {
@@ -201,16 +193,11 @@ class CentralizedApiClientFactory {
       };
     }
 
-    console.log('✅ Client found, proceeding with execution');
-
     try {
       // Validate parameters if validation is available
       const isValid = this.validateParameters(apiType, modelId, params);
-      console.log('🔍 Parameter validation result:', isValid);
       
       if (!isValid) {
-        console.log('❌ Parameter validation failed');
-        console.log('=== API CLIENT FACTORY DEBUG END ===');
         return {
           success: false,
           error: {
@@ -229,17 +216,10 @@ class CentralizedApiClientFactory {
       }
 
       // Execute the API call
-      console.log('🚀 Calling client.validateParams()');
       const validatedParams = client.validateParams(params);
-      console.log('✅ Validated params:', JSON.stringify(validatedParams, null, 2));
-      
-      console.log('🚀 Calling client.execute()');
-      console.log('=== API CLIENT FACTORY DEBUG END ===');
       
       return await client.execute(validatedParams);
     } catch (error) {
-      console.log('💥 Error in executeApiCall:', error);
-      console.log('=== API CLIENT FACTORY DEBUG END ===');
       return {
         success: false,
         error: {

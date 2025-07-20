@@ -103,19 +103,11 @@ export class ApiIntegrationService {
     functionName: string,
     params: any
   ): Promise<StandardizedApiResponse<any>> {
-    // === API INTEGRATION SERVICE DEBUG START ===
-    console.log('🔧 ApiIntegrationService.executeSupabaseFunction called');
-    console.log('📝 Function Name:', functionName);
-    console.log('📦 Raw Params:', JSON.stringify(params, null, 2));
-    
     // Format parameters correctly for SupabaseApiClient
     const supabaseParams = {
       functionName: functionName,
       data: params
     };
-    
-    console.log('🔄 Formatted Supabase Params:', JSON.stringify(supabaseParams, null, 2));
-    console.log('=== API INTEGRATION SERVICE DEBUG END ===');
     
     return await apiClientFactory.executeApiCall('supabase', functionName, supabaseParams);
   }

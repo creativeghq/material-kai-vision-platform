@@ -105,7 +105,6 @@ export class ApiRegistry extends Singleton {
     this.registerApi(supabaseConfig);
     this.registerApi(huggingfaceConfig);
 
-    console.log(`✅ API Registry initialized with ${this.configs.size} configurations for environment: ${this.environment}`);
   }
 
   protected cleanup(): void {
@@ -136,8 +135,6 @@ export class ApiRegistry extends Singleton {
    * Get a specific API configuration by type
    */
   public getApiConfigByType<T extends ApiConfig>(type: string): T | null {
-    console.log(`🔍 DEBUG: Looking for API config with type: "${type}"`);
-    console.log(`🔍 DEBUG: Available configs:`, Array.from(this.configs.keys()));
     console.log(`🔍 DEBUG: Config types:`, Array.from(this.configs.values()).map(c => c.type));
     
     for (const config of this.configs.values()) {
