@@ -1840,17 +1840,47 @@ serve(async (req) => {
     console.log('📨 Received 3D generation request');
     const rawRequest = await req.json();
     
-    // Handle API Gateway parameter structure vs direct calls
+    // Handle multiple possible parameter wrapper formats
     let request: GenerationRequest;
+    
+    console.log('🔍 Raw request structure:', {
+      hasData: !!rawRequest.data,
+      hasFunctionName: !!rawRequest.functionName,
+      hasParameters: !!rawRequest.parameters,
+      hasBody: !!rawRequest.body,
+      topLevelKeys: Object.keys(rawRequest || {}),
+      dataKeys: rawRequest.data ? Object.keys(rawRequest.data) : null
+    });
+    
+    // Try multiple unwrapping strategies
     if (rawRequest.functionName && rawRequest.data) {
       // API Gateway format: { functionName: "...", data: { actual_params } }
       console.log('🔄 API Gateway format detected, extracting data from wrapper');
+      request = rawRequest.data;
+    } else if (rawRequest.parameters) {
+      // Parameters wrapper: { parameters: { actual_params } }
+      console.log('🔄 Parameters wrapper format detected');
+      request = rawRequest.parameters;
+    } else if (rawRequest.body && typeof rawRequest.body === 'object') {
+      // Body wrapper: { body: { actual_params } }
+      console.log('🔄 Body wrapper format detected');
+      request = rawRequest.body;
+    } else if (rawRequest.data && typeof rawRequest.data === 'object') {
+      // Data wrapper: { data: { actual_params } }
+      console.log('🔄 Data wrapper format detected');
       request = rawRequest.data;
     } else {
       // Direct call format: { actual_params }
       console.log('📋 Direct call format detected');
       request = rawRequest;
     }
+    
+    console.log('✅ Final extracted request:', {
+      hasPrompt: !!request.prompt,
+      promptLength: request.prompt?.length || 0,
+      requestKeys: Object.keys(request || {}),
+      requestType: typeof request
+    });
     
     // Ensure request is properly typed and has required fields
     if (!request || typeof request !== 'object') {
