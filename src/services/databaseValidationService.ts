@@ -65,7 +65,7 @@ class DatabaseValidationService {
   private readonly EXPECTED_TABLES: string[] = [
     'profiles',
     'materials_catalog',
-    'material_embeddings',
+    
     'material_style_analysis',
     'material_knowledge',
     'enhanced_knowledge_base',
@@ -254,7 +254,7 @@ class DatabaseValidationService {
     // Expected indexes for performance
     const expectedIndexes = [
       { table: 'materials_catalog', column: 'category' },
-      { table: 'material_embeddings', column: 'material_id' },
+      
       { table: 'recognition_results', column: 'file_id' },
       { table: 'moodboard_items', column: 'moodboard_id' },
       { table: 'uploaded_files', column: 'user_id' },
@@ -283,15 +283,6 @@ class DatabaseValidationService {
     try {
       // Check for orphaned records
       const integrityChecks = [
-        {
-          name: 'Orphaned material embeddings',
-          query: `
-            SELECT COUNT(*) as count 
-            FROM material_embeddings me 
-            LEFT JOIN materials_catalog mc ON me.material_id = mc.id 
-            WHERE mc.id IS NULL
-          `
-        },
         {
           name: 'Orphaned moodboard items',
           query: `

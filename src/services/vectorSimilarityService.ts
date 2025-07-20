@@ -130,49 +130,6 @@ class VectorSimilarityService {
     });
   }
 
-  /**
-   * Search similar materials to existing material
-   */
-  async findSimilarMaterials(
-    materialId: string,
-    options: { 
-      threshold?: number; 
-      count?: number; 
-      excludeSelf?: boolean;
-    } = {}
-  ): Promise<VectorSearchResponse> {
-    try {
-      // Get the material's embedding first
-      const { data: material, error } = await supabase
-        .from('material_embeddings')
-        .select('embedding')
-        .eq('material_id', materialId)
-        .limit(1)
-        .single();
-
-      if (error || !material) {
-        throw new Error('Material embedding not found');
-      }
-
-      const results = await this.search({
-        query_embedding: JSON.parse(material.embedding),
-        match_threshold: options.threshold || 0.8,
-        match_count: options.count || 10,
-        search_type: 'material'
-      });
-
-      // Filter out the original material if requested
-      if (options.excludeSelf) {
-        results.results = results.results.filter(r => r.material_id !== materialId);
-      }
-
-      return results;
-
-    } catch (error) {
-      console.error('Error finding similar materials:', error);
-      throw error;
-    }
-  }
 
   /**
    * Search materials by properties

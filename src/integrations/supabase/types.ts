@@ -956,53 +956,6 @@ export type Database = {
         }
         Relationships: []
       }
-      material_embeddings: {
-        Row: {
-          confidence_score: number | null
-          created_at: string
-          embedding: string
-          embedding_type: string
-          id: string
-          material_id: string
-          metadata: Json | null
-          model_version: string
-          updated_at: string
-          vector_dimension: number
-        }
-        Insert: {
-          confidence_score?: number | null
-          created_at?: string
-          embedding: string
-          embedding_type: string
-          id?: string
-          material_id: string
-          metadata?: Json | null
-          model_version: string
-          updated_at?: string
-          vector_dimension?: number
-        }
-        Update: {
-          confidence_score?: number | null
-          created_at?: string
-          embedding?: string
-          embedding_type?: string
-          id?: string
-          material_id?: string
-          metadata?: Json | null
-          model_version?: string
-          updated_at?: string
-          vector_dimension?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "material_embeddings_material_id_fkey"
-            columns: ["material_id"]
-            isOneToOne: false
-            referencedRelation: "materials_catalog"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       material_knowledge: {
         Row: {
           content: string

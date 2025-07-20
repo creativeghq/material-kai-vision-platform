@@ -67,10 +67,12 @@ class CentralizedApiClientFactory {
       supabaseFunctions.forEach(functionName => {
         const functionConfig = supabaseConfig.functions[functionName];
         if (functionConfig) {
+          // Use the service role key for server-side operations, fallback to anon key
+          const apiKey = supabaseConfig.serviceRoleKey || supabaseConfig.anonKey;
           this.registerClient(
             'supabase',
             functionName,
-            new SupabaseApiClient(functionName)
+            new SupabaseApiClient(apiKey, functionName)
           );
         }
       });

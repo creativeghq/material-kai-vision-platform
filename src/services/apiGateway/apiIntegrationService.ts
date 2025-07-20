@@ -103,7 +103,12 @@ export class ApiIntegrationService {
     functionName: string,
     params: any
   ): Promise<StandardizedApiResponse<any>> {
-    return await apiClientFactory.executeApiCall('supabase', functionName, params);
+    // Format parameters correctly for SupabaseApiClient
+    const supabaseParams = {
+      functionName: functionName,
+      data: params
+    };
+    return await apiClientFactory.executeApiCall('supabase', functionName, supabaseParams);
   }
 
   /**

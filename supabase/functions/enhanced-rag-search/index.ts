@@ -31,46 +31,6 @@ serve(async (req) => {
       userId 
     } = await req.json();
 
-    // Handle embedding material action
-    if (action === 'embed_material') {
-      if (!material_id || !content) {
-        return new Response(
-          JSON.stringify({ error: 'Missing required fields for embedding: material_id, content' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Create embedding for material (simplified - would use actual embedding service)
-      const { data: embeddingData, error: embeddingError } = await supabase
-        .from('material_embeddings')
-        .insert({
-          material_id: material_id,
-          embedding_type: 'text',
-          embedding: Array.from({length: 512}, () => Math.random()).join(','), // Mock embedding
-          model_version: 'pdf-extraction-v1',
-          vector_dimension: 512,
-          confidence_score: metadata?.confidence || 0.8,
-          metadata: metadata || {}
-        })
-        .select();
-
-      if (embeddingError) {
-        console.error('Embedding creation error:', embeddingError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to create embedding', details: embeddingError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Material embedding created successfully',
-          embedding_id: embeddingData[0]?.id
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     if (!query) {
       return new Response(
@@ -107,22 +67,6 @@ serve(async (req) => {
       console.error('Material search error:', matError);
     }
 
-    // Search material embeddings for semantic similarity
-    const { data: embeddingResults, error: embError } = await supabase
-      .from('material_embeddings')
-      .select(`
-        material_id,
-        confidence_score,
-        embedding_type,
-        materials_catalog (
-          id, name, description, category, properties
-        )
-      `)
-      .limit(Math.floor(maxResults / 2));
-
-    if (embError) {
-      console.error('Embedding search error:', embError);
-    }
 
     // Format results - enhanced knowledge base is now the primary source
     const results = {
@@ -151,16 +95,6 @@ serve(async (req) => {
         category: item.category,
         properties: item.properties
       })),
-      embeddedMaterials: (embeddingResults || []).map(item => ({
-        id: item.material_id,
-        title: item.materials_catalog?.name || 'Unknown Material',
-        content: item.materials_catalog?.description || '',
-        confidence: item.confidence_score || 0.5,
-        type: 'embedded_material',
-        category: item.materials_catalog?.category,
-        properties: item.materials_catalog?.properties,
-        embeddingType: item.embedding_type
-      })),
       recommendations: generateRecommendations(query, queryIntent),
       realTimeInfo: includeRealTime ? await getRealTimeInfo(query) : null
     };
@@ -170,7 +104,7 @@ serve(async (req) => {
       await supabase.from('search_analytics').insert({
         user_id: userId,
         query_text: query,
-        total_results: results.knowledgeBase.length + results.materials.length + results.embeddedMaterials.length,
+        total_results: results.knowledgeBase.length + results.materials.length,
         response_time_ms: 150,
         query_processing_time_ms: 50
       });
@@ -184,7 +118,7 @@ serve(async (req) => {
         query: query,
         intent: queryIntent,
         results: results,
-        totalResults: results.knowledgeBase.length + results.materials.length + results.embeddedMaterials.length
+        totalResults: results.knowledgeBase.length + results.materials.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

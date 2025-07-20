@@ -15,7 +15,7 @@ export interface UnifiedSearchResult {
   id: string;
   title: string;
   content: string;
-  type: 'knowledge_document' | 'material' | 'embedded_material';
+  type: 'knowledge_document' | 'material';
   confidence: number;
   source: string;
   metadata: Record<string, any>;
@@ -163,7 +163,7 @@ export class UnifiedSearchService {
 
       const processingTime = Date.now() - startTime;
 
-      // Format unified results from knowledge base, materials, and embeddings
+      // Format unified results from knowledge base and materials
       const allResults: UnifiedSearchResult[] = [
         ...(data.results.knowledgeBase || []).map((item: any) => ({
           id: item.id,
@@ -184,19 +184,6 @@ export class UnifiedSearchService {
           metadata: {
             category: item.category,
             properties: item.properties
-          }
-        })),
-        ...(data.results.embeddedMaterials || []).map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          content: item.content,
-          type: 'embedded_material' as const,
-          confidence: item.confidence,
-          source: 'vector_embeddings',
-          metadata: {
-            category: item.category,
-            properties: item.properties,
-            embeddingType: item.embeddingType
           }
         }))
       ];
