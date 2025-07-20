@@ -166,11 +166,43 @@ export const Designer3DPage: React.FC = () => {
         setIsUploading(false);
       }
 
+      // Define models that require images vs text-only models
+      const imageRequiredModels = [
+        'lucataco/interior-design',
+        'adirik/flux-cinestill',
+        'adirik/interior-design',
+        'davisbrown/designer-architecture',
+        'rocketdigitalai/interior-design-sdxl'
+      ];
+      
+      const textOnlyModels = [
+        'black-forest-labs/flux-schnell',
+        'stability-ai/stable-diffusion-3-medium',
+        'bytedance/sdxl-lightning-4step',
+        'playgroundai/playground-v2.5-1024px-aesthetic',
+        'threestudio-project/threestudio',
+        'stabilityai/stable-diffusion-xl-base-1.0',
+        'black-forest-labs/FLUX.1-schnell',
+        'stabilityai/stable-diffusion-2-1'
+      ];
+
+      // Determine which model to use based on whether we have an image
+      let selectedModel;
+      if (imageUrl) {
+        // If we have an image, use an image-capable model
+        selectedModel = imageRequiredModels[0]; // Default to first image-capable model
+      } else {
+        // If no image, use a text-only model
+        selectedModel = textOnlyModels[0]; // Default to first text-only model
+      }
+
+      // Build request data with required model field
       const requestData = {
         prompt: prompt.trim(),
+        model: selectedModel,
         room_type: roomType || undefined,
         style: style || undefined,
-        image_url: imageUrl // Changed from reference_image_url to image_url to match schema
+        ...(imageUrl && { image_url: imageUrl }) // Only include image_url if we have one
       };
 
       // Use the new centralized API integration service
