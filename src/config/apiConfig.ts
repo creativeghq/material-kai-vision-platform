@@ -135,7 +135,7 @@ export class ApiRegistry extends Singleton {
    * Get a specific API configuration by type
    */
   public getApiConfigByType<T extends ApiConfig>(type: string): T | null {
-    console.log(`🔍 DEBUG: Config types:`, Array.from(this.configs.values()).map(c => c.type));
+    
     
     for (const config of this.configs.values()) {
       // Normalize both strings for comparison to handle case sensitivity and whitespace

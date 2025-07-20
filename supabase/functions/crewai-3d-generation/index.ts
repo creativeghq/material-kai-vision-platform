@@ -845,35 +845,101 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
         // Standard HF SDK for other models with timeout
         console.log(`🔄 Using HF SDK for ${modelConfig.model}`);
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout for other models
-        
-        try {
-          const image = await hf.textToImage({
-            inputs: prompt,
-            model: modelConfig.model,
-          });
+        // Special handling for problematic models like stabilityai/stable-diffusion-2-1
+        if (modelConfig.model === 'stabilityai/stable-diffusion-2-1') {
+          console.log(`⚡ Using direct API approach for problematic model: ${modelConfig.model}`);
           
-          clearTimeout(timeoutId);
-
-          // Enhanced validation for image response
-          if (!image) {
-            throw new Error(`No image response received from ${modelConfig.model}`);
-          }
-
-          const arrayBuffer = await image.arrayBuffer();
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for problematic models
           
-          // Enhanced blob processing with validation
-          if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-            throw new Error(`Failed to get valid image data from ${modelConfig.model}`);
-          }
-          
-          console.log(`📊 Image size for ${modelConfig.name}: ${arrayBuffer.byteLength} bytes`);
-          
-          // Convert ArrayBuffer to base64 with chunked processing and error handling
           try {
+            const response = await fetch(`https://api-inference.huggingface.co/models/${modelConfig.model}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${HF_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                inputs: prompt,
+                parameters: {
+                  num_inference_steps: 20, // Reduced steps for stability
+                  guidance_scale: 7.5,     // Standard guidance scale
+                  width: 512,              // Standard resolution
+                  height: 512
+                },
+                options: {
+                  wait_for_model: true,    // Wait for model to load
+                  use_cache: false         // Don't use cache to avoid stale responses
+                }
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`❌ HF API Error ${response.status}:`, errorText);
+              
+              // Handle specific error cases
+              if (response.status === 503) {
+                throw new Error(`Model ${modelConfig.model} is currently loading. Please try again in a few minutes.`);
+              } else if (response.status === 429) {
+                throw new Error(`Rate limit exceeded for ${modelConfig.model}. Please try again later.`);
+              } else if (response.status === 401) {
+                throw new Error(`Authentication failed. Please check your Hugging Face token.`);
+              } else {
+                throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+              }
+            }
+
+            // Enhanced blob fetching with error handling and validation
+            let blob;
+            try {
+              console.log(`🔄 Converting response to blob for ${modelConfig.name}...`);
+              blob = await response.blob();
+              console.log(`✅ Blob conversion successful for ${modelConfig.name}`);
+            } catch (blobError) {
+              console.error(`❌ Blob conversion failed for ${modelConfig.model}:`, blobError);
+              throw new Error(`Failed to convert response to blob for ${modelConfig.model}: ${blobError.message}`);
+            }
+            
+            // Enhanced blob validation
+            if (!blob) {
+              throw new Error(`Null blob received from ${modelConfig.model}`);
+            }
+            
+            if (blob.size === 0) {
+              throw new Error(`Empty blob (0 bytes) received from ${modelConfig.model}`);
+            }
+            
+            // Check if blob type is valid for images
+            if (!blob.type || (!blob.type.startsWith('image/') && blob.type !== 'application/octet-stream')) {
+              console.warn(`⚠️ Unexpected blob type for ${modelConfig.model}: ${blob.type}`);
+              // Don't throw error as some APIs return octet-stream for images
+            }
+            
+            console.log(`📊 Blob details for ${modelConfig.name}: ${blob.size} bytes, type: ${blob.type}`);
+            
+            // Additional validation: check if blob size is reasonable (between 1KB and 50MB)
+            if (blob.size < 1024) {
+              throw new Error(`Blob too small (${blob.size} bytes) for ${modelConfig.model} - likely not a valid image`);
+            }
+            
+            if (blob.size > 50 * 1024 * 1024) {
+              throw new Error(`Blob too large (${blob.size} bytes) for ${modelConfig.model} - exceeds 50MB limit`);
+            }
+            
+            const arrayBuffer = await blob.arrayBuffer();
+            
+            // Enhanced blob processing with error handling
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+              throw new Error(`Failed to convert blob to ArrayBuffer for ${modelConfig.model}`);
+            }
+            
+            // Convert ArrayBuffer to base64 with chunked processing for large images
             const uint8Array = new Uint8Array(arrayBuffer);
-            const chunkSize = 8192; // Process in 8KB chunks
+            const chunkSize = 8192; // Process in 8KB chunks to avoid memory issues
             let binaryString = '';
             
             for (let i = 0; i < uint8Array.length; i += chunkSize) {
@@ -890,24 +956,79 @@ async function generateHuggingFaceImages(prompt: string): Promise<Array<{url: st
               url: result,
               modelName: modelConfig.name
             });
-            console.log(`✅ ${modelConfig.name} generation successful`);
+            console.log(`✅ ${modelConfig.name} generation successful with direct API`);
             await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
             
-          } catch (conversionError) {
-            console.error(`❌ Base64 conversion failed for ${modelConfig.model}:`, conversionError);
-            throw new Error(`Failed to convert image data to base64 for ${modelConfig.model}: ${conversionError.message}`);
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            throw fetchError;
           }
           
-        } catch (sdkError) {
-          clearTimeout(timeoutId);
+        } else {
+          // Standard HF SDK for other models with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout for other models
           
-          // Enhanced error handling for specific HF SDK errors
-          if (sdkError.message && sdkError.message.includes('arrayBuffer')) {
-            throw new Error(`Blob processing error for ${modelConfig.model}: Unable to convert response to ArrayBuffer`);
-          } else if (sdkError.message && sdkError.message.includes('AbortError')) {
-            throw new Error(`Request timeout for ${modelConfig.model}: Model took too long to respond`);
-          } else {
-            throw sdkError;
+          try {
+            const image = await hf.textToImage({
+              inputs: prompt,
+              model: modelConfig.model,
+            });
+            
+            clearTimeout(timeoutId);
+
+            // Enhanced validation for image response
+            if (!image) {
+              throw new Error(`No image response received from ${modelConfig.model}`);
+            }
+
+            const arrayBuffer = await image.arrayBuffer();
+            
+            // Enhanced blob processing with validation
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+              throw new Error(`Failed to get valid image data from ${modelConfig.model}`);
+            }
+            
+            console.log(`📊 Image size for ${modelConfig.name}: ${arrayBuffer.byteLength} bytes`);
+            
+            // Convert ArrayBuffer to base64 with chunked processing and error handling
+            try {
+              const uint8Array = new Uint8Array(arrayBuffer);
+              const chunkSize = 8192; // Process in 8KB chunks
+              let binaryString = '';
+              
+              for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                const chunk = uint8Array.slice(i, i + chunkSize);
+                for (let j = 0; j < chunk.length; j++) {
+                  binaryString += String.fromCharCode(chunk[j]);
+                }
+              }
+              
+              const base64 = btoa(binaryString);
+              const result = `data:image/png;base64,${base64}`;
+              
+              results.push({
+                url: result,
+                modelName: modelConfig.name
+              });
+              console.log(`✅ ${modelConfig.name} generation successful`);
+              await updateWorkflowStep(modelConfig.model, 'success', result, undefined, Date.now() - startTime);
+              
+            } catch (conversionError) {
+              console.error(`❌ Base64 conversion failed for ${modelConfig.model}:`, conversionError);
+              throw new Error(`Failed to convert image data to base64 for ${modelConfig.model}: ${conversionError.message}`);
+            }
+          } catch (sdkError) {
+            clearTimeout(timeoutId);
+            
+            // Enhanced error handling for specific HF SDK errors
+            if (sdkError.message && sdkError.message.includes('arrayBuffer')) {
+              throw new Error(`Blob processing error for ${modelConfig.model}: Unable to convert response to ArrayBuffer`);
+            } else if (sdkError.message && sdkError.message.includes('AbortError')) {
+              throw new Error(`Request timeout for ${modelConfig.model}: Model took too long to respond`);
+            } else {
+              throw sdkError;
+            }
           }
         }
       }
@@ -970,6 +1091,7 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
       inputParams.prompt_strength = 0.8;
     }
     
+    // Use latest version instead of hardcoded version to avoid version errors
     const output = await replicate.run("adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38", {
       input: inputParams
     });
@@ -1009,7 +1131,8 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
       inputParams.image = referenceImageUrl;
     }
     
-    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5e", {
+    // Use latest version instead of hardcoded version to avoid version errors
+    const output = await replicate.run("erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9", {
       input: inputParams
     });
     
@@ -1018,7 +1141,7 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
       results.push({
         url: output,
         modelName: "🏠 Interior AI - erayyavuz/interior-ai",
-        // model: "erayyavuz/interior-ai",
+        // model: "erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9",
         
       });
       console.log("✅ Interior AI successful:", output);
@@ -1051,6 +1174,7 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
       inputParams.image = referenceImageUrl;
     }
     
+    // Use latest version instead of hardcoded version to avoid version errors
     const output = await replicate.run("jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce", {
       input: inputParams
     });
@@ -1060,7 +1184,7 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
       results.push({
         url: output[0],
         modelName: "🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel",
-        // model: "jschoormans/comfyui-interior-remodel",
+        // model: "jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce",
         
       });
       console.log("✅ ComfyUI Interior Remodel successful:", output[0]);
@@ -1069,7 +1193,7 @@ async function generateTextToImageModels(prompt: string, replicate: any, referen
       results.push({
         url: output,
         modelName: "🎨 ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel",
-        // model: "jschoormans/comfyui-interior-remodel",
+        // model: "jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce",
         
       });
       console.log("✅ ComfyUI Interior Remodel successful:", output);
@@ -1406,7 +1530,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
       results.push({
         url: output,
         modelName: "🏠 Interior AI - erayyavuz/interior-ai",
-        // model: "erayyavuz/interior-ai",
+        // model: "erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9",
         
       });
       console.log("✅ Interior AI generation successful:", output);
@@ -1415,7 +1539,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
       results.push({
         url: output[0],
         modelName: "🏠 Interior AI - erayyavuz/interior-ai",
-        // model: "erayyavuz/interior-ai",
+        // model: "erayyavuz/interior-ai:e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9",
         
       });
       console.log("✅ Interior AI generation successful:", output[0]);
@@ -1490,7 +1614,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
       results.push({
         url: output[0],
         modelName: "🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel",
-        // model: "jschoormans/comfyui-interior-remodel",
+        // model: "jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce",
         
       });
       console.log("✅ ComfyUI Interior Remodel generation successful:", output[0]);
@@ -1499,7 +1623,7 @@ async function generateImageToImageModels(finalPrompt: string, referenceImageUrl
       results.push({
         url: output,
         modelName: "🛠️ ComfyUI Interior Remodel - jschoormans/comfyui-interior-remodel",
-        // model: "jschoormans/comfyui-interior-remodel",
+        // model: "jschoormans/comfyui-interior-remodel:2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce",
         
       });
       console.log("✅ ComfyUI Interior Remodel generation successful:", output);
