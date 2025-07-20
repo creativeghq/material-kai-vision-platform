@@ -105,19 +105,6 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
   }
 
   protected async makeRequest(params: SupabaseParams): Promise<StandardizedApiResponse<SupabaseResponse>> {
-    console.log('=== CLIENT-SIDE DEBUG START ===');
-    console.log('Original params received:', JSON.stringify(params, null, 2));
-    console.log('Function name:', params.functionName);
-    console.log('Data field exists:', 'data' in params);
-    console.log('Data value:', params.data);
-    console.log('Data type:', typeof params.data);
-    if (params.data) {
-      console.log('Data keys:', Object.keys(params.data));
-      console.log('Prompt in data:', 'prompt' in params.data);
-      console.log('Prompt value from data:', params.data.prompt);
-    }
-    console.log('=== CLIENT-SIDE DEBUG END ===');
-
     this.validateParams(params);
 
     const functionConfig = SupabaseConfigUtils.getFunctionConfig(params.functionName);
