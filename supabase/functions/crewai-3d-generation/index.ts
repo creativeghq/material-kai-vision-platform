@@ -149,7 +149,6 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
     { modelName: 'rocketdigitalai/interior-design-sdxl', model: 'rocketdigitalai/interior-design-sdxl', name: 'Interior Design SDXL', type: hasReferenceImage ? 'image-to-image' : 'text-to-image', status: 'pending' },
     // Hugging Face Models (text-to-image only)
     { modelName: 'stabilityai/stable-diffusion-xl-base-1.0', model: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', type: 'text-to-image', status: 'pending' },
-    { modelName: 'black-forest-labs/FLUX.1-schnell', model: 'black-forest-labs/FLUX.1-schnell', name: 'FLUX-Schnell', type: 'text-to-image', status: 'pending' },
     { modelName: 'stabilityai/stable-diffusion-2-1', model: 'stabilityai/stable-diffusion-2-1', name: 'Stable Diffusion 2.1', type: 'text-to-image', status: 'pending' }
   ];
 }

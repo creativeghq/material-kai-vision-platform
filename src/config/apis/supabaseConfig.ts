@@ -37,9 +37,8 @@ const crewai3DGenerationInputSchema = z.object({
     'davisbrown/designer-architecture',
     'rocketdigitalai/interior-design-sdxl',
     
-    // Hugging Face Models (3 total)
+    // Hugging Face Models (2 total)
     'stabilityai/stable-diffusion-xl-base-1.0',
-    'black-forest-labs/FLUX.1-schnell',
     'stabilityai/stable-diffusion-2-1',
   ]).optional(),
   image_url: z.string().url("Valid image URL is required").optional(),
