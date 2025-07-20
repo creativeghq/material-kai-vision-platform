@@ -42,7 +42,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
   }
 
   public validateParams(params: unknown): SupabaseParams {
-    // First, basic type checking
+    // Basic type checking only - rely on server-side validation for comprehensive validation
     if (!params || typeof params !== 'object') {
       throw new Error('Parameters must be an object');
     }
@@ -53,20 +53,30 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
       throw new Error('Function name is required and must be a string');
     }
 
+    // Check if function exists in configuration (for basic routing)
     const functionConfig = SupabaseConfigUtils.getFunctionConfig(typedParams.functionName);
     if (!functionConfig) {
       throw new Error(`Function ${typedParams.functionName} not found in Supabase configuration`);
     }
 
-    // Validate input data against function schema
+    // Only perform basic UX validation using simplified schemas
+    // Server-side validation will handle comprehensive data validation
     if (typedParams.data) {
       try {
+        // Use simplified schema for basic UX feedback only
         functionConfig.inputSchema.parse(typedParams.data);
       } catch (error) {
         if (error instanceof z.ZodError) {
-          throw new Error(`Validation error: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+          // Only show user-friendly validation errors for UX
+          const userFriendlyErrors = error.errors
+            .filter(e => e.message.includes('required') || e.message.includes('valid'))
+            .map(e => e.message);
+          
+          if (userFriendlyErrors.length > 0) {
+            throw new Error(`Please check: ${userFriendlyErrors.join(', ')}`);
+          }
         }
-        throw new Error('Unknown validation error');
+        // For other validation errors, let server handle them
       }
     }
 

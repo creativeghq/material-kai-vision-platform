@@ -3,6 +3,26 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 import Replicate from "https://esm.sh/replicate@0.25.2";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+
+// Server-side validation schema
+const GenerationRequestSchema = z.object({
+  user_id: z.string().uuid('Invalid user ID format'),
+  prompt: z.string().min(10, 'Prompt must be at least 10 characters').max(1000, 'Prompt must be less than 1000 characters'),
+  model: z.enum(['huggingface', 'replicate']).optional(),
+  room_type: z.string().optional(),
+  roomType: z.string().optional(), // Support camelCase from frontend
+  style: z.string().optional(),
+  specific_materials: z.array(z.string()).optional(),
+  reference_image_url: z.string().url().optional(),
+  testMode: z.boolean().optional(),
+  directTestMode: z.boolean().optional(),
+  testSingleModel: z.string().optional(),
+  skipDatabaseOperations: z.boolean().optional(),
+  healthCheck: z.boolean().optional(),
+  initializeOnly: z.boolean().optional(),
+  replicateApiToken: z.string().optional()
+});
 
 // Global workflow tracking
 let workflowSteps: any[] = [];
@@ -1853,6 +1873,9 @@ serve(async (req) => {
       rawRequestStringified: JSON.stringify(rawRequest, null, 2).substring(0, 500) + '...'
     });
     
+    // Server-side validation using Zod schema
+    console.log('🔍 Validating request with server-side schema...');
+    
     // CRITICAL FIX: Pre-process request to ensure required fields are at top level
     // This must happen BEFORE any external Zod validation runs
     const processedRequest = { ...rawRequest };
@@ -1879,29 +1902,93 @@ serve(async (req) => {
       if (foundPrompt && typeof foundPrompt === 'string' && foundPrompt.trim()) {
         processedRequest.prompt = foundPrompt.trim();
         console.log('✅ Promoted valid prompt to top level');
-      } else {
-        console.error('❌ No valid prompt found in request structure');
-        return new Response(
-          JSON.stringify({
-            error: 'Parameter validation failed',
-            details: ['prompt is required and must be a non-empty string'],
-            received_structure: {
-              hasTopLevelPrompt: !!rawRequest.prompt,
-              hasDataPrompt: !!(rawRequest.data?.prompt),
-              hasParametersPrompt: !!(rawRequest.parameters?.prompt),
-              hasBodyPrompt: !!(rawRequest.body?.prompt),
-              topLevelKeys: Object.keys(rawRequest || {})
-            }
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
       }
     }
     
     // Extract user_id from nested structures
+    if (!processedRequest.user_id) {
+      let foundUserId: string | undefined;
+      
+      // Try multiple extraction strategies for user_id
+      if (rawRequest.data?.user_id) {
+        foundUserId = rawRequest.data.user_id;
+        console.log('🔧 Found user_id in data structure');
+      } else if (rawRequest.parameters?.user_id) {
+        foundUserId = rawRequest.parameters.user_id;
+        console.log('🔧 Found user_id in parameters wrapper');
+      } else if (rawRequest.body?.user_id) {
+        foundUserId = rawRequest.body.user_id;
+        console.log('🔧 Found user_id in body wrapper');
+      } else if (rawRequest.user_id) {
+        foundUserId = rawRequest.user_id;
+        console.log('🔧 Found user_id at top level');
+      }
+      
+      if (foundUserId) {
+        processedRequest.user_id = foundUserId;
+        console.log('✅ Promoted user_id to top level');
+      }
+    }
+    
+    // Extract optional parameters from nested structures
+    const optionalParams = ['model', 'room_type', 'roomType', 'style', 'specific_materials', 'reference_image_url', 'testMode', 'directTestMode', 'testSingleModel', 'skipDatabaseOperations', 'healthCheck', 'initializeOnly', 'replicateApiToken'];
+    
+    optionalParams.forEach(param => {
+      if (!processedRequest[param]) {
+        const foundValue = rawRequest.data?.[param] || rawRequest.parameters?.[param] || rawRequest.body?.[param] || rawRequest[param];
+        if (foundValue !== undefined) {
+          processedRequest[param] = foundValue;
+          console.log(`✅ Promoted ${param} to top level`);
+        }
+      }
+    });
+    
+    // Apply server-side Zod validation
+    console.log('🔍 Applying server-side Zod validation...');
+    try {
+      const validatedRequest = GenerationRequestSchema.parse(processedRequest);
+      console.log('✅ Server-side validation passed');
+      
+      // Use validated request for further processing
+      const request = validatedRequest;
+      console.log('📋 Validated request parameters:', {
+        user_id: request.user_id,
+        prompt: request.prompt?.substring(0, 100) + '...',
+        model: request.model,
+        room_type: request.room_type || request.roomType,
+        style: request.style,
+        testMode: request.testMode
+      });
+      
+    } catch (zodError) {
+      console.error('❌ Server-side validation failed:', zodError);
+      
+      // Format Zod validation errors for client
+      const validationErrors = zodError.errors?.map(err =>
+        `${err.path.join('.')}: ${err.message}`
+      ) || ['Invalid request format'];
+      
+      return new Response(
+        JSON.stringify({
+          error: 'Server-side validation failed',
+          details: validationErrors,
+          received_structure: {
+            hasTopLevelPrompt: !!rawRequest.prompt,
+            hasDataPrompt: !!(rawRequest.data?.prompt),
+            hasParametersPrompt: !!(rawRequest.parameters?.prompt),
+            hasBodyPrompt: !!(rawRequest.body?.prompt),
+            topLevelKeys: Object.keys(rawRequest || {}),
+            processedKeys: Object.keys(processedRequest || {})
+          }
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    // Continue with the rest of the function using validated request
     if (!processedRequest.user_id) {
       let foundUserId: string | undefined;
       

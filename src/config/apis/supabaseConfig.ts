@@ -21,37 +21,20 @@ const successResponseSchema = z.object({
   message: z.string().optional(),
 });
 
-// CrewAI 3D Generation function schema
+// CrewAI 3D Generation function schema - UX validation only
 const crewai3DGenerationInputSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
-  model: z.enum([
-    // Replicate Models (working models only)
-    'black-forest-labs/flux-schnell',
-    'adirik/interior-design',
-    'erayyavuz/interior-ai',
-    'jschoormans/comfyui-interior-remodel',
-    'julian-at/interiorly-gen1-dev',
-    'lucataco/interior-design',
-    'rocketdigitalai/interior-design-sdxl',
-    'davisbrown/designer-architecture',
-    'playgroundai/playground-v2.5-1024px-aesthetic',
-    'bytedance/sdxl-lightning-4step',
-    
-    // Hugging Face Models (working models only)
-    'stabilityai/stable-diffusion-xl-base-1.0',
-    'stabilityai/stable-diffusion-2-1',
-  ]).optional(),
-  image_url: z.string().url("Valid image URL is required").optional(),
+  model: z.string().optional(), // Simplified - server validates specific models
+  image_url: z.string().url("Please enter a valid URL").optional(),
   room_type: z.string().optional(),
   style: z.string().optional(),
-  num_inference_steps: z.number().int().min(10).max(50).default(20),
-  guidance_scale: z.number().min(1).max(20).default(7.5),
-  strength: z.number().min(0).max(1).default(0.8),
-  seed: z.number().int().optional(),
-  // Additional parameters for text-to-image models
+  num_inference_steps: z.number().optional(),
+  guidance_scale: z.number().optional(),
+  strength: z.number().optional(),
+  seed: z.number().optional(),
   negative_prompt: z.string().optional(),
-  width: z.number().int().min(64).max(2048).optional(),
-  height: z.number().int().min(64).max(2048).optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
 });
 
 const crewai3DGenerationOutputSchema = z.union([
@@ -72,13 +55,13 @@ const crewai3DGenerationOutputSchema = z.union([
   }),
 ]);
 
-// Enhanced RAG Search function schema
+// Enhanced RAG Search function schema - UX validation only
 const enhancedRAGSearchInputSchema = z.object({
   query: z.string().min(1, "Query is required"),
   collection_name: z.string().optional(),
-  limit: z.number().int().min(1).max(100).default(10),
-  threshold: z.number().min(0).max(1).default(0.7),
-  include_metadata: z.boolean().default(true),
+  limit: z.number().optional(),
+  threshold: z.number().optional(),
+  include_metadata: z.boolean().optional(),
   filters: z.record(z.any()).optional(),
 });
 
@@ -105,14 +88,14 @@ const enhancedRAGSearchOutputSchema = z.union([
   }),
 ]);
 
-// Material Scraper function schema
+// Material Scraper function schema - UX validation only
 const materialScraperInputSchema = z.object({
-  url: z.string().url("Valid URL is required"),
-  extract_images: z.boolean().default(true),
-  extract_text: z.boolean().default(true),
-  max_images: z.number().int().min(1).max(50).default(10),
-  image_min_size: z.number().int().min(100).default(200),
-  timeout: z.number().int().min(5000).max(60000).default(30000),
+  url: z.string().url("Please enter a valid URL"),
+  extract_images: z.boolean().optional(),
+  extract_text: z.boolean().optional(),
+  max_images: z.number().optional(),
+  image_min_size: z.number().optional(),
+  timeout: z.number().optional(),
 });
 
 const materialScraperOutputSchema = z.union([
@@ -140,15 +123,15 @@ const materialScraperOutputSchema = z.union([
   }),
 ]);
 
-// OCR Processing function schema
+// OCR Processing function schema - UX validation only
 const ocrProcessingInputSchema = z.object({
-  image_url: z.string().url("Valid image URL is required"),
-  language: z.string().default("eng"),
-  output_format: z.enum(["text", "json", "hocr"]).default("text"),
+  image_url: z.string().url("Please enter a valid image URL"),
+  language: z.string().optional(),
+  output_format: z.string().optional(),
   preprocessing: z.object({
-    enhance_contrast: z.boolean().default(true),
-    denoise: z.boolean().default(true),
-    deskew: z.boolean().default(true),
+    enhance_contrast: z.boolean().optional(),
+    denoise: z.boolean().optional(),
+    deskew: z.boolean().optional(),
   }).optional(),
 });
 
@@ -174,14 +157,12 @@ const ocrProcessingOutputSchema = z.union([
   }),
 ]);
 
-// SVBRDF Extractor function schema
+// SVBRDF Extractor function schema - UX validation only
 const svbrdfExtractorInputSchema = z.object({
-  image_url: z.string().url("Valid image URL is required"),
-  output_format: z.enum(["pbr", "blender", "unity"]).default("pbr"),
-  resolution: z.number().int().refine(val => [256, 512, 1024].includes(val), {
-    message: "Resolution must be 256, 512, or 1024"
-  }).default(512),
-  enhance_quality: z.boolean().default(true),
+  image_url: z.string().url("Please enter a valid image URL"),
+  output_format: z.string().optional(),
+  resolution: z.number().optional(),
+  enhance_quality: z.boolean().optional(),
 });
 
 const svbrdfExtractorOutputSchema = z.union([
@@ -256,9 +237,9 @@ export const supabaseConfig: SupabaseApiConfig = {
     
     'nerf-processor': {
       inputSchema: z.object({
-        images: z.array(z.string().url()).min(3, "At least 3 images required"),
-        output_format: z.enum(["ply", "obj", "gltf"]).default("ply"),
-        quality: z.enum(["low", "medium", "high"]).default("medium"),
+        images: z.array(z.string().url()).min(1, "At least 1 image required"),
+        output_format: z.string().optional(),
+        quality: z.string().optional(),
       }),
       outputSchema: z.union([
         z.object({
@@ -278,9 +259,9 @@ export const supabaseConfig: SupabaseApiConfig = {
     
     'spaceformer-analysis': {
       inputSchema: z.object({
-        image_url: z.string().url("Valid image URL is required"),
-        analysis_type: z.enum(["layout", "furniture", "style", "complete"]).default("complete"),
-        include_suggestions: z.boolean().default(true),
+        image_url: z.string().url("Please enter a valid image URL"),
+        analysis_type: z.string().optional(),
+        include_suggestions: z.boolean().optional(),
       }),
       outputSchema: z.union([
         z.object({

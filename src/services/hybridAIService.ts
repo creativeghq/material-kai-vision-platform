@@ -1,5 +1,4 @@
 import { BaseService, ServiceConfig } from './base/BaseService';
-import { ResponseValidator } from './responseValidator';
 
 export interface AIProvider {
   name: string;
@@ -223,37 +222,19 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     }
   }
 
-  // Validate responses based on type
+  // Simple validation - server-side validation now handles comprehensive checks
   private static validateResponse(result: any, request: HybridRequest): any {
-    switch (request.type) {
-      case 'material-analysis':
-        return ResponseValidator.validateMaterialAnalysis(result, request.prompt);
-      
-      case '3d-generation':
-        return ResponseValidator.validate3DGeneration(
-          result.image_url || '', 
-          request.prompt, 
-          result, 
-          result.matched_materials || []
-        );
-      
-      case 'text-processing':
-        return ResponseValidator.validateTextProcessing(
-          result.text || result.raw_response || '', 
-          request.prompt.length
-        );
-      
-      default:
-        // Basic validation for general requests
-        const hasContent = result && (result.text || result.raw_response || Object.keys(result).length > 0);
-        return {
-          score: hasContent ? 0.8 : 0.2,
-          confidence: hasContent ? 0.8 : 0.2,
-          reasoning: hasContent ? 'Response contains content' : 'Response is empty or invalid',
-          issues: hasContent ? [] : ['Empty or invalid response'],
-          suggestions: hasContent ? [] : ['Retry with different parameters']
-        };
-    }
+    // Basic validation for all request types - server now handles detailed validation
+    const hasContent = result && (result.text || result.raw_response || result.image_url || Object.keys(result).length > 0);
+    const hasError = result?.error || result?.status === 'error';
+    
+    return {
+      score: hasError ? 0.1 : (hasContent ? 0.9 : 0.3),
+      confidence: hasContent ? 0.8 : 0.2,
+      reasoning: hasContent ? 'Response contains content' : 'Response is empty or invalid',
+      issues: hasContent ? [] : ['Empty or invalid response'],
+      suggestions: hasContent ? [] : ['Retry with different parameters']
+    };
   }
 
   // Check provider availability (calls edge function)
