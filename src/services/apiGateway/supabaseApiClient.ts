@@ -180,12 +180,14 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
     // Store timeout ID on the signal for cleanup
     (controller.signal as any)._timeoutId = timeoutId;
 
-    // For Supabase Edge Functions, we send the function parameters directly
-    // The function name is already included in the URL via buildFunctionUrl()
+    // FIXED: Send the data fields directly at the top level, not nested under 'data'
+    // This ensures the server receives the prompt field at the expected location
+    const requestBody = params.data || {};
+    
     return {
       method: 'POST',
       headers,
-      body: JSON.stringify(params.data || {}),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     };
   }
