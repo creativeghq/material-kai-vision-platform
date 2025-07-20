@@ -1852,8 +1852,25 @@ serve(async (req) => {
       request = rawRequest;
     }
     
+    // Ensure request is properly typed and has required fields
+    if (!request || typeof request !== 'object') {
+      console.error('❌ Invalid request format: request is not an object');
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid request format',
+          details: 'Request must be a valid JSON object'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
     console.log('Processing 3D generation request:', JSON.stringify({
       ...request,
+      prompt: request.prompt ? `"${request.prompt.substring(0, 50)}${request.prompt.length > 50 ? '...' : ''}"` : '[NO_PROMPT]',
+      user_id: request.user_id ? '[USER_ID_PROVIDED]' : '[NO_USER_ID]',
       reference_image_url: request.reference_image_url ? '[IMAGE_PROVIDED]' : '[NO_IMAGE]'
     }));
 
@@ -1892,11 +1909,36 @@ serve(async (req) => {
       );
     }
 
-    // Validate request
-    if (!request.user_id || !request.prompt) {
-      console.error('Validation failed: missing user_id or prompt');
+    // Validate required parameters with detailed error messages
+    const validationErrors: string[] = [];
+    
+    if (!request.user_id || typeof request.user_id !== 'string' || request.user_id.trim() === '') {
+      validationErrors.push('user_id is required and must be a non-empty string');
+    }
+    
+    if (!request.prompt || typeof request.prompt !== 'string' || request.prompt.trim() === '') {
+      validationErrors.push('prompt is required and must be a non-empty string');
+    }
+    
+    if (validationErrors.length > 0) {
+      console.error('❌ Parameter validation failed:', validationErrors);
+      console.error('📋 Received request structure:', {
+        hasUserId: !!request.user_id,
+        userIdType: typeof request.user_id,
+        hasPrompt: !!request.prompt,
+        promptType: typeof request.prompt,
+        requestKeys: Object.keys(request || {})
+      });
+      
       return new Response(
-        JSON.stringify({ error: 'user_id and prompt are required' }),
+        JSON.stringify({
+          error: 'Parameter validation failed',
+          details: validationErrors,
+          received: {
+            user_id: request.user_id ? '[PROVIDED]' : '[MISSING]',
+            prompt: request.prompt ? '[PROVIDED]' : '[MISSING]'
+          }
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
