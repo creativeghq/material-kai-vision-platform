@@ -22,19 +22,24 @@ const successResponseSchema = z.object({
 });
 
 // CrewAI 3D Generation function schema - UX validation only
+// Schema matches the actual data structure sent by ApiIntegrationService
 const crewai3DGenerationInputSchema = z.object({
-  prompt: z.string().min(1, "Prompt is required"),
-  model: z.string().optional(), // Simplified - server validates specific models
-  image_url: z.string().url("Please enter a valid URL").optional(),
-  room_type: z.string().optional(),
-  style: z.string().optional(),
-  num_inference_steps: z.number().optional(),
-  guidance_scale: z.number().optional(),
-  strength: z.number().optional(),
-  seed: z.number().optional(),
-  negative_prompt: z.string().optional(),
-  width: z.number().optional(),
-  height: z.number().optional(),
+  functionName: z.string(),
+  data: z.object({
+    prompt: z.string().min(1, "Prompt is required"),
+    model: z.string().optional(), // Simplified - server validates specific models
+    user_id: z.string().optional(), // Added user_id field
+    image_url: z.string().url("Please enter a valid URL").optional(),
+    room_type: z.string().optional(),
+    style: z.string().optional(),
+    num_inference_steps: z.number().optional(),
+    guidance_scale: z.number().optional(),
+    strength: z.number().optional(),
+    seed: z.number().optional(),
+    negative_prompt: z.string().optional(),
+    width: z.number().optional(),
+    height: z.number().optional(),
+  }),
 });
 
 const crewai3DGenerationOutputSchema = z.union([
