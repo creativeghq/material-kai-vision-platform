@@ -1838,7 +1838,7 @@ serve(async (req) => {
     console.log(`   Anthropic: ${anthropicToken ? '✅ Available' : '❌ Missing'}`);
     
     console.log('📨 Received 3D generation request');
-    const rawRequest = await req.json();
+    let rawRequest = await req.json();
     
     console.log('🔍 Raw request structure:', {
       hasData: !!rawRequest.data,
@@ -1853,59 +1853,106 @@ serve(async (req) => {
       rawRequestStringified: JSON.stringify(rawRequest, null, 2).substring(0, 500) + '...'
     });
     
-    // CRITICAL FIX: Ensure prompt is available at top level for external validation
-    // This addresses the external validateParameters function that runs before our logic
-    if (!rawRequest.prompt) {
-      // Try to find prompt in nested structures and promote it to top level
+    // CRITICAL FIX: Pre-process request to ensure required fields are at top level
+    // This must happen BEFORE any external Zod validation runs
+    const processedRequest = { ...rawRequest };
+    
+    // Extract prompt from nested structures
+    if (!processedRequest.prompt) {
       let foundPrompt: string | undefined;
       
+      // Try multiple extraction strategies in order of preference
       if (rawRequest.functionName && rawRequest.data?.prompt) {
         foundPrompt = rawRequest.data.prompt;
-        console.log('🔧 Found prompt in API Gateway data, promoting to top level');
+        console.log('🔧 Found prompt in API Gateway data structure');
       } else if (rawRequest.parameters?.prompt) {
         foundPrompt = rawRequest.parameters.prompt;
-        console.log('🔧 Found prompt in parameters wrapper, promoting to top level');
+        console.log('🔧 Found prompt in parameters wrapper');
       } else if (rawRequest.body?.prompt) {
         foundPrompt = rawRequest.body.prompt;
-        console.log('🔧 Found prompt in body wrapper, promoting to top level');
+        console.log('🔧 Found prompt in body wrapper');
       } else if (rawRequest.data?.prompt) {
         foundPrompt = rawRequest.data.prompt;
-        console.log('🔧 Found prompt in data wrapper, promoting to top level');
+        console.log('🔧 Found prompt in data wrapper');
       }
       
-      if (foundPrompt) {
-        rawRequest.prompt = foundPrompt;
-        console.log('✅ Promoted prompt to top level for external validation');
+      if (foundPrompt && typeof foundPrompt === 'string' && foundPrompt.trim()) {
+        processedRequest.prompt = foundPrompt.trim();
+        console.log('✅ Promoted valid prompt to top level');
       } else {
-        // If no prompt found anywhere, provide a default for build-time validation
-        console.log('⚠️ No prompt found in request, using default for validation');
-        rawRequest.prompt = 'default-build-validation-prompt';
+        console.error('❌ No valid prompt found in request structure');
+        return new Response(
+          JSON.stringify({
+            error: 'Parameter validation failed',
+            details: ['prompt is required and must be a non-empty string'],
+            received_structure: {
+              hasTopLevelPrompt: !!rawRequest.prompt,
+              hasDataPrompt: !!(rawRequest.data?.prompt),
+              hasParametersPrompt: !!(rawRequest.parameters?.prompt),
+              hasBodyPrompt: !!(rawRequest.body?.prompt),
+              topLevelKeys: Object.keys(rawRequest || {})
+            }
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
     }
     
-    // Also ensure user_id is available at top level for external validation
-    if (!rawRequest.user_id) {
+    // Extract user_id from nested structures
+    if (!processedRequest.user_id) {
       let foundUserId: string | undefined;
       
       if (rawRequest.functionName && rawRequest.data?.user_id) {
         foundUserId = rawRequest.data.user_id;
+        console.log('🔧 Found user_id in API Gateway data structure');
       } else if (rawRequest.parameters?.user_id) {
         foundUserId = rawRequest.parameters.user_id;
+        console.log('🔧 Found user_id in parameters wrapper');
       } else if (rawRequest.body?.user_id) {
         foundUserId = rawRequest.body.user_id;
+        console.log('🔧 Found user_id in body wrapper');
       } else if (rawRequest.data?.user_id) {
         foundUserId = rawRequest.data.user_id;
+        console.log('🔧 Found user_id in data wrapper');
       }
       
-      if (foundUserId) {
-        rawRequest.user_id = foundUserId;
-        console.log('✅ Promoted user_id to top level for external validation');
+      if (foundUserId && typeof foundUserId === 'string' && foundUserId.trim()) {
+        processedRequest.user_id = foundUserId.trim();
+        console.log('✅ Promoted valid user_id to top level');
       } else {
-        // Provide default for build-time validation
-        console.log('⚠️ No user_id found in request, using default for validation');
-        rawRequest.user_id = 'default-build-validation-user';
+        console.error('❌ No valid user_id found in request structure');
+        return new Response(
+          JSON.stringify({
+            error: 'Parameter validation failed',
+            details: ['user_id is required and must be a non-empty string'],
+            received_structure: {
+              hasTopLevelUserId: !!rawRequest.user_id,
+              hasDataUserId: !!(rawRequest.data?.user_id),
+              hasParametersUserId: !!(rawRequest.parameters?.user_id),
+              hasBodyUserId: !!(rawRequest.body?.user_id),
+              topLevelKeys: Object.keys(rawRequest || {})
+            }
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
     }
+    
+    // Update rawRequest to use the processed version
+    rawRequest = processedRequest;
+    
+    console.log('✅ Request preprocessing completed:', {
+      hasPrompt: !!rawRequest.prompt,
+      hasUserId: !!rawRequest.user_id,
+      promptLength: rawRequest.prompt?.length || 0,
+      userIdLength: rawRequest.user_id?.length || 0
+    });
     
     // Handle multiple possible parameter wrapper formats
     let request: GenerationRequest;
