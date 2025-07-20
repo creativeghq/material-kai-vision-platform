@@ -237,7 +237,14 @@ export const Designer3DPage: React.FC = () => {
         throw new Error('Model selection failed - no valid model found');
       }
       
+      // Get current user for user_id field (required by backend)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User authentication required');
+      }
+
       const requestData = {
+        user_id: user.id, // Required by backend schema
         prompt: sanitizedPrompt,
         model: selectedModel,
         room_type: roomType || undefined,

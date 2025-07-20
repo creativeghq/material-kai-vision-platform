@@ -1709,7 +1709,19 @@ serve(async (req) => {
     console.log(`   Anthropic: ${anthropicToken ? '✅ Available' : '❌ Missing'}`);
     
     console.log('📨 Received 3D generation request');
-    const request: GenerationRequest = await req.json();
+    const rawRequest = await req.json();
+    
+    // Handle API Gateway parameter structure vs direct calls
+    let request: GenerationRequest;
+    if (rawRequest.functionName && rawRequest.data) {
+      // API Gateway format: { functionName: "...", data: { actual_params } }
+      console.log('🔄 API Gateway format detected, extracting data from wrapper');
+      request = rawRequest.data;
+    } else {
+      // Direct call format: { actual_params }
+      console.log('📋 Direct call format detected');
+      request = rawRequest;
+    }
     
     console.log('Processing 3D generation request:', JSON.stringify({
       ...request,
