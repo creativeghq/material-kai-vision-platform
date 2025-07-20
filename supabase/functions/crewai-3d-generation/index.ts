@@ -9,7 +9,8 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 const GenerationRequestSchema = z.object({
   user_id: z.string().uuid('Invalid user ID format'),
   prompt: z.string().min(10, 'Prompt must be at least 10 characters').max(1000, 'Prompt must be less than 1000 characters'),
-  model: z.enum(['huggingface', 'replicate']).optional(),
+  models: z.array(z.string()).min(1, 'At least one model is required').optional(), // Updated to accept array of model names
+  model: z.enum(['huggingface', 'replicate']).optional(), // Keep for backward compatibility
   room_type: z.string().optional(),
   roomType: z.string().optional(), // Support camelCase from frontend
   style: z.string().optional(),

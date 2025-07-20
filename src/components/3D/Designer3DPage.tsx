@@ -195,14 +195,16 @@ export const Designer3DPage: React.FC = () => {
         'jschoormans/interior-v2'
       ];
 
-      // Determine which model to use based on whether we have an image
-      let selectedModel;
+      // Determine which models to use based on whether we have an image
+      let selectedModels;
       if (imageUrl) {
-        // If we have an image, use an image-capable model
-        selectedModel = imageRequiredModels[0]; // Default to first image-capable model
+        // If we have an image, use all image-capable models
+        selectedModels = imageRequiredModels;
+        console.log('🔍 DEBUG: Using image-capable models:', selectedModels);
       } else {
-        // If no image, use a text-only model
-        selectedModel = textOnlyModels[0]; // Default to first text-only model
+        // If no image, use all text-only models
+        selectedModels = textOnlyModels;
+        console.log('🔍 DEBUG: Using text-only models:', selectedModels);
       }
 
       // Build request data with required model field
@@ -229,9 +231,9 @@ export const Designer3DPage: React.FC = () => {
         throw new Error('Prompt is required but was undefined or empty');
       }
       
-      if (!selectedModel) {
+      if (!selectedModels || selectedModels.length === 0) {
         console.error('❌ DEBUG: Model selection failed');
-        throw new Error('Model selection failed - no valid model found');
+        throw new Error('Model selection failed - no valid models found');
       }
       
       // Get current user for user_id field (required by backend)
@@ -243,7 +245,7 @@ export const Designer3DPage: React.FC = () => {
       const requestData = {
         user_id: user.id, // Required by backend schema
         prompt: sanitizedPrompt,
-        model: selectedModel,
+        models: selectedModels, // Send all available models instead of just one
         room_type: roomType || undefined,
         style: style || undefined,
         ...(imageUrl && { image_url: imageUrl }) // Only include image_url if we have one

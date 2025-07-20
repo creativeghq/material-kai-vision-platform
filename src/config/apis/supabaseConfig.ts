@@ -27,7 +27,7 @@ const crewai3DGenerationInputSchema = z.object({
   functionName: z.string(),
   data: z.object({
     prompt: z.string().min(1, "Prompt is required"),
-    model: z.string().optional(), // Simplified - server validates specific models
+    models: z.array(z.string()).min(1, "At least one model is required"), // Updated to accept array of models
     user_id: z.string().optional(), // Added user_id field
     image_url: z.string().url("Please enter a valid URL").optional(),
     room_type: z.string().optional(),
