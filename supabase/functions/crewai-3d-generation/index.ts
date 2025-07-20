@@ -1710,6 +1710,46 @@ async function generate3DImage(enhancedPrompt: string, materials: any[], referen
     console.log(`   ${index + 1}. ✅ ${result.modelName}: ${result.url.substring(0, 50)}...`);
   });
   
+  // Log failed models with reasons
+  const failedModels = workflowSteps.filter(step => step.status === 'failed');
+  const skippedModels = workflowSteps.filter(step => step.status === 'skipped');
+  
+  if (failedModels.length > 0 || skippedModels.length > 0) {
+    console.log("\n🚨 FAILED/SKIPPED MODELS SUMMARY:");
+    console.log(`📊 Total models attempted: ${workflowSteps.length}`);
+    console.log(`✅ Successful: ${workflowSteps.filter(step => step.status === 'success' || step.status === 'completed').length}`);
+    console.log(`❌ Failed: ${failedModels.length}`);
+    console.log(`⏭️ Skipped: ${skippedModels.length}`);
+    
+    if (failedModels.length > 0) {
+      console.log("\n❌ FAILED MODELS:");
+      failedModels.forEach((step, index) => {
+        const reason = step.errorMessage || step.error || 'Unknown error';
+        const processingTime = step.processingTimeMs ? ` (${step.processingTimeMs}ms)` : '';
+        console.log(`   ${index + 1}. ❌ ${step.modelName || step.name}: ${reason}${processingTime}`);
+      });
+    }
+    
+    if (skippedModels.length > 0) {
+      console.log("\n⏭️ SKIPPED MODELS:");
+      skippedModels.forEach((step, index) => {
+        const reason = step.errorMessage || step.error || 'Model not compatible with current request type';
+        console.log(`   ${index + 1}. ⏭️ ${step.modelName || step.name}: ${reason}`);
+      });
+    }
+    
+    // Log models that didn't run at all (still pending)
+    const pendingModels = workflowSteps.filter(step => step.status === 'pending');
+    if (pendingModels.length > 0) {
+      console.log("\n⏸️ MODELS NOT ATTEMPTED:");
+      pendingModels.forEach((step, index) => {
+        console.log(`   ${index + 1}. ⏸️ ${step.modelName || step.name}: Never started (possibly due to early termination)`);
+      });
+    }
+  } else {
+    console.log("\n🎉 ALL MODELS PROCESSED SUCCESSFULLY!");
+  }
+  
   return allResults; // Return full objects with url and modelName
 }
 
