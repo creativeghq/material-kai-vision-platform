@@ -1840,17 +1840,47 @@ serve(async (req) => {
     console.log('📨 Received 3D generation request');
     const rawRequest = await req.json();
     
-    // Handle multiple possible parameter wrapper formats
-    let request: GenerationRequest;
-    
     console.log('🔍 Raw request structure:', {
       hasData: !!rawRequest.data,
       hasFunctionName: !!rawRequest.functionName,
       hasParameters: !!rawRequest.parameters,
       hasBody: !!rawRequest.body,
       topLevelKeys: Object.keys(rawRequest || {}),
-      dataKeys: rawRequest.data ? Object.keys(rawRequest.data) : null
+      dataKeys: rawRequest.data ? Object.keys(rawRequest.data) : null,
+      parametersKeys: rawRequest.parameters ? Object.keys(rawRequest.parameters) : null,
+      bodyKeys: rawRequest.body ? Object.keys(rawRequest.body) : null,
+      rawRequestType: typeof rawRequest,
+      rawRequestStringified: JSON.stringify(rawRequest, null, 2).substring(0, 500) + '...'
     });
+    
+    // CRITICAL FIX: Ensure prompt is available at top level for external validation
+    // This addresses the external validateParameters function that runs before our logic
+    if (!rawRequest.prompt) {
+      // Try to find prompt in nested structures and promote it to top level
+      let foundPrompt: string | undefined;
+      
+      if (rawRequest.functionName && rawRequest.data?.prompt) {
+        foundPrompt = rawRequest.data.prompt;
+        console.log('🔧 Found prompt in API Gateway data, promoting to top level');
+      } else if (rawRequest.parameters?.prompt) {
+        foundPrompt = rawRequest.parameters.prompt;
+        console.log('🔧 Found prompt in parameters wrapper, promoting to top level');
+      } else if (rawRequest.body?.prompt) {
+        foundPrompt = rawRequest.body.prompt;
+        console.log('🔧 Found prompt in body wrapper, promoting to top level');
+      } else if (rawRequest.data?.prompt) {
+        foundPrompt = rawRequest.data.prompt;
+        console.log('🔧 Found prompt in data wrapper, promoting to top level');
+      }
+      
+      if (foundPrompt) {
+        rawRequest.prompt = foundPrompt;
+        console.log('✅ Promoted prompt to top level for external validation');
+      }
+    }
+    
+    // Handle multiple possible parameter wrapper formats
+    let request: GenerationRequest;
     
     // Try multiple unwrapping strategies
     if (rawRequest.functionName && rawRequest.data) {
