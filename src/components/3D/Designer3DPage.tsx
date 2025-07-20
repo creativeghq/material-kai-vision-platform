@@ -141,7 +141,18 @@ export const Designer3DPage: React.FC = () => {
   };
 
   const handleGenerate = async () => {
+    // CRITICAL DEBUG: Capture prompt state at function entry
+    console.log('🔍 DEBUG: handleGenerate called');
+    console.log('🔍 DEBUG: prompt state at entry:', {
+      prompt,
+      promptType: typeof prompt,
+      promptLength: prompt?.length,
+      promptTrimmed: prompt?.trim(),
+      promptTrimmedLength: prompt?.trim()?.length
+    });
+
     if (!prompt.trim()) {
+      console.error('❌ DEBUG: Prompt validation failed at entry check');
       toast({
         title: 'Prompt Required',
         description: 'Please enter a design prompt to generate your 3D interior.',
@@ -150,6 +161,7 @@ export const Designer3DPage: React.FC = () => {
       return;
     }
 
+    console.log('✅ DEBUG: Initial prompt validation passed');
     setIsGenerating(true);
     setIsUploading(selectedImage ? true : false);
     
@@ -198,13 +210,30 @@ export const Designer3DPage: React.FC = () => {
 
       // Build request data with required model field
       // Add defensive checks to ensure required fields are never undefined
+      console.log('🔍 DEBUG: Building request data');
+      console.log('🔍 DEBUG: prompt state before sanitization:', {
+        prompt,
+        promptType: typeof prompt,
+        promptLength: prompt?.length,
+        promptValue: JSON.stringify(prompt)
+      });
+      
       const sanitizedPrompt = prompt?.trim() || '';
       
+      console.log('🔍 DEBUG: After sanitization:', {
+        sanitizedPrompt,
+        sanitizedPromptType: typeof sanitizedPrompt,
+        sanitizedPromptLength: sanitizedPrompt?.length,
+        sanitizedPromptValue: JSON.stringify(sanitizedPrompt)
+      });
+      
       if (!sanitizedPrompt) {
+        console.error('❌ DEBUG: Prompt validation failed after sanitization');
         throw new Error('Prompt is required but was undefined or empty');
       }
       
       if (!selectedModel) {
+        console.error('❌ DEBUG: Model selection failed');
         throw new Error('Model selection failed - no valid model found');
       }
       
@@ -216,8 +245,14 @@ export const Designer3DPage: React.FC = () => {
         ...(imageUrl && { image_url: imageUrl }) // Only include image_url if we have one
       };
 
+      console.log('🔍 DEBUG: Final request data:', {
+        requestData,
+        requestDataStringified: JSON.stringify(requestData, null, 2)
+      });
+
       // Use the new centralized API integration service
       const apiService = ApiIntegrationService.getInstance();
+      console.log('🔍 DEBUG: About to call API with request data');
       const result = await apiService.executeSupabaseFunction('crewai-3d-generation', requestData);
       console.log("Generation response received:", result);
       
@@ -434,7 +469,20 @@ export const Designer3DPage: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label htmlFor="prompt">Design Prompt</Label>
-              <Select onValueChange={(value) => setPrompt(value)}>
+              <Select onValueChange={(value) => {
+                console.log('🔍 DEBUG: Preset selection changed:', {
+                  selectedValue: value,
+                  valueType: typeof value,
+                  valueLength: value?.length,
+                  currentPrompt: prompt,
+                  currentPromptType: typeof prompt
+                });
+                setPrompt(value);
+                console.log('🔍 DEBUG: After setPrompt from preset:', {
+                  newPromptValue: value,
+                  promptStateAfterSet: prompt // Note: this might still show old value due to React batching
+                });
+              }}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Choose a preset" />
                 </SelectTrigger>
