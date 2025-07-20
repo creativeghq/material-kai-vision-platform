@@ -167,11 +167,10 @@ export const Designer3DPage: React.FC = () => {
       }
 
       const requestData = {
-        user_id: (await supabase.auth.getUser()).data.user?.id,
         prompt: prompt.trim(),
         room_type: roomType || undefined,
         style: style || undefined,
-        reference_image_url: imageUrl // Add the uploaded image URL
+        image_url: imageUrl // Changed from reference_image_url to image_url to match schema
       };
 
       // Use the new centralized API integration service
