@@ -197,8 +197,19 @@ export const Designer3DPage: React.FC = () => {
       }
 
       // Build request data with required model field
+      // Add defensive checks to ensure required fields are never undefined
+      const sanitizedPrompt = prompt?.trim() || '';
+      
+      if (!sanitizedPrompt) {
+        throw new Error('Prompt is required but was undefined or empty');
+      }
+      
+      if (!selectedModel) {
+        throw new Error('Model selection failed - no valid model found');
+      }
+      
       const requestData = {
-        prompt: prompt.trim(),
+        prompt: sanitizedPrompt,
         model: selectedModel,
         room_type: roomType || undefined,
         style: style || undefined,
