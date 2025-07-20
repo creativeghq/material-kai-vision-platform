@@ -25,19 +25,19 @@ const successResponseSchema = z.object({
 const crewai3DGenerationInputSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
   model: z.enum([
-    // Replicate Interior Design Models (10 total)
-    'lucataco/interior-design',
-    'adirik/flux-cinestill',
+    // Replicate Models (working models only)
     'black-forest-labs/flux-schnell',
-    'stability-ai/stable-diffusion-3-medium',
-    'bytedance/sdxl-lightning-4step',
-    'playgroundai/playground-v2.5-1024px-aesthetic',
-    'threestudio-project/threestudio',
     'adirik/interior-design',
-    'davisbrown/designer-architecture',
+    'erayyavuz/interior-ai',
+    'jschoormans/comfyui-interior-remodel',
+    'julian-at/interiorly-gen1-dev',
+    'lucataco/interior-design',
     'rocketdigitalai/interior-design-sdxl',
+    'davisbrown/designer-architecture',
+    'playgroundai/playground-v2.5-1024px-aesthetic',
+    'bytedance/sdxl-lightning-4step',
     
-    // Hugging Face Models (2 total)
+    // Hugging Face Models (working models only)
     'stabilityai/stable-diffusion-xl-base-1.0',
     'stabilityai/stable-diffusion-2-1',
   ]).optional(),
