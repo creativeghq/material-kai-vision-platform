@@ -14,6 +14,27 @@
         "resolve-library-id",
         "get-library-docs"
       ]
+    },
+    "supabase": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@supabase/mcp-server-supabase@latest"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_a6fd60d0832d2205cb1f5f52dcc1fc3bdf648843"
+      },
+      "disabled": false,
+      "alwaysAllow": [
+        "get_project",
+        "list_tables",
+        "execute_sql",
+        "get_project_url",
+        "get_anon_key",
+        "search_docs"
+      ]
     }
   }
 }
