@@ -1860,6 +1860,14 @@ serve(async (req) => {
     console.log('📨 Received 3D generation request');
     let rawRequest = await req.json();
     
+    console.log('=== SERVER-SIDE DEBUG START ===');
+    console.log('Raw request body received:', JSON.stringify(rawRequest, null, 2));
+    console.log('Body type:', typeof rawRequest);
+    console.log('Body keys:', Object.keys(rawRequest || {}));
+    console.log('Prompt field exists:', 'prompt' in (rawRequest || {}));
+    console.log('Prompt value:', rawRequest?.prompt);
+    console.log('Prompt type:', typeof rawRequest?.prompt);
+    
     console.log('🔍 Raw request structure:', {
       hasData: !!rawRequest.data,
       hasFunctionName: !!rawRequest.functionName,
@@ -1872,6 +1880,7 @@ serve(async (req) => {
       rawRequestType: typeof rawRequest,
       rawRequestStringified: JSON.stringify(rawRequest, null, 2).substring(0, 500) + '...'
     });
+    console.log('=== SERVER-SIDE DEBUG END ===');
     
     // Server-side validation using Zod schema
     console.log('🔍 Validating request with server-side schema...');
