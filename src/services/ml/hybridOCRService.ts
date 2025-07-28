@@ -460,3 +460,27 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
 
 // Export singleton instance with default config
 export const hybridOCRService = HybridOCRService.createInstance();
+
+// Static convenience method for easy access
+export interface HybridOCRStatic {
+  processOCR(imageFile: File, options?: HybridOCROptions): Promise<MLResult>;
+  determineProcessingStrategy(
+    file: File, 
+    options?: HybridOCROptions
+  ): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string; estimatedTime: string; accuracy: string; }>;
+}
+
+// Add static methods to HybridOCRService class
+(HybridOCRService as any).processOCR = async function(
+  imageFile: File, 
+  options: HybridOCROptions = {}
+): Promise<MLResult> {
+  return hybridOCRService.processOCR(imageFile, options);
+};
+
+(HybridOCRService as any).determineProcessingStrategy = async function(
+  file: File,
+  options: HybridOCROptions = {}
+): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string; estimatedTime: string; accuracy: string; }> {
+  return HybridOCRService.getProcessingRecommendation(file, options);
+};

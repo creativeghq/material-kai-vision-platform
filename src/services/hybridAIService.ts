@@ -255,4 +255,36 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
       return { openai: false, claude: false };
     }
   }
+
 }
+
+// Create and export a singleton instance for static-like access
+const hybridAIConfig: HybridAIServiceConfig = {
+  name: 'HybridAIService',
+  version: '1.0.0',
+  environment: 'development',
+  enabled: true,
+  providers: [
+    { name: 'openai', priority: 1, available: true },
+    { name: 'claude', priority: 2, available: true }
+  ],
+  defaultMinScore: 0.7,
+  defaultMaxRetries: 2,
+  enableValidation: true
+};
+
+let hybridAIInstance: HybridAIService | null = null;
+
+// Static-like access functions
+export const HybridAIServiceStatic = {
+  async processRequest(request: HybridRequest): Promise<HybridResponse> {
+    if (!hybridAIInstance) {
+      hybridAIInstance = new HybridAIService(hybridAIConfig);
+      await hybridAIInstance.initialize();
+    }
+    return hybridAIInstance.processRequest(request);
+  }
+};
+
+// Extend the class with static methods for backward compatibility
+(HybridAIService as any).processRequest = HybridAIServiceStatic.processRequest;

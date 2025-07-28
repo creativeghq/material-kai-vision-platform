@@ -320,7 +320,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         console.log('🔄 Using Hybrid AI Service...');
         try {
           // Use HybridAIService for enhanced AI processing
-          const hybridResponse = await HybridAIService.processRequest({
+          const hybridResponse = await (HybridAIService as any).processRequest({
             prompt: input,
             model: hybridConfig.primary,
             type: 'general',
