@@ -36,7 +36,7 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
    * Factory method to create ClientMLService instance
    */
   static createInstance(config: Partial<ClientMLServiceConfig> = {}): ClientMLService {
-    const defaultConfig: ClientMLServiceConfig = {
+const defaultConfig: ClientMLServiceConfig = {
       name: 'ClientMLService',
       version: '1.0.0',
       environment: 'development',
@@ -49,6 +49,15 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
       maxConcurrentOperations: 3,
       enableCaching: true,
       cacheExpirationMs: 300000, // 5 minutes
+      timeout: 30000,
+      retries: 3,
+      rateLimit: {
+        requestsPerMinute: 60
+      },
+      healthCheck: {
+        enabled: true,
+        interval: 300000
+      },
       ...config
     };
     return new ClientMLService(defaultConfig);
