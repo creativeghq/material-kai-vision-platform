@@ -39,6 +39,8 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
     const defaultConfig: ClientMLServiceConfig = {
       name: 'ClientMLService',
       version: '1.0.0',
+      environment: 'development',
+      enabled: true,
       enableImageClassification: true,
       enableTextEmbedding: true,
       enableMaterialAnalysis: true,
@@ -58,15 +60,30 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
   protected async doInitialize(): Promise<void> {
     // Initialize sub-services based on configuration
     if (this.config.enableImageClassification) {
-      this.imageClassifier = new ImageClassifierService();
+      this.imageClassifier = new ImageClassifierService({
+        name: 'ImageClassifierService',
+        version: '1.0.0',
+        environment: 'development',
+        enabled: true
+      });
     }
     
     if (this.config.enableTextEmbedding) {
-      this.textEmbedder = new TextEmbedderService();
+      this.textEmbedder = new TextEmbedderService({
+        name: 'TextEmbedderService',
+        version: '1.0.0',
+        environment: 'development',
+        enabled: true
+      });
     }
     
     if (this.config.enableMaterialAnalysis) {
-      this.materialAnalyzer = new MaterialAnalyzerService();
+      this.materialAnalyzer = new MaterialAnalyzerService({
+        name: 'MaterialAnalyzerService',
+        version: '1.0.0',
+        environment: 'development',
+        enabled: true
+      });
     }
 
     // Preload models if configured
@@ -80,17 +97,17 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
    */
   protected async doHealthCheck(): Promise<void> {
     // Check device capabilities
-    const deviceInfo = DeviceDetector.getDeviceInfo();
-    if (!deviceInfo.webgl && !deviceInfo.webgpu) {
-      throw new Error('No suitable ML acceleration available (WebGL/WebGPU)');
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
+    if (!deviceInfo.supportsWebGPU) {
+      console.warn('WebGPU not available, falling back to CPU processing');
     }
 
     // Check sub-services if they exist
-    if (this.imageClassifier && !this.imageClassifier.isInitialized()) {
+    if (this.imageClassifier && !this.imageClassifier.isReady) {
       throw new Error('Image classifier service not properly initialized');
     }
     
-    if (this.textEmbedder && !this.textEmbedder.isInitialized()) {
+    if (this.textEmbedder && !this.textEmbedder.isReady) {
       throw new Error('Text embedder service not properly initialized');
     }
   }
@@ -99,6 +116,9 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
    * Classify an image using the image classification model
    */
   async classifyImage(imageSource: string | File | Blob): Promise<MLResult> {
+    if (!this.imageClassifier) {
+      throw new Error('Image classifier not initialized');
+    }
     return this.imageClassifier.classify(imageSource);
   }
 
@@ -109,6 +129,9 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
     text: string | string[], 
     options: FeatureExtractionOptions = { pooling: 'mean', normalize: true }
   ): Promise<MLResult> {
+    if (!this.textEmbedder) {
+      throw new Error('Text embedder not initialized');
+    }
     return this.textEmbedder.generateEmbedding(text, options);
   }
 
@@ -116,6 +139,9 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
    * Perform comprehensive material analysis combining image and text
    */
   async analyzeMaterial(imageSource: string | File | Blob, description?: string): Promise<MLResult> {
+    if (!this.materialAnalyzer) {
+      throw new Error('Material analyzer not initialized');
+    }
     return this.materialAnalyzer.analyzeMaterial(imageSource, description);
   }
 
@@ -124,7 +150,15 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
    */
   async preloadModels(): Promise<void> {
     try {
-      await this.materialAnalyzer.preloadModels();
+      if (this.imageClassifier) {
+        await this.imageClassifier.initialize();
+      }
+      if (this.textEmbedder) {
+        await this.textEmbedder.initialize();
+      }
+      if (this.materialAnalyzer) {
+        await this.materialAnalyzer.initialize();
+      }
       console.log('All ML models preloaded successfully');
     } catch (error) {
       console.error('Failed to preload ML models:', error);
@@ -135,14 +169,14 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
   /**
    * Get the current status of all ML services
    */
-  getStatus(): { 
+  async getStatus(): Promise<{ 
     initialized: boolean; 
     models: string[];
     device: string;
-    deviceInfo: ReturnType<typeof DeviceDetector.getDeviceInfo>;
-  } {
-    const imageStatus = this.imageClassifier.isInitialized();
-    const textStatus = this.textEmbedder.isInitialized();
+  }> {
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
+    const imageStatus = this.imageClassifier ? true : false;
+    const textStatus = this.textEmbedder ? true : false;
     
     return {
       initialized: imageStatus && textStatus,
@@ -150,27 +184,28 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
         imageStatus ? 'image-classifier' : '',
         textStatus ? 'text-embedder' : ''
       ].filter(Boolean),
-      device: DeviceDetector.getOptimalDevice(),
-      deviceInfo: DeviceDetector.getDeviceInfo()
+      device: deviceInfo.optimalDevice
     };
   }
 
   /**
    * Get detailed status for debugging
    */
-  getDetailedStatus() {
+  async getDetailedStatus() {
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
     return {
       services: {
-        imageClassifier: this.imageClassifier.getModelInfo(),
-        textEmbedder: this.textEmbedder.getModelInfo(),
-        materialAnalyzer: this.materialAnalyzer.getStatus()
+        imageClassifier: this.imageClassifier ? 'initialized' : 'not initialized',
+        textEmbedder: this.textEmbedder ? 'initialized' : 'not initialized',
+        materialAnalyzer: this.materialAnalyzer ? 'initialized' : 'not initialized'
       },
-      device: DeviceDetector.getDeviceInfo()
+      device: deviceInfo
     };
   }
 }
 
-export const clientMLService = new ClientMLService();
+// Export singleton instance using factory method  
+export const clientMLService = ClientMLService.createInstance();
 export { ClientMLService };
 
 // Re-export types for convenience

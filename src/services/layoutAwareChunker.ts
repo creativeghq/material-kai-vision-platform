@@ -68,7 +68,12 @@ export class LayoutAwareChunker {
   private chunkCounter: number = 0;
 
   constructor() {
-    this.textEmbedder = new TextEmbedderService();
+    this.textEmbedder = new TextEmbedderService({
+      name: 'TextEmbedderService',
+      version: '1.0.0', 
+      environment: 'development',
+      enabled: true
+    });
   }
 
   /**
