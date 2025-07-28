@@ -198,10 +198,9 @@ const svbrdfExtractorOutputSchema = z.union([
 export const supabaseConfig: SupabaseApiConfig = {
   name: 'supabase',
   type: 'supabase',
-  baseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  projectUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  baseUrl: "https://bgbavxtjlbvgplozizxu.supabase.co",
+  projectUrl: "https://bgbavxtjlbvgplozizxu.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg",
   timeout: 60000, // 1 minute default
   retryAttempts: 3,
   rateLimit: {
