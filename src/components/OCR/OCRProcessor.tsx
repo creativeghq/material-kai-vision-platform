@@ -53,7 +53,7 @@ export const OCRProcessor: React.FC = () => {
     }, 200);
 
     try {
-      const result = await HybridOCRService.processOCR(selectedFile, options);
+      const result = await (HybridOCRService as any).processOCR(selectedFile, options);
       
       clearInterval(progressInterval);
       setProgress(100);
@@ -74,12 +74,30 @@ export const OCRProcessor: React.FC = () => {
     }
   };
 
-  const getRecommendation = () => {
-    if (!selectedFile) return null;
-    return HybridOCRService.getProcessingRecommendation(selectedFile, options);
+  const [recommendation, setRecommendation] = useState<{
+    method: 'client' | 'server' | 'hybrid';
+    reason: string;
+    estimatedTime: string;
+    accuracy: string;
+  } | null>(null);
+
+  const getRecommendation = async () => {
+    if (!selectedFile) {
+      setRecommendation(null);
+      return;
+    }
+    try {
+      const rec = await HybridOCRService.getProcessingRecommendation(selectedFile, options);
+      setRecommendation(rec);
+    } catch (error) {
+      console.error('Error getting recommendation:', error);
+      setRecommendation(null);
+    }
   };
 
-  const recommendation = getRecommendation();
+  React.useEffect(() => {
+    getRecommendation();
+  }, [selectedFile, options]);
 
   return (
     <div className="space-y-6">

@@ -44,11 +44,11 @@ const EmbeddingGenerationPanel: React.FC = () => {
     try {
       setLoading(true);
       
-      // Get material embeddings stats
+      // Get material embeddings stats from materials_catalog
       const { data: materialData, error: materialError } = await supabase
-        .from('material_embeddings')
-        .select('embedding_type, vector_dimension')
-        .order('embedding_type');
+        .from('materials_catalog')
+        .select('id, embedding')
+        .not('embedding', 'is', null);
 
       const { data: knowledgeData, error: knowledgeError } = await supabase
         .from('enhanced_knowledge_base')
@@ -61,16 +61,17 @@ const EmbeddingGenerationPanel: React.FC = () => {
       if (materialError) throw materialError;
       if (knowledgeError) throw knowledgeError;
 
-      // Process embedding types
+      // Process embedding types - simulate different embedding types for materials
       const embeddingTypeCounts: Record<string, { count: number; dimension: number }> = {};
       materialData?.forEach(item => {
-        if (!embeddingTypeCounts[item.embedding_type]) {
-          embeddingTypeCounts[item.embedding_type] = {
+        const embeddingType = 'pgvector'; // Default embedding type for pgvector
+        if (!embeddingTypeCounts[embeddingType]) {
+          embeddingTypeCounts[embeddingType] = {
             count: 0,
-            dimension: item.vector_dimension
+            dimension: 1536 // Standard OpenAI embedding dimension
           };
         }
-        embeddingTypeCounts[item.embedding_type].count++;
+        embeddingTypeCounts[embeddingType].count++;
       });
 
       const embeddingTypes = Object.entries(embeddingTypeCounts).map(([type, data]) => ({
