@@ -12,19 +12,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@solana/wallet-standard-features": "^1.3.0",
     "@supabase/supabase-js": "^2.39.0",
     "next": "^14.0.0",
+    "node-fetch": "^3.3.2",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "node-fetch": "^3.3.2"
+    "react-dom": "^18.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "typescript": "^5.0.0",
     "eslint": "^8.0.0",
-    "eslint-config-next": "^14.0.0"
+    "eslint-config-next": "^14.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
