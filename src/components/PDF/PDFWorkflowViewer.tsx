@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,14 +11,7 @@ import {
   AlertCircle, 
   ChevronDown, 
   ChevronRight,
-  FileUp,
   Database,
-  Search,
-  Brain,
-  Image,
-  Layout,
-  BarChart3,
-  Zap,
   PlayCircle,
   RefreshCw,
   ExternalLink
@@ -29,12 +22,12 @@ import { HTMLDocumentViewer } from './HTMLDocumentViewer';
 export interface WorkflowStep {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   startTime?: Date;
   endTime?: Date;
   duration?: number;
-  icon: React.ComponentType<any>;
+  icon?: React.ComponentType<any>;
   details?: string[];
   error?: string;
   logs?: string[];
@@ -43,8 +36,8 @@ export interface WorkflowStep {
 
 export interface WorkflowJob {
   id: string;
-  name: string;
-  filename: string;
+  name?: string;
+  filename?: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   startTime: Date;
   endTime?: Date;
@@ -249,7 +242,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
                                 <span className="font-medium">{step.name}</span>
                                 {getStatusBadge(step.status)}
                               </div>
@@ -314,12 +307,12 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                       The PDF has been processed into a rich HTML document with preserved layout and extracted images.
                                     </p>
                                     <div className="space-y-2">
-                                     <button 
-                                          onClick={() => {
-                                            setSelectedKnowledgeEntryId(step.metadata.knowledgeEntryId);
-                                            setSelectedDocumentTitle(step.metadata.title || 'HTML Document');
-                                            setHtmlViewerOpen(true);
-                                          }}
+                                     <button
+                                        onClick={() => {
+                                          setSelectedKnowledgeEntryId(step.metadata?.knowledgeEntryId || '');
+                                          setSelectedDocumentTitle(step.metadata?.title || 'HTML Document');
+                                          setHtmlViewerOpen(true);
+                                        }}
                                           className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline mr-4"
                                         >
                                           <ExternalLink className="h-3 w-3" />

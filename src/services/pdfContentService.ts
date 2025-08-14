@@ -1,9 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ConsolidatedPDFWorkflowService, ConsolidatedProcessingOptions } from './consolidatedPDFWorkflowService';
 
 export interface PDFUploadOptions {
   extractMaterials?: boolean;
   language?: string;
+  useMivaaProcessing?: boolean; // New flag to enable MIVAA processing
+  chunkSize?: number;
+  overlap?: number;
+  preserveLayout?: boolean;
+  includeImages?: boolean;
+  generateEmbeddings?: boolean;
+  enableSemanticAnalysis?: boolean;
 }
 
 export interface PDFProcessingResult {
@@ -22,6 +30,11 @@ export interface PDFProcessingResult {
     standards: string[];
   };
   message: string;
+  // Enhanced MIVAA-specific fields
+  workflowJobId?: string;
+  mivaaProcessingResult?: any;
+  embeddingsGenerated?: number;
+  chunksCreated?: number;
 }
 
 export interface PDFContentEntry {
@@ -37,10 +50,10 @@ export interface PDFContentEntry {
 
 export class PDFContentService {
   /**
-   * Upload and process PDF file with simplified extraction
+   * Upload and process PDF file with MIVAA integration
    */
   static async uploadAndProcess(
-    file: File, 
+    file: File,
     options: PDFUploadOptions = {}
   ): Promise<PDFProcessingResult> {
     try {
@@ -55,7 +68,7 @@ export class PDFContentService {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('pdf-documents')
         .upload(fileName, file);
 
@@ -70,27 +83,74 @@ export class PDFContentService {
 
       toast.info('Processing PDF content...');
 
-      // Process PDF using simplified processor
-      const { data: processingData, error: processingError } = await supabase.functions.invoke('pdf-processor', {
-        body: {
-          fileUrl: publicUrl,
-          originalFilename: file.name,
-          fileSize: file.size,
-          userId: user.id,
-          options
+      // Use MIVAA processing by default or when explicitly enabled
+      const useMivaaProcessing = options.useMivaaProcessing !== false; // Default to true
+
+      if (useMivaaProcessing) {
+        // Use consolidated MIVAA workflow service
+        const consolidatedOptions: ConsolidatedProcessingOptions = {
+          extractMaterials: options.extractMaterials ?? true,
+          language: options.language ?? 'en',
+          chunkSize: options.chunkSize ?? 1000,
+          overlap: options.overlap ?? 200,
+          preserveLayout: options.preserveLayout ?? true,
+          includeImages: options.includeImages ?? true,
+          generateEmbeddings: options.generateEmbeddings ?? true,
+          enableSemanticAnalysis: options.enableSemanticAnalysis ?? true,
+          useMivaaProcessing: true, // Always use MIVAA for processing
+          
+          
+        };
+
+        const workflowService = new ConsolidatedPDFWorkflowService();
+        const jobId = await workflowService.startPDFProcessing(file, consolidatedOptions);
+
+        toast.success('PDF processing started with MIVAA!');
+        
+        return {
+          success: true,
+          processingId: jobId,
+          knowledgeEntryId: jobId, // Use jobId as temporary identifier
+          materialCategories: [],
+          materialsDetected: 0,
+          processingTimeMs: 0,
+          confidence: 0,
+          extractedContent: {
+            textLength: 0,
+            categories: [],
+            keyMaterials: [],
+            applications: [],
+            standards: []
+          },
+          message: 'PDF processing started successfully with MIVAA workflow',
+          workflowJobId: jobId,
+          mivaaProcessingResult: null,
+          embeddingsGenerated: 0,
+          chunksCreated: 0
+        };
+      } else {
+        // Fallback to basic processing for legacy support
+        const { data: processingData, error: processingError } = await supabase.functions.invoke('pdf-processor', {
+          body: {
+            fileUrl: publicUrl,
+            originalFilename: file.name,
+            fileSize: file.size,
+            userId: user.id,
+            options
+          }
+        });
+
+        if (processingError) {
+          throw new Error(`Processing failed: ${processingError.message}`);
         }
-      });
 
-      if (processingError) {
-        throw new Error(`Processing failed: ${processingError.message}`);
+        toast.success('PDF processed successfully!');
+        return processingData as PDFProcessingResult;
       }
-
-      toast.success('PDF processed successfully!');
-      return processingData as PDFProcessingResult;
 
     } catch (error) {
       console.error('PDF upload and processing error:', error);
-      toast.error(`Processing failed: ${error.message}`);
+      toast.error(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
     }
   }
@@ -106,17 +166,15 @@ export class PDFContentService {
       }
 
       const { data, error } = await supabase
-        .from('pdf_processing_results')
+        .from('document_processing_status')
         .select(`
           id,
-          original_filename,
-          processing_status,
-          document_classification,
-          materials_identified_count,
-          confidence_score_avg,
-          created_at
+          document_id,
+          status,
+          metadata,
+          created_at,
+          updated_at
         `)
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -125,12 +183,12 @@ export class PDFContentService {
 
       return (data || []).map(item => ({
         id: item.id,
-        originalFilename: item.original_filename,
-        processingStatus: item.processing_status,
-        materialCategories: (item.document_classification as any)?.material_categories || [],
-        materialsDetected: item.materials_identified_count || 0,
-        confidence: item.confidence_score_avg || 0,
-        createdAt: item.created_at
+        originalFilename: (item.metadata as any)?.original_filename || 'Unknown',
+        processingStatus: item.status || 'unknown',
+        materialCategories: (item.metadata as any)?.material_categories || [],
+        materialsDetected: (item.metadata as any)?.materials_identified_count || 0,
+        confidence: (item.metadata as any)?.confidence_score_avg || 0,
+        createdAt: item.created_at || new Date().toISOString()
       }));
 
     } catch (error) {
@@ -150,7 +208,7 @@ export class PDFContentService {
       }
 
       const { data, error } = await supabase
-        .from('pdf_processing_results')
+        .from('document_processing_status')
         .select('*')
         .eq('id', processingId)
         .eq('user_id', user.id)
@@ -161,10 +219,10 @@ export class PDFContentService {
       }
 
       // Also get the associated knowledge base entry
-      const { data: knowledgeData, error: knowledgeError } = await supabase
+      const { data: knowledgeData } = await supabase
         .from('enhanced_knowledge_base')
         .select('*')
-        .ilike('title', `%${data.original_filename}%`)
+        .ilike('title', `%${(data.metadata as any)?.original_filename || 'Unknown'}%`)
         .eq('created_by', user.id)
         .single();
 
@@ -206,7 +264,7 @@ export class PDFContentService {
 
       // Delete processing record
       const { error: processDeleteError } = await supabase
-        .from('pdf_processing_results')
+        .from('document_processing_status')
         .delete()
         .eq('id', processingId)
         .eq('user_id', user.id);
@@ -282,7 +340,7 @@ export class PDFContentService {
       }
 
       const { data, error } = await supabase
-        .from('pdf_processing_results')
+        .from('document_processing_status')
         .select('*')
         .eq('user_id', user.id);
 
@@ -291,11 +349,11 @@ export class PDFContentService {
       }
 
       const totalPDFs = data.length;
-      const successfulProcessing = data.filter(p => p.processing_status === 'completed').length;
-      const averageConfidence = data.reduce((sum, p) => sum + (p.confidence_score_avg || 0), 0) / totalPDFs || 0;
-      const totalMaterials = data.reduce((sum, p) => sum + (p.materials_identified_count || 0), 0);
+      const successfulProcessing = data.filter(p => p.status === 'completed').length;
+      const averageConfidence = data.reduce((sum, p) => sum + ((p.metadata as any)?.confidence_score_avg || 0), 0) / totalPDFs || 0;
+      const totalMaterials = data.reduce((sum, p) => sum + ((p.metadata as any)?.materials_identified_count || 0), 0);
       const recentActivity = data
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .sort((a, b) => new Date(b.created_at || new Date().toISOString()).getTime() - new Date(a.created_at || new Date().toISOString()).getTime())
         .slice(0, 5);
 
       return {

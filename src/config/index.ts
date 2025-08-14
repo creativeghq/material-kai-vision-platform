@@ -1,26 +1,107 @@
 /**
- * Main API Configuration Index
+ * Main Configuration Index
  * 
- * This file initializes and registers all API configurations with the central registry.
- * It provides a unified interface for accessing all API configurations across the platform.
+ * This file provides a unified interface for both the legacy API configuration system
+ * and the new centralized configuration management system for microservice integration.
  */
 
+// Legacy API Configuration System
 import {
   apiRegistry,
-  ApiRegistry,
   ApiConfig,
-  BaseApiConfig,
-  ReplicateApiConfig,
-  SupabaseApiConfig,
-  OpenAIApiConfig,
-  HuggingFaceApiConfig,
-  EnvironmentConfig,
 } from './apiConfig';
 import replicateConfig from './apis/replicateConfig';
 import supabaseConfig from './apis/supabaseConfig';
 import { huggingfaceConfig } from './apis/huggingfaceConfig';
 
-// Initialize and register all API configurations
+// New Centralized Configuration System
+import { configFactory } from './configFactory';
+import { AppConfig } from './types';
+
+// Global configuration instance
+let globalConfig: AppConfig | null = null;
+
+/**
+ * Initialize the complete configuration system
+ * This includes both legacy API configs and the new centralized system
+ */
+export const initializeConfiguration = async (): Promise<AppConfig> => {
+  try {
+    // Initialize the centralized configuration first
+    globalConfig = await configFactory.create();
+    
+    // Initialize legacy API configuration system
+    initializeApiConfigurations();
+    
+    console.log('✅ Complete configuration system initialized successfully');
+    console.log('📊 Centralized config summary:', configFactory.getConfigSummary());
+    console.log('🔌 API config summary:', ApiConfigManager.getConfigSummary());
+    
+    return globalConfig;
+  } catch (error) {
+    console.error('❌ Failed to initialize configuration system:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get the current global configuration
+ */
+export const getConfig = (): AppConfig => {
+  if (!globalConfig) {
+    throw new Error('Configuration not initialized. Call initializeConfiguration() first.');
+  }
+  return globalConfig;
+};
+
+/**
+ * Get configuration for a specific service
+ */
+export const getServiceConfig = <T extends keyof AppConfig['services']>(
+  serviceName: T
+): AppConfig['services'][T] => {
+  const config = getConfig();
+  return config.services[serviceName];
+};
+
+/**
+ * Check if a feature is enabled
+ */
+export const isFeatureEnabled = (feature: string): boolean => {
+  const config = getConfig();
+  
+  switch (feature) {
+    case 'debug':
+      return config.debug;
+    case 'hotReload':
+      return config.hotReload.enabled;
+    case 'caching':
+      return config.performance.caching.enabled;
+    case 'rateLimit':
+      return config.performance.rateLimit.enabled;
+    case 'monitoring':
+      return config.performance.monitoring.enabled;
+    default:
+      return false;
+  }
+};
+
+/**
+ * Reload configuration (useful for hot reload scenarios)
+ */
+export const reloadConfiguration = async (): Promise<AppConfig> => {
+  await configFactory.reload();
+  globalConfig = configFactory.getCurrentConfig();
+  
+  if (!globalConfig) {
+    throw new Error('Failed to reload configuration');
+  }
+  
+  console.log('🔄 Configuration reloaded successfully');
+  return globalConfig;
+};
+
+// Initialize and register all API configurations (Legacy System)
 export function initializeApiConfigurations(): void {
   // Register Replicate API configuration
   apiRegistry.registerApi(replicateConfig);
@@ -55,6 +136,16 @@ export type {
   EnvironmentConfig,
 } from './apiConfig';
 
+// Export new centralized configuration types and factory
+export {
+  configFactory,
+};
+export type { AppConfig };
+
+// Export types for external use
+export * from './types';
+export * from './schemas/configSchemas';
+
 // Custom error class for configuration issues
 export class ConfigurationError extends Error {
   public readonly configType: string;
@@ -68,7 +159,7 @@ export class ConfigurationError extends Error {
   }
 }
 
-// Convenience functions for common operations
+// Convenience functions for common operations (Legacy API System)
 export class ApiConfigManager {
   /**
    * Get a specific API configuration by name
@@ -241,16 +332,51 @@ export class ApiConfigManager {
   public static initialize(): void {
     initializeApiConfigurations();
     
-    const validation = this.validateEnvironment();
+    this.validateEnvironment();
     // Silently handle missing environment variables in production
     // Configuration summary and validation details are available via getConfigSummary() and validateEnvironment()
   }
 }
 
-// Auto-initialize when module is imported (can be disabled if needed)
+// Export configuration summary for debugging (Combined System)
+export const getConfigSummary = () => {
+  const baseInfo = {
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+  };
+
+  if (globalConfig) {
+    return {
+      ...baseInfo,
+      centralizedConfig: configFactory.getConfigSummary(),
+      apiConfigurations: ApiConfigManager.getConfigSummary(),
+    };
+  }
+
+  return {
+    ...baseInfo,
+    status: 'Centralized configuration not initialized',
+    apiConfigurations: ApiConfigManager.getConfigSummary(),
+  };
+};
+
+// Cleanup function for graceful shutdown
+export const cleanupConfiguration = () => {
+  configFactory.cleanup();
+  console.log('🧹 Configuration system cleaned up');
+};
+
+// Auto-initialize when module is imported (can be disabled by setting DISABLE_AUTO_INIT=true)
 // Initialize in all environments except during testing
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && process.env.DISABLE_AUTO_INIT !== 'true') {
+  // Initialize legacy API system immediately
   ApiConfigManager.initialize();
+  
+  // Initialize centralized system asynchronously
+  initializeConfiguration().catch(error => {
+    console.error('Failed to auto-initialize centralized configuration:', error);
+    console.log('Legacy API configuration system is still available');
+  });
 }
 
 export default ApiConfigManager;

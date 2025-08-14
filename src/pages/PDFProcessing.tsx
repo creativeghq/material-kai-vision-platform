@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { PDFProcessor } from '@/components/PDF/PDFProcessor';
-import { EnhancedPDFProcessor } from '@/components/PDF/EnhancedPDFProcessor';
+import { useState, useEffect } from 'react';
+
 import { PDFWorkflowViewer, WorkflowJob } from '@/components/PDF/PDFWorkflowViewer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+
 import { Badge } from '@/components/ui/badge';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Play, FileText, Zap, Activity } from 'lucide-react';
-import { pdfWorkflowService } from '@/services/pdfWorkflowService';
+import { Upload, Activity } from 'lucide-react';
+import { consolidatedPDFWorkflowService } from '@/services/consolidatedPDFWorkflowService';
 import { useToast } from '@/hooks/use-toast';
 
 const PDFProcessing = () => {
@@ -17,7 +16,7 @@ const PDFProcessing = () => {
 
   useEffect(() => {
     // Subscribe to workflow updates
-    const unsubscribe = pdfWorkflowService.subscribe((job) => {
+    const unsubscribe = consolidatedPDFWorkflowService.subscribe((job) => {
       setWorkflowJobs(prev => {
         const filtered = prev.filter(j => j.id !== job.id);
         return [job, ...filtered];
@@ -25,7 +24,7 @@ const PDFProcessing = () => {
     });
 
     // Load existing jobs
-    setWorkflowJobs(pdfWorkflowService.getAllJobs());
+    setWorkflowJobs(consolidatedPDFWorkflowService.getAllJobs());
 
     return () => {
       unsubscribe();
@@ -35,7 +34,7 @@ const PDFProcessing = () => {
   const onDrop = async (acceptedFiles: File[]) => {
     for (const file of acceptedFiles) {
       try {
-        const jobId = await pdfWorkflowService.startPDFProcessing(file);
+        void await consolidatedPDFWorkflowService.startPDFProcessing(file);
         toast({
           title: "Processing Started",
           description: `Started processing ${file.name}. You can monitor the progress in the workflow below.`,
@@ -60,7 +59,7 @@ const PDFProcessing = () => {
   });
 
   const handleRetryJob = (jobId: string) => {
-    pdfWorkflowService.retryJob(jobId);
+    consolidatedPDFWorkflowService.retryJob(jobId);
     toast({
       title: "Job Retried",
       description: "The processing job has been restarted.",

@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
-import { htmlDOMAnalyzer, type LayoutAnalysisResult, type DOMElement, type TextBlock } from './htmlDOMAnalyzer';
+import { htmlDOMAnalyzer, type LayoutAnalysisResult, type DOMElement } from './htmlDOMAnalyzer';
 import { TextEmbedderService } from './ml/textEmbedder';
-import type { TextEmbeddingResult } from './ml/types';
+import { MivaaEmbeddingIntegration } from './mivaaEmbeddingIntegration';
 
 export interface ChunkingOptions {
   chunkSize: number; // Target characters per chunk
@@ -65,10 +65,18 @@ export interface ChunkingResult {
  */
 export class LayoutAwareChunker {
   private textEmbedder: TextEmbedderService;
+  private mivaaEmbedder: MivaaEmbeddingIntegration;
   private chunkCounter: number = 0;
 
   constructor() {
-    this.textEmbedder = new TextEmbedderService();
+    this.textEmbedder = new TextEmbedderService({
+      name: 'HuggingFaceEmbedder',
+      version: '1.0.0',
+      environment: 'development',
+      enabled: true,
+      modelName: 'mixedbread-ai/mxbai-embed-xsmall-v1'
+    });
+    this.mivaaEmbedder = new MivaaEmbeddingIntegration();
   }
 
   /**
@@ -132,7 +140,7 @@ export class LayoutAwareChunker {
       
     } catch (error) {
       console.error('Layout-aware chunking error:', error);
-      throw new Error(`Chunking failed: ${error.message}`);
+      throw new Error(`Chunking failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -265,7 +273,7 @@ export class LayoutAwareChunker {
   private initializeChunk(
     documentId: string,
     element: DOMElement,
-    group: ElementGroup
+    _group: ElementGroup
   ): Partial<DocumentChunk> {
     const chunkId = this.generateChunkId();
     
@@ -336,7 +344,7 @@ export class LayoutAwareChunker {
       hierarchyLevel: partialChunk.hierarchyLevel!,
       pageNumber: partialChunk.pageNumber!,
       bbox: partialChunk.bbox!,
-      parentChunkId: partialChunk.parentChunkId,
+      ...(partialChunk.parentChunkId ? { parentChunkId: partialChunk.parentChunkId } : {}),
       childChunkIds: partialChunk.childChunkIds!,
       metadata: partialChunk.metadata!,
       createdAt: partialChunk.createdAt!
@@ -382,11 +390,51 @@ export class LayoutAwareChunker {
   }
 
   /**
-   * Generate embeddings for chunks
+   * Generate embeddings for chunks using MIVAA service
    */
   private async generateChunkEmbeddings(chunks: DocumentChunk[]): Promise<void> {
-    console.log(`Generating embeddings for ${chunks.length} chunks...`);
+    console.log(`Generating embeddings for ${chunks.length} chunks using MIVAA service...`);
     
+    // Configuration option to choose embedding service
+    const useMivaa = process.env.USE_MIVAA_EMBEDDINGS !== 'false'; // Default to MIVAA for new configuration
+    
+    if (useMivaa) {
+      // Use MIVAA embedding service (text-embedding-3-large, 1536 dimensions)
+      try {
+        // Process chunks individually since MIVAA API expects single text input
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          if (!chunk) continue; // Skip undefined chunks
+          
+          try {
+            const result = await this.mivaaEmbedder.generateEmbedding({
+              model: 'text-embedding-3-large',
+              dimensions: 1536,
+              text: chunk.text
+            });
+            
+            if (result.embedding && result.embedding.length > 0) {
+              chunk.embedding = result.embedding;
+            }
+          } catch (embeddingError) {
+            console.warn(`Failed to generate MIVAA embedding for chunk ${i}:`, embeddingError instanceof Error ? embeddingError.message : String(embeddingError));
+          }
+        }
+        console.log(`Successfully processed ${chunks.length} chunks for MIVAA embeddings`);
+      } catch (error) {
+        console.warn('MIVAA embedding service failed, falling back to HuggingFace:', error);
+        await this.generateHuggingFaceEmbeddings(chunks);
+      }
+    } else {
+      // Use HuggingFace embedding service (fallback)
+      await this.generateHuggingFaceEmbeddings(chunks);
+    }
+  }
+
+  /**
+   * Generate embeddings using HuggingFace service (fallback method)
+   */
+  private async generateHuggingFaceEmbeddings(chunks: DocumentChunk[]): Promise<void> {
     try {
       await this.textEmbedder.initialize();
       
@@ -397,11 +445,11 @@ export class LayoutAwareChunker {
             chunk.embedding = (result as any).embedding;
           }
         } catch (error) {
-          console.warn(`Failed to generate embedding for chunk ${chunk.id}:`, error);
+          console.warn(`Failed to generate HuggingFace embedding for chunk ${chunk.id}:`, error);
         }
       }
     } catch (error) {
-      console.warn('Text embedder initialization failed, skipping embeddings:', error);
+      console.warn('HuggingFace text embedder initialization failed, skipping embeddings:', error);
     }
   }
 
@@ -439,7 +487,11 @@ export class LayoutAwareChunker {
             word_count: chunk.metadata.wordCount,
             character_count: chunk.metadata.characterCount,
             reading_time: chunk.metadata.readingTime,
-            complexity: chunk.metadata.complexity
+            complexity: chunk.metadata.complexity,
+            // Embedding service metadata
+            embedding_service: process.env.USE_OPENAI_EMBEDDINGS === 'true' || true ? 'openai' : 'huggingface',
+            embedding_model: process.env.USE_OPENAI_EMBEDDINGS === 'true' || true ? 'text-embedding-3-large' : 'mixedbread-ai/mxbai-embed-xsmall-v1',
+            embedding_dimensions: chunk.embedding ? chunk.embedding.length : null
           },
           status: 'published'
         };
@@ -467,6 +519,10 @@ export class LayoutAwareChunker {
     for (let i = 1; i < chunks.length; i++) {
       const prevChunk = chunks[i - 1];
       const currentChunk = chunks[i];
+      
+      if (!prevChunk || !currentChunk) {
+        continue;
+      }
       
       // Get overlap text from previous chunk
       const prevText = prevChunk.text;
@@ -517,7 +573,7 @@ export class LayoutAwareChunker {
     }
   }
 
-  private extractPageNumber(element: DOMElement): number {
+  private extractPageNumber(_element: DOMElement): number {
     // Extract from bbox or metadata
     return 1; // Simplified for now
   }
@@ -659,7 +715,7 @@ export class LayoutAwareChunker {
       hierarchyLevel: metadata.hierarchy_level || 1,
       pageNumber: metadata.page_number || 1,
       bbox: metadata.bbox || { x: 0, y: 0, width: 0, height: 0 },
-      parentChunkId: undefined,
+      // parentChunkId is omitted when undefined to satisfy exactOptionalPropertyTypes
       childChunkIds: [],
       embedding: row.openai_embedding ? row.openai_embedding.split(',').map(Number) : undefined,
       metadata: {

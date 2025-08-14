@@ -49,9 +49,9 @@ async function generateQueryEmbedding(text: string): Promise<number[]> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'text-embedding-3-small',
+      model: 'text-embedding-ada-002',
       input: text,
-      dimensions: 512 // Match our vector dimension
+      // text-embedding-ada-002 produces 1536 dimensions by default
     }),
   });
 
@@ -73,7 +73,7 @@ async function performRAGSearch(
 
   const { data, error } = await supabase
     .rpc('enhanced_vector_search', {
-      query_embedding: `[${queryEmbedding.join(',')}]`,
+      query_embedding: queryEmbedding,
       search_type: searchParams.search_type || 'hybrid',
       embedding_types: searchParams.embedding_types || ['clip'],
       match_threshold: searchParams.match_threshold || 0.7,

@@ -94,7 +94,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   }
 
   // Getter for backward compatibility
-  private get config(): CostConfig {
+  private get budgetConfig(): CostConfig {
     return {
       monthlyBudget: this.getConfig().monthlyBudget,
       warningThreshold: this.getConfig().warningThreshold,
@@ -106,6 +106,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   static createInstance(config?: Partial<CostOptimizerServiceConfig>): CostOptimizer {
     return new CostOptimizer(config);
   }
+
 
   protected async doInitialize(): Promise<void> {
     // Test Supabase connection
@@ -379,7 +380,13 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
    * Update budget configuration
    */
   updateBudgetConfig(config: Partial<CostConfig>): void {
-    this.config = { ...this.config, ...config };
+    // Update the underlying service configuration
+    this.updateConfig({
+      monthlyBudget: config.monthlyBudget,
+      warningThreshold: config.warningThreshold,
+      emergencyThreshold: config.emergencyThreshold,
+      costPerProvider: config.costPerProvider
+    });
   }
 
   /**
@@ -472,4 +479,4 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   }
 }
 
-export const costOptimizer = CostOptimizer.getInstance();
+export const costOptimizer = CostOptimizer.createInstance();

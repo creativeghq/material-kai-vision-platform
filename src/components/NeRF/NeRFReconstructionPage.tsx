@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThreeJsViewer } from '@/components/3D/ThreeJsViewer';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { NeRFProcessingAPI, NeRFReconstructionRecord } from '@/services/nerfProcessingAPI';
 import { Upload, Camera, Download, Share2, Eye, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';

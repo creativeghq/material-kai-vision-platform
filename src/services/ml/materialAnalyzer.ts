@@ -115,10 +115,25 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
   private textEmbedder: TextEmbedderService;
   private static knowledgeBase = new Map<string, Partial<MaterialProperties>>();
   
-  constructor(config: MaterialAnalyzerServiceConfig) {
+  constructor(
+    config: MaterialAnalyzerServiceConfig,
+    imageClassifier?: ImageClassifierService,
+    textEmbedder?: TextEmbedderService
+  ) {
     super(config);
-    this.imageClassifier = new ImageClassifierService();
-    this.textEmbedder = new TextEmbedderService();
+    // Use dependency injection with fallback to new instances
+    this.imageClassifier = imageClassifier || new ImageClassifierService({
+      name: 'ImageClassifier',
+      version: '1.0.0',
+      environment: config.environment,
+      enabled: true
+    });
+    this.textEmbedder = textEmbedder || new TextEmbedderService({
+      name: 'TextEmbedder',
+      version: '1.0.0',
+      environment: config.environment,
+      enabled: true
+    });
   }
 
   protected async doInitialize(): Promise<void> {
@@ -136,11 +151,11 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   protected async doHealthCheck(): Promise<void> {
     // Check if dependent services are healthy
-    if (!this.imageClassifier.isInitialized()) {
+    if (!this.imageClassifier.isReady()) {
       throw new Error('Image classifier service not initialized');
     }
 
-    if (!this.textEmbedder.isInitialized()) {
+    if (!this.textEmbedder.isReady()) {
       throw new Error('Text embedder service not initialized');
     }
 
@@ -284,7 +299,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     }
 
     return {
-      initialized: this.imageClassifier.isInitialized() && this.textEmbedder.isInitialized(),
+      initialized: this.imageClassifier.isReady() && this.textEmbedder.isReady(),
       models: [
         this.imageClassifier.getModelInfo(),
         this.textEmbedder.getModelInfo()

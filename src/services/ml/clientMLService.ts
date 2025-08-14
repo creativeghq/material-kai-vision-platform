@@ -28,17 +28,33 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
   private textEmbedder?: TextEmbedderService;
   private materialAnalyzer?: MaterialAnalyzerService;
 
-  protected constructor(config: ClientMLServiceConfig) {
+  protected constructor(
+    config: ClientMLServiceConfig,
+    imageClassifier?: ImageClassifierService,
+    textEmbedder?: TextEmbedderService,
+    materialAnalyzer?: MaterialAnalyzerService
+  ) {
     super(config);
+    // Use dependency injection with fallback to new instances
+    this.imageClassifier = imageClassifier;
+    this.textEmbedder = textEmbedder;
+    this.materialAnalyzer = materialAnalyzer;
   }
 
   /**
    * Factory method to create ClientMLService instance
    */
-  static createInstance(config: Partial<ClientMLServiceConfig> = {}): ClientMLService {
+  static createInstance(
+    config: Partial<ClientMLServiceConfig> = {},
+    imageClassifier?: ImageClassifierService,
+    textEmbedder?: TextEmbedderService,
+    materialAnalyzer?: MaterialAnalyzerService
+  ): ClientMLService {
     const defaultConfig: ClientMLServiceConfig = {
       name: 'ClientMLService',
       version: '1.0.0',
+      environment: 'development',
+      enabled: true,
       enableImageClassification: true,
       enableTextEmbedding: true,
       enableMaterialAnalysis: true,
@@ -49,24 +65,39 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
       cacheExpirationMs: 300000, // 5 minutes
       ...config
     };
-    return new ClientMLService(defaultConfig);
+    return new ClientMLService(defaultConfig, imageClassifier, textEmbedder, materialAnalyzer);
   }
 
   /**
    * Initialize the service and its dependencies
    */
   protected async doInitialize(): Promise<void> {
-    // Initialize sub-services based on configuration
-    if (this.config.enableImageClassification) {
-      this.imageClassifier = new ImageClassifierService();
+    // Use dependency injection with fallback to new instances
+    if (this.config.enableImageClassification && !this.imageClassifier) {
+      this.imageClassifier = new ImageClassifierService({
+        name: 'ImageClassifierService',
+        version: '1.0.0',
+        environment: this.config.environment,
+        enabled: true
+      });
     }
     
-    if (this.config.enableTextEmbedding) {
-      this.textEmbedder = new TextEmbedderService();
+    if (this.config.enableTextEmbedding && !this.textEmbedder) {
+      this.textEmbedder = new TextEmbedderService({
+        name: 'TextEmbedderService',
+        version: '1.0.0',
+        environment: this.config.environment,
+        enabled: true
+      });
     }
     
-    if (this.config.enableMaterialAnalysis) {
-      this.materialAnalyzer = new MaterialAnalyzerService();
+    if (this.config.enableMaterialAnalysis && !this.materialAnalyzer) {
+      this.materialAnalyzer = new MaterialAnalyzerService({
+        name: 'MaterialAnalyzerService',
+        version: '1.0.0',
+        environment: this.config.environment,
+        enabled: true
+      });
     }
 
     // Preload models if configured
@@ -170,7 +201,7 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
   }
 }
 
-export const clientMLService = new ClientMLService();
+export const clientMLService = ClientMLService.createInstance();
 export { ClientMLService };
 
 // Re-export types for convenience

@@ -11,6 +11,7 @@ import type { HuggingFaceApiConfig } from './apis/huggingfaceConfig';
 import { replicateConfig } from './apis/replicateConfig';
 import { supabaseConfig } from './apis/supabaseConfig';
 import { huggingfaceConfig } from './apis/huggingfaceConfig';
+import { openaiConfig } from './apis/openaiConfig';
 
 // Re-export the HuggingFaceApiConfig type for use in other modules
 export type { HuggingFaceApiConfig };
@@ -104,6 +105,7 @@ export class ApiRegistry extends Singleton {
     this.registerApi(replicateConfig);
     this.registerApi(supabaseConfig);
     this.registerApi(huggingfaceConfig);
+    this.registerApi(openaiConfig);
 
   }
 

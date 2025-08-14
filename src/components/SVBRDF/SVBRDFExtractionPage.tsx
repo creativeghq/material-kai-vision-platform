@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { SVBRDFExtractionAPI, SVBRDFExtractionRecord } from '@/services/svbrdfExtractionAPI';
 import { Upload, Camera, Download, Link, Eye, AlertCircle, CheckCircle, Clock, Palette, Layers, Settings } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';

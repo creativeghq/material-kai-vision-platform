@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  FileText, 
+   
   Upload, 
   AlertCircle, 
   CheckCircle, 
@@ -28,7 +28,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { MivaaIntegrationService } from '@/services/pdf/mivaaIntegrationService';
+import { PDFResultsViewer } from './PDFResultsViewer';
 // Note: hybridPDFPipelineAPI service will be implemented in future phases
 type ProcessingOptions = {
   enableLayoutAnalysis?: boolean;
@@ -125,7 +126,6 @@ export const EnhancedPDFProcessor: React.FC = () => {
 
   const processFile = async (file: File) => {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const apiService = ApiIntegrationService.getInstance();
     
     // Add to processing queue
     const newJob: ProcessingJob = {
@@ -152,7 +152,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
       // Upload file to storage
       setUploadProgress(20);
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('pdf-documents')
         .upload(fileName, file);
 
@@ -166,39 +166,26 @@ export const EnhancedPDFProcessor: React.FC = () => {
         .getPublicUrl(fileName);
 
       setUploadProgress(40);
-      updateJobStatus(jobId, 'processing', 30, 'Creating document record...');
+      updateJobStatus(jobId, 'processing', 30, 'Processing PDF with MIVAA...');
 
-      // Create document record first using the original PDF processor
-      const result = await apiService.executeSupabaseFunction('pdf-processor', {
-        fileUrl: publicUrl,
-        originalFilename: file.name,
-        fileSize: file.size,
-        userId: user.id,
+      // Process PDF using MIVAA integration service
+      const mivaaService = MivaaIntegrationService.getInstance();
+      const extractionResult = await mivaaService.extractAll({
+        documentId: publicUrl,
+        file: new File([], 'dummy.pdf'), // MIVAA service uses documentId as file_path
         options: {
-          extractMaterials: options.enableLayoutAnalysis,
-          language: 'en'
+          extractionType: 'all' as const,
+          outputFormat: 'json' as const
         }
       });
       
-      if (!result.success) {
-        console.error('PDF processor response error:', result.error);
-        throw new Error(`Document creation failed: ${result.error?.message || 'Unknown error'}`);
-      }
-
-      console.log('PDF processor response:', result.data);
+      console.log('MIVAA extraction result:', extractionResult);
       
-      // Check if the PDF processor was successful
-      if (!result.data?.success) {
-        const errorMsg = result.data?.error || result.data?.message || 'PDF processor did not complete successfully';
-        console.error('PDF processor failed:', errorMsg);
-        throw new Error(`PDF processing failed: ${errorMsg}`);
-      }
-      
-      // Use knowledgeEntryId if available, otherwise use processingId as fallback
-      const documentId = result.data?.knowledgeEntryId || result.data?.processingId;
+      // Create a document ID for tracking (using filename + timestamp as fallback)
+      const documentId = `${file.name.replace(/\.[^/.]+$/, '')}_${Date.now()}`;
       
       if (!documentId) {
-        console.error('No document ID found in response:', result.data);
+        console.error('No document ID found in response:', extractionResult);
         throw new Error('Document was not properly added to knowledge base. Please try again.');
       }
       
@@ -293,17 +280,27 @@ export const EnhancedPDFProcessor: React.FC = () => {
   };
 
   const updateJobStatus = (
-    jobId: string, 
-    status: ProcessingStatus['status'], 
-    progress: number, 
+    jobId: string,
+    status: ProcessingStatus['status'],
+    progress: number,
     currentStep: string,
     error?: string
   ) => {
-    setProcessingJobs(prev => prev.map(job => 
-      job.id === jobId 
-        ? { ...job, status, progress, currentStep, error }
-        : job
-    ));
+    setProcessingJobs(prev => prev.map(job => {
+      if (job.id === jobId) {
+        const updatedJob: ProcessingJob = {
+          ...job,
+          status,
+          progress,
+          currentStep
+        };
+        if (error !== undefined) {
+          updatedJob.error = error;
+        }
+        return updatedJob;
+      }
+      return job;
+    }));
   };
 
   const handleSearch = async () => {
@@ -374,6 +371,16 @@ export const EnhancedPDFProcessor: React.FC = () => {
       </Badge>
     );
   };
+
+  // Show results viewer if viewing results
+  if (viewingResults) {
+    return (
+      <PDFResultsViewer
+        processingId={viewingResults}
+        onClose={() => setViewingResults(null)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -655,7 +662,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => setViewingResults(job.documentId || job.id)}
+                          onClick={() => {/* TODO: Implement results viewing functionality */}}
                         >
                           <Eye className="h-4 w-4 mr-2" />
                           View Results

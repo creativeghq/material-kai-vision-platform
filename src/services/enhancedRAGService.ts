@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { RagDocument } from './mivaaToRagTransformer';
+import { ErrorHandler } from '../utils/errorHandler';
 
 export interface EnhancedRAGRequest {
   query: string;
@@ -148,8 +150,11 @@ export class EnhancedRAGService {
 
       return data as EnhancedRAGResponse;
     } catch (error) {
-      console.error('Error in enhanced RAG search:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Enhanced RAG search failed',
+        { query: request.query, searchType: request.searchType, originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -184,8 +189,11 @@ export class EnhancedRAGService {
         updatedAt: item.updated_at
       }));
     } catch (error) {
-      console.error('Error fetching material knowledge:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Material knowledge fetch failed',
+        { materialId, originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -256,8 +264,11 @@ export class EnhancedRAGService {
 
       return data;
     } catch (error) {
-      console.error('Error adding knowledge entry:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Knowledge entry addition failed',
+        { entryTitle: entry.title, originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -293,8 +304,11 @@ export class EnhancedRAGService {
         updatedAt: item.updated_at
       }));
     } catch (error) {
-      console.error('Error fetching knowledge relationships:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Knowledge relationships fetch failed',
+        { entryId, originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -336,8 +350,11 @@ export class EnhancedRAGService {
         createdAt: item.created_at
       }));
     } catch (error) {
-      console.error('Error fetching query history:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Query history fetch failed',
+        { originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -383,8 +400,11 @@ export class EnhancedRAGService {
 
       return { success: true };
     } catch (error) {
-      console.error('Error providing feedback:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Feedback submission failed',
+        { satisfaction: feedback.satisfaction, originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -433,14 +453,17 @@ export class EnhancedRAGService {
         avgSatisfaction: Math.round(avgSatisfaction * 100) / 100,
         avgResponseTime: Math.round(avgResponseTime),
         topQueries: Object.entries(topQueries)
-          .sort(([,a], [,b]) => b - a)
+          .sort(([,a], [,b]) => (b as number) - (a as number))
           .slice(0, 10)
           .map(([query, count]) => ({ query, count })),
         searchHistory: data.slice(0, 50) // Recent searches
       };
     } catch (error) {
-      console.error('Error fetching search analytics:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Search analytics fetch failed',
+        { originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -484,8 +507,11 @@ export class EnhancedRAGService {
 
       return data;
     } catch (error) {
-      console.error('Error extracting material knowledge:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Material knowledge extraction failed',
+        { materialId, originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 
@@ -514,8 +540,11 @@ export class EnhancedRAGService {
 
       return { success: true };
     } catch (error) {
-      console.error('Error validating knowledge:', error);
-      throw error;
+      const ragError = ErrorHandler.createValidationError(
+        'Knowledge validation failed',
+        { originalError: (error as Error).message }
+      );
+      throw ragError;
     }
   }
 }

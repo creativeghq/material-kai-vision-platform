@@ -1,13 +1,85 @@
 # Supabase Functions Audit Report
 
-**Generated:** July 13, 2025  
+**Generated:** July 13, 2025
+**Updated:** July 27, 2025
 **Purpose:** Comprehensive audit and cleanup of Supabase functions in the Material Kai Vision Platform
 
 ## Executive Summary
 
-The Material Kai Vision Platform has successfully completed a comprehensive Supabase functions cleanup, achieving **100% function utilization**. The cleanup process transformed the platform from 20 functions (90% utilization) to 12 functions (100% utilization), eliminating all technical debt in the serverless function architecture.
+**⚠️ AUDIT UPDATE (July 27, 2025): SIGNIFICANT DISCREPANCIES FOUND**
 
-## Cleanup Process Documentation
+A re-audit conducted on July 27, 2025, revealed that the previous report was **outdated and inaccurate**. The actual current state shows:
+
+- **18 functions exist locally** (vs 12 reported previously)
+- **10 functions actively used** in codebase
+- **8 functions appear unused** (potential cleanup candidates)
+- **11 functions referenced in code but missing locally** (broken functionality)
+
+The platform requires immediate attention to resolve these discrepancies and restore function integrity.
+
+## Current State Analysis (July 27, 2025)
+
+### Critical Findings
+
+**Local Functions Directory Analysis:**
+- **18 total functions found** in `supabase/functions/` directory (including `_shared/`)
+- **Significant discrepancy** with previous audit report claiming only 12 functions
+
+**Codebase Usage Analysis:**
+- **42 function invocation points** found across TypeScript service files
+- **21 unique functions referenced** in codebase via `supabase.functions.invoke()`
+- **Multiple broken references** to functions that don't exist locally
+
+### Function Status Breakdown
+
+#### ✅ Active Functions (10) - Exist Locally AND Used in Codebase
+1. **`convertapi-pdf-processor`** - PDF processing via ConvertAPI
+2. **`crewai-3d-generation`** - 3D content generation using CrewAI
+3. **`enhanced-crewai`** - Enhanced AI crew coordination
+4. **`enhanced-rag-search`** - Enhanced retrieval-augmented generation search
+5. **`huggingface-model-trainer`** - Machine learning model training
+6. **`nerf-processor`** - Neural Radiance Fields processing
+7. **`ocr-processing`** - Optical character recognition
+8. **`rag-knowledge-search`** - Knowledge base RAG search
+9. **`spaceformer-analysis`** - Spatial analysis using Spaceformer
+10. **`svbrdf-extractor`** - Spatially Varying BRDF extraction
+
+#### ❌ Missing Functions (11) - Referenced in Code but NOT Found Locally
+1. **`voice-to-material`** - Voice processing (4 invocations)
+2. **`vector-similarity-search`** - Vector similarity search (4 invocations)
+3. **`material-recognition`** - Material recognition (4 invocations)
+4. **`ai-material-analysis`** - AI material analysis (4 invocations)
+5. **`hybrid-material-analysis`** - Hybrid material analysis (4 invocations)
+6. **`material-properties-analysis`** - Material properties analysis (4 invocations)
+7. **`style-analysis`** - Style analysis (4 invocations)
+8. **`generate-material-image`** - Material image generation (4 invocations)
+9. **`enhanced-pdf-html-processor`** - Enhanced PDF processing (4 invocations)
+10. **`pdf-integration-health`** - PDF integration health check (4 invocations)
+11. **`pdf-batch-process`** - PDF batch processing (4 invocations)
+
+#### 🔍 Potentially Unused Functions (8) - Exist Locally but NOT Found in Codebase
+1. **`api-gateway`** - API routing and gateway functionality
+2. **`material-scraper`** - Material data scraping
+3. **`parse-sitemap`** - Sitemap parsing functionality
+4. **`pdf-batch-process`** - PDF batch processing (duplicate with missing?)
+5. **`pdf-extract`** - PDF extraction functionality
+6. **`pdf-integration-health`** - PDF integration health (duplicate with missing?)
+7. **`scrape-session-manager`** - Scraping session management
+8. **`scrape-single-page`** - Single page scraping
+
+### Impact Assessment
+
+**Broken Functionality:**
+- **44 invocation points** calling non-existent functions
+- **Critical services affected** across multiple domains (material analysis, PDF processing, voice processing)
+- **Potential runtime errors** when these functions are called
+
+**Cleanup Opportunities:**
+- **8 potentially unused functions** consuming resources
+- **Inconsistent state** between local functions and deployed functions
+- **Technical debt** from orphaned function directories
+
+## Previous Cleanup Process Documentation (July 13, 2025)
 
 ### Phase 1: Initial Analysis
 - **20 total functions** identified in `supabase/functions/` directory

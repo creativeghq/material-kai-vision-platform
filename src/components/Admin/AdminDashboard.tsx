@@ -1,28 +1,124 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
-import { 
-  BarChart3, 
-  Brain, 
-  Database, 
-  Microscope, 
-  Settings, 
+import {
+  BarChart3,
+  Brain,
+  Database,
+  Microscope,
+  Settings,
   Activity,
   Search,
-  Tags,
   Shield,
-  ArrowLeft,
   Home,
   FileText,
   Globe,
-  Upload
+  Upload,
+  Users,
+  Server,
+  Cpu,
+  HardDrive,
+  Wifi,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  TrendingUp,
+  UserPlus,
+  Edit,
+  Trash2,
+  Eye,
+  RefreshCw,
+  Download,
+  Filter,
+  MoreHorizontal
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+// Mock data for demonstration - in real app, this would come from APIs
+const mockSystemMetrics = {
+  cpu: 45,
+  memory: 68,
+  disk: 32,
+  network: 12,
+  uptime: "15 days, 4 hours",
+  activeUsers: 23,
+  totalRequests: 8432,
+  errorRate: 0.2
+};
+
+const mockUsers = [
+  { id: 1, name: "John Doe", email: "john@example.com", role: "Admin", status: "Active", lastLogin: "2 hours ago" },
+  { id: 2, name: "Jane Smith", email: "jane@example.com", role: "User", status: "Active", lastLogin: "1 day ago" },
+  { id: 3, name: "Bob Wilson", email: "bob@example.com", role: "Moderator", status: "Inactive", lastLogin: "1 week ago" },
+  { id: 4, name: "Alice Brown", email: "alice@example.com", role: "User", status: "Active", lastLogin: "3 hours ago" }
+];
+
+const mockConfigs = [
+  { key: "max_upload_size", value: "100MB", category: "File Processing", description: "Maximum file size for uploads" },
+  { key: "session_timeout", value: "30 minutes", category: "Security", description: "User session timeout duration" },
+  { key: "api_rate_limit", value: "1000/hour", category: "API", description: "API requests per hour limit" },
+  { key: "backup_frequency", value: "Daily", category: "System", description: "Automated backup frequency" }
+];
+
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("overview");
+  const [systemMetrics, setSystemMetrics] = useState(mockSystemMetrics);
+  const [users] = useState(mockUsers);
+  const [configs, setConfigs] = useState(mockConfigs);
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [userFilter, setUserFilter] = useState("");
+  const [configFilter, setConfigFilter] = useState("");
+
+  // Simulate real-time updates for system metrics
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSystemMetrics(prev => ({
+        ...prev,
+        cpu: Math.max(10, Math.min(90, prev.cpu + (Math.random() - 0.5) * 10)),
+        memory: Math.max(20, Math.min(95, prev.memory + (Math.random() - 0.5) * 8)),
+        network: Math.max(0, Math.min(100, prev.network + (Math.random() - 0.5) * 20))
+      }));
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleUserAction = (action: string, userId?: number) => {
+    console.log(`${action} action for user:`, userId);
+    // In real app, this would make API calls
+  };
+
+  const handleBulkUserAction = (action: string) => {
+    console.log(`Bulk ${action} for users:`, selectedUsers);
+    // In real app, this would make API calls
+  };
+
+  const handleConfigUpdate = (key: string, newValue: string) => {
+    setConfigs(prev => prev.map(config => 
+      config.key === key ? { ...config, value: newValue } : config
+    ));
+    console.log(`Updated config ${key} to:`, newValue);
+    // In real app, this would make API calls
+  };
+
+  const filteredUsers = users.filter(user => 
+    user.name.toLowerCase().includes(userFilter.toLowerCase()) ||
+    user.email.toLowerCase().includes(userFilter.toLowerCase()) ||
+    user.role.toLowerCase().includes(userFilter.toLowerCase())
+  );
+
+  const filteredConfigs = configs.filter(config =>
+    config.key.toLowerCase().includes(configFilter.toLowerCase()) ||
+    config.category.toLowerCase().includes(configFilter.toLowerCase()) ||
+    config.description.toLowerCase().includes(configFilter.toLowerCase())
+  );
+
   const adminSections = [
     {
       title: "PDF Knowledge Base",
@@ -116,6 +212,15 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const getMetricColor = (value: number, type: string) => {
+    if (type === 'cpu' || type === 'memory') {
+      if (value > 80) return 'text-red-600';
+      if (value > 60) return 'text-yellow-600';
+      return 'text-green-600';
+    }
+    return 'text-blue-600';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header with Navigation */}
@@ -149,125 +254,475 @@ const AdminDashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
-        {/* Hero Section for PDF Upload */}
-        <Card className="border-2 border-primary/20 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <FileText className="h-6 w-6 text-primary" />
-              PDF Knowledge Base - Core System
-            </CardTitle>
-            <CardDescription className="text-base">
-              Upload PDF documents to extract materials knowledge and enhance the intelligent search system
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <Button asChild size="lg" className="flex items-center gap-2">
-                <Link to="/admin/pdf-processing">
-                  <Upload className="h-5 w-5" />
-                  Upload PDF Documents
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link to="/admin/knowledge-base">
-                  <Database className="h-5 w-5" />
-                  Manage Knowledge Base
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Enhanced Admin Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="monitoring">System Monitoring</TabsTrigger>
+            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="config">Configuration</TabsTrigger>
+          </TabsList>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {adminSections
-            .sort((a, b) => (a.priority || 99) - (b.priority || 99))
-            .map((section) => {
-            const Icon = section.icon;
-            return (
-              <Card key={section.path} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <Icon className="h-8 w-8 text-primary" />
-                    <Badge className={getStatusColor(section.status)}>
-                      {section.status}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-lg">{section.title}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {section.description}
-                  </CardDescription>
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            {/* Hero Section for PDF Upload */}
+            <Card className="border-2 border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <FileText className="h-6 w-6 text-primary" />
+                  PDF Knowledge Base - Core System
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Upload PDF documents to extract materials knowledge and enhance the intelligent search system
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4">
+                  <Button asChild size="lg" className="flex items-center gap-2">
+                    <Link to="/admin/pdf-processing">
+                      <Upload className="h-5 w-5" />
+                      Upload PDF Documents
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg">
+                    <Link to="/admin/knowledge-base">
+                      <Database className="h-5 w-5" />
+                      Manage Knowledge Base
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {adminSections
+                .sort((a, b) => (a.priority || 99) - (b.priority || 99))
+                .map((section) => {
+                const Icon = section.icon;
+                return (
+                  <Card key={section.path} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <Icon className="h-8 w-8 text-primary" />
+                        <Badge className={getStatusColor(section.status)}>
+                          {section.status}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-lg">{section.title}</CardTitle>
+                      <CardDescription className="text-sm">
+                        {section.description}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          {section.count}
+                        </span>
+                        <Button asChild variant="outline" size="sm">
+                          <Link to={section.path}>
+                            Manage
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">System Status</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      {section.count}
-                    </span>
-                    <Button asChild variant="outline" size="sm">
-                      <Link to={section.path}>
-                        Manage
-                      </Link>
-                    </Button>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>PDF Documents</span>
+                      <Badge variant="outline">156 Processed</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Knowledge Entries</span>
+                      <Badge variant="outline">1,247 Active</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Search Queries</span>
+                      <Badge variant="outline">8,432 Total</Badge>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">System Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>PDF Documents</span>
-                  <Badge variant="outline">156 Processed</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span>Knowledge Entries</span>
-                  <Badge variant="outline">1,247 Active</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span>Search Queries</span>
-                  <Badge variant="outline">8,432 Total</Badge>
-                </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Recent Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div>• New PDF processed: Material Specifications v2.1</div>
+                    <div>• 3D material suggestions updated</div>
+                    <div>• Enhanced search index rebuilt</div>
+                    <div>• Knowledge base entries validated</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button asChild variant="outline" size="sm" className="w-full">
+                    <Link to="/admin/pdf-processing">Process New PDF</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full">
+                    <Link to="/admin/search-hub">Test Search System</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full">
+                    <Link to="/admin/3d-suggestions">Configure 3D Suggestions</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* System Monitoring Tab */}
+          <TabsContent value="monitoring" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">CPU Usage</CardTitle>
+                  <Cpu className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    <span className={getMetricColor(systemMetrics.cpu, 'cpu')}>
+                      {systemMetrics.cpu.toFixed(1)}%
+                    </span>
+                  </div>
+                  <Progress value={systemMetrics.cpu} className="mt-2" />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Memory Usage</CardTitle>
+                  <HardDrive className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    <span className={getMetricColor(systemMetrics.memory, 'memory')}>
+                      {systemMetrics.memory.toFixed(1)}%
+                    </span>
+                  </div>
+                  <Progress value={systemMetrics.memory} className="mt-2" />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Disk Usage</CardTitle>
+                  <Server className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    <span className={getMetricColor(systemMetrics.disk, 'disk')}>
+                      {systemMetrics.disk}%
+                    </span>
+                  </div>
+                  <Progress value={systemMetrics.disk} className="mt-2" />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Network I/O</CardTitle>
+                  <Wifi className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    <span className={getMetricColor(systemMetrics.network, 'network')}>
+                      {systemMetrics.network.toFixed(1)} MB/s
+                    </span>
+                  </div>
+                  <Progress value={systemMetrics.network} className="mt-2" />
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    System Health
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span>System Uptime</span>
+                    <Badge variant="outline" className="text-green-600">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      {systemMetrics.uptime}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Active Users</span>
+                    <Badge variant="outline">
+                      <Users className="h-3 w-3 mr-1" />
+                      {systemMetrics.activeUsers}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Total Requests</span>
+                    <Badge variant="outline">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      {systemMetrics.totalRequests.toLocaleString()}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Error Rate</span>
+                    <Badge variant="outline" className={systemMetrics.errorRate > 1 ? "text-red-600" : "text-green-600"}>
+                      {systemMetrics.errorRate > 1 ? <AlertTriangle className="h-3 w-3 mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                      {systemMetrics.errorRate}%
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    System Alerts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      High memory usage detected on server-02 (85%)
+                    </AlertDescription>
+                  </Alert>
+                  <Alert>
+                    <Clock className="h-4 w-4" />
+                    <AlertDescription>
+                      Scheduled maintenance in 2 hours
+                    </AlertDescription>
+                  </Alert>
+                  <Alert>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      All services are running normally
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* User Management Tab */}
+          <TabsContent value="users" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">User Management</h3>
+                <p className="text-sm text-muted-foreground">
+                  Manage user accounts, roles, and permissions
+                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div>• New PDF processed: Material Specifications v2.1</div>
-                <div>• 3D material suggestions updated</div>
-                <div>• Enhanced search index rebuilt</div>
-                <div>• Knowledge base entries validated</div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+                <Button size="sm">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button asChild variant="outline" size="sm" className="w-full">
-                <Link to="/admin/pdf-processing">Process New PDF</Link>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={userFilter}
+                  onChange={(e) => setUserFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-input rounded-md"
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filter
               </Button>
-              <Button asChild variant="outline" size="sm" className="w-full">
-                <Link to="/admin/search-hub">Test Search System</Link>
+              {selectedUsers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleBulkUserAction('activate')}>
+                    Activate ({selectedUsers.length})
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleBulkUserAction('deactivate')}>
+                    Deactivate ({selectedUsers.length})
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b">
+                      <tr>
+                        <th className="text-left p-4">
+                          <input
+                            type="checkbox"
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUsers(filteredUsers.map(u => u.id));
+                              } else {
+                                setSelectedUsers([]);
+                              }
+                            }}
+                          />
+                        </th>
+                        <th className="text-left p-4">User</th>
+                        <th className="text-left p-4">Role</th>
+                        <th className="text-left p-4">Status</th>
+                        <th className="text-left p-4">Last Login</th>
+                        <th className="text-left p-4">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((user) => (
+                        <tr key={user.id} className="border-b hover:bg-muted/50">
+                          <td className="p-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsers([...selectedUsers, user.id]);
+                                } else {
+                                  setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                                }
+                              }}
+                            />
+                          </td>
+                          <td className="p-4">
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-muted-foreground">{user.email}</div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant="outline">{user.role}</Badge>
+                          </td>
+                          <td className="p-4">
+                            <Badge className={user.status === 'Active' ? 'bg-green-500/20 text-green-600' : 'bg-gray-500/20 text-gray-600'}>
+                              {user.status}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-sm text-muted-foreground">{user.lastLogin}</td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleUserAction('edit', user.id)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleUserAction('view', user.id)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleUserAction('delete', user.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Configuration Tab */}
+          <TabsContent value="config" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">System Configuration</h3>
+                <p className="text-sm text-muted-foreground">
+                  Manage system settings and configuration parameters
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+                <Button size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Add Config
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search configurations..."
+                  value={configFilter}
+                  onChange={(e) => setConfigFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-input rounded-md"
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filter by Category
               </Button>
-              <Button asChild variant="outline" size="sm" className="w-full">
-                <Link to="/admin/3d-suggestions">Configure 3D Suggestions</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+
+            <div className="grid gap-4">
+              {filteredConfigs.map((config) => (
+                <Card key={config.key}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-medium">{config.key}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            {config.category}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          {config.description}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Current Value:</span>
+                          <input
+                            type="text"
+                            value={config.value}
+                            onChange={(e) => handleConfigUpdate(config.key, e.target.value)}
+                            className="px-2 py-1 border border-input rounded text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

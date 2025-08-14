@@ -18,8 +18,8 @@ import {
   X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { unifiedSearchService } from '@/services/unifiedSearchService';
-import { vectorSimilarityService } from '@/services/vectorSimilarityService';
+import { MivaaSearchIntegration } from '@/services/mivaaSearchIntegration';
+import { MivaaEmbeddingIntegration } from '@/services/mivaaEmbeddingIntegration';
 
 interface SearchResult {
   id: string;
@@ -40,6 +40,10 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   onResultsFound,
   onMaterialSelect
 }) => {
+  // Initialize MIVAA service instances
+  const mivaaSearchService = new MivaaSearchIntegration();
+  const mivaaEmbeddingService = new MivaaEmbeddingIntegration();
+
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -89,8 +93,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       let searchResults: any;
 
       if (actualSearchType === 'text') {
-        // Enhanced text search with natural language processing
-        searchResults = await unifiedSearchService.searchMaterials({
+        // Enhanced text search with MIVAA's LlamaIndex RAG
+        searchResults = await mivaaSearchService.searchDocuments({
           query: query.trim(),
           searchType: 'enhanced_text',
           includeKnowledge: true,
@@ -98,20 +102,23 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           limit: 15
         });
       } else if (actualSearchType === 'image') {
-        // Image-based search
+        // Image-based search using MIVAA embedding service
         const imageBase64 = imagePreview?.split(',')[1] || '';
-        searchResults = await vectorSimilarityService.searchByImage(imageBase64, {
+        const embeddings = await mivaaEmbeddingService.generateEmbeddings([imageBase64]);
+        searchResults = await mivaaSearchService.searchByEmbedding({
+          embedding: embeddings.embeddings[0],
           threshold: 0.7,
-          count: 12
+          limit: 12
         });
       } else {
-        // Hybrid search (text + image)
+        // Hybrid search (text + image) using MIVAA services
         const imageBase64 = imagePreview?.split(',')[1] || '';
-        searchResults = await vectorSimilarityService.hybridSearch(
-          query.trim(),
-          imageBase64,
-          { threshold: 0.6, count: 20 }
-        );
+        searchResults = await mivaaSearchService.hybridSearch({
+          textQuery: query.trim(),
+          imageData: imageBase64,
+          threshold: 0.6,
+          limit: 20
+        });
       }
 
       // Transform results to unified format
@@ -164,8 +171,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
     setIsSearching(true);
     try {
-      // Quick text-based search for material specifications
-      const quickResults = await unifiedSearchService.searchMaterials({
+      // Quick text-based search using MIVAA's fast search
+      const quickResults = await mivaaSearchService.searchDocuments({
         query: searchQuery,
         searchType: 'specification_match',
         includeKnowledge: false,
@@ -196,7 +203,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     } finally {
       setIsSearching(false);
     }
-  }, [onResultsFound, toast]);
+  }, [onResultsFound, toast, mivaaSearchService]);
 
   const getResultIcon = (type: string) => {
     switch (type) {

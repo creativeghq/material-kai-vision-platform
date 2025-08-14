@@ -55,7 +55,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     }
 
     // Validate device capabilities
-    const deviceInfo = DeviceDetector.getDeviceInfo();
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
     if (!deviceInfo.supportsWebGPU && this.config?.preferServerSide === false) {
       console.warn('WebGPU not supported, server-side processing recommended');
     }
@@ -90,7 +90,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     }
 
     // Test basic functionality
-    const deviceInfo = DeviceDetector.getDeviceInfo();
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
     if (!deviceInfo.supportsWebGPU && !this.config.fallbackToClient) {
       throw new Error('No WebGPU support and fallback disabled');
     }
@@ -132,7 +132,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     options: HybridMLOptions = {}
   ): Promise<HybridMLResult> {
     const opts = { ...this.DEFAULT_OPTIONS, ...options };
-    const processingDecision = this.determineProcessingMethod(files, opts);
+    const processingDecision = await this.determineProcessingMethod(files, opts);
 
     console.log(`Using ${processingDecision.method} processing:`, processingDecision.reason);
 
@@ -165,10 +165,10 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   /**
    * Determine the optimal processing method based on various factors
    */
-  private determineProcessingMethod(
-    files: File[], 
+  private async determineProcessingMethod(
+    files: File[],
     options: Required<HybridMLOptions>
-  ): { method: 'client' | 'server' | 'hybrid'; reason: string } {
+  ): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string }> {
     // Check file constraints
     const totalSize = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024); // MB
     const oversizedFiles = files.filter(file => file.size > options.maxFileSize * 1024 * 1024);
@@ -196,12 +196,12 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     }
 
     // Check device capabilities
-    const deviceInfo = DeviceDetector.getDeviceInfo();
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
     
     if (!deviceInfo.supportsWebGPU && totalSize > 2) {
-      return { 
-        method: 'server', 
-        reason: 'No WebGPU support and large total file size' 
+      return {
+        method: 'server',
+        reason: 'No WebGPU support and large total file size'
       };
     }
 
@@ -420,15 +420,15 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   /**
    * Get processing recommendations for given files
    */
-  getProcessingRecommendation(files: File[]): {
+  async getProcessingRecommendation(files: File[]): Promise<{
     recommendedMethod: 'client' | 'server' | 'hybrid';
     reasons: string[];
     estimatedTime: string;
     costImplications: string;
-  } {
+  }> {
     const decision = this.determineProcessingMethod(files, this.DEFAULT_OPTIONS);
     const totalSize = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
-    const deviceInfo = DeviceDetector.getDeviceInfo();
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
 
     const reasons = [decision.reason];
     
@@ -526,13 +526,13 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   /**
    * Get service status
    */
-  getStatus(): {
+  async getStatus(): Promise<{
     client: ReturnType<typeof clientMLService.getStatus>;
-    device: ReturnType<typeof DeviceDetector.getDeviceInfo>;
+    device: Awaited<ReturnType<typeof DeviceDetector.getDeviceInfo>>;
     recommendations: string[];
-  } {
+  }> {
     const clientStatus = clientMLService.getStatus();
-    const deviceInfo = DeviceDetector.getDeviceInfo();
+    const deviceInfo = await DeviceDetector.getDeviceInfo();
     
     const recommendations = [];
     
