@@ -1,6 +1,13 @@
 import { z } from 'zod';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ErrorHandler } from '../utils/errorHandler';
 import { JWTAuthMiddleware, AuthenticatedRequest, AuthenticationResult } from '../middleware/jwtAuthMiddleware';
+import { MaterialKaiAuthMiddleware } from '../middleware/materialKaiAuthMiddleware';
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
 // Express types (would be imported from @types/express in real implementation)
 interface Request {
@@ -111,9 +118,37 @@ export class MivaaGatewayController {
 
   /**
    * Authentication Middleware for MIVAA requests
+   * Supports both JWT authentication and Material Kai API key authentication
    */
   private async authenticateRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      // Create Material Kai middleware instance with Supabase client
+      // Create Material Kai middleware instance with Supabase client
+      const materialKaiMiddleware = new MaterialKaiAuthMiddleware(supabase);
+      
+      // Extract origin from request headers
+      const origin = req.headers.origin || req.headers.Origin || null;
+      
+      // First, try Material Kai API key authentication
+      const materialKaiResult = await materialKaiMiddleware.authenticate(
+        req.headers as Record<string, string | string[] | undefined>,
+        typeof origin === 'string' ? origin : null
+      );
+      
+      if (materialKaiResult.success && materialKaiResult.keyData) {
+        // Material Kai authentication successful
+        (req as any).authContext = {
+          userId: 'material-kai-user',
+          workspaceId: materialKaiResult.keyData.workspace_id,
+          authType: 'material-kai',
+          apiKey: materialKaiResult.keyData.api_key,
+          scopes: ['mivaa:access', 'material-kai:access']
+        };
+        next();
+        return;
+      }
+
+      // If Material Kai auth failed, try JWT authentication as fallback
       const authRequest: AuthenticatedRequest = {
         headers: req.headers as Record<string, string>,
         body: req.body
@@ -126,18 +161,23 @@ export class MivaaGatewayController {
       }
 
       // Authenticate with MIVAA-specific scopes
-      const authResult: AuthenticationResult = await JWTAuthMiddleware.authenticate(authRequest, {
+      const jwtAuthResult: AuthenticationResult = await JWTAuthMiddleware.authenticate(authRequest, {
         allowApiKey: true,
         requiredScopes: ['mivaa:access'],
         workspaceRequired: true
       });
 
-      if (!authResult.success) {
+      if (!jwtAuthResult.success) {
+        // Both authentication methods failed
         const errorResponse: MivaaResponse = {
           success: false,
           error: {
-            code: authResult.error?.code || 'MIVAA_AUTH_FAILED',
-            message: authResult.error?.message || 'MIVAA authentication failed'
+            code: 'MIVAA_AUTH_FAILED',
+            message: 'Authentication failed. Please provide a valid JWT token or Material Kai API key.',
+            details: {
+              materialKaiError: materialKaiResult.error,
+              jwtError: jwtAuthResult.error?.message
+            }
           },
           metadata: {
             timestamp: new Date().toISOString(),
@@ -146,12 +186,15 @@ export class MivaaGatewayController {
           }
         };
         
-        res.status(authResult.error?.statusCode || 401).json(errorResponse);
+        res.status(401).json(errorResponse);
         return;
       }
 
-      // Attach auth context to request
-      (req as any).authContext = authResult.authContext;
+      // JWT authentication successful
+      (req as any).authContext = {
+        ...jwtAuthResult.authContext,
+        authType: 'jwt'
+      };
       next();
     } catch (error) {
       const errorResponse: MivaaResponse = {

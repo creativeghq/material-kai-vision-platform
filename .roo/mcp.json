@@ -40,7 +40,8 @@
         "get_project",
         "deploy_edge_function",
         "list_edge_functions",
-        "list_extensions"
+        "list_extensions",
+        "delete_edge_function"
       ]
     },
     "repomix": {

@@ -112,15 +112,24 @@ The platform uses environment variables for configuration management across diff
 
 | Variable Name | Required | Description | Default Value | Configuration Location |
 |---------------|----------|-------------|---------------|----------------------|
-| `MATERIAL_KAI_PLATFORM_URL` | No | Platform API URL | "https://api.materialkai.vision" | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_API_KEY` | Yes | Platform API key | - | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_WORKSPACE_ID` | Yes | Platform workspace ID | - | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_SERVICE_NAME` | No | Service identifier | "mivaa-pdf-extractor" | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_SYNC_ENABLED` | No | Enable platform sync | true | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_REAL_TIME_ENABLED` | No | Enable real-time updates | true | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_BATCH_SIZE` | No | Batch processing size | 10 | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_RETRY_ATTEMPTS` | No | Retry attempts | 3 | GitHub Secrets, Vercel |
-| `MATERIAL_KAI_TIMEOUT` | No | Request timeout | 30 | GitHub Secrets, Vercel |
+| `MATERIAL_KAI_PLATFORM_URL` | No | Platform API URL | "https://api.materialkai.vision" | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_API_KEY` | Yes | Platform API key for authentication | - | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_WORKSPACE_ID` | Yes | Platform workspace identifier | - | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_SERVICE_NAME` | No | Service identifier | "mivaa-pdf-extractor" | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_SYNC_ENABLED` | No | Enable platform sync | true | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_REAL_TIME_ENABLED` | No | Enable real-time updates | true | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_BATCH_SIZE` | No | Batch processing size | 10 | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_RETRY_ATTEMPTS` | No | Retry attempts for failed requests | 3 | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_TIMEOUT` | No | Request timeout in seconds | 30 | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_RATE_LIMIT_ENABLED` | No | Enable rate limiting for API keys | true | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_RATE_LIMIT_REQUESTS` | No | Max requests per minute per API key | 100 | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_CORS_ORIGINS` | No | Allowed CORS origins for Material Kai | "*" | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_AUTH_FALLBACK_ENABLED` | No | Enable hardcoded API key fallback | true | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_DB_LOOKUP_ENABLED` | No | Enable database API key lookup | true | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_USAGE_TRACKING_ENABLED` | No | Enable API key usage tracking | true | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_LOG_LEVEL` | No | Logging level for Material Kai operations | "INFO" | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_CACHE_TTL` | No | Cache TTL for API key validation (seconds) | 300 | GitHub Secrets, Vercel, Supabase |
+| `MATERIAL_KAI_ENVIRONMENT` | No | Environment identifier | "production" | GitHub Secrets, Vercel, Supabase |
 
 ## Monitoring & Error Tracking
 
@@ -169,10 +178,21 @@ The platform uses environment variables for configuration management across diff
 - `JWT_SECRET_KEY`
 - `MATERIAL_KAI_API_KEY`
 - `MATERIAL_KAI_WORKSPACE_ID`
+- `HUGGINGFACE_API_TOKEN`
+- `REPLICATE_API_KEY`
+- `JINA_API_KEY`
+- `FIRECRAWL_API_KEY`
 - `DO_API_TOKEN`
 - `DO_DROPLET_NAME`
 - `DO_SSH_KEY_NAME`
 - `GITHUB_TOKEN`
+
+**Optional but Recommended Secrets:**
+- `ANTHROPIC_API_KEY`
+- `SENTRY_DSN`
+- `MATERIAL_KAI_PLATFORM_URL`
+- `MATERIAL_KAI_RATE_LIMIT_REQUESTS`
+- `MATERIAL_KAI_CORS_ORIGINS`
 
 ### Vercel Environment Variables
 
@@ -187,6 +207,18 @@ The platform uses environment variables for configuration management across diff
 - `JWT_SECRET_KEY`
 - `MATERIAL_KAI_API_KEY`
 - `MATERIAL_KAI_WORKSPACE_ID`
+
+**Optional Variables for Enhanced Functionality:**
+- `MATERIAL_KAI_PLATFORM_URL`
+- `MATERIAL_KAI_RATE_LIMIT_ENABLED`
+- `MATERIAL_KAI_RATE_LIMIT_REQUESTS`
+- `MATERIAL_KAI_CORS_ORIGINS`
+- `MATERIAL_KAI_AUTH_FALLBACK_ENABLED`
+- `MATERIAL_KAI_DB_LOOKUP_ENABLED`
+- `MATERIAL_KAI_USAGE_TRACKING_ENABLED`
+- `MATERIAL_KAI_LOG_LEVEL`
+- `MATERIAL_KAI_CACHE_TTL`
+- `MATERIAL_KAI_ENVIRONMENT`
 
 ### Supabase Configuration
 
@@ -203,6 +235,33 @@ The platform uses environment variables for configuration management across diff
 2. Set up SSH keys for server access
 3. Configure the droplet settings in GitHub Secrets
 
+### Material Kai Platform Configuration
+
+The Material Kai Platform integration requires specific configuration for API key management and authentication:
+
+1. **Database Setup**: Ensure the `material_kai_keys` table exists in your Supabase database
+2. **API Key Generation**: Use the format `mk_api_YYYY_[random_string]` for API keys
+3. **Workspace Configuration**: Set up workspace identifiers in the format `workspace_[name]_YYYY_[identifier]`
+
+**Example Configuration:**
+```bash
+# Required Material Kai Variables
+MATERIAL_KAI_API_KEY=mk_api_2024_Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s
+MATERIAL_KAI_WORKSPACE_ID=workspace_main_2024_basil_material_kai_vision
+
+# Optional Material Kai Variables (with defaults)
+MATERIAL_KAI_PLATFORM_URL=https://api.materialkai.vision
+MATERIAL_KAI_RATE_LIMIT_ENABLED=true
+MATERIAL_KAI_RATE_LIMIT_REQUESTS=100
+MATERIAL_KAI_CORS_ORIGINS=*
+MATERIAL_KAI_AUTH_FALLBACK_ENABLED=true
+MATERIAL_KAI_DB_LOOKUP_ENABLED=true
+MATERIAL_KAI_USAGE_TRACKING_ENABLED=true
+MATERIAL_KAI_LOG_LEVEL=INFO
+MATERIAL_KAI_CACHE_TTL=300
+MATERIAL_KAI_ENVIRONMENT=production
+```
+
 ## Security Best Practices
 
 1. **Never commit secrets to version control**
@@ -218,17 +277,45 @@ The platform uses environment variables for configuration management across diff
 - Use test/development API keys
 - Enable debug mode
 - Use local storage for development
+- **Material Kai Configuration:**
+  ```bash
+  MATERIAL_KAI_ENVIRONMENT=development
+  MATERIAL_KAI_LOG_LEVEL=DEBUG
+  MATERIAL_KAI_RATE_LIMIT_ENABLED=false
+  MATERIAL_KAI_AUTH_FALLBACK_ENABLED=true
+  MATERIAL_KAI_CACHE_TTL=60
+  ```
 
 ### Staging
 - Use staging API keys
 - Mirror production configuration
 - Enable detailed logging
+- **Material Kai Configuration:**
+  ```bash
+  MATERIAL_KAI_ENVIRONMENT=staging
+  MATERIAL_KAI_LOG_LEVEL=INFO
+  MATERIAL_KAI_RATE_LIMIT_ENABLED=true
+  MATERIAL_KAI_RATE_LIMIT_REQUESTS=200
+  MATERIAL_KAI_AUTH_FALLBACK_ENABLED=true
+  MATERIAL_KAI_CACHE_TTL=180
+  ```
 
 ### Production
 - Use production API keys
 - Disable debug mode
 - Enable monitoring and error tracking
 - Use production-grade storage and databases
+- **Material Kai Configuration:**
+  ```bash
+  MATERIAL_KAI_ENVIRONMENT=production
+  MATERIAL_KAI_LOG_LEVEL=WARN
+  MATERIAL_KAI_RATE_LIMIT_ENABLED=true
+  MATERIAL_KAI_RATE_LIMIT_REQUESTS=100
+  MATERIAL_KAI_AUTH_FALLBACK_ENABLED=false
+  MATERIAL_KAI_DB_LOOKUP_ENABLED=true
+  MATERIAL_KAI_USAGE_TRACKING_ENABLED=true
+  MATERIAL_KAI_CACHE_TTL=300
+  ```
 
 ## Validation
 
@@ -249,6 +336,19 @@ This script will check all environment variables and provide a detailed report o
 3. **Database Connection Issues**: Verify Supabase URL and keys are correct
 4. **CORS Issues**: Configure CORS_ORIGINS for your domain
 5. **File Upload Issues**: Check MAX_FILE_SIZE setting
+6. **Material Kai Authentication Failures**:
+   - Verify API key format matches `mk_api_YYYY_[random_string]`
+   - Check that `material_kai_keys` table exists in Supabase
+   - Ensure workspace ID is correctly formatted
+   - Verify rate limiting settings are not too restrictive
+7. **Material Kai Database Issues**:
+   - Run the migration: `supabase/migrations/20240814_create_material_kai_keys.sql`
+   - Check RLS policies are enabled for the table
+   - Verify service role key has proper permissions
+8. **Material Kai Middleware Errors**:
+   - Check `MATERIAL_KAI_AUTH_FALLBACK_ENABLED` setting
+   - Verify `MATERIAL_KAI_DB_LOOKUP_ENABLED` configuration
+   - Review logs for specific validation errors
 
 ### Getting Help
 
