@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { 
@@ -244,9 +243,9 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               statusConfig.animate && 'animate-spin'
             )}
           />
-          <Badge variant={statusConfig.variant} className="text-xs">
+          <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
             {statusConfig.label}
-          </Badge>
+          </span>
         </div>
         <div className="flex-1 min-w-0">
           <Progress value={progressData.overallProgress} className="h-2" />
@@ -289,7 +288,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
             <div className="flex items-center gap-2">
               {progressData.status === 'idle' && (
                 <Button
-                  size="sm"
+                  className="px-3 py-1.5 text-sm"
                   onClick={() => handleControl('start')}
                   disabled={!isConnected}
                 >
@@ -299,8 +298,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               )}
               {progressData.status === 'running' && (
                 <Button
-                  size="sm"
-                  variant="outline"
+                  className="px-3 py-1.5 text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                   onClick={() => handleControl('pause')}
                   disabled={!isConnected}
                 >
@@ -310,7 +308,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               )}
               {progressData.status === 'paused' && (
                 <Button
-                  size="sm"
+                  className="px-3 py-1.5 text-sm"
                   onClick={() => handleControl('resume')}
                   disabled={!isConnected}
                 >
@@ -320,8 +318,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               )}
               {(progressData.status === 'running' || progressData.status === 'paused') && (
                 <Button
-                  size="sm"
-                  variant="destructive"
+                  className="px-3 py-1.5 text-sm bg-red-600 text-white hover:bg-red-700"
                   onClick={() => handleControl('cancel')}
                   disabled={!isConnected}
                 >

@@ -6,9 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { moodboardAPI, type CreateMoodBoardData } from '@/services/moodboardAPI';
+import { moodboardAPI } from '@/services/moodboardAPI';
 import type { Material, MoodBoard } from '@/types/materials';
 
 interface AddToBoardModalProps {
@@ -146,18 +145,18 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
 
         {/* Material Preview */}
         <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-          {material.thumbnail_url && (
-            <img 
-              src={material.thumbnail_url} 
+          {material.thumbnailUrl && (
+            <img
+              src={material.thumbnailUrl}
               alt={material.name}
               className="w-12 h-12 rounded object-cover"
             />
           )}
           <div className="flex-1 min-w-0">
             <h4 className="font-medium truncate">{material.name}</h4>
-            <Badge variant="outline" className="text-xs">
+            <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
               {material.category}
-            </Badge>
+            </span>
           </div>
         </div>
 
@@ -186,7 +185,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                           <div className="flex items-center gap-2">
                             <span>{board.title}</span>
                             {board.isPublic && (
-                              <Badge variant="secondary" className="text-xs">Public</Badge>
+                              <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Public</span>
                             )}
                           </div>
                         </SelectItem>
@@ -217,8 +216,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                 <Separator className="flex-1" />
               </div>
 
-              <Button 
-                variant="outline" 
+              <Button
                 onClick={() => setShowCreateNew(true)}
                 className="w-full"
               >
@@ -245,8 +243,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
               />
 
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
                   onClick={() => setShowCreateNew(false)}
                   className="flex-1"
                 >

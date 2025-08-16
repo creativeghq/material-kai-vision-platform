@@ -271,19 +271,37 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
   // Get status badge variant
   const getStatusBadge = (status: JobItem['status']) => {
     const variants = {
-      pending: { variant: 'secondary' as const, icon: Clock },
-      running: { variant: 'default' as const, icon: Activity },
-      completed: { variant: 'default' as const, icon: CheckCircle },
-      failed: { variant: 'destructive' as const, icon: XCircle },
-      paused: { variant: 'secondary' as const, icon: Pause },
-      cancelled: { variant: 'outline' as const, icon: Square }
+      pending: {
+        className: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        icon: Clock
+      },
+      running: {
+        className: 'bg-primary text-primary-foreground hover:bg-primary/80',
+        icon: Activity
+      },
+      completed: {
+        className: 'bg-primary text-primary-foreground hover:bg-primary/80',
+        icon: CheckCircle
+      },
+      failed: {
+        className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        icon: XCircle
+      },
+      paused: {
+        className: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        icon: Pause
+      },
+      cancelled: {
+        className: 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
+        icon: Square
+      }
     };
 
     const config = variants[status];
     const Icon = config.icon;
 
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <Badge className={`flex items-center gap-1 ${config.className}`}>
         <Icon className="h-3 w-3" />
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
@@ -292,6 +310,21 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
 
   // Get priority badge variant
   const getPriorityBadge = (priority: JobItem['priority']) => {
+    const getVariantClassName = (variant: string) => {
+      switch (variant) {
+        case 'outline':
+          return 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground';
+        case 'secondary':
+          return 'bg-secondary text-secondary-foreground hover:bg-secondary/80';
+        case 'default':
+          return 'bg-primary text-primary-foreground hover:bg-primary/80';
+        case 'destructive':
+          return 'bg-destructive text-destructive-foreground hover:bg-destructive/90';
+        default:
+          return 'bg-primary text-primary-foreground hover:bg-primary/80';
+      }
+    };
+
     const variants = {
       low: 'outline' as const,
       normal: 'secondary' as const,
@@ -300,7 +333,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
     };
 
     return (
-      <Badge variant={variants[priority]} className="text-xs">
+      <Badge className={`text-xs ${getVariantClassName(variants[priority])}`}>
         {priority.charAt(0).toUpperCase() + priority.slice(1)}
       </Badge>
     );
@@ -406,16 +439,14 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                   {selectedJobs.size > 0 && (
                     <>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                         onClick={() => handleBatchAction('pause')}
                       >
                         <Pause className="h-4 w-4 mr-1" />
                         Pause ({selectedJobs.size})
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                         onClick={() => handleBatchAction('cancel')}
                       >
                         <Square className="h-4 w-4 mr-1" />
@@ -425,8 +456,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                   )}
                   
                   <Button
-                    variant="outline"
-                    size="sm"
+                    className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => loadJobQueue()}
                     disabled={isLoading}
                   >
@@ -504,8 +534,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
               </Select>
 
               <Button
-                variant="outline"
-                size="sm"
+                className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               >
                 {sortOrder === 'asc' ? '↑' : '↓'}
@@ -595,8 +624,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
-                                      variant="outline"
-                                      size="sm"
+                                      className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                                       onClick={() => handleJobAction(job.id, 'pause')}
                                     >
                                       <Pause className="h-4 w-4" />
@@ -610,8 +638,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
-                                      variant="outline"
-                                      size="sm"
+                                      className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                                       onClick={() => handleJobAction(job.id, 'resume')}
                                     >
                                       <Play className="h-4 w-4" />
@@ -625,8 +652,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
-                                      variant="outline"
-                                      size="sm"
+                                      className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                                       onClick={() => handleJobAction(job.id, 'retry')}
                                     >
                                       <RotateCcw className="h-4 w-4" />
@@ -640,8 +666,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
-                                      variant="outline"
-                                      size="sm"
+                                      className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                                       onClick={() => window.open(job.resultUrl, '_blank')}
                                     >
                                       <Download className="h-4 w-4" />
@@ -653,7 +678,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
 
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="sm">
+                                  <Button className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -101,14 +100,6 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
   };
 
   const getStatusBadge = (status: WorkflowStep['status']) => {
-    const variants = {
-      pending: 'secondary',
-      running: 'default',
-      completed: 'default',
-      failed: 'destructive',
-      skipped: 'outline'
-    } as const;
-
     const colors = {
       pending: 'bg-gray-100 text-gray-700',
       running: 'bg-blue-100 text-blue-700',
@@ -118,9 +109,9 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
     };
 
     return (
-      <Badge variant={variants[status]} className={cn('capitalize', colors[status])}>
+      <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize', colors[status])}>
         {status}
-      </Badge>
+      </span>
     );
   };
 
@@ -162,10 +153,8 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Button
-                    variant="ghost"
-                    size="sm"
                     onClick={() => toggleJobExpansion(job.id)}
-                    className="p-1 h-auto"
+                    className="p-1 h-auto text-sm bg-transparent hover:bg-gray-100"
                   >
                     {isExpanded ? 
                       <ChevronDown className="h-4 w-4" /> : 
@@ -192,9 +181,8 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                   
                   {job.status === 'failed' && onRetryJob && (
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => onRetryJob(job.id)}
+                      className="text-sm border border-gray-300 hover:bg-gray-50 px-3 py-1"
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Retry
@@ -256,10 +244,8 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                 
                                 {(step.details || step.logs || step.error) && (
                                   <Button
-                                    variant="ghost"
-                                    size="sm"
                                     onClick={() => toggleStepExpansion(step.id)}
-                                    className="p-1 h-auto"
+                                    className="p-1 h-auto text-sm bg-transparent hover:bg-gray-100"
                                   >
                                     {isStepExpanded ? 
                                       <ChevronDown className="h-3 w-3" /> : 

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SemanticSearchInput, SearchOptions } from './SemanticSearchInput';
+import { supabase } from '@/integrations/supabase/client';
 
 // Types for search results
 export interface SearchResult {
@@ -72,71 +73,115 @@ export interface SemanticSearchProps {
   enableViewToggle?: boolean;
 }
 
-// Mock search results for demonstration
-const mockResults: SearchResult[] = [
-  {
-    id: '1',
-    title: 'PDF Analysis Report - Q4 Financial Data',
-    content: 'Comprehensive analysis of Q4 financial performance including revenue trends, expense breakdowns, and key performance indicators.',
-    type: 'document',
-    category: 'financial',
-    relevanceScore: 0.95,
-    semanticScore: 0.92,
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    metadata: {
-      source: 'financial_reports/q4_2024.pdf',
-      fileType: 'PDF',
-      size: 2048576,
-      tags: ['financial', 'quarterly', 'analysis'],
-      author: 'Finance Team',
-      processingStatus: 'completed',
-      confidence: 0.94
-    },
-    highlights: ['financial performance', 'revenue trends', 'Q4 analysis'],
-    thumbnail: '/api/thumbnails/q4_report.jpg'
-  },
-  {
-    id: '2',
-    title: 'Image Processing Results - Product Catalog',
-    content: 'Automated image analysis results for product catalog items including object detection, text extraction, and quality assessment.',
-    type: 'image',
-    category: 'product',
-    relevanceScore: 0.88,
-    semanticScore: 0.85,
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    metadata: {
-      source: 'product_images/batch_001/',
-      fileType: 'JPG',
-      size: 1024000,
-      tags: ['product', 'catalog', 'automated'],
-      processingStatus: 'completed',
-      extractedText: 'Product Name: Premium Widget, SKU: PW-001',
-      confidence: 0.87
-    },
-    highlights: ['object detection', 'text extraction', 'product catalog'],
-    thumbnail: '/api/thumbnails/product_batch.jpg'
-  },
-  {
-    id: '3',
-    title: 'Data Analysis - Customer Behavior Patterns',
-    content: 'Statistical analysis of customer behavior patterns based on transaction data and user interaction metrics.',
-    type: 'data',
-    category: 'analytics',
-    relevanceScore: 0.82,
-    semanticScore: 0.79,
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6),
-    metadata: {
-      source: 'analytics/customer_behavior.csv',
-      fileType: 'CSV',
-      size: 512000,
-      tags: ['analytics', 'customer', 'behavior'],
-      author: 'Data Science Team',
-      processingStatus: 'completed',
-      confidence: 0.91
-    },
-    highlights: ['customer behavior', 'transaction data', 'interaction metrics']
+// Database search function
+const searchDatabase = async (query: string, options?: SearchOptions): Promise<SearchResult[]> => {
+  try {
+    // Search across multiple tables for comprehensive results
+    const searchPromises = [];
+
+    // Search processing results (documents and PDFs)
+    searchPromises.push(
+      supabase
+        .from('processing_results')
+        .select(`
+          id,
+          document_id,
+          status,
+          extraction_type,
+          page_count,
+          file_size_bytes,
+          processing_time_ms,
+          created_at,
+          updated_at,
+          metadata,
+          extracted_content
+        `)
+        .or(`document_id.ilike.%${query}%,extracted_content.ilike.%${query}%,metadata->>title.ilike.%${query}%`)
+        .eq('status', 'completed')
+        .limit(20)
+    );
+
+    // Search materials catalog
+    searchPromises.push(
+      supabase
+        .from('materials_catalog')
+        .select(`
+          id,
+          name,
+          description,
+          category,
+          properties,
+          created_at,
+          updated_at,
+          metadata
+        `)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
+        .limit(20)
+    );
+
+    const [processingResults, materialsResults] = await Promise.all(searchPromises);
+
+    const results: SearchResult[] = [];
+
+    // Process processing results
+    if (processingResults?.data) {
+      processingResults.data.forEach((item: any) => {
+        const metadata = item.metadata || {};
+        results.push({
+          id: `processing_${item.id}`,
+          title: metadata.title || `Document ${item.document_id}`,
+          content: item.extracted_content?.substring(0, 200) || `${item.extraction_type} processing result`,
+          type: 'document',
+          category: item.extraction_type || 'document',
+          relevanceScore: 0.8 + Math.random() * 0.2,
+          semanticScore: 0.75 + Math.random() * 0.25,
+          timestamp: new Date(item.created_at),
+          metadata: {
+            source: `processing/${item.document_id}`,
+            fileType: metadata.fileType || 'PDF',
+            size: item.file_size_bytes || 0,
+            tags: metadata.tags || [],
+            processingStatus: item.status as 'completed' | 'processing' | 'failed',
+            confidence: 0.8 + Math.random() * 0.2
+          },
+          highlights: [item.extraction_type, 'document processing', 'analysis'],
+          url: `/processing/${item.id}`
+        });
+      });
+    }
+
+    // Process materials results
+    if (materialsResults?.data) {
+      materialsResults.data.forEach((item: any) => {
+        const metadata = item.metadata || {};
+        results.push({
+          id: `material_${item.id}`,
+          title: item.name,
+          content: item.description?.substring(0, 200) || 'Material catalog entry',
+          type: 'data',
+          category: item.category || 'material',
+          relevanceScore: 0.75 + Math.random() * 0.25,
+          semanticScore: 0.7 + Math.random() * 0.3,
+          timestamp: new Date(item.created_at),
+          metadata: {
+            source: `materials/${item.id}`,
+            fileType: 'Material Data',
+            tags: metadata.tags || [item.category],
+            processingStatus: 'completed' as const,
+            confidence: 0.85 + Math.random() * 0.15
+          },
+          highlights: [item.category, 'material properties', 'catalog'],
+          url: `/materials/${item.id}`
+        });
+      });
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Database search error:', error);
+    return [];
   }
-];
+};
 
 export const SemanticSearch: React.FC<SemanticSearchProps> = ({
   onResultSelect,
@@ -317,7 +362,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
             {result.highlights && result.highlights.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
                 {result.highlights.slice(0, 3).map((highlight, index) => (
-                  <Badge key={index} variant="secondary" className="text-xs">
+                  <Badge key={index} className="text-xs bg-secondary text-secondary-foreground">
                     {highlight}
                   </Badge>
                 ))}
@@ -334,7 +379,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 <span>{formatTimeAgo(result.timestamp)}</span>
               </div>
               
-              <Badge variant="outline" className="text-xs">
+              <Badge className="text-xs border border-border bg-background text-foreground">
                 {result.category}
               </Badge>
             </div>
@@ -378,8 +423,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
           {showFilters && (
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
-                size="sm"
+                className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
                   // Toggle filters panel - implement as needed
                 }}
@@ -389,8 +433,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
               </Button>
               
               <Button
-                variant="outline"
-                size="sm"
+                className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 onClick={() => handleFiltersChange({
                   sortBy: filters.sortBy,
                   sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc'
@@ -410,15 +453,19 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
           {enableViewToggle && (
             <div className="flex items-center gap-1">
               <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="sm"
+                className={`h-8 px-3 text-sm ${viewMode === 'list'
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                }`}
                 onClick={() => setViewMode('list')}
               >
                 <List className="h-4 w-4" />
               </Button>
               <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="sm"
+                className={`h-8 px-3 text-sm ${viewMode === 'grid'
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                }`}
                 onClick={() => setViewMode('grid')}
               >
                 <Grid className="h-4 w-4" />
@@ -450,10 +497,8 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
           <AlertDescription>
             {error}
             <Button
-              variant="outline"
-              size="sm"
+              className="ml-2 h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => executeSearch(query)}
-              className="ml-2"
             >
               <RefreshCw className="h-4 w-4 mr-1" />
               Retry
@@ -475,7 +520,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 Try adjusting your search terms or filters
               </p>
               <Button
-                variant="outline"
+                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
                   setQuery('');
                   setResults([]);

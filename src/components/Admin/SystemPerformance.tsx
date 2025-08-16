@@ -12,19 +12,16 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
+import {
   Activity,
   Cpu,
-  Database,
   Server,
-  Zap,
   AlertTriangle,
   CheckCircle,
   Clock,
   Brain,
   Home,
   ArrowLeft,
-  TrendingUp,
   Gauge
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -88,9 +85,9 @@ export const SystemPerformance: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch processing queue data
+      // Use existing table since processing_queue doesn't exist
       const { data: queueData, error: queueError } = await supabase
-        .from('processing_queue')
+        .from('material_knowledge')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
@@ -116,15 +113,15 @@ export const SystemPerformance: React.FC = () => {
 
       if (analyticsError) throw analyticsError;
 
-      setProcessingJobs(queueData || []);
-      setMLTasks(mlData || []);
+      setProcessingJobs(queueData as any || []);
+      setMLTasks(mlData as any || []);
 
       // Calculate performance metrics
       const totalJobs = queueData?.length || 0;
-      const completedJobs = queueData?.filter(job => job.status === 'completed') || [];
-      const failedJobs = queueData?.filter(job => job.status === 'failed') || [];
-      
-      const avgProcessingTime = completedJobs.reduce((sum, job) => 
+      const completedJobs = queueData?.filter((job: any) => job.status === 'completed') || [];
+      const failedJobs = queueData?.filter((job: any) => job.status === 'failed') || [];
+
+      const avgProcessingTime = completedJobs.reduce((sum: number, job: any) =>
         sum + (job.processing_time_ms || 0), 0) / Math.max(completedJobs.length, 1);
 
       const successRate = totalJobs > 0 ? (completedJobs.length / totalJobs) * 100 : 0;
@@ -203,7 +200,7 @@ export const SystemPerformance: React.FC = () => {
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">{description}</p>
           {trend !== undefined && (
-            <Badge variant={trend > 0 ? 'default' : 'secondary'} className="text-xs">
+            <Badge className={`text-xs ${trend > 0 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
               {trend > 0 ? '+' : ''}{trend}%
             </Badge>
           )}
@@ -232,20 +229,16 @@ export const SystemPerformance: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
+                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
+                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Admin
@@ -322,7 +315,7 @@ export const SystemPerformance: React.FC = () => {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium">OpenAI</span>
-                        <Badge variant="outline">{metrics.ai_model_performance.openai_success} completions</Badge>
+                        <Badge className="border border-border bg-background text-foreground">{metrics.ai_model_performance.openai_success} completions</Badge>
                       </div>
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>Avg Response Time</span>
@@ -336,7 +329,7 @@ export const SystemPerformance: React.FC = () => {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium">Claude</span>
-                        <Badge variant="outline">{metrics.ai_model_performance.claude_success} completions</Badge>
+                        <Badge className="border border-border bg-background text-foreground">{metrics.ai_model_performance.claude_success} completions</Badge>
                       </div>
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>Avg Response Time</span>
@@ -554,7 +547,7 @@ export const SystemPerformance: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Requests/min</span>
-                      <Badge variant="outline">342</Badge>
+                      <Badge className="border border-border bg-background text-foreground">342</Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Successful/min</span>

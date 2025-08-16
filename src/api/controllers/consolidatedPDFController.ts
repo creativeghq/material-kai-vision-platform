@@ -456,7 +456,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Invalid request data',
           code: 'VALIDATION_ERROR',
-          data: { details: validationResult.error.errors },
+          data: { details: validationResult.error.issues },
           timestamp: new Date().toISOString()
         };
       }

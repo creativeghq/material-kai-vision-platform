@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { Activity, Clock, Globe, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -73,57 +72,80 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
 
   const loadProcessingStats = async () => {
     try {
-      // Get session info
-      const { data: session } = await supabase
+      // Load session data
+      const { data: sessionData, error: sessionError } = await supabase
         .from('scraping_sessions')
-        .select('current_page_url, completed_pages, total_pages')
-        .eq('id', sessionId)
+        .select('*')
+        .eq('session_id', sessionId)
         .single();
 
-      // Get recent page completions (last 10)
-      const { data: recentPages } = await supabase
+      if (sessionError && sessionError.code !== 'PGRST116') {
+        console.error('Error loading session:', sessionError);
+        throw sessionError;
+      }
+
+      // Load recent pages data
+      const { data: pagesData, error: pagesError } = await supabase
         .from('scraping_pages')
-        .select('url, status, materials_found, processing_time_ms, completed_at')
+        .select('*')
         .eq('session_id', sessionId)
-        .not('completed_at', 'is', null)
-        .order('completed_at', { ascending: false })
-        .limit(10);
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (pagesError) {
+        console.error('Error loading pages:', pagesError);
+        throw pagesError;
+      }
+
+      const pages = pagesData || [];
+      const session = sessionData;
 
       // Calculate stats
-      const completedPages = recentPages || [];
       const now = new Date();
       const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
       
-      const recentCompletions = completedPages.filter(page => 
+      const recentCompletions = pages.filter(page =>
         page.completed_at && new Date(page.completed_at) > last5Minutes
       );
 
       const pagesPerMinute = recentCompletions.length;
+      const completedPages = pages.filter(page => page.status === 'completed');
       const avgProcessingTime = completedPages.length > 0
-        ? completedPages.reduce((sum, page) => sum + (page.processing_time_ms || 0), 0) / completedPages.length
+        ? completedPages.reduce((sum, page) => {
+            if (page.completed_at && page.started_at) {
+              const processingTime = new Date(page.completed_at).getTime() - new Date(page.started_at).getTime();
+              return sum + processingTime;
+            }
+            return sum;
+          }, 0) / completedPages.length
         : 0;
 
       // Estimate time remaining
-      const remainingPages = (session?.total_pages || 0) - (session?.completed_pages || 0);
-      const estimatedMinutes = pagesPerMinute > 0 
-        ? Math.ceil(remainingPages / pagesPerMinute)
-        : 0;
-      
-      const estimatedTimeRemaining = estimatedMinutes > 0
-        ? `~${estimatedMinutes} minutes`
-        : 'Calculating...';
+      let estimatedTimeRemaining = 'Calculating...';
+      if (session) {
+        const remainingPages = (session.total_pages || 0) - (session.completed_pages || 0);
+        const estimatedMinutes = pagesPerMinute > 0
+          ? Math.ceil(remainingPages / pagesPerMinute)
+          : 0;
+        
+        estimatedTimeRemaining = estimatedMinutes > 0
+          ? `~${estimatedMinutes} minutes`
+          : 'Calculating...';
+      }
 
       // Format recent activity
-      const recentActivity = completedPages.slice(0, 5).map(page => ({
-        url: page.url,
-        status: page.status,
-        materialsFound: page.materials_found,
-        processingTime: page.processing_time_ms || 0,
-        timestamp: page.completed_at || ''
+      const recentActivity = pages.slice(0, 5).map(page => ({
+        url: page.url || 'Unknown URL',
+        status: page.status || 'unknown',
+        materialsFound: page.materials_found || 0,
+        processingTime: page.completed_at && page.started_at
+          ? new Date(page.completed_at).getTime() - new Date(page.started_at).getTime()
+          : 0,
+        timestamp: page.completed_at || page.created_at || ''
       }));
 
       setStats({
-        currentPageUrl: session?.current_page_url || null,
+        currentPageUrl: session?.source_url || null,
         pagesPerMinute,
         avgProcessingTime,
         estimatedTimeRemaining,
@@ -132,6 +154,14 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
 
     } catch (error) {
       console.error('Error loading processing stats:', error);
+      // Set fallback stats on error
+      setStats({
+        currentPageUrl: null,
+        pagesPerMinute: 0,
+        avgProcessingTime: 0,
+        estimatedTimeRemaining: 'Error loading data',
+        recentActivity: []
+      });
     }
   };
 
@@ -226,7 +256,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
                   </div>
                   <div className="flex items-center gap-2">
                     {activity.materialsFound > 0 && (
-                      <Badge variant="outline" className="text-green-600">
+                      <Badge className="border border-input bg-background hover:bg-accent hover:text-accent-foreground text-green-600">
                         {activity.materialsFound} materials
                       </Badge>
                     )}

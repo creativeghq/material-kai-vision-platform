@@ -349,8 +349,8 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
             <CardTitle>Batch File Upload</CardTitle>
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
-                size="sm"
+                className="border border-border bg-background text-foreground"
+                
                 onClick={() => setShowConfig(!showConfig)}
               >
                 <Settings className="h-4 w-4 mr-1" />
@@ -358,8 +358,8 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
               </Button>
               {files.length > 0 && (
                 <Button
-                  variant="outline"
-                  size="sm"
+                  className="border border-border bg-background text-foreground"
+                  
                   onClick={clearAll}
                   disabled={isProcessing}
                 >
@@ -425,7 +425,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                   <Checkbox
                     id="extract-text"
                     checked={config.options.extractText || false}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked: boolean) =>
                       setConfig(prev => ({
                         ...prev,
                         options: { ...prev.options, extractText: !!checked }
@@ -439,7 +439,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                   <Checkbox
                     id="extract-images"
                     checked={config.options.extractImages || false}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked: boolean) =>
                       setConfig(prev => ({
                         ...prev,
                         options: { ...prev.options, extractImages: !!checked }
@@ -453,7 +453,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                   <Checkbox
                     id="ocr-enabled"
                     checked={config.options.ocrEnabled || false}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked: boolean) =>
                       setConfig(prev => ({
                         ...prev,
                         options: { ...prev.options, ocrEnabled: !!checked }
@@ -574,7 +574,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                             {file.file.name}
                           </p>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
+                            <Badge className="border border-border bg-background text-foreground text-xs">
                               {formatBytes(file.file.size)}
                             </Badge>
                             <div className={cn(
@@ -608,8 +608,8 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
 
                       {!isProcessing && file.status === 'pending' && (
                         <Button
-                          variant="ghost"
-                          size="sm"
+                          className="bg-transparent hover:bg-accent hover:text-accent-foreground"
+                          
                           onClick={() => removeFile(file.id)}
                         >
                           <X className="h-4 w-4" />
@@ -624,7 +624,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
               {completedCount > 0 && !isProcessing && (
                 <div className="flex justify-end">
                   <Button
-                    variant="outline"
+                    className="border border-border bg-background text-foreground"
                     onClick={downloadResults}
                   >
                     <Download className="h-4 w-4 mr-1" />

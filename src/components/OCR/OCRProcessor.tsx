@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { Upload, FileText, Eye, Server, Cpu, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -143,7 +142,7 @@ export const OCRProcessor: React.FC = () => {
               <Label htmlFor="language">Language</Label>
               <Select 
                 value={options.language} 
-                onValueChange={(value) => setOptions(prev => ({ ...prev, language: value }))}
+                onValueChange={(value: string) => setOptions(prev => ({ ...prev, language: value }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select language" />
@@ -181,7 +180,7 @@ export const OCRProcessor: React.FC = () => {
             <Switch
               id="structured-data"
               checked={options.extractStructuredData}
-              onCheckedChange={(checked) => setOptions(prev => ({ ...prev, extractStructuredData: checked }))}
+              onCheckedChange={(checked: boolean) => setOptions(prev => ({ ...prev, extractStructuredData: checked }))}
             />
             <Label htmlFor="structured-data">Extract structured data</Label>
           </div>
@@ -228,11 +227,11 @@ export const OCRProcessor: React.FC = () => {
             <CardTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
               OCR Results
-              <Badge variant="secondary">
+              <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800">
                 {ocrResult.processingMethod} processing
-              </Badge>
+              </span>
               {ocrResult.fallbackUsed && (
-                <Badge variant="outline">Fallback used</Badge>
+                <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Fallback used</span>
               )}
             </CardTitle>
           </CardHeader>
@@ -247,13 +246,13 @@ export const OCRProcessor: React.FC = () => {
               <TabsContent value="text" className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">
+                    <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
                       Confidence: {Math.round(ocrResult.confidence * 100)}%
-                    </Badge>
+                    </span>
                     {ocrResult.language && (
-                      <Badge variant="outline">
+                      <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
                         Language: {ocrResult.language}
-                      </Badge>
+                      </span>
                     )}
                   </div>
                   <div className="bg-muted p-4 rounded-lg">

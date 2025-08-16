@@ -3,13 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Brain, 
-  Settings, 
-  Activity, 
-  Database, 
-  RefreshCw, 
+import {
+  Brain,
+  Activity,
+  Database,
+  RefreshCw,
   Zap,
   TrendingUp,
   AlertCircle,
@@ -46,7 +44,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
       
       // Get material embeddings stats from materials_catalog
       const { data: materialData, error: materialError } = await supabase
-        .from('materials_catalog')
+        .from('material_knowledge')
         .select('id, embedding')
         .not('embedding', 'is', null);
 
@@ -55,7 +53,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
         .select('id, openai_embedding, huggingface_embedding, custom_embedding');
 
       const { data: materialsTotal } = await supabase
-        .from('materials_catalog')
+        .from('material_knowledge')
         .select('id', { count: 'exact' });
 
       if (materialError) throw materialError;
@@ -63,7 +61,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
 
       // Process embedding types - simulate different embedding types for materials
       const embeddingTypeCounts: Record<string, { count: number; dimension: number }> = {};
-      materialData?.forEach(item => {
+      materialData?.forEach(_item => {
         const embeddingType = 'pgvector'; // Default embedding type for pgvector
         if (!embeddingTypeCounts[embeddingType]) {
           embeddingTypeCounts[embeddingType] = {
@@ -155,14 +153,13 @@ const EmbeddingGenerationPanel: React.FC = () => {
           <p className="text-muted-foreground">Monitor and manage vector embeddings for materials and knowledge</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchEmbeddingStats} variant="outline" size="sm">
+          <Button onClick={fetchEmbeddingStats} className="border border-gray-300 text-sm px-3 py-1">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           <Button 
             onClick={handleRegenerateEmbeddings} 
-            variant="default" 
-            size="sm"
+            className="bg-blue-600 text-white text-sm px-3 py-1"
             disabled={regenerating}
           >
             {regenerating ? (
@@ -243,7 +240,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold capitalize">{embeddingType.type}</h3>
-                    <Badge variant="outline">{embeddingType.dimension}D</Badge>
+                    <Badge className="border border-gray-300">{embeddingType.dimension}D</Badge>
                   </div>
                   <p className="text-2xl font-bold text-primary">{embeddingType.count}</p>
                   <p className="text-sm text-muted-foreground">embeddings generated</p>
@@ -256,7 +253,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold">OpenAI</h3>
-                  <Badge variant="outline">1536D</Badge>
+                  <Badge className="border border-gray-300">1536D</Badge>
                 </div>
                 <p className="text-2xl font-bold text-muted-foreground">0</p>
                 <p className="text-sm text-muted-foreground">Coming soon</p>
@@ -267,7 +264,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold">HuggingFace</h3>
-                  <Badge variant="outline">768D</Badge>
+                  <Badge className="border border-gray-300">768D</Badge>
                 </div>
                 <p className="text-2xl font-bold text-muted-foreground">0</p>
                 <p className="text-sm text-muted-foreground">Coming soon</p>

@@ -55,16 +55,16 @@ export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) =
         </div>
 
         <div className="ml-auto flex items-center space-x-4">
-          <Button variant="ghost" size="icon">
+          <Button className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0">
             <Bell className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0">
             <Settings className="w-4 h-4" />
           </Button>
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Button className="bg-transparent hover:bg-accent hover:text-accent-foreground relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
                       {user.email ? getInitials(user.email) : 'U'}

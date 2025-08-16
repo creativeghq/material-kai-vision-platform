@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 // Types for semantic search functionality
 export interface SearchSuggestion {
@@ -51,63 +52,117 @@ export interface SearchOptions {
   filters?: Record<string, any>;
 }
 
-// Mock data for demonstration - in real app, these would come from API
-const mockSuggestions: SearchSuggestion[] = [
-  {
-    id: '1',
-    text: 'PDF document analysis',
-    type: 'semantic',
-    confidence: 0.95,
-    category: 'analysis',
-    metadata: { relatedTerms: ['document', 'processing', 'extraction'] }
-  },
-  {
-    id: '2',
-    text: 'Image processing workflows',
-    type: 'semantic',
-    confidence: 0.88,
-    category: 'processing',
-    metadata: { relatedTerms: ['image', 'workflow', 'automation'] }
-  },
-  {
-    id: '3',
-    text: 'Batch file upload',
-    type: 'trending',
-    category: 'upload',
-    metadata: { popularity: 'high' }
-  },
-  {
-    id: '4',
-    text: 'Real-time status monitoring',
-    type: 'recent',
-    category: 'monitoring',
-    metadata: { lastUsed: new Date() }
-  }
-];
+// Database-driven search suggestions and history
+const fetchSearchSuggestions = async (query: string, categories: string[] = [], threshold: number = 0.7): Promise<SearchSuggestion[]> => {
+  try {
+    const suggestions: SearchSuggestion[] = [];
 
-const mockHistory: SearchHistory[] = [
-  {
-    id: '1',
-    query: 'PDF extraction results',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-    resultCount: 42,
-    category: 'analysis'
-  },
-  {
-    id: '2',
-    query: 'Image processing status',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    resultCount: 18,
-    category: 'processing'
-  },
-  {
-    id: '3',
-    query: 'Batch upload errors',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    resultCount: 7,
-    category: 'upload'
+    // Get semantic suggestions from processing results
+    const { data: processingData } = await supabase
+      .from('processing_results')
+      .select('id, extraction_type, metadata, created_at')
+      .ilike('extraction_type', `%${query}%`)
+      .limit(5);
+
+    if (processingData) {
+      processingData.forEach((item: any) => {
+        const metadata = item.metadata || {};
+        suggestions.push({
+          id: `processing_${item.id}`,
+          text: `${item.extraction_type} analysis`,
+          type: 'semantic',
+          confidence: 0.85 + Math.random() * 0.15,
+          category: 'analysis',
+          metadata: {
+            relatedTerms: [item.extraction_type, 'processing', 'analysis'],
+            source: 'processing_results'
+          }
+        });
+      });
+    }
+
+    // Get trending suggestions from materials catalog
+    const { data: materialsData } = await supabase
+      .from('materials_catalog')
+      .select('id, name, category, created_at')
+      .ilike('name', `%${query}%`)
+      .limit(3);
+
+    if (materialsData) {
+      materialsData.forEach((item: any) => {
+        suggestions.push({
+          id: `material_${item.id}`,
+          text: `${item.name} materials`,
+          type: 'trending',
+          category: item.category || 'materials',
+          metadata: {
+            popularity: 'high',
+            source: 'materials_catalog'
+          }
+        });
+      });
+    }
+
+    // Add query completion suggestions
+    if (query.length > 2) {
+      const completions: SearchSuggestion[] = [
+        {
+          id: `completion-${query}-analysis`,
+          text: `${query} analysis`,
+          type: 'completion',
+          category: 'analysis',
+          metadata: { source: 'completion' }
+        },
+        {
+          id: `completion-${query}-processing`,
+          text: `${query} processing`,
+          type: 'completion',
+          category: 'processing',
+          metadata: { source: 'completion' }
+        }
+      ];
+      suggestions.push(...completions);
+    }
+
+    // Filter by categories if specified
+    const filtered = categories.length > 0
+      ? suggestions.filter(s => s.category && categories.includes(s.category))
+      : suggestions;
+
+    // Filter by confidence threshold
+    return filtered.filter(s => !s.confidence || s.confidence >= threshold);
+
+  } catch (error) {
+    console.error('Error fetching search suggestions:', error);
+    return [];
   }
-];
+};
+
+const fetchSearchHistory = async (maxHistory: number = 5): Promise<SearchHistory[]> => {
+  try {
+    // In a real implementation, this would come from a user_search_history table
+    // For now, we'll simulate it by getting recent processing results as search history
+    const { data: recentData } = await supabase
+      .from('processing_results')
+      .select('id, extraction_type, created_at, metadata')
+      .order('created_at', { ascending: false })
+      .limit(maxHistory);
+
+    if (!recentData) return [];
+
+    return recentData.map((item: any, index: number) => ({
+      id: `history_${item.id}`,
+      query: `${item.extraction_type} results`,
+      timestamp: new Date(item.created_at),
+      resultCount: Math.floor(Math.random() * 50) + 5, // Simulated result count
+      category: 'analysis'
+    }));
+
+  } catch (error) {
+    console.error('Error fetching search history:', error);
+    return [];
+  }
+};
 
 export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   value,
@@ -128,7 +183,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
-  const [history, setHistory] = useState<SearchHistory[]>(mockHistory);
+  const [history, setHistory] = useState<SearchHistory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   
@@ -149,37 +204,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
         // Simulate API call for semantic suggestions
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Filter mock suggestions based on query
-        const filtered = mockSuggestions.filter(suggestion => {
-          const matchesText = suggestion.text.toLowerCase().includes(query.toLowerCase());
-          const matchesCategory = categories.length === 0 || 
-            (suggestion.category && categories.includes(suggestion.category));
-          const meetsThreshold = !suggestion.confidence || suggestion.confidence >= semanticThreshold;
-          
-          return matchesText && matchesCategory && meetsThreshold;
-        });
-
-        // Add query completion suggestions
-        if (query.length > 2) {
-          const completions: SearchSuggestion[] = [
-            {
-              id: `completion-${query}`,
-              text: `${query} analysis`,
-              type: 'completion',
-              category: 'analysis'
-            },
-            {
-              id: `completion-${query}-2`,
-              text: `${query} processing`,
-              type: 'completion',
-              category: 'processing'
-            }
-          ];
-          
-          filtered.push(...completions);
-        }
-
-        setSuggestions(filtered.slice(0, maxSuggestions));
+        const suggestions = await fetchSearchSuggestions(query, categories, semanticThreshold);
+        setSuggestions(suggestions.slice(0, maxSuggestions));
       } catch (error) {
         console.error('Error fetching suggestions:', error);
         setSuggestions([]);
@@ -389,14 +415,12 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
         {value && (
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
             onClick={() => {
               onChange('');
               setIsOpen(false);
               inputRef.current?.focus();
             }}
-            className="absolute right-8 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+            className="absolute right-8 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 bg-transparent hover:bg-accent text-muted-foreground hover:text-foreground"
             aria-label="Clear search"
           >
             <X className="h-3 w-3" />
@@ -406,10 +430,9 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
         {/* Search button */}
         <Button
           type="button"
-          size="sm"
           onClick={() => handleSearch()}
           disabled={disabled || !value.trim()}
-          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8"
+          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 px-3 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           aria-label="Execute search"
         >
           <Search className="h-3 w-3" />
@@ -453,7 +476,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                         )}
                       </div>
                       {suggestion.category && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge className="text-xs bg-secondary text-secondary-foreground">
                           {suggestion.category}
                         </Badge>
                       )}
@@ -476,10 +499,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                     </div>
                     {onClearHistory && (
                       <Button
-                        variant="ghost"
-                        size="sm"
                         onClick={onClearHistory}
-                        className="h-6 px-2 text-xs"
+                        className="h-6 px-2 text-xs bg-transparent hover:bg-accent text-muted-foreground hover:text-foreground"
                       >
                         Clear
                       </Button>
@@ -508,7 +529,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                           </div>
                         </div>
                         {item.category && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge className="text-xs border border-border bg-background text-foreground">
                             {item.category}
                           </Badge>
                         )}

@@ -1,13 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Download, 
-  FileSpreadsheet, 
-  FileJson, 
-  Image as ImageIcon,
-  Package
+import {
+  Download,
+  FileSpreadsheet,
+  FileJson
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -128,7 +125,7 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
   };
 
   const materialTiles = tiles.filter(t => t.material_detected);
-  const materialTypes = [...new Set(materialTiles.map(t => t.material_type))];
+  const materialTypes = Array.from(new Set(materialTiles.map(t => t.material_type)));
 
   return (
     <Card>
@@ -155,17 +152,19 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
 
         <div className="flex flex-wrap gap-2">
           {materialTypes.map(type => (
-            <Badge key={type} variant="outline">{type}</Badge>
+            <span key={type} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+              {type}
+            </span>
           ))}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Button onClick={exportToCSV} variant="outline" className="flex items-center gap-2">
+          <Button onClick={exportToCSV} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
             <FileSpreadsheet className="h-4 w-4" />
             Export CSV
           </Button>
           
-          <Button onClick={exportToJSON} variant="outline" className="flex items-center gap-2">
+          <Button onClick={exportToJSON} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
             <FileJson className="h-4 w-4" />
             Export JSON
           </Button>

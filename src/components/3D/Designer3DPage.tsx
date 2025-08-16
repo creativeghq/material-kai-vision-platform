@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ThreeJsViewer } from './ThreeJsViewer';
 import { ImageModal } from './ImageModal';
-import { integratedWorkflowService } from '@/services/integratedWorkflowService';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Wand2, Download, Share2, Upload, X, ImageIcon } from 'lucide-react';
+import { Loader2, Wand2, Download, X, ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { GenerationWorkflowModal } from './GenerationWorkflowModal';
@@ -37,7 +35,7 @@ export const Designer3DPage: React.FC = () => {
     const checkAdminRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase.rpc('has_role', {
+        const { data } = await (supabase as any).rpc('has_role', {
           _user_id: user.id,
           _role: 'admin'
         });
@@ -311,7 +309,7 @@ export const Designer3DPage: React.FC = () => {
 
         console.log('Polling result:', data);
 
-        if (data.generation_status === 'completed' && data.image_urls?.length > 0) {
+        if (data.generation_status === 'completed' && data.image_urls && data.image_urls.length > 0) {
           // Generation completed successfully
           console.log('🔍 DEBUG: Generation completed successfully');
           console.log('📊 Available models count:', filteredModels.length);
@@ -418,11 +416,6 @@ export const Designer3DPage: React.FC = () => {
     poll();
   };
 
-  // Add a function to handle generation cancellation if needed
-  const cancelGeneration = () => {
-    setIsGenerating(false);
-    setIsUploading(false);
-  };
 
   const handleImageClick = (index: number) => {
     setCurrentImageIndex(index);
@@ -475,7 +468,7 @@ export const Designer3DPage: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label htmlFor="prompt">Design Prompt</Label>
-              <Select onValueChange={(value) => {
+              <Select onValueChange={(value: string) => {
                 console.log('🔍 DEBUG: Preset selection changed:', {
                   selectedValue: value,
                   valueType: typeof value,
@@ -546,9 +539,7 @@ export const Designer3DPage: React.FC = () => {
                   />
                   <Button
                     onClick={removeImage}
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-1 right-1"
+                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white text-sm px-2 py-1"
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -594,8 +585,7 @@ export const Designer3DPage: React.FC = () => {
           <Button 
             onClick={handleGenerate}
             disabled={isGenerating || isUploading || !prompt.trim()}
-            className="w-full"
-            size="lg"
+            className="w-full px-6 py-3 text-lg"
           >
             {isGenerating || isUploading ? (
               <>
@@ -653,11 +643,9 @@ export const Designer3DPage: React.FC = () => {
                     <p className="text-xs text-muted-foreground">
                       Modern interior with warm lighting and contemporary furniture
                     </p>
-                    <Button 
-                      onClick={() => handleDownload(index)} 
-                      variant="outline" 
-                      size="sm"
-                      className="w-full text-xs"
+                    <Button
+                      onClick={() => handleDownload(index)}
+                      className="w-full text-xs border border-gray-300 hover:bg-gray-50 px-3 py-1"
                     >
                       <Download className="h-3 w-3 mr-1" />
                       Download
@@ -680,7 +668,7 @@ export const Designer3DPage: React.FC = () => {
             </p>
           </CardHeader>
           <CardContent>
-            <ThreeJsViewer imageUrl={generatedImages[0]?.url} className="h-96 rounded-lg border" />
+            <ThreeJsViewer imageUrl={generatedImages[0]?.url || ''} className="h-96 rounded-lg border" />
           </CardContent>
         </Card>
       )}
@@ -744,8 +732,8 @@ export const Designer3DPage: React.FC = () => {
               if (urlMatch) {
                 const extractedId = urlMatch[1] || urlMatch[2];
                 const matchingModel = filteredModels.find(m =>
-                  m.id.toLowerCase().includes(extractedId.toLowerCase()) ||
-                  m.name.toLowerCase().includes(extractedId.toLowerCase())
+                  (extractedId && m.id.toLowerCase().includes(extractedId.toLowerCase())) ||
+                  (extractedId && m.name.toLowerCase().includes(extractedId.toLowerCase()))
                 );
                 if (matchingModel) {
                   modelName = matchingModel.name;

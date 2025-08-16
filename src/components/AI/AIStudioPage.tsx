@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ThreeJsViewer } from '@/components/3D/ThreeJsViewer';
-import { IntegratedAIService, SpaceFormerResult, CrewAIResult } from '@/services/integratedAIService';
+import { IntegratedAIService } from '@/services/integratedAIService';
 import { 
-  Upload, Camera, Brain, Zap, Target, CheckCircle, Clock, AlertCircle,
+  Upload, Camera, Brain, Zap, Target, CheckCircle, Clock,
   Layers, Users, BarChart3, Lightbulb, Home, Ruler, Palette
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
@@ -136,7 +136,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
         <Progress value={progress} className="w-full h-3" />
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {stages.map((stage, index) => (
+          {stages.map((stage) => (
             <Card key={stage.name} className={`transition-all ${
               stage.status === 'completed' ? 'border-green-500 bg-green-50 dark:bg-green-950' :
               stage.status === 'processing' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' :
@@ -252,7 +252,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                           <div key={index} className="p-3 border rounded">
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-medium">{placement.zone}</span>
-                              <Badge variant="outline">{placement.cost_range}</Badge>
+                              <Badge className="border border-border bg-background text-foreground">{placement.cost_range}</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">{placement.reasoning}</p>
                           </div>
@@ -279,7 +279,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Overall Confidence</span>
-                  <Badge variant="default">
+                  <Badge className="bg-primary text-primary-foreground">
                     {(crewaiCoordination.overall_confidence * 100).toFixed(0)}%
                   </Badge>
                 </div>
@@ -298,7 +298,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                       <div key={index} className="p-2 border rounded">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{execution.agent_name}</span>
-                          <Badge variant="outline">
+                          <Badge className="border border-border bg-background text-foreground">
                             {(execution.confidence * 100).toFixed(0)}%
                           </Badge>
                         </div>
@@ -366,13 +366,13 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
         )}
 
         <div className="flex gap-4 justify-center">
-          <Button onClick={() => setActiveTab('upload')} variant="outline">
+          <Button onClick={() => setActiveTab('upload')} className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
             Start New Analysis
           </Button>
           <Button>
             Export Results
           </Button>
-          <Button variant="outline">
+          <Button className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
             Share Design
           </Button>
         </div>
@@ -449,8 +449,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                         <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
                           <span className="text-sm truncate">{file.name}</span>
                           <Button
-                            variant="ghost"
-                            size="sm"
+                            className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                             onClick={() => removeFile(index)}
                           >
                             ×
@@ -494,10 +493,9 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                     {['Functionality', 'Aesthetics', 'Budget', 'Sustainability'].map(priority => (
                       <Button
                         key={priority}
-                        variant="outline"
-                        size="sm"
+                        className={`border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm ${userPreferences.priorities?.[priority.toLowerCase()] ? 'bg-primary text-primary-foreground' : ''}`}
                         onClick={() => {
-                          setUserPreferences(prev => ({
+                          setUserPreferences((prev: any) => ({
                             ...prev,
                             priorities: {
                               ...prev.priorities,
@@ -505,7 +503,6 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                             }
                           }));
                         }}
-                        className={userPreferences.priorities?.[priority.toLowerCase()] ? 'bg-primary text-primary-foreground' : ''}
                       >
                         {priority}
                       </Button>
@@ -523,11 +520,10 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                   </Alert>
                 )}
 
-                <Button 
+                <Button
                   onClick={handleCompleteDesign}
                   disabled={uploadedFiles.length === 0 || !roomType || isProcessing}
-                  className="w-full"
-                  size="lg"
+                  className="w-full h-11 px-8"
                 >
                   <Zap className="w-4 h-4 mr-2" />
                   Start AI Studio Analysis

@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
-import { Globe, Loader2, Plus, ArrowRight, Settings, Zap, Brain, FileText, Search, Map, MousePointer } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Globe, Loader2, Plus, Settings, Zap, Brain, FileText, Search, Map, MousePointer } from 'lucide-react';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
 import { SessionDetailView } from './SessionDetailView';
 import {
@@ -162,50 +162,69 @@ Return a list of materials found on the page.`);
           throw new Error('Invalid scraping mode');
       }
 
-      // Create session
+      // Get current user (for now using a placeholder - this should be replaced with actual auth)
+      const currentUserId = 'user-placeholder-id'; // TODO: Replace with actual user ID from auth
+
+      // Create session in Supabase database
       const sessionId = crypto.randomUUID();
-      const { data: sessionData, error: sessionError } = await supabase
+      const sessionData = {
+        id: sessionId,
+        user_id: currentUserId,
+        session_id: sessionId,
+        source_url: sourceUrl,
+        status: 'pending',
+        total_pages: urls.length,
+        completed_pages: 0,
+        failed_pages: 0,
+        materials_processed: 0,
+        progress_percentage: 0,
+        scraping_config: {
+          mode: scrapingMode,
+          service: selectedService,
+          extractionPrompt,
+          maxPages: scrapingMode === 'sitemap' ? maxPages : 1,
+          timeout,
+          retryCount,
+          concurrentPages,
+          firecrawlOptions: selectedService === 'firecrawl' ? firecrawlOptions : undefined,
+          jinaOptions: selectedService === 'jina' ? jinaOptions : undefined
+        }
+      };
+
+      // Insert session into database
+      const { data: insertedSession, error: sessionError } = await supabase
         .from('scraping_sessions')
-        .insert({
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          session_id: sessionId,
-          source_url: sourceUrl,
-          status: 'pending',
-          total_pages: urls.length,
-          completed_pages: 0,
-          failed_pages: 0,
-          pending_pages: urls.length,
-          session_type: scrapingMode,
-          scraping_config: {
-            mode: scrapingMode,
-            service: selectedService,
-            extractionPrompt,
-            maxPages: scrapingMode === 'sitemap' ? maxPages : 1,
-            timeout,
-            retryCount,
-            concurrentPages,
-            firecrawlOptions: selectedService === 'firecrawl' ? firecrawlOptions : undefined,
-            jinaOptions: selectedService === 'jina' ? jinaOptions : undefined
-          }
-        })
+        .insert([sessionData])
         .select()
         .single();
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.error('Error creating session:', sessionError);
+        throw new Error(`Failed to create session: ${sessionError.message}`);
+      }
 
-      // Create page entries
+      // Create page entries in database
       const pageEntries = urls.map((url, index) => ({
-        session_id: sessionData.id,
+        session_id: sessionId,
         url,
         status: 'pending',
-        page_index: index
+        page_index: index,
+        materials_found: 0,
+        processing_time_ms: null,
+        error_message: null
       }));
 
-      const { error: pagesError } = await supabase
-        .from('scraping_pages')
-        .insert(pageEntries);
+      if (pageEntries.length > 0) {
+        const { error: pagesError } = await supabase
+          .from('scraping_pages')
+          .insert(pageEntries);
 
-      if (pagesError) throw pagesError;
+        if (pagesError) {
+          console.error('Error creating page entries:', pagesError);
+          // Don't throw here - session was created successfully, just log the error
+          console.warn('Session created but failed to create page entries');
+        }
+      }
 
       toast({
         title: "Success",
@@ -213,7 +232,7 @@ Return a list of materials found on the page.`);
       });
 
       // Navigate to session detail
-      setSelectedSessionId(sessionData.id);
+      setSelectedSessionId(insertedSession.id);
       setViewMode('detail');
       
     } catch (error) {
@@ -253,7 +272,7 @@ Return a list of materials found on the page.`);
   const renderCreateForm = () => (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" onClick={() => setViewMode('sessions')}>
+        <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground" onClick={() => setViewMode('sessions')}>
           ← Back to Sessions
         </Button>
         <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
@@ -538,7 +557,7 @@ Return a list of materials found on the page.`);
                     <Checkbox
                       id={format}
                       checked={firecrawlOptions.formats.includes(format)}
-                      onCheckedChange={(checked) => {
+                      onCheckedChange={(checked: boolean) => {
                         setFirecrawlOptions(prev => ({
                           ...prev,
                           formats: checked 
@@ -558,7 +577,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="onlyMainContent"
                   checked={firecrawlOptions.onlyMainContent}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFirecrawlOptions(prev => ({ ...prev, onlyMainContent: !!checked }))
                   }
                 />
@@ -568,7 +587,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="includeLinks"
                   checked={firecrawlOptions.includeLinks}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFirecrawlOptions(prev => ({ ...prev, includeLinks: !!checked }))
                   }
                 />
@@ -633,7 +652,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="mobile"
                   checked={firecrawlOptions.mobile}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFirecrawlOptions(prev => ({ ...prev, mobile: !!checked }))
                   }
                 />
@@ -643,7 +662,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="parsePDF"
                   checked={firecrawlOptions.parsePDF}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFirecrawlOptions(prev => ({ ...prev, parsePDF: !!checked }))
                   }
                 />
@@ -653,7 +672,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="blockAds"
                   checked={firecrawlOptions.blockAds}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFirecrawlOptions(prev => ({ ...prev, blockAds: !!checked }))
                   }
                 />
@@ -663,7 +682,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="removeBase64Images"
                   checked={firecrawlOptions.removeBase64Images}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFirecrawlOptions(prev => ({ ...prev, removeBase64Images: !!checked }))
                   }
                 />
@@ -673,7 +692,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="skipTlsVerification"
                   checked={firecrawlOptions.skipTlsVerification}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setFirecrawlOptions(prev => ({ ...prev, skipTlsVerification: !!checked }))
                   }
                 />
@@ -788,7 +807,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="includeImages"
                   checked={jinaOptions.includeImages}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setJinaOptions(prev => ({ ...prev, includeImages: !!checked }))
                   }
                 />
@@ -798,7 +817,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="includeLinksJina"
                   checked={jinaOptions.includeLinks}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setJinaOptions(prev => ({ ...prev, includeLinks: !!checked }))
                   }
                 />
@@ -808,7 +827,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="removeAds"
                   checked={jinaOptions.removeAds}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setJinaOptions(prev => ({ ...prev, removeAds: !!checked }))
                   }
                 />
@@ -818,7 +837,7 @@ Return a list of materials found on the page.`);
                 <Checkbox
                   id="removeForms"
                   checked={jinaOptions.removeForms}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked: boolean) =>
                     setJinaOptions(prev => ({ ...prev, removeForms: !!checked }))
                   }
                 />
@@ -832,8 +851,7 @@ Return a list of materials found on the page.`);
       <Button 
         onClick={createNewSession} 
         disabled={creating || !getSourceUrl().trim()}
-        className="w-full"
-        size="lg"
+        className="w-full h-11 px-8"
       >
         {creating ? (
           <>

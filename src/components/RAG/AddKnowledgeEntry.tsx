@@ -5,16 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Plus, 
-  FileText, 
-  ExternalLink, 
-  Database, 
-  Loader2,
-  CheckCircle,
-  AlertCircle
+import {
+  Plus,
+  FileText,
+  ExternalLink,
+  Database,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedRAGService } from '@/services/enhancedRAGService';
@@ -159,7 +156,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
           {/* Content Type */}
           <div className="space-y-2">
             <Label htmlFor="contentType">Content Type</Label>
-            <Select value={formData.contentType} onValueChange={(value) => handleInputChange('contentType', value)}>
+            <Select value={formData.contentType} onValueChange={(value: string) => handleInputChange('contentType', value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -228,14 +225,13 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
             />
             <div className="flex flex-wrap gap-2">
               {formData.materialCategories.map((category, i) => (
-                <Badge 
-                  key={i} 
-                  variant="secondary" 
-                  className="cursor-pointer"
+                <span
+                  key={i}
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 cursor-pointer hover:bg-red-100"
                   onClick={() => removeTag('materialCategories', i)}
                 >
                   {category} ×
-                </Badge>
+                </span>
               ))}
             </div>
           </div>
@@ -256,14 +252,13 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
             />
             <div className="flex flex-wrap gap-2">
               {formData.semanticTags.map((tag, i) => (
-                <Badge 
-                  key={i} 
-                  variant="outline" 
-                  className="cursor-pointer"
+                <span
+                  key={i}
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300 cursor-pointer hover:bg-red-100"
                   onClick={() => removeTag('semanticTags', i)}
                 >
                   {tag} ×
-                </Badge>
+                </span>
               ))}
             </div>
           </div>
@@ -272,7 +267,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="language">Language</Label>
-              <Select value={formData.language} onValueChange={(value) => handleInputChange('language', value)}>
+              <Select value={formData.language} onValueChange={(value: string) => handleInputChange('language', value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -290,7 +285,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
               <Label htmlFor="readingLevel">Reading Level (1-5)</Label>
               <Select 
                 value={formData.readingLevel.toString()} 
-                onValueChange={(value) => handleInputChange('readingLevel', parseInt(value))}
+                onValueChange={(value: string) => handleInputChange('readingLevel', parseInt(value))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -309,7 +304,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
               <Label htmlFor="technicalComplexity">Technical Complexity (1-5)</Label>
               <Select 
                 value={formData.technicalComplexity.toString()} 
-                onValueChange={(value) => handleInputChange('technicalComplexity', parseInt(value))}
+                onValueChange={(value: string) => handleInputChange('technicalComplexity', parseInt(value))}
               >
                 <SelectTrigger>
                   <SelectValue />

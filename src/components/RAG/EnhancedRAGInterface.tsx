@@ -8,33 +8,29 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Loader2, 
-  Search, 
-  Brain, 
-  BookOpen, 
-  Package, 
-  Zap, 
-  TrendingUp, 
-  Clock, 
-  Eye,
+import {
+  Loader2,
+  Search,
+  Brain,
+  BookOpen,
+  Package,
+  Zap,
+  TrendingUp,
+  Clock,
   ThumbsUp,
   ThumbsDown,
   Lightbulb,
   ExternalLink,
-  BarChart3,
-  Settings,
-  History
+  BarChart3
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   EnhancedRAGService, 
   type EnhancedRAGRequest, 
   type EnhancedRAGResponse,
-  type KnowledgeResult,
-  type MaterialKnowledgeResult,
-  type RecommendationResult
+  
+  
+  
 } from '@/services/enhancedRAGService';
 
 interface EnhancedRAGInterfaceProps {
@@ -54,7 +50,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
     materialCategories: [] as string[]
   });
   const [analytics, setAnalytics] = useState<any>(null);
-  const [queryHistory, setQueryHistory] = useState<any[]>([]);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -73,8 +69,8 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
 
   const loadQueryHistory = async () => {
     try {
-      const history = await EnhancedRAGService.getQueryHistory(10);
-      setQueryHistory(history);
+      await EnhancedRAGService.getQueryHistory(10);
+      
     } catch (error) {
       console.error('Error loading query history:', error);
     }
@@ -95,9 +91,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
       const request: EnhancedRAGRequest = {
         query: query.trim(),
         context: {
-          roomType: context.roomType || undefined,
-          stylePreferences: context.stylePreferences.length > 0 ? context.stylePreferences : undefined,
-          materialCategories: context.materialCategories.length > 0 ? context.materialCategories : undefined
+          ...(context.roomType && { roomType: context.roomType }),
+          ...(context.stylePreferences.length > 0 && { stylePreferences: context.stylePreferences }),
+          ...(context.materialCategories.length > 0 && { materialCategories: context.materialCategories }),
         },
         searchType,
         maxResults,
@@ -177,7 +173,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5" />
             Enhanced RAG Knowledge Search
-            <Badge variant="outline" className="ml-auto">AI-Powered</Badge>
+            <span className="ml-auto inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">AI-Powered</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -219,7 +215,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
 
             <div className="space-y-2">
               <Label htmlFor="maxResults">Max Results</Label>
-              <Select value={maxResults.toString()} onValueChange={(value) => setMaxResults(parseInt(value))}>
+              <Select value={maxResults.toString()} onValueChange={(value: string) => setMaxResults(parseInt(value))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -280,7 +276,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                 {context.stylePreferences.map((style, i) => (
                   <Badge 
                     key={i} 
-                    variant="secondary" 
                     className="cursor-pointer"
                     onClick={() => setContext(prev => ({
                       ...prev,
@@ -314,7 +309,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                 {context.materialCategories.map((category, i) => (
                   <Badge 
                     key={i} 
-                    variant="secondary"
                     className="cursor-pointer"
                     onClick={() => setContext(prev => ({
                       ...prev,
@@ -338,7 +332,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <CardTitle className="flex items-center gap-2">
                 {getIntentIcon(searchResults.queryIntent)}
                 Search Results
-                <Badge variant="outline">{searchResults.queryIntent}</Badge>
+                <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{searchResults.queryIntent}</span>
               </CardTitle>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
@@ -350,7 +344,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                   Complexity: {(searchResults.semanticAnalysis.queryComplexity * 100).toFixed(0)}%
                 </span>
                 {searchResults.analytics.cacheHit && (
-                  <Badge variant="secondary">Cached</Badge>
+                  <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Cached</span>
                 )}
               </div>
             </div>
@@ -366,9 +360,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                 {Object.entries(searchResults.semanticAnalysis.detectedEntities).map(([key, values]) => {
                   if (Array.isArray(values) && values.length > 0) {
                     return values.map((value, i) => (
-                      <Badge key={`${key}-${i}`} variant="outline" className="text-xs">
+                      <span key={`${key}-${i}`} className="text-xs inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 font-medium text-gray-900 bg-gray-50">
                         {key}: {value}
-                      </Badge>
+                      </span>
                     ));
                   }
                   return null;
@@ -382,8 +376,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                   {searchResults.semanticAnalysis.suggestedRefinements.map((suggestion, i) => (
                     <Button
                       key={i}
-                      variant="ghost"
-                      size="sm"
                       className="h-6 px-2 text-xs"
                       onClick={() => setQuery(suggestion)}
                     >
@@ -450,10 +442,10 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
 
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary">{result.source}</Badge>
+                            <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">{result.source}</span>
                             {result.metadata?.tags && (
                               result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
-                                <Badge key={i} variant="outline">{tag}</Badge>
+                                <span key={i} className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{tag}</span>
                               ))
                             )}
                           </div>
@@ -461,8 +453,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                           {/* PDF Link for additional details */}
                           {result.pdfUrl && (
                             <Button
-                              variant="outline"
-                              size="sm"
                               className="flex items-center gap-1"
                               onClick={() => window.open(result.pdfUrl, '_blank')}
                             >
@@ -474,8 +464,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                           {/* Fallback to general source URL */}
                           {!result.pdfUrl && result.sourceUrl && (
                             <Button
-                              variant="outline"
-                              size="sm"
                               className="flex items-center gap-1"
                               onClick={() => window.open(result.sourceUrl, '_blank')}
                             >
@@ -504,7 +492,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                           <div className="flex items-center gap-2">
                             <Package className="h-4 w-4" />
                             <h3 className="font-semibold">{result.materialName}</h3>
-                            <Badge variant="outline">{result.extractionType}</Badge>
+                            <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{result.extractionType}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${getConfidenceColor(result.confidence)}`} />
@@ -537,7 +525,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                           <div className="flex items-center gap-2">
                             <Lightbulb className="h-4 w-4" />
                             <h3 className="font-semibold">{rec.title}</h3>
-                            <Badge variant="outline">{rec.type}</Badge>
+                            <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{rec.type}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${getConfidenceColor(rec.score)}`} />
@@ -568,7 +556,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                       <div className="flex items-center gap-2 mb-3">
                         <TrendingUp className="h-5 w-5" />
                         <h3 className="font-semibold">Current Information</h3>
-                        <Badge variant="outline">Live Data</Badge>
+                        <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">Live Data</span>
                       </div>
                       
                       <div className="prose prose-sm max-w-none">
@@ -584,8 +572,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                             {searchResults.results.realTimeInfo.relatedQuestions.map((question, i) => (
                               <Button
                                 key={i}
-                                variant="ghost"
-                                size="sm"
                                 className="h-auto p-2 text-left justify-start"
                                 onClick={() => setQuery(question)}
                               >
@@ -607,16 +593,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <span className="text-sm text-muted-foreground">How helpful were these results?</span>
               <div className="flex items-center gap-2">
                 <Button
-                  variant="ghost"
-                  size="sm"
                   onClick={() => handleFeedback(5)}
                   className="text-green-600 hover:text-green-700"
                 >
                   <ThumbsUp className="h-4 w-4" />
                 </Button>
                 <Button
-                  variant="ghost"
-                  size="sm"
                   onClick={() => handleFeedback(2)}
                   className="text-red-600 hover:text-red-700"
                 >

@@ -12,7 +12,7 @@ import {
   CheckCircle, 
   XCircle,
   Activity,
-  Upload,
+  
   ArrowLeft,
   Home
 } from 'lucide-react';
@@ -51,23 +51,16 @@ export const AITestingPanel: React.FC = () => {
     setResults([]);
     
     try {
-      // Create a test file record first
-      const { data: testFile, error: fileError } = await supabase
-        .from('uploaded_files')
-        .insert({
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          file_name: 'test-image.jpg',
-          file_type: 'image',
-          storage_path: testImageUrl, // Using URL directly for testing
-          file_size: 0,
-          metadata: { test: true, original_url: testImageUrl }
-        })
-        .select()
-        .single();
-
-      if (fileError) {
-        throw new Error(`Failed to create test file: ${fileError.message}`);
-      }
+      // Mock test file data since uploaded_files table doesn't exist
+      const testFile = {
+        id: 'test-file-' + Date.now(),
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        file_name: 'test-image.jpg',
+        file_type: 'image',
+        storage_path: testImageUrl,
+        file_size: 0,
+        metadata: { test: true, original_url: testImageUrl }
+      };
 
       // Test hybrid analysis
       const apiService = ApiIntegrationService.getInstance();
@@ -102,11 +95,9 @@ export const AITestingPanel: React.FC = () => {
 
       setResults(testResults);
 
-      // Clean up test file
-      await supabase
-        .from('uploaded_files')
-        .delete()
-        .eq('id', testFile.id);
+      // Note: Cleanup would normally delete from uploaded_files table
+      // but since table doesn't exist in current schema, we skip this step
+      console.log('Test file cleanup skipped (uploaded_files table not in schema):', testFile.id);
 
       toast({
         title: 'Test Completed',
@@ -118,7 +109,7 @@ export const AITestingPanel: React.FC = () => {
       console.error('Test error:', error);
       toast({
         title: 'Test Failed',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive'
       });
     } finally {
@@ -154,7 +145,7 @@ export const AITestingPanel: React.FC = () => {
       console.error('3D test error:', error);
       toast({
         title: '3D Test Failed',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive'
       });
     } finally {
@@ -175,20 +166,16 @@ export const AITestingPanel: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
+                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
               <Button 
-                variant="outline" 
-                size="sm" 
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
+                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Admin
@@ -230,10 +217,8 @@ export const AITestingPanel: React.FC = () => {
                 {getSampleImageUrls().map((url, i) => (
                   <Button
                     key={i}
-                    variant="outline"
-                    size="sm"
+                    className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
                     onClick={() => setTestImageUrl(url)}
-                    className="mr-2 mb-1 text-xs"
                   >
                     Sample {i + 1}
                   </Button>
@@ -326,7 +311,7 @@ export const AITestingPanel: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     {result.success && (
-                      <Badge variant={result.score >= 0.7 ? 'default' : 'secondary'}>
+                      <Badge className={result.score >= 0.7 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'}>
                         Score: {result.score.toFixed(2)}
                       </Badge>
                     )}

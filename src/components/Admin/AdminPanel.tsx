@@ -16,18 +16,13 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Activity, 
-  Brain, 
-  TrendingUp, 
-  AlertTriangle, 
-  CheckCircle, 
-  XCircle,
+  Activity,
+  Brain,
+  CheckCircle,
   Clock,
   Zap,
   Star,
-  BarChart3,
-  Database,
-  TestTube
+  BarChart3
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -38,15 +33,6 @@ interface AnalyticsEvent {
   event_data: any;
   created_at: string;
   user_id: string;
-}
-
-interface ScoreData {
-  score: number;
-  provider: string;
-  attempts: number;
-  processing_time_ms: number;
-  analysis_type?: string;
-  final_score?: number;
 }
 
 export const AdminPanel: React.FC = () => {
@@ -82,8 +68,9 @@ export const AdminPanel: React.FC = () => {
         throw error;
       }
 
-      setAnalyticsData(data || []);
-      calculateStats(data || []);
+      const filteredData = (data || []).filter(item => item.created_at !== null) as AnalyticsEvent[];
+      setAnalyticsData(filteredData);
+      calculateStats(filteredData);
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -138,9 +125,9 @@ export const AdminPanel: React.FC = () => {
   };
 
   const getProviderBadge = (provider: string) => {
-    if (provider === 'openai') return <Badge variant="outline">OpenAI</Badge>;
-    if (provider === 'claude') return <Badge variant="secondary">Claude</Badge>;
-    return <Badge variant="default">{provider}</Badge>;
+    if (provider === 'openai') return <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">OpenAI</Badge>;
+    if (provider === 'claude') return <Badge className="px-2 py-1 bg-gray-200 text-gray-800">Claude</Badge>;
+    return <Badge className="px-2 py-1 bg-blue-100 text-blue-800">{provider}</Badge>;
   };
 
   const formatTime = (timestamp: string) => {
@@ -183,20 +170,16 @@ export const AdminPanel: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
+                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Activity className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
+                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <BarChart3 className="h-4 w-4" />
                 Back to Admin
@@ -288,7 +271,7 @@ export const AdminPanel: React.FC = () => {
                         {formatTime(event.created_at)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{event.event_type}</Badge>
+                        <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">{event.event_type}</Badge>
                       </TableCell>
                       <TableCell>
                         {event.event_data.final_score ? 

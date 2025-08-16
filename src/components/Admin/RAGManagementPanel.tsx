@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Database, Brain, Zap, Upload, Settings, Rocket, ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { ragService, TrainingRequest } from '@/services/ragService';
+import { ragService } from '@/services/ragService';
 
 export const RAGManagementPanel: React.FC = () => {
   const navigate = useNavigate();
@@ -155,20 +155,16 @@ export const RAGManagementPanel: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
+                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
+                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Admin
@@ -289,7 +285,7 @@ export const RAGManagementPanel: React.FC = () => {
                               </div>
                               <div className="flex items-center gap-2">
                                 <div className={`w-2 h-2 rounded-full ${getStatusColor(job.status)}`} />
-                                <Badge variant="outline">{job.status}</Badge>
+                                <Badge className="border border-border bg-background text-foreground">{job.status}</Badge>
                               </div>
                             </div>
                           ))}
@@ -415,7 +411,7 @@ export const RAGManagementPanel: React.FC = () => {
                         Embedding generation is handled automatically during material processing.
                         Custom models will be deployed here after training completion.
                       </p>
-                      <Button variant="outline" disabled>
+                      <Button disabled className="border border-border bg-background text-foreground">
                         <Settings className="h-4 w-4 mr-2" />
                         Configure Custom Models (Coming Soon)
                       </Button>

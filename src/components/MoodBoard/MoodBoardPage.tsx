@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Grid3X3, List, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -132,15 +131,11 @@ export const MoodBoardPage = () => {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
             <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
               onClick={() => setViewMode('grid')}
             >
               <Grid3X3 className="h-4 w-4" />
             </Button>
             <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
               onClick={() => setViewMode('list')}
             >
               <List className="h-4 w-4" />
@@ -195,9 +190,9 @@ export const MoodBoardPage = () => {
                     </div>
                     <div className="flex gap-1 ml-2">
                       {board.isPublic ? (
-                        <Badge variant="secondary">Public</Badge>
+                        <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Public</span>
                       ) : (
-                        <Badge variant="outline">Private</Badge>
+                        <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Private</span>
                       )}
                     </div>
                   </div>
@@ -206,16 +201,14 @@ export const MoodBoardPage = () => {
                 <CardContent className="pt-0">
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{board.items?.length || 0} materials</span>
-                    <span>{board.createdAt.toLocaleDateString()}</span>
+                    <span>{new Date(board.createdAt).toLocaleDateString()}</span>
                   </div>
                   
                   <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button className="flex-1">
                       Open
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteMoodBoard(board.id, board.title);
@@ -270,9 +263,9 @@ export const MoodBoardPage = () => {
               <Switch
                 id="public"
                 checked={newMoodBoard.is_public}
-                onCheckedChange={(checked) => setNewMoodBoard(prev => ({ 
-                  ...prev, 
-                  is_public: checked 
+                onCheckedChange={(checked: boolean) => setNewMoodBoard(prev => ({
+                  ...prev,
+                  is_public: checked
                 }))}
               />
               <Label htmlFor="public">Make this moodboard public</Label>
@@ -280,7 +273,6 @@ export const MoodBoardPage = () => {
 
             <div className="flex gap-2 pt-4">
               <Button
-                variant="outline"
                 onClick={() => setShowCreateDialog(false)}
                 className="flex-1"
               >

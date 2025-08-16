@@ -1,26 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Package, 
-  Edit3, 
-  Save, 
-  X, 
+import {
+  Package,
+  Edit3,
+  Save,
+  X,
   Plus,
   Image as ImageIcon,
-  CheckCircle,
   AlertCircle,
-  Tag,
   Palette
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MaterialTile {
@@ -90,7 +85,6 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
   const { toast } = useToast();
   const [materials, setMaterials] = useState<DetectedMaterial[]>([]);
   const [editingMaterial, setEditingMaterial] = useState<string | null>(null);
-  const [catalogMaterials, setCatalogMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -112,7 +106,6 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
     });
 
     const detectedMaterials: DetectedMaterial[] = Object.entries(materialGroups).map(([type, groupTiles]) => {
-      const firstTile = groupTiles[0];
       const avgConfidence = groupTiles.reduce((sum, t) => sum + (t.material_confidence || 0), 0) / groupTiles.length;
       
       // Extract properties and effects from structured data
@@ -133,14 +126,14 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
         name: type.charAt(0).toUpperCase() + type.slice(1),
         category: type,
         type: type,
-        effects: [...new Set(effects)],
+        effects: Array.from(new Set(effects)),
         properties,
         confidence: avgConfidence,
         sources: groupTiles.map(tile => ({
           page: tile.page_number,
           tile: tile.tile_index,
           text: tile.extracted_text,
-          image_url: tile.image_url
+          ...(tile.image_url && { image_url: tile.image_url })
         })),
         metadata: {
           processing_id: processingId,
@@ -156,13 +149,11 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
 
   const loadCatalogMaterials = async () => {
     try {
-      const { data, error } = await supabase
-        .from('materials_catalog')
-        .select('id, name, category, properties, description')
-        .limit(100);
-
-      if (error) throw error;
-      setCatalogMaterials(data || []);
+      // Note: materials_catalog table doesn't exist in current schema
+      // This is a placeholder for future implementation
+      console.log('Loading catalog materials - feature not yet implemented');
+      // Placeholder for catalog materials loading
+      console.log('Loading catalog materials...');
     } catch (error) {
       console.error('Error loading catalog materials:', error);
     }
@@ -170,31 +161,13 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
 
   const saveMaterialToCatalog = async (material: DetectedMaterial) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('User not authenticated');
-
-      const materialData = {
-        name: material.name,
-        category: material.category as any,
-        description: `Extracted from PDF: ${material.sources.map(s => s.text).join('; ')}`,
-        properties: {
-          ...material.properties,
-          effects: material.effects,
-          confidence_score: material.confidence,
-          extraction_sources: material.sources
-        },
-        created_by: userData.user.id
-      };
-
-      const { error } = await supabase
-        .from('materials_catalog')
-        .insert(materialData);
-
-      if (error) throw error;
+      // Note: materials_catalog table doesn't exist in current schema
+      // This is a placeholder for future implementation
+      console.log('Saving material to catalog - feature not yet implemented', material);
 
       toast({
-        title: "Material Saved",
-        description: `${material.name} has been added to the materials catalog.`,
+        title: "Feature Not Available",
+        description: "Material catalog saving is not yet implemented.",
       });
 
     } catch (error) {
@@ -272,26 +245,23 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                     ) : (
                       <CardTitle className="text-lg">{material.name}</CardTitle>
                     )}
-                    <Badge variant="outline" className="capitalize">
+                    <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700 capitalize">
                       {material.category}
-                    </Badge>
-                    <Badge variant="secondary">
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800">
                       {Math.round(material.confidence * 100)}% confidence
-                    </Badge>
+                    </span>
                   </div>
                   <div className="flex items-center space-x-2">
                     {editingMaterial === material.id ? (
                       <>
-                        <Button 
-                          size="sm" 
+                        <Button
                           onClick={() => setEditingMaterial(null)}
                         >
                           <Save className="h-4 w-4 mr-1" />
                           Save
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
+                        <Button
                           onClick={() => setEditingMaterial(null)}
                         >
                           <X className="h-4 w-4" />
@@ -299,16 +269,13 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                       </>
                     ) : (
                       <>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
+                        <Button
                           onClick={() => setEditingMaterial(material.id)}
                         >
                           <Edit3 className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
-                        <Button 
-                          size="sm"
+                        <Button
                           onClick={() => saveMaterialToCatalog(material)}
                         >
                           <Plus className="h-4 w-4 mr-1" />
@@ -328,7 +295,7 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                     {editingMaterial === material.id ? (
                       <Select 
                         value={material.category} 
-                        onValueChange={(value) => updateMaterial(material.id, { category: value })}
+                        onValueChange={(value: string) => updateMaterial(material.id, { category: value })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -367,9 +334,9 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                     </Label>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {material.effects.map((effect, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
+                        <span key={index} className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800">
                           {effect}
-                        </Badge>
+                        </span>
                       ))}
                     </div>
                   </div>

@@ -22,20 +22,16 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
         <div className="flex items-center space-x-4">
           {/* Navigation Buttons */}
           <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
               onClick={() => navigate('/')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 text-sm"
             >
               <Home className="h-4 w-4" />
               Main App
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
               onClick={() => navigate('/admin')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
               Admin Dashboard

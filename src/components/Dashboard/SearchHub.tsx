@@ -2,12 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Search, 
-  TrendingUp, 
-  Clock, 
-  Star, 
+import {
+  TrendingUp,
+  Clock,
+  Star,
   ArrowRight,
   Package,
   BookOpen,
@@ -65,8 +63,8 @@ export const SearchHub: React.FC<SearchHubProps> = ({
   return (
     <div className="space-y-6">
       {/* Main Search Interface */}
-      <UnifiedSearchInterface 
-        onMaterialSelect={onMaterialSelect}
+      <UnifiedSearchInterface
+        onMaterialSelect={onMaterialSelect || (() => {})}
         onResultsFound={(results) => {
           console.log('Search results found:', results.length);
         }}
@@ -112,7 +110,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {popularMaterials.map((material, index) => (
+            {popularMaterials.map((material) => (
               <div 
                 key={material.id}
                 className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer"
@@ -122,7 +120,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
                   <Package className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{material.name}</span>
                 </div>
-                <Badge variant="secondary" className="text-xs">
+                <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80 text-xs">
                   {material.searches}
                 </Badge>
               </div>
@@ -167,27 +165,24 @@ export const SearchHub: React.FC<SearchHubProps> = ({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col items-center gap-2"
+            <Button
+              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleQuickAction('3d')}
             >
               <Sparkles className="h-6 w-6" />
               <span className="text-sm">Generate 3D</span>
             </Button>
             
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col items-center gap-2"
+            <Button
+              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleQuickAction('moodboard')}
             >
               <Star className="h-6 w-6" />
               <span className="text-sm">Create Moodboard</span>
             </Button>
             
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col items-center gap-2"
+            <Button
+              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => {
                 // Open catalog view
                 window.location.href = '/catalog';
@@ -197,9 +192,8 @@ export const SearchHub: React.FC<SearchHubProps> = ({
               <span className="text-sm">Browse Catalog</span>
             </Button>
             
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col items-center gap-2"
+            <Button
+              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => {
                 // Open knowledge base
                 window.location.href = '/rag';

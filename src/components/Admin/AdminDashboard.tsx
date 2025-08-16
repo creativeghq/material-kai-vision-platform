@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import {
   BarChart3,
   Brain,
-  Database,
+  Database as DatabaseIcon,
   Microscope,
   Settings,
   Activity,
@@ -38,44 +38,212 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 
-// Mock data for demonstration - in real app, this would come from APIs
-const mockSystemMetrics = {
-  cpu: 45,
-  memory: 68,
-  disk: 32,
-  network: 12,
-  uptime: "15 days, 4 hours",
-  activeUsers: 23,
-  totalRequests: 8432,
-  errorRate: 0.2
+// Types for our data structures
+type SystemMetrics = {
+  cpu: number;
+  memory: number;
+  disk: number;
+  network: number;
+  uptime: string;
+  activeUsers: number;
+  totalRequests: number;
+  errorRate: number;
+  processedDocuments: number;
+  knowledgeEntries: number;
+  activeSessions: number;
 };
 
-const mockUsers = [
-  { id: 1, name: "John Doe", email: "john@example.com", role: "Admin", status: "Active", lastLogin: "2 hours ago" },
-  { id: 2, name: "Jane Smith", email: "jane@example.com", role: "User", status: "Active", lastLogin: "1 day ago" },
-  { id: 3, name: "Bob Wilson", email: "bob@example.com", role: "Moderator", status: "Inactive", lastLogin: "1 week ago" },
-  { id: 4, name: "Alice Brown", email: "alice@example.com", role: "User", status: "Active", lastLogin: "3 hours ago" }
-];
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  lastLogin: string;
+};
 
-const mockConfigs = [
-  { key: "max_upload_size", value: "100MB", category: "File Processing", description: "Maximum file size for uploads" },
-  { key: "session_timeout", value: "30 minutes", category: "Security", description: "User session timeout duration" },
-  { key: "api_rate_limit", value: "1000/hour", category: "API", description: "API requests per hour limit" },
-  { key: "backup_frequency", value: "Daily", category: "System", description: "Automated backup frequency" }
-];
+type Config = {
+  key: string;
+  value: string;
+  category: string;
+  description: string;
+};
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
-  const [systemMetrics, setSystemMetrics] = useState(mockSystemMetrics);
-  const [users] = useState(mockUsers);
-  const [configs, setConfigs] = useState(mockConfigs);
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
+    cpu: 45,
+    memory: 68,
+    disk: 32,
+    network: 12,
+    uptime: "15 days, 4 hours",
+    activeUsers: 23,
+    totalRequests: 8432,
+    errorRate: 0.2,
+    processedDocuments: 0,
+    knowledgeEntries: 0,
+    activeSessions: 0
+  });
+  const [users, setUsers] = useState<User[]>([]);
+  const [configs, setConfigs] = useState<Config[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [userFilter, setUserFilter] = useState("");
   const [configFilter, setConfigFilter] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate real-time updates for system metrics
+  // Load real data from Supabase
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Load system metrics from database
+      await loadSystemMetrics();
+      
+      // Load users from workspaces (simplified user management)
+      await loadUsers();
+      
+      // Load configurations from workspace settings
+      await loadConfigurations();
+
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSystemMetrics = async () => {
+    try {
+      // Get processing results count
+      const { count: processedDocs } = await supabase
+        .from('processing_results')
+        .select('*', { count: 'exact', head: true });
+
+      // Get materials catalog count
+      const { count: knowledgeEntries } = await supabase
+        .from('materials_catalog')
+        .select('*', { count: 'exact', head: true });
+
+      // Get active scraping sessions count
+      const { count: activeSessions } = await supabase
+        .from('scraping_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+      // Calculate total requests from processing results
+      const { data: processingData } = await supabase
+        .from('processing_results')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
+      const totalRequests = processingData?.length || 0;
+
+      // Calculate error rate from processing results
+      const { count: errorCount } = await supabase
+        .from('processing_results')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'error');
+
+      const errorRate = totalRequests > 0 ? ((errorCount || 0) / totalRequests) * 100 : 0;
+
+      setSystemMetrics(prev => ({
+        ...prev,
+        processedDocuments: processedDocs || 0,
+        knowledgeEntries: knowledgeEntries || 0,
+        activeSessions: activeSessions || 0,
+        totalRequests,
+        errorRate: Number(errorRate.toFixed(2))
+      }));
+    } catch (err) {
+      console.error('Error loading system metrics:', err);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      // Load workspaces as a simplified user management system
+      const { data: workspaces, error } = await supabase
+        .from('workspaces')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform workspaces into user-like objects for display
+      const userList: User[] = workspaces?.map((workspace, index) => ({
+        id: workspace.id,
+        name: workspace.name,
+        email: `admin@${workspace.name.toLowerCase().replace(/\s+/g, '')}.com`,
+        role: index === 0 ? 'Admin' : 'User',
+        status: 'Active',
+        lastLogin: workspace.updated_at ?
+          new Date(workspace.updated_at).toLocaleDateString() :
+          'Never'
+      })) || [];
+
+      setUsers(userList);
+    } catch (err) {
+      console.error('Error loading users:', err);
+    }
+  };
+
+  const loadConfigurations = async () => {
+    try {
+      // Load workspace settings as configurations
+      const { data: workspaces, error } = await supabase
+        .from('workspaces')
+        .select('settings')
+        .limit(1);
+
+      if (error) throw error;
+
+      // Default configurations with some from workspace settings
+      const defaultConfigs: Config[] = [
+        { key: "max_upload_size", value: "100MB", category: "File Processing", description: "Maximum file size for uploads" },
+        { key: "session_timeout", value: "30 minutes", category: "Security", description: "User session timeout duration" },
+        { key: "api_rate_limit", value: "1000/hour", category: "API", description: "API requests per hour limit" },
+        { key: "backup_frequency", value: "Daily", category: "System", description: "Automated backup frequency" }
+      ];
+
+      // Add workspace-specific settings if available
+      if (workspaces?.[0]?.settings) {
+        const settings = workspaces[0].settings as any;
+        Object.entries(settings).forEach(([key, value]) => {
+          defaultConfigs.push({
+            key,
+            value: String(value),
+            category: "Workspace",
+            description: `Workspace setting: ${key}`
+          });
+        });
+      }
+
+      setConfigs(defaultConfigs);
+    } catch (err) {
+      console.error('Error loading configurations:', err);
+      // Set default configs on error
+      setConfigs([
+        { key: "max_upload_size", value: "100MB", category: "File Processing", description: "Maximum file size for uploads" },
+        { key: "session_timeout", value: "30 minutes", category: "Security", description: "User session timeout duration" },
+        { key: "api_rate_limit", value: "1000/hour", category: "API", description: "API requests per hour limit" },
+        { key: "backup_frequency", value: "Daily", category: "System", description: "Automated backup frequency" }
+      ]);
+    }
+  };
+
+  // Real-time updates for system metrics
   useEffect(() => {
     const interval = setInterval(() => {
       setSystemMetrics(prev => ({
@@ -89,31 +257,54 @@ const AdminDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleUserAction = (action: string, userId?: number) => {
+  const handleUserAction = (action: string, userId?: string) => {
     console.log(`${action} action for user:`, userId);
-    // In real app, this would make API calls
+    // In real app, this would make API calls to manage workspace users
   };
 
   const handleBulkUserAction = (action: string) => {
     console.log(`Bulk ${action} for users:`, selectedUsers);
-    // In real app, this would make API calls
+    // In real app, this would make API calls to manage multiple workspace users
   };
 
-  const handleConfigUpdate = (key: string, newValue: string) => {
-    setConfigs(prev => prev.map(config => 
-      config.key === key ? { ...config, value: newValue } : config
-    ));
-    console.log(`Updated config ${key} to:`, newValue);
-    // In real app, this would make API calls
+  const handleConfigUpdate = async (key: string, newValue: string) => {
+    try {
+      setConfigs(prev => prev.map(config =>
+        config.key === key ? { ...config, value: newValue } : config
+      ));
+
+      // Update workspace settings in database if it's a workspace setting
+      const config = configs.find(c => c.key === key);
+      if (config?.category === "Workspace") {
+        const { data: workspaces } = await supabase
+          .from('workspaces')
+          .select('id, settings')
+          .limit(1);
+
+        if (workspaces?.[0]) {
+          const currentSettings = workspaces[0].settings as any || {};
+          const updatedSettings = { ...currentSettings, [key]: newValue };
+
+          await supabase
+            .from('workspaces')
+            .update({ settings: updatedSettings })
+            .eq('id', workspaces[0].id);
+        }
+      }
+
+      console.log(`Updated config ${key} to:`, newValue);
+    } catch (err) {
+      console.error('Error updating configuration:', err);
+    }
   };
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter((user: User) =>
     user.name.toLowerCase().includes(userFilter.toLowerCase()) ||
     user.email.toLowerCase().includes(userFilter.toLowerCase()) ||
     user.role.toLowerCase().includes(userFilter.toLowerCase())
   );
 
-  const filteredConfigs = configs.filter(config =>
+  const filteredConfigs = configs.filter((config: Config) =>
     config.key.toLowerCase().includes(configFilter.toLowerCase()) ||
     config.category.toLowerCase().includes(configFilter.toLowerCase()) ||
     config.description.toLowerCase().includes(configFilter.toLowerCase())
@@ -168,7 +359,7 @@ const AdminDashboard: React.FC = () => {
     {
       title: "Knowledge Base Management",
       description: "Manage enhanced knowledge base entries from PDF processing",
-      icon: Database,
+      icon: DatabaseIcon,
       path: "/admin/knowledge-base",
       status: "active",
       count: "1,247 entries",
@@ -228,11 +419,9 @@ const AdminDashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
@@ -246,7 +435,7 @@ const AdminDashboard: React.FC = () => {
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="text-sm">
+          <Badge className="text-sm px-2 py-1 border border-gray-300 bg-white text-gray-700">
             Administrator Access
           </Badge>
         </div>
@@ -278,15 +467,15 @@ const AdminDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="flex gap-4">
-                  <Button asChild size="lg" className="flex items-center gap-2">
+                  <Button asChild className="flex items-center gap-2 px-6 py-3 text-lg">
                     <Link to="/admin/pdf-processing">
                       <Upload className="h-5 w-5" />
                       Upload PDF Documents
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" size="lg">
+                  <Button asChild className="px-6 py-3 text-lg border border-gray-300 hover:bg-gray-50">
                     <Link to="/admin/knowledge-base">
-                      <Database className="h-5 w-5" />
+                      <DatabaseIcon className="h-5 w-5" />
                       Manage Knowledge Base
                     </Link>
                   </Button>
@@ -318,7 +507,7 @@ const AdminDashboard: React.FC = () => {
                         <span className="text-sm text-muted-foreground">
                           {section.count}
                         </span>
-                        <Button asChild variant="outline" size="sm">
+                        <Button asChild className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                           <Link to={section.path}>
                             Manage
                           </Link>
@@ -339,15 +528,15 @@ const AdminDashboard: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>PDF Documents</span>
-                      <Badge variant="outline">156 Processed</Badge>
+                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">156 Processed</Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Knowledge Entries</span>
-                      <Badge variant="outline">1,247 Active</Badge>
+                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">1,247 Active</Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Search Queries</span>
-                      <Badge variant="outline">8,432 Total</Badge>
+                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">8,432 Total</Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -372,13 +561,13 @@ const AdminDashboard: React.FC = () => {
                   <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Button asChild variant="outline" size="sm" className="w-full">
+                  <Button asChild className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                     <Link to="/admin/pdf-processing">Process New PDF</Link>
                   </Button>
-                  <Button asChild variant="outline" size="sm" className="w-full">
+                  <Button asChild className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                     <Link to="/admin/search-hub">Test Search System</Link>
                   </Button>
-                  <Button asChild variant="outline" size="sm" className="w-full">
+                  <Button asChild className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                     <Link to="/admin/3d-suggestions">Configure 3D Suggestions</Link>
                   </Button>
                 </CardContent>
@@ -461,28 +650,28 @@ const AdminDashboard: React.FC = () => {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span>System Uptime</span>
-                    <Badge variant="outline" className="text-green-600">
+                    <Badge className="text-green-600 px-2 py-1 border border-gray-300 bg-white">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       {systemMetrics.uptime}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Active Users</span>
-                    <Badge variant="outline">
+                    <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
                       <Users className="h-3 w-3 mr-1" />
                       {systemMetrics.activeUsers}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Total Requests</span>
-                    <Badge variant="outline">
+                    <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
                       <TrendingUp className="h-3 w-3 mr-1" />
                       {systemMetrics.totalRequests.toLocaleString()}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Error Rate</span>
-                    <Badge variant="outline" className={systemMetrics.errorRate > 1 ? "text-red-600" : "text-green-600"}>
+                    <Badge className={`px-2 py-1 border border-gray-300 bg-white ${systemMetrics.errorRate > 1 ? "text-red-600" : "text-green-600"}`}>
                       {systemMetrics.errorRate > 1 ? <AlertTriangle className="h-3 w-3 mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
                       {systemMetrics.errorRate}%
                     </Badge>
@@ -531,11 +720,11 @@ const AdminDashboard: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
+                <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
-                <Button size="sm">
+                <Button className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white">
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add User
                 </Button>
@@ -552,16 +741,16 @@ const AdminDashboard: React.FC = () => {
                   className="w-full px-3 py-2 border border-input rounded-md"
                 />
               </div>
-              <Button variant="outline" size="sm">
+              <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
               {selectedUsers.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleBulkUserAction('activate')}>
+                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('activate')}>
                     Activate ({selectedUsers.length})
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleBulkUserAction('deactivate')}>
+                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('deactivate')}>
                     Deactivate ({selectedUsers.length})
                   </Button>
                 </div>
@@ -579,7 +768,7 @@ const AdminDashboard: React.FC = () => {
                             type="checkbox"
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedUsers(filteredUsers.map(u => u.id));
+                                setSelectedUsers(filteredUsers.map((u: User) => u.id));
                               } else {
                                 setSelectedUsers([]);
                               }
@@ -594,7 +783,7 @@ const AdminDashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUsers.map((user) => (
+                      {filteredUsers.map((user: User) => (
                         <tr key={user.id} className="border-b hover:bg-muted/50">
                           <td className="p-4">
                             <input
@@ -616,7 +805,7 @@ const AdminDashboard: React.FC = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                            <Badge variant="outline">{user.role}</Badge>
+                            <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">{user.role}</Badge>
                           </td>
                           <td className="p-4">
                             <Badge className={user.status === 'Active' ? 'bg-green-500/20 text-green-600' : 'bg-gray-500/20 text-gray-600'}>
@@ -626,13 +815,13 @@ const AdminDashboard: React.FC = () => {
                           <td className="p-4 text-sm text-muted-foreground">{user.lastLogin}</td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleUserAction('edit', user.id)}>
+                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('edit', user.id)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleUserAction('view', user.id)}>
+                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('view', user.id)}>
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleUserAction('delete', user.id)}>
+                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('delete', user.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -656,11 +845,11 @@ const AdminDashboard: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
+                <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh
                 </Button>
-                <Button size="sm">
+                <Button className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white">
                   <Settings className="h-4 w-4 mr-2" />
                   Add Config
                 </Button>
@@ -677,21 +866,21 @@ const AdminDashboard: React.FC = () => {
                   className="w-full px-3 py-2 border border-input rounded-md"
                 />
               </div>
-              <Button variant="outline" size="sm">
+              <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter by Category
               </Button>
             </div>
 
             <div className="grid gap-4">
-              {filteredConfigs.map((config) => (
+              {filteredConfigs.map((config: Config) => (
                 <Card key={config.key}>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h4 className="font-medium">{config.key}</h4>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge className="text-xs px-2 py-1 border border-gray-300 bg-white text-gray-700">
                             {config.category}
                           </Badge>
                         </div>
@@ -709,10 +898,10 @@ const AdminDashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
+                        <Button className="px-2 py-1 text-sm hover:bg-gray-100">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button className="px-2 py-1 text-sm hover:bg-gray-100">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </div>

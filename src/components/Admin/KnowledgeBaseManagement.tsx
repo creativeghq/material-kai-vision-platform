@@ -7,7 +7,7 @@ import EmbeddingGenerationPanel from './EmbeddingGenerationPanel';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -72,7 +72,26 @@ const KnowledgeBaseManagement: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setEntries(data || []);
+      // Handle potential null values from database
+      const processedData = (data || []).map(entry => ({
+        ...entry,
+        status: entry.status || 'draft',
+        title: entry.title || '',
+        content: entry.content || '',
+        created_by: entry.created_by || '',
+        updated_at: entry.updated_at || null,
+        source_url: entry.source_url || '',
+        content_type: entry.content_type || 'text',
+        
+        metadata: entry.metadata || {},
+        
+        confidence_scores: entry.confidence_scores || {},
+        approved_by: entry.approved_by || null,
+        approved_at: entry.approved_at || null,
+        version: entry.version || 1,
+        accuracy_score: entry.accuracy_score || null
+      }));
+      setEntries(processedData as KnowledgeEntry[]);
     } catch (error) {
       console.error('Error fetching knowledge entries:', error);
       toast({
@@ -179,9 +198,9 @@ const KnowledgeBaseManagement: React.FC = () => {
       const { error } = await supabase
         .from('enhanced_knowledge_base')
         .update({
-          title: updatedEntry.title,
-          content: updatedEntry.content,
-          status: updatedEntry.status,
+          title: updatedEntry.title || '',
+          content: updatedEntry.content || '',
+          status: updatedEntry.status || 'draft',
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedEntry.id);
@@ -232,20 +251,16 @@ const KnowledgeBaseManagement: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
               >
                 <Search className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
               >
                 <Filter className="h-4 w-4" />
                 Back to Admin
@@ -260,11 +275,11 @@ const KnowledgeBaseManagement: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={fetchEntries} variant="outline" size="sm">
+            <Button onClick={fetchEntries} className="border border-border bg-background text-foreground h-8 px-3 text-sm">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="default" size="sm">
+            <Button className="bg-primary text-primary-foreground h-8 px-3 text-sm">
               <Plus className="h-4 w-4 mr-2" />
               Add Entry
             </Button>
@@ -327,11 +342,11 @@ const KnowledgeBaseManagement: React.FC = () => {
             </Select>
 
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              <Button className="border border-border bg-background text-foreground h-8 px-3 text-sm">
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
-              <Button variant="outline" size="sm">
+              <Button className="border border-border bg-background text-foreground h-8 px-3 text-sm">
                 <Upload className="h-4 w-4 mr-2" />
                 Import
               </Button>
@@ -370,7 +385,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                       <div className="font-medium">{entry.title}</div>
                       <div className="text-sm text-muted-foreground">
                         {entry.semantic_tags?.slice(0, 3).map(tag => (
-                          <Badge key={tag} variant="outline" className="mr-1 text-xs">
+                          <Badge key={tag} className="border border-border bg-background text-foreground mr-1 text-xs">
                             {tag}
                           </Badge>
                         ))}
@@ -378,7 +393,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{entry.content_type}</Badge>
+                    <Badge className="border border-border bg-background text-foreground">{entry.content_type}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(entry.status)}>
@@ -388,9 +403,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                   <TableCell>
                     {entry.metadata?.storage_info?.pdf_storage_url ? (
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-1"
+                        className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1"
                         onClick={() => window.open(entry.metadata.storage_info.pdf_storage_url, '_blank')}
                       >
                         <ExternalLink className="h-3 w-3" />
@@ -403,9 +416,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                   <TableCell>
                     {entry.metadata?.storage_info?.html_storage_url ? (
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-1"
+                        className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1"
                         onClick={() => window.open(entry.metadata.storage_info.html_storage_url, '_blank')}
                       >
                         <ExternalLink className="h-3 w-3" />
@@ -434,8 +445,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
-                        variant="outline"
-                        size="sm"
+                        className="border border-border bg-background text-foreground h-8 px-3 text-sm"
                         onClick={() => {
                           setSelectedEntry(entry);
                           setIsEditDialogOpen(true);
@@ -444,8 +454,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        className="border border-border bg-background text-foreground h-8 px-3 text-sm"
                         onClick={() => handleDeleteEntry(entry.id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -488,7 +497,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 <Label htmlFor="status">Status</Label>
                 <Select 
                   defaultValue={selectedEntry.status}
-                  onValueChange={(value) => setSelectedEntry({...selectedEntry, status: value})}
+                  onValueChange={(value: string) => setSelectedEntry({...selectedEntry, status: value})}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -502,7 +511,7 @@ const KnowledgeBaseManagement: React.FC = () => {
               </div>
               <div className="flex justify-end gap-2">
                 <Button 
-                  variant="outline" 
+                  className="border border-border bg-background text-foreground"
                   onClick={() => setIsEditDialogOpen(false)}
                 >
                   Cancel
@@ -552,7 +561,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                           Process some PDF documents first to see extracted images here.
                         </p>
                         <Button 
-                          variant="outline"
+                          className="border border-border bg-background text-foreground"
                           onClick={() => navigate('/admin/pdf-processing')}
                         >
                           Go to PDF Processing
@@ -626,7 +635,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                                 }}
                               />
                               <div className="absolute top-2 right-2">
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge className="bg-secondary text-secondary-foreground text-xs">
                                   {image.size ? `${(image.size / 1024).toFixed(1)}KB` : 'Unknown'}
                                 </Badge>
                               </div>
@@ -643,18 +652,14 @@ const KnowledgeBaseManagement: React.FC = () => {
                                 </div>
                                 <div className="flex gap-1">
                                   <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 text-xs flex-1"
+                                    className="border border-border bg-background text-foreground h-7 text-xs flex-1"
                                     onClick={() => window.open(image.supabase_url, '_blank')}
                                   >
                                     <ExternalLink className="h-3 w-3 mr-1" />
                                     View
                                   </Button>
                                   <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 text-xs"
+                                    className="border border-border bg-background text-foreground h-7 text-xs flex-1"
                                     onClick={() => {
                                       navigator.clipboard.writeText(image.supabase_url);
                                       toast({
@@ -667,7 +672,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                                   </Button>
                                 </div>
                                 <div className="text-xs text-muted-foreground space-y-1">
-                                  <div>Source Type: <Badge variant="outline" className="text-xs">{image.sourceType}</Badge></div>
+                                  <div>Source Type: <Badge className="text-xs border border-border bg-background text-foreground">{image.sourceType}</Badge></div>
                                   <div>Extracted: {new Date(image.createdAt).toLocaleDateString()}</div>
                                 </div>
                               </div>

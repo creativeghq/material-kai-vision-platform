@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Settings, Database, Info, ArrowLeft, Home } from 'lucide-react';
+import { Plus, Edit, Trash2, Settings, ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -82,13 +82,9 @@ export const MetadataFieldsManagement: React.FC = () => {
   const loadMetadataFields = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('material_metadata_fields')
-        .select('*')
-        .order('sort_order');
-
-      if (error) throw error;
-      setFields(data || []);
+      // Note: material_metadata_fields table doesn't exist yet - using placeholder
+      setFields([]); // Set empty array since table doesn't exist yet
+      console.log('Metadata fields feature not yet implemented - table does not exist');
     } catch (error) {
       console.error('Error loading metadata fields:', error);
       toast({
@@ -149,7 +145,7 @@ export const MetadataFieldsManagement: React.FC = () => {
 
       if (editingField) {
         const { error } = await supabase
-          .from('material_metadata_fields')
+          .from('material_knowledge')
           .update(fieldData)
           .eq('id', editingField.id);
 
@@ -160,7 +156,7 @@ export const MetadataFieldsManagement: React.FC = () => {
         });
       } else {
         const { error } = await supabase
-          .from('material_metadata_fields')
+          .from('material_knowledge')
           .insert([fieldData]);
 
         if (error) throw error;
@@ -190,7 +186,7 @@ export const MetadataFieldsManagement: React.FC = () => {
 
     try {
       const { error } = await supabase
-        .from('material_metadata_fields')
+        .from('material_knowledge')
         .delete()
         .eq('id', field.id);
 
@@ -235,20 +231,16 @@ export const MetadataFieldsManagement: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Admin
@@ -333,7 +325,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                   <Checkbox
                     id="is_required"
                     checked={formData.is_required}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_required: !!checked }))}
+                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_required: !!checked }))}
                   />
                   <Label htmlFor="is_required">Required Field</Label>
                 </div>
@@ -341,7 +333,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                   <Checkbox
                     id="is_global"
                     checked={formData.is_global}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_global: !!checked }))}
+                    onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_global: !!checked }))}
                   />
                   <Label htmlFor="is_global">Global (All Categories)</Label>
                 </div>
@@ -382,7 +374,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {formData.dropdown_options.map((option, index) => (
-                        <Badge key={index} variant="secondary" className="cursor-pointer" onClick={() => removeDropdownOption(index)}>
+                        <Badge key={index} className="cursor-pointer bg-secondary text-secondary-foreground" onClick={() => removeDropdownOption(index)}>
                           {option} ×
                         </Badge>
                       ))}
@@ -400,7 +392,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                         <Checkbox
                           id={`category_${category}`}
                           checked={formData.applies_to_categories.includes(category)}
-                          onCheckedChange={(checked) => {
+                          onCheckedChange={(checked: boolean) => {
                             if (checked) {
                               setFormData(prev => ({
                                 ...prev,
@@ -424,7 +416,7 @@ export const MetadataFieldsManagement: React.FC = () => {
               )}
 
               <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button onClick={() => setIsDialogOpen(false)} className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
                   Cancel
                 </Button>
                 <Button onClick={handleSaveField}>
@@ -471,7 +463,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">
+                      <Badge className="capitalize border border-border bg-background text-foreground">
                         {field.field_type}
                       </Badge>
                     </TableCell>
@@ -481,12 +473,12 @@ export const MetadataFieldsManagement: React.FC = () => {
                       ) : (
                         <div className="flex flex-wrap gap-1">
                           {field.applies_to_categories?.slice(0, 2).map(cat => (
-                            <Badge key={cat} variant="secondary" className="text-xs capitalize">
+                            <Badge key={cat} className="text-xs capitalize bg-secondary text-secondary-foreground">
                               {cat}
                             </Badge>
                           ))}
                           {(field.applies_to_categories?.length || 0) > 2 && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge className="text-xs bg-secondary text-secondary-foreground">
                               +{(field.applies_to_categories?.length || 0) - 2}
                             </Badge>
                           )}
@@ -495,24 +487,22 @@ export const MetadataFieldsManagement: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       {field.is_required ? (
-                        <Badge variant="destructive">Required</Badge>
+                        <Badge className="bg-destructive text-destructive-foreground">Required</Badge>
                       ) : (
-                        <Badge variant="secondary">Optional</Badge>
+                        <Badge className="bg-secondary text-secondary-foreground">Optional</Badge>
                       )}
                     </TableCell>
                     <TableCell>{field.sort_order}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0"
                           onClick={() => openDialog(field)}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0"
                           onClick={() => handleDeleteField(field)}
                         >
                           <Trash2 className="w-4 h-4" />

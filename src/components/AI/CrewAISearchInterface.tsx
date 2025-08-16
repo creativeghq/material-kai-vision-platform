@@ -24,7 +24,6 @@ import {
   X,
   FileImage,
   FileText,
-  Upload,
   Settings,
   Cpu
 } from 'lucide-react';
@@ -527,7 +526,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-6 w-6 text-primary" />
             CrewAI Material Research Assistant
-            <Badge variant="outline" className="ml-auto">
+            <Badge className="ml-auto border border-border bg-background text-foreground">
               <Sparkles className="h-3 w-3 mr-1" />
               AI-Powered
             </Badge>
@@ -611,7 +610,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                                 {material.description}
                               </div>
                               {material.category && (
-                                <Badge variant="outline" className="mt-1 text-xs">
+                                <Badge className="mt-1 text-xs border border-border bg-background text-foreground">
                                   {material.category}
                                 </Badge>
                               )}
@@ -637,8 +636,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                           {message.suggestions.map((suggestion, idx) => (
                             <Button
                               key={idx}
-                              variant="outline"
-                              size="sm"
+                              
+                              
                               onClick={() => handleSuggestionClick(suggestion)}
                               className="text-xs h-7"
                             >
@@ -692,10 +691,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                     )}
                     <span className="truncate max-w-[120px]">{file.name}</span>
                     <Button
-                      variant="ghost"
-                      size="sm"
                       onClick={() => removeAttachedFile(file.id)}
-                      className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                      className="h-4 w-4 p-0 bg-transparent hover:bg-destructive hover:text-destructive-foreground"
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -713,10 +710,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                     AI Configuration
                   </h4>
                   <Button
-                    variant="ghost"
-                    size="sm"
                     onClick={() => setShowSettings(false)}
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 bg-transparent hover:bg-accent hover:text-accent-foreground"
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -807,8 +802,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
               {/* File Attachment Button */}
               <Button
                 type="button"
-                variant="outline"
-                size="icon"
+                
+                
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
                 title="Attach files"
@@ -819,8 +814,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
               {/* Settings Button */}
               <Button
                 type="button"
-                variant="outline"
-                size="icon"
+                
+                
                 onClick={() => setShowSettings(!showSettings)}
                 disabled={isLoading}
                 title="AI Settings"
@@ -832,7 +827,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
               <Button
                 onClick={handleSendMessage}
                 disabled={isLoading || !input.trim()}
-                size="icon"
+                className="h-8 w-8 p-0"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -863,7 +858,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Button
-          variant="outline"
+          
           onClick={onNavigateToMoodboard}
           className="justify-start gap-2"
         >
@@ -871,7 +866,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           Browse Mood Boards
         </Button>
         <Button
-          variant="outline"
+          
           onClick={onNavigateTo3D}
           className="justify-start gap-2"
         >
@@ -879,7 +874,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           3D Generation
         </Button>
         <Button
-          variant="outline"
+          
           onClick={() => handleSuggestionClick("Show me the latest material trends")}
           className="justify-start gap-2"
         >

@@ -88,8 +88,6 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
             </DialogTitle>
             <div className="flex gap-2">
               <Button
-                variant="outline"
-                size="sm"
                 onClick={openInNewTab}
                 disabled={!htmlContent || loading}
                 className="text-xs"
@@ -98,8 +96,6 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
                 Open in New Tab
               </Button>
               <Button
-                variant="outline"
-                size="sm"
                 onClick={downloadHTML}
                 disabled={!htmlContent || loading}
                 className="text-xs"
@@ -125,8 +121,6 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
                 <p className="text-red-600 font-medium">Error loading document</p>
                 <p className="text-gray-500 text-sm mt-1">{error}</p>
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={fetchHTMLContent}
                   className="mt-3"
                 >

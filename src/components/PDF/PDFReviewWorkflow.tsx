@@ -7,24 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Check, 
-  X, 
-  Edit3, 
-  Send, 
-  Image as ImageIcon, 
-  Download, 
-  Database, 
-  Brain, 
-  Search,
+import {
+  Check,
+  X,
+  Image as ImageIcon,
+  Brain,
   Workflow,
   CheckCircle,
   XCircle,
   Clock,
   Zap
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { PDFExportOptions } from './PDFExportOptions';
@@ -160,7 +153,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
       const totalSteps = workflowActions.size;
 
       // Execute each workflow action
-      for (const actionId of workflowActions) {
+      for (const actionId of Array.from(workflowActions)) {
         const action = availableWorkflows.find(a => a.id === actionId);
         if (!action) continue;
 
@@ -179,7 +172,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
           }
         } catch (error) {
           console.error(`Error in ${action.label}:`, error);
-          workflowResults[action.id] = { error: error.message };
+          workflowResults[action.id] = { error: error instanceof Error ? error.message : String(error) };
         }
 
         completed++;
@@ -270,8 +263,12 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
               Review & Workflow Manager
             </span>
             <div className="flex gap-2">
-              <Badge variant="outline">{stats.reviewed}/{stats.total} Reviewed</Badge>
-              <Badge variant="default">{stats.approved} Approved</Badge>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+                {stats.reviewed}/{stats.total} Reviewed
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                {stats.approved} Approved
+              </span>
             </div>
           </CardTitle>
           <CardDescription>
@@ -297,7 +294,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         <TabsContent value="review" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Material Review</h3>
-            <Button onClick={selectAllApproved} variant="outline" size="sm">
+            <Button onClick={selectAllApproved} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5">
               Select All Approved
             </Button>
           </div>
@@ -314,8 +311,12 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                       />
                       <div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline">Page {tile.page_number}</Badge>
-                          <Badge variant="outline">Tile {tile.tile_index + 1}</Badge>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+                            Page {tile.page_number}
+                          </span>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+                            Tile {tile.tile_index + 1}
+                          </span>
                           <Badge className={tile.material_detected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
                             {tile.corrected_material_type || tile.material_type}
                           </Badge>
@@ -344,7 +345,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                       <label className="text-sm font-medium">Material Type</label>
                       <Select
                         value={tile.corrected_material_type || tile.material_type}
-                        onValueChange={(value) => updateTileReview(tile.id, { corrected_material_type: value })}
+                        onValueChange={(value: string) => updateTileReview(tile.id, { corrected_material_type: value })}
                       >
                         <SelectTrigger className="mt-1">
                           <SelectValue />
@@ -397,16 +398,14 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                     <div className="flex justify-between items-center pt-2">
                       <div className="flex gap-2">
                         <Button
-                          variant="outline"
-                          size="sm"
+                          className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
                           onClick={() => updateTileReview(tile.id, { reviewed: true, approved: true })}
                         >
                           <Check className="h-4 w-4 mr-1" />
                           Approve
                         </Button>
                         <Button
-                          variant="outline"
-                          size="sm"
+                          className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
                           onClick={() => updateTileReview(tile.id, { reviewed: true, approved: false })}
                         >
                           <X className="h-4 w-4 mr-1" />

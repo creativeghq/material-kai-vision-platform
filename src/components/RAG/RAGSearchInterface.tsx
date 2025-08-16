@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Search, Brain, BookOpen, Package } from 'lucide-react';
@@ -117,7 +116,7 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               className="flex-1"
             />
-            <Button onClick={handleQuickSearch} disabled={isSearching} variant="outline">
+            <Button onClick={handleQuickSearch} disabled={isSearching} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               Quick
             </Button>
@@ -187,7 +186,7 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
                           <div className="flex items-center gap-2">
                             {getResultIcon(result.result_type)}
                             <h3 className="font-semibold">{result.title}</h3>
-                            <Badge variant="outline">{result.result_type}</Badge>
+                            <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{result.result_type}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div 
@@ -209,18 +208,18 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
                         {/* Metadata */}
                         <div className="flex flex-wrap gap-2">
                           {result.metadata?.category && (
-                            <Badge variant="secondary">
+                            <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
                               Category: {result.metadata.category}
-                            </Badge>
+                            </span>
                           )}
                           {result.metadata?.content_type && (
-                            <Badge variant="secondary">
+                            <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
                               Type: {result.metadata.content_type}
-                            </Badge>
+                            </span>
                           )}
                           {result.metadata?.tags && Array.isArray(result.metadata.tags) && 
                             result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
-                              <Badge key={i} variant="outline">{tag}</Badge>
+                              <span key={i} className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{tag}</span>
                             ))
                           }
                         </div>

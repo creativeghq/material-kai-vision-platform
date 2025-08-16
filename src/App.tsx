@@ -17,7 +17,6 @@ import AgentMLCoordination from "./components/Admin/AgentMLCoordination";
 import { AdminPanel } from "./components/Admin/AdminPanel";
 import { ApiGatewayAdmin } from "./components/Admin/ApiGatewayAdmin";
 import { MetadataFieldsManagement } from "./components/Admin/MetadataFieldsManagement";
-import { RAGManagementPanel } from "./components/Admin/RAGManagementPanel";
 import { AITestingPanel } from "./components/Admin/AITestingPanel";
 import { AnalyticsDashboard } from "./components/Admin/AnalyticsDashboard";
 import { SystemPerformance } from "./components/Admin/SystemPerformance";

@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-};
+import {
+  corsHeaders,
+  AuthUtils,
+  Logger,
+  Utils,
+  ValidationSchemas
+} from '../_shared/config.ts';
 
 interface PdfExtractionRequest {
   documentId: string;
@@ -101,33 +102,45 @@ serve(async (req) => {
     console.log(`PDF Extraction - Processing document: ${requestBody.documentId}, type: ${requestBody.extractionType}`);
 
     // Check authentication and authorization
-    const authResult = await checkAuthentication(req, supabase);
+    const authResult = await AuthUtils.checkAuthentication(req, supabase);
     if (!authResult.success) {
-      return createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
+      return Utils.createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
+    }
+
+    // Validate workspace membership if workspaceId is provided
+    if (requestBody.workspaceId && authResult.workspaceId !== requestBody.workspaceId) {
+      const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
+        supabase,
+        authResult.userId!,
+        requestBody.workspaceId
+      );
+      if (!workspaceCheck.success) {
+        return Utils.createErrorResponse(workspaceCheck.error || 'Workspace access denied', 403, startTime);
+      }
     }
 
     // Get document information from database
     const documentInfo = await getDocumentInfo(supabase, requestBody.documentId);
     if (!documentInfo) {
-      return createErrorResponse('Document not found', 404, startTime);
+      return Utils.createErrorResponse('Document not found', 404, startTime);
     }
 
     // Check user permissions for the document
     const hasPermission = await checkDocumentPermissions(
-      supabase, 
-      requestBody.documentId, 
-      authResult.userId,
-      requestBody.workspaceId
+      supabase,
+      requestBody.documentId,
+      authResult.userId!,
+      requestBody.workspaceId || authResult.workspaceId
     );
     if (!hasPermission) {
-      return createErrorResponse('Insufficient permissions', 403, startTime);
+      return Utils.createErrorResponse('Insufficient permissions', 403, startTime);
     }
 
     // Create processing record
     const processingRecord = await createProcessingRecord(supabase, {
       documentId: requestBody.documentId,
-      userId: authResult.userId,
-      workspaceId: requestBody.workspaceId,
+      userId: authResult.userId!,
+      workspaceId: requestBody.workspaceId || authResult.workspaceId,
       extractionType: requestBody.extractionType,
       status: 'processing',
       options: requestBody.options,
@@ -148,7 +161,7 @@ serve(async (req) => {
         completedAt: new Date().toISOString(),
       });
 
-      return createErrorResponse(
+      return Utils.createErrorResponse(
         extractionResult.error || 'PDF processing failed',
         500,
         startTime
@@ -182,8 +195,8 @@ serve(async (req) => {
     if (ragDocuments.length > 0) {
       await storeRagDocuments(supabase, ragDocuments, {
         documentId: requestBody.documentId,
-        userId: authResult.userId,
-        workspaceId: requestBody.workspaceId,
+        userId: authResult.userId!,
+        workspaceId: requestBody.workspaceId || authResult.workspaceId,
       });
     }
 
@@ -191,10 +204,10 @@ serve(async (req) => {
     console.log(`PDF extraction completed in ${responseTime}ms for document: ${requestBody.documentId}`);
 
     // Log successful request
-    await logApiUsage(supabase, {
+    await Logger.logApiUsage(supabase, {
       endpoint_id: null,
-      user_id: authResult.userId,
-      ip_address: getClientIP(req),
+      user_id: authResult.userId!,
+      ip_address: Utils.getClientIP(req),
       user_agent: req.headers.get('user-agent') || undefined,
       request_method: 'POST',
       request_path: '/pdf-extract',
@@ -228,7 +241,7 @@ serve(async (req) => {
     
     const responseTime = Date.now() - startTime;
     
-    return createErrorResponse(
+    return Utils.createErrorResponse(
       'Internal server error during PDF extraction',
       500,
       startTime
@@ -237,79 +250,54 @@ serve(async (req) => {
 });
 
 function validateRequest(request: PdfExtractionRequest): string | null {
-  if (!request.documentId) {
-    return 'documentId is required';
+  if (!request.documentId || !ValidationSchemas.documentId(request.documentId)) {
+    return 'Valid documentId is required';
   }
 
-  if (!request.extractionType) {
-    return 'extractionType is required';
+  if (!request.extractionType || !ValidationSchemas.extractionType(request.extractionType)) {
+    return 'Valid extractionType is required (markdown, tables, images, all)';
   }
 
-  const validTypes = ['markdown', 'tables', 'images', 'all'];
-  if (!validTypes.includes(request.extractionType)) {
-    return `extractionType must be one of: ${validTypes.join(', ')}`;
-  }
-
-  if (request.options?.chunkSize && (request.options.chunkSize < 100 || request.options.chunkSize > 10000)) {
+  if (request.options?.chunkSize && !ValidationSchemas.chunkSize(request.options.chunkSize)) {
     return 'chunkSize must be between 100 and 10000';
   }
 
-  if (request.options?.overlapSize && (request.options.overlapSize < 0 || request.options.overlapSize > 1000)) {
+  if (request.options?.overlapSize && !ValidationSchemas.overlapSize(request.options.overlapSize)) {
     return 'overlapSize must be between 0 and 1000';
   }
 
   return null;
 }
 
-async function checkAuthentication(req: Request, supabase: any): Promise<{
-  success: boolean;
-  userId?: string;
-  error?: string;
-}> {
-  const authHeader = req.headers.get('authorization');
-  const apiKey = req.headers.get('x-api-key');
-
-  // Check API key authentication
-  if (apiKey && apiKey.startsWith('kai_')) {
-    // TODO: Validate API key against database
-    return { success: true, userId: 'api_user' };
-  }
-
-  // Check JWT authentication
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      
-      if (error || !user) {
-        return { success: false, error: 'Invalid authentication token' };
-      }
-
-      return { success: true, userId: user.id };
-    } catch (error) {
-      return { success: false, error: 'Authentication verification failed' };
-    }
-  }
-
-  return { success: false, error: 'Authentication required' };
-}
+// Authentication is now handled by AuthUtils from shared config
 
 async function getDocumentInfo(supabase: any, documentId: string): Promise<any> {
   try {
-    const { data, error } = await supabase
-      .from('pdf_processing_results')
-      .select('*')
+    // First check processing_results table for document metadata
+    const { data: processingData, error: processingError } = await supabase
+      .from('processing_results')
+      .select(`
+        id,
+        file_path,
+        file_name,
+        file_size,
+        user_id,
+        workspace_id,
+        status,
+        metadata,
+        created_at
+      `)
       .eq('id', documentId)
       .single();
 
-    if (error) {
-      console.error('Error fetching document info:', error);
+    if (processingError) {
+      Logger.logError('getDocumentInfo', processingError, { documentId });
       return null;
     }
 
-    return data;
+    return processingData;
   } catch (error) {
-    console.error('Error fetching document info:', error);
+    Logger.logError('getDocumentInfo', error, { documentId });
     return null;
   }
 }
@@ -321,32 +309,37 @@ async function checkDocumentPermissions(
   workspaceId?: string
 ): Promise<boolean> {
   try {
-    // For now, implement basic permission check
-    // In a real implementation, you would check workspace membership, document ownership, etc.
-    const { data, error } = await supabase
-      .from('pdf_processing_results')
+    // Get document ownership and workspace info
+    const { data: docData, error: docError } = await supabase
+      .from('processing_results')
       .select('user_id, workspace_id')
       .eq('id', documentId)
       .single();
 
-    if (error) {
-      console.error('Error checking permissions:', error);
+    if (docError) {
+      Logger.logError('checkDocumentPermissions', docError, { documentId, userId });
       return false;
     }
 
-    // Check if user owns the document or has workspace access
-    if (data.user_id === userId) {
+    // Check if user owns the document
+    if (docData.user_id === userId) {
       return true;
     }
 
-    if (workspaceId && data.workspace_id === workspaceId) {
-      // TODO: Check if user is member of workspace
-      return true;
+    // Check workspace access if document belongs to a workspace
+    if (docData.workspace_id && workspaceId === docData.workspace_id) {
+      // Verify user is a member of the workspace
+      const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
+        supabase,
+        userId,
+        docData.workspace_id
+      );
+      return workspaceCheck.success;
     }
 
     return false;
   } catch (error) {
-    console.error('Error checking permissions:', error);
+    Logger.logError('checkDocumentPermissions', error, { documentId, userId, workspaceId });
     return false;
   }
 }
@@ -354,43 +347,72 @@ async function checkDocumentPermissions(
 async function createProcessingRecord(supabase: any, data: any): Promise<any> {
   try {
     const { data: record, error } = await supabase
-      .from('pdf_processing_results')
+      .from('processing_results')
       .insert({
-        document_id: data.documentId,
+        id: Utils.generateId('pdf_extract'),
+        source_type: 'pdf_extraction',
+        source_id: data.documentId,
         user_id: data.userId,
         workspace_id: data.workspaceId,
-        extraction_type: data.extractionType,
         status: data.status,
-        options: data.options,
+        metadata: {
+          extraction_type: data.extractionType,
+          options: data.options,
+          processing_type: 'pdf_extract'
+        },
         created_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating processing record:', error);
+      Logger.logError('createProcessingRecord', error, data);
       throw new Error('Failed to create processing record');
     }
 
     return record;
   } catch (error) {
-    console.error('Error creating processing record:', error);
+    Logger.logError('createProcessingRecord', error, data);
     throw error;
   }
 }
 
 async function updateProcessingRecord(supabase: any, recordId: string, updates: any): Promise<void> {
   try {
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (updates.status) {
+      updateData.status = updates.status;
+    }
+
+    if (updates.results) {
+      updateData.results = updates.results;
+    }
+
+    if (updates.error) {
+      updateData.error_message = updates.error;
+    }
+
+    if (updates.processingTime) {
+      updateData.processing_time_ms = updates.processingTime;
+    }
+
+    if (updates.completedAt) {
+      updateData.completed_at = updates.completedAt;
+    }
+
     const { error } = await supabase
-      .from('pdf_processing_results')
-      .update(updates)
+      .from('processing_results')
+      .update(updateData)
       .eq('id', recordId);
 
     if (error) {
-      console.error('Error updating processing record:', error);
+      Logger.logError('updateProcessingRecord', error, { recordId, updates });
     }
   } catch (error) {
-    console.error('Error updating processing record:', error);
+    Logger.logError('updateProcessingRecord', error, { recordId, updates });
   }
 }
 

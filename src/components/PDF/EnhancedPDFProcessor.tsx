@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -358,17 +357,25 @@ export const EnhancedPDFProcessor: React.FC = () => {
   };
 
   const getStatusBadge = (status: ProcessingStatus['status']) => {
-    const variants = {
-      pending: 'secondary',
-      processing: 'default',
-      completed: 'default',
-      failed: 'destructive'
-    } as const;
+    const getStatusStyles = (status: ProcessingStatus['status']) => {
+      switch (status) {
+        case 'pending':
+          return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800 capitalize';
+        case 'processing':
+          return 'inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 capitalize';
+        case 'completed':
+          return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 capitalize';
+        case 'failed':
+          return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800 capitalize';
+        default:
+          return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800 capitalize';
+      }
+    };
 
     return (
-      <Badge variant={variants[status]} className="capitalize">
+      <span className={getStatusStyles(status)}>
         {status}
-      </Badge>
+      </span>
     );
   };
 
@@ -416,7 +423,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
                     <Checkbox
                       id="enableLayoutAnalysis"
                       checked={options.enableLayoutAnalysis}
-                      onCheckedChange={(checked) => setOptions(prev => ({ 
+                      onCheckedChange={(checked: boolean) => setOptions(prev => ({
                         ...prev, 
                         enableLayoutAnalysis: !!checked 
                       }))}
@@ -431,7 +438,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
                     <Checkbox
                       id="enableImageMapping"
                       checked={options.enableImageMapping}
-                      onCheckedChange={(checked) => setOptions(prev => ({ 
+                      onCheckedChange={(checked: boolean) => setOptions(prev => ({
                         ...prev, 
                         enableImageMapping: !!checked 
                       }))}
@@ -578,12 +585,12 @@ export const EnhancedPDFProcessor: React.FC = () => {
                   {searchResults.map((result, index) => (
                     <Card key={index} className="p-4">
                       <div className="flex justify-between items-start mb-2">
-                        <Badge variant="outline">
+                        <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
                           Similarity: {Math.round(result.similarity_score * 100)}%
-                        </Badge>
-                        <Badge variant="secondary">
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800">
                           {result.chunk_type}
-                        </Badge>
+                        </span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         Page {result.page_number} • Chunk {result.chunk_index}
@@ -660,8 +667,6 @@ export const EnhancedPDFProcessor: React.FC = () => {
                       
                       {job.status === 'completed' && job.results && (
                         <Button 
-                          variant="outline" 
-                          size="sm"
                           onClick={() => {/* TODO: Implement results viewing functionality */}}
                         >
                           <Eye className="h-4 w-4 mr-2" />

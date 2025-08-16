@@ -302,6 +302,7 @@ export class AuthUtils {
   static async checkAuthentication(req: Request, supabase: any): Promise<{
     success: boolean;
     userId?: string;
+    workspaceId?: string;
     error?: string;
   }> {
     const authHeader = req.headers.get('authorization');
@@ -309,8 +310,49 @@ export class AuthUtils {
 
     // Check API key authentication
     if (apiKey && apiKey.startsWith('kai_')) {
-      // TODO: Validate API key against database
-      return { success: true, userId: 'api_user' };
+      try {
+        // Validate API key against database
+        const { data: apiKeyData, error: apiKeyError } = await supabase
+          .from('api_keys')
+          .select(`
+            id,
+            user_id,
+            workspace_id,
+            is_active,
+            expires_at,
+            rate_limit_per_minute,
+            last_used_at
+          `)
+          .eq('key_hash', apiKey)
+          .eq('is_active', true)
+          .single();
+
+        if (apiKeyError || !apiKeyData) {
+          return { success: false, error: 'Invalid API key' };
+        }
+
+        // Check if API key has expired
+        if (apiKeyData.expires_at && new Date(apiKeyData.expires_at) < new Date()) {
+          return { success: false, error: 'API key has expired' };
+        }
+
+        // Update last used timestamp
+        await supabase
+          .from('api_keys')
+          .update({
+            last_used_at: new Date().toISOString(),
+            usage_count: supabase.raw('usage_count + 1')
+          })
+          .eq('id', apiKeyData.id);
+
+        return {
+          success: true,
+          userId: apiKeyData.user_id,
+          workspaceId: apiKeyData.workspace_id
+        };
+      } catch (error) {
+        return { success: false, error: 'API key validation failed' };
+      }
     }
 
     // Check JWT authentication
@@ -323,13 +365,70 @@ export class AuthUtils {
           return { success: false, error: 'Invalid authentication token' };
         }
 
-        return { success: true, userId: user.id };
+        // Get user's default workspace
+        const { data: workspaceData } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        return {
+          success: true,
+          userId: user.id,
+          workspaceId: workspaceData?.workspace_id
+        };
       } catch (error) {
         return { success: false, error: 'Authentication verification failed' };
       }
     }
 
     return { success: false, error: 'Authentication required' };
+  }
+
+  // New method to check workspace membership
+  static async checkWorkspaceMembership(
+    supabase: any,
+    userId: string,
+    workspaceId: string
+  ): Promise<{
+    success: boolean;
+    role?: string;
+    permissions?: string[];
+    error?: string;
+  }> {
+    try {
+      const { data: memberData, error } = await supabase
+        .from('workspace_members')
+        .select(`
+          role,
+          permissions,
+          status
+        `)
+        .eq('user_id', userId)
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'active')
+        .single();
+
+      if (error || !memberData) {
+        return { success: false, error: 'User is not a member of this workspace' };
+      }
+
+      return {
+        success: true,
+        role: memberData.role,
+        permissions: memberData.permissions || []
+      };
+    } catch (error) {
+      return { success: false, error: 'Workspace membership check failed' };
+    }
+  }
+
+  // New method to check specific permissions
+  static hasPermission(permissions: string[], requiredPermission: string): boolean {
+    return permissions.includes(requiredPermission) || permissions.includes('admin');
   }
 }
 

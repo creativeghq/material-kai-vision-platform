@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+
 import { 
   Settings, 
   Search, 
@@ -20,7 +20,7 @@ import {
   Shield, 
   Activity, 
   Network, 
-  Trash2,
+  
   Copy,
   CheckCircle,
   XCircle,
@@ -37,15 +37,15 @@ import { toast } from 'sonner';
 export const ApiGatewayAdmin: React.FC = () => {
   const navigate = useNavigate();
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
-  const [internalNetworks, setInternalNetworks] = useState<InternalNetwork[]>([]);
+  const [_internalNetworks, setInternalNetworks] = useState<InternalNetwork[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [rateLimitRules, setRateLimitRules] = useState<RateLimitRule[]>([]);
+  const [_rateLimitRules, setRateLimitRules] = useState<RateLimitRule[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
   const [endpointDetailsOpen, setEndpointDetailsOpen] = useState(false);
-  const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
+  const [_selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
 
   // Global rate limits state
   const [globalRateLimits, setGlobalRateLimits] = useState({
@@ -218,20 +218,16 @@ export const ApiGatewayAdmin: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                className="border border-gray-300 text-sm px-3 py-1 flex items-center gap-2"
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                className="border border-gray-300 text-sm px-3 py-1 flex items-center gap-2"
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Admin
@@ -245,7 +241,7 @@ export const ApiGatewayAdmin: React.FC = () => {
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="text-sm">
+          <Badge className="border border-gray-300 text-sm">
             <Shield className="h-3 w-3 mr-1" />
             Admin Access
           </Badge>
@@ -301,7 +297,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                         </h4>
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <Button className="text-gray-600 hover:text-gray-800 text-sm px-2 py-1">
                               <Edit className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
@@ -399,7 +395,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <p className="text-muted-foreground mb-4">
                       Click "Seed Default Endpoints" to populate with default API endpoints
                     </p>
-                    <Button onClick={seedDefaultEndpoints} variant="outline">
+                    <Button onClick={seedDefaultEndpoints} className="border border-gray-300 px-4 py-2">
                       <Plus className="mr-2 h-4 w-4" />
                       Seed Default Endpoints
                     </Button>
@@ -432,10 +428,10 @@ export const ApiGatewayAdmin: React.FC = () => {
                               {endpoint.path}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline">{endpoint.method}</Badge>
+                              <Badge className="border border-gray-300 text-xs px-2 py-1">{endpoint.method}</Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="secondary">{endpoint.category}</Badge>
+                              <Badge className="bg-gray-100 text-gray-800 text-xs px-2 py-1">{endpoint.category}</Badge>
                             </TableCell>
                             <TableCell className="max-w-xs truncate">
                               {endpoint.description || 'No description'}
@@ -537,11 +533,11 @@ export const ApiGatewayAdmin: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h4 className="font-medium">{apiKey.key_name}</h4>
-                              <Badge variant={apiKey.is_active ? "default" : "secondary"}>
+                              <Badge className={apiKey.is_active ? "bg-blue-100 text-blue-800 text-xs px-2 py-1" : "bg-gray-100 text-gray-800 text-xs px-2 py-1"}>
                                 {apiKey.is_active ? "Active" : "Revoked"}
                               </Badge>
                               {apiKey.rate_limit_override && (
-                                <Badge variant="outline">
+                                <Badge className="border border-gray-300 text-xs px-2 py-1">
                                   {apiKey.rate_limit_override} req/min
                                 </Badge>
                               )}
@@ -579,8 +575,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                             <Sheet>
                               <SheetTrigger asChild>
                                 <Button
-                                  variant="outline"
-                                  size="sm"
+                                  className="border border-gray-300 text-sm px-3 py-1"
                                   onClick={() => setSelectedApiKey(apiKey)}
                                 >
                                   <Settings className="h-4 w-4 mr-1" />
@@ -641,7 +636,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                                     <Button className="flex-1">
                                       Update Rules
                                     </Button>
-                                    <Button variant="outline" className="flex-1">
+                                    <Button className="flex-1 border border-gray-300 px-4 py-2">
                                       Reset to Default
                                     </Button>
                                   </div>
@@ -649,15 +644,13 @@ export const ApiGatewayAdmin: React.FC = () => {
                               </SheetContent>
                             </Sheet>
                             <Button
-                              variant="outline"
-                              size="sm"
+                              className="border border-gray-300 text-sm px-3 py-1"
                               onClick={() => copyApiKey(apiKey.api_key)}
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
                             <Button
-                              variant="outline"
-                              size="sm"
+                              className="border border-gray-300 text-sm px-3 py-1"
                               onClick={() => {
                                 // Toggle API key active status
                                 console.log('Toggle API key status');
@@ -733,7 +726,7 @@ export const ApiGatewayAdmin: React.FC = () => {
 
         {/* Endpoint Details Modal */}
         <Sheet open={endpointDetailsOpen} onOpenChange={setEndpointDetailsOpen}>
-          <SheetContent className="w-[700px] sm:w-[800px]">
+          <SheetContent className="w-[700px] sm:w-[800px]" side="right" {...({} as any)}>
             <SheetHeader>
               <SheetTitle>API Endpoint Details</SheetTitle>
               <SheetDescription>
@@ -750,11 +743,11 @@ export const ApiGatewayAdmin: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <h4 className="font-medium text-sm text-muted-foreground">Method</h4>
-                      <Badge variant="outline" className="mt-1">{selectedEndpoint.method}</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1 mt-1">{selectedEndpoint.method}</Badge>
                     </div>
                     <div>
                       <h4 className="font-medium text-sm text-muted-foreground">Category</h4>
-                      <Badge variant="secondary" className="mt-1">{selectedEndpoint.category}</Badge>
+                      <Badge className="bg-gray-100 text-gray-800 text-xs px-2 py-1 mt-1">{selectedEndpoint.category}</Badge>
                     </div>
                   </div>
                   <div>
@@ -769,7 +762,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Public Access</span>
-                        <Badge variant={selectedEndpoint.is_public ? "default" : "secondary"}>
+                        <Badge className={selectedEndpoint.is_public ? "bg-blue-100 text-blue-800 text-xs px-2 py-1" : "bg-gray-100 text-gray-800 text-xs px-2 py-1"}>
                           {selectedEndpoint.is_public ? "Enabled" : "Disabled"}
                         </Badge>
                       </div>
@@ -780,7 +773,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Internal Access</span>
-                        <Badge variant={selectedEndpoint.is_internal ? "default" : "secondary"}>
+                        <Badge className={selectedEndpoint.is_internal ? "bg-blue-100 text-blue-800 text-xs px-2 py-1" : "bg-gray-100 text-gray-800 text-xs px-2 py-1"}>
                           {selectedEndpoint.is_internal ? "Enabled" : "Disabled"}
                         </Badge>
                       </div>
@@ -796,7 +789,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                   <div className="p-4 border rounded-lg">
                     <div className="flex items-center justify-between">
                       <span className="font-medium">Current Rate Limit</span>
-                      <Badge variant="outline">{selectedEndpoint.rate_limit_per_minute} req/min</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">{selectedEndpoint.rate_limit_per_minute} req/min</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
                       Maximum requests allowed per minute for this endpoint

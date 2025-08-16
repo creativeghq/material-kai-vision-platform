@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ErrorHandler } from '../utils/errorHandler';
 import { JWTAuthMiddleware, AuthenticatedRequest, AuthenticationResult } from '../middleware/jwtAuthMiddleware';
 import { MaterialKaiAuthMiddleware } from '../middleware/materialKaiAuthMiddleware';
 
@@ -60,10 +59,10 @@ interface MivaaResponse {
 const MivaaRequestSchema = z.object({
   endpoint: z.string().min(1, 'Endpoint is required'),
   method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   body: z.any().optional(),
-  params: z.record(z.string()).optional(),
-  query: z.record(z.any()).optional(),
+  params: z.record(z.string(), z.string()).optional(),
+  query: z.record(z.string(), z.any()).optional(),
   timeout: z.number().min(1000).max(300000).optional() // 1s to 5min
 });
 
@@ -266,7 +265,7 @@ export class MivaaGatewayController {
           error: {
             code: 'MIVAA_VALIDATION_ERROR',
             message: 'MIVAA request validation failed',
-            details: validationResult.error.errors.map(err => ({
+            details: validationResult.error.issues.map(err => ({
               field: err.path.join('.'),
               message: err.message
             }))
@@ -477,7 +476,7 @@ export class MivaaGatewayController {
    * GET /api/mivaa/health
    * Health check endpoint for MIVAA gateway
    */
-  public healthCheck = async (req: Request, res: Response): Promise<void> => {
+  public healthCheck = async (_req: Request, res: Response): Promise<void> => {
     try {
       // Check MIVAA service health
       const healthRequest: MivaaRequest = {

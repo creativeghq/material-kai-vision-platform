@@ -11,17 +11,15 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
+import {
   BarChart3,
   Users,
   Search,
   TrendingUp,
-  Eye,
   MousePointer,
   Activity,
   Home,
   ArrowLeft,
-  Calendar,
   Clock
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -78,7 +76,7 @@ export const AnalyticsDashboard: React.FC = () => {
       
       // Fetch search analytics
       const { data: searchData, error: searchError } = await supabase
-        .from('search_analytics')
+        .from('analytics_events')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -94,8 +92,38 @@ export const AnalyticsDashboard: React.FC = () => {
 
       if (apiError) throw apiError;
 
-      setSearchAnalytics(searchData || []);
-      setApiUsage(apiData || []);
+      // Filter and cast data to match expected types
+      const filteredSearchData = (searchData || []).filter(item =>
+        item.created_at &&
+        item.event_type &&
+        item.id
+      ).map(item => ({
+        id: item.id,
+        query_text: (item.event_data as any)?.query || 'Unknown query',
+        results_shown: (item.event_data as any)?.results_count || 0,
+        clicks_count: (item.event_data as any)?.clicks || 0,
+        satisfaction_rating: (item.event_data as any)?.rating || null,
+        response_time_ms: (item.event_data as any)?.response_time || 0,
+        created_at: item.created_at || new Date().toISOString(),
+        user_id: item.user_id,
+        session_id: item.session_id
+      }));
+
+      const filteredApiData = (apiData || []).filter(item =>
+        item.created_at &&
+        item.id &&
+        item.response_status !== null
+      ).map(item => ({
+        ...item,
+        response_status: item.response_status || 0,
+        response_time_ms: item.response_time_ms || 0,
+        user_id: item.user_id || 'anonymous',
+        endpoint_id: item.endpoint_id || 'unknown',
+        user_agent: item.user_agent || 'unknown'
+      }));
+
+      setSearchAnalytics(filteredSearchData);
+      setApiUsage(filteredApiData);
 
       // Calculate aggregate statistics
       const totalSearches = searchData?.length || 0;
@@ -149,7 +177,7 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">{description}</p>
           {trend !== undefined && (
-            <Badge variant={trend > 0 ? 'default' : 'secondary'} className="text-xs">
+            <Badge className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
               {trend > 0 ? '+' : ''}{trend}%
             </Badge>
           )}
@@ -178,20 +206,16 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Admin
@@ -278,7 +302,7 @@ export const AnalyticsDashboard: React.FC = () => {
                           {search.query_text}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{search.results_shown}</Badge>
+                          <Badge className="border border-gray-300 bg-white text-gray-700">{search.results_shown}</Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -289,7 +313,7 @@ export const AnalyticsDashboard: React.FC = () => {
                         <TableCell>{search.response_time_ms}ms</TableCell>
                         <TableCell>
                           {search.satisfaction_rating ? (
-                            <Badge variant={search.satisfaction_rating >= 4 ? 'default' : 'secondary'}>
+                            <Badge className={search.satisfaction_rating >= 4 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
                               {search.satisfaction_rating}/5
                             </Badge>
                           ) : (
@@ -331,7 +355,7 @@ export const AnalyticsDashboard: React.FC = () => {
                           {log.request_path}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{log.request_method}</Badge>
+                          <Badge className="border border-gray-300 bg-white text-gray-700">{log.request_method}</Badge>
                         </TableCell>
                         <TableCell>
                           <span className={getStatusColor(log.response_status)}>
@@ -479,15 +503,15 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Material Recognition</span>
-                      <Badge variant="outline">1,247 uses</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">1,247 uses</Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>3D Generation</span>
-                      <Badge variant="outline">892 uses</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">892 uses</Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Mood Boards</span>
-                      <Badge variant="outline">634 uses</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">634 uses</Badge>
                     </div>
                   </div>
                 </CardContent>

@@ -1,14 +1,8 @@
 import React from 'react';
-import { 
-  Home, 
-  Eye, 
-  Archive, 
-  Palette, 
-  Grid3X3, 
-  Brain, 
-  Activity,
+import {
+  Home,
+  Palette,
   Settings,
-  Layers,
   Box,
   ScanText,
   Search,
@@ -42,8 +36,11 @@ export const Sidebar: React.FC = () => {
         {navigationItems.map((item) => (
           <Button
             key={item.id}
-            variant={isActive(item.path) ? 'default' : 'ghost'}
-            className="w-full justify-start"
+            className={`w-full justify-start ${
+              isActive(item.path)
+                ? 'bg-primary text-primary-foreground hover:bg-primary/80'
+                : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+            }`}
             asChild
           >
             <Link to={item.path}>

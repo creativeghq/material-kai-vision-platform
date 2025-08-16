@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileImage, Loader2, CheckCircle, AlertCircle, Brain } from 'lucide-react';
+import { Upload, FileImage, Loader2, CheckCircle, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +61,6 @@ export const MaterialRecognition: React.FC = () => {
           const enhancedMetadata = {
             ...result.metadata,
             properties: {
-              ...result.metadata?.properties,
               ...(enhancement.ocrExtraction && {
                 extracted_text: enhancement.ocrExtraction.extractedText,
                 specifications: enhancement.ocrExtraction.specifications,
@@ -118,7 +117,7 @@ export const MaterialRecognition: React.FC = () => {
           <CardTitle className="flex items-center gap-2">
             <FileImage className="w-5 h-5" />
             Material Recognition
-            <Badge variant="secondary" className="flex items-center gap-1">
+            <Badge className="flex items-center gap-1 bg-secondary text-secondary-foreground hover:bg-secondary/80">
               <Brain className="w-3 h-3" />
               Hybrid AI
             </Badge>
@@ -143,7 +142,7 @@ export const MaterialRecognition: React.FC = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   or click to select files (JPEG, PNG, WebP)
                 </p>
-                <Button variant="outline">Select Images</Button>
+                <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground">Select Images</Button>
               </div>
             )}
           </div>
@@ -153,7 +152,7 @@ export const MaterialRecognition: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-medium">Selected Files ({files.length})</h3>
-                <Button variant="ghost" size="sm" onClick={clearFiles}>
+                <Button className="hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={clearFiles}>
                   Clear All
                 </Button>
               </div>
@@ -169,8 +168,7 @@ export const MaterialRecognition: React.FC = () => {
                     </div>
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                       <Button
-                        variant="destructive"
-                        size="sm"
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-3"
                         onClick={() => removeFile(index)}
                       >
                         Remove

@@ -56,7 +56,7 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Recognition Results</h3>
-          <Badge variant="secondary">
+          <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
             {results.length} material{results.length !== 1 ? 's' : ''} identified
           </Badge>
         </div>
@@ -70,78 +70,81 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
               {/* Material Image */}
               <div className="aspect-square bg-muted rounded-lg mb-3 overflow-hidden">
                 <img
-                  src={result.imageUrl}
-                  alt={result.name}
+                  src={result.metadata?.legacy?.imageUrl || '/placeholder-image.jpg'}
+                  alt={result.metadata?.detectedName || 'Material'}
                   className="w-full h-full object-cover"
                 />
               </div>
 
               {/* Material Info */}
               <div className="space-y-2">
-                <h4 className="font-medium text-sm">{result.name}</h4>
+                <h4 className="font-medium text-sm">{result.metadata?.detectedName || 'Unknown Material'}</h4>
                 
                 {/* Confidence Score */}
                 <div className="flex items-center justify-between">
-                  <Badge 
-                    variant={result.confidence > 0.9 ? "default" : result.confidence > 0.7 ? "secondary" : "outline"}
+                  <Badge
+                    className={
+                      result.confidenceScore > 0.9 ? "bg-green-100 text-green-800 hover:bg-green-100/80" :
+                      result.confidenceScore > 0.7 ? "bg-secondary text-secondary-foreground hover:bg-secondary/80" :
+                      "border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                    }
                   >
-                    {Math.round(result.confidence * 100)}% match
+                    {Math.round(result.confidenceScore * 100)}% match
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {result.processingTime.toFixed(1)}s
+                    {result.processingTimeMs ? (result.processingTimeMs / 1000).toFixed(1) : '0.0'}s
                   </span>
                 </div>
 
                 {/* Material Properties */}
-                {result.metadata && (
+                {result.propertiesDetected && (
                   <div className="space-y-1">
-                    {result.metadata.color && (
+                    {result.propertiesDetected.density && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Color:</span>
-                        <span className="capitalize">{result.metadata.color}</span>
+                        <span className="text-muted-foreground">Density:</span>
+                        <span>{result.propertiesDetected.density} g/cm³</span>
                       </div>
                     )}
-                    {result.metadata.finish && (
+                    {result.propertiesDetected.yieldStrength && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Finish:</span>
-                        <span className="capitalize">{result.metadata.finish}</span>
+                        <span className="text-muted-foreground">Yield Strength:</span>
+                        <span>{result.propertiesDetected.yieldStrength} MPa</span>
                       </div>
                     )}
-                    {result.metadata.brand && (
+                    {result.material?.name && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Brand:</span>
-                        <span>{result.metadata.brand}</span>
+                        <span className="text-muted-foreground">Material:</span>
+                        <span>{result.material.name}</span>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Enhanced Material Properties */}
-                {result.metadata?.properties?.extracted_text && (
+                {result.propertiesDetected?.customProperties && (
                   <div className="text-xs text-muted-foreground mb-2">
-                    <span className="font-medium">Text Found: </span>
-                    {result.metadata.properties.extracted_text.substring(0, 50)}...
+                    <span className="font-medium">Additional Properties Available</span>
                   </div>
                 )}
                 
-                {result.metadata?.properties?.svbrdf_maps && (
+                {result.material && (
                   <div className="text-xs text-success mb-2">
-                    <span className="font-medium">SVBRDF Maps Available</span>
+                    <span className="font-medium">Material Data Available</span>
                   </div>
                 )}
 
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="flex space-x-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Add to favorites">
+                    <Button className="hover:bg-accent hover:text-accent-foreground h-7 w-7 p-0" title="Add to favorites">
                       <Star className="w-3 h-3" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Download SVBRDF maps" 
-                            disabled={!result.metadata?.properties?.svbrdf_maps}>
+                    <Button className="hover:bg-accent hover:text-accent-foreground h-7 w-7 p-0" title="Download material data"
+                            disabled={!result.material}>
                       <Download className="w-3 h-3" />
                     </Button>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Share result">
+                  <Button className="hover:bg-accent hover:text-accent-foreground h-7 w-7 p-0" title="Share result">
                     <Share2 className="w-3 h-3" />
                   </Button>
                 </div>

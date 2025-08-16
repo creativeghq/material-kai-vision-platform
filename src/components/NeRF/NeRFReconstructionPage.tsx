@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThreeJsViewer } from '@/components/3D/ThreeJsViewer';
@@ -111,13 +110,13 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
+        return <span className="inline-flex items-center rounded-full bg-green-500 px-2.5 py-0.5 text-xs font-semibold text-white"><CheckCircle className="w-3 h-3 mr-1" />Completed</span>;
       case 'processing':
-        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Processing</Badge>;
+        return <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700"><Clock className="w-3 h-3 mr-1" />Processing</span>;
       case 'failed':
-        return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />Failed</Badge>;
+        return <span className="inline-flex items-center rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-semibold text-white"><AlertCircle className="w-3 h-3 mr-1" />Failed</span>;
       default:
-        return <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+        return <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700"><Clock className="w-3 h-3 mr-1" />Pending</span>;
     }
   };
 
@@ -172,8 +171,6 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
                     <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
                       <span className="text-sm truncate">{file.name}</span>
                       <Button
-                        variant="ghost"
-                        size="sm"
                         onClick={() => removeFile(index)}
                       >
                         ×
@@ -227,19 +224,19 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
                   <div className="flex items-center gap-2">
                     {getStatusBadge(reconstruction.reconstruction_status)}
                     {reconstruction.quality_score && (
-                      <Badge variant="outline">
+                      <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
                         Quality: {reconstruction.quality_score.toFixed(2)}
-                      </Badge>
+                      </span>
                     )}
                   </div>
                   <div className="flex gap-2">
                     {reconstruction.model_file_url && (
-                      <Button variant="outline" size="sm">
+                      <Button>
                         <Download className="w-4 h-4 mr-1" />
                         Download
                       </Button>
                     )}
-                    <Button variant="outline" size="sm">
+                    <Button>
                       <Share2 className="w-4 h-4 mr-1" />
                       Share
                     </Button>

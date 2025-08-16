@@ -7,12 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Sparkles, 
-  Settings, 
+import {
+  Sparkles,
+  Settings,
   Brain,
   FileText,
-  Download,
   Loader2,
   CheckCircle,
   XCircle
@@ -234,7 +233,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="roomType">Room Type</Label>
-              <Select value={config.roomType} onValueChange={(value) => setConfig(prev => ({ ...prev, roomType: value }))}>
+              <Select value={config.roomType} onValueChange={(value: string) => setConfig(prev => ({ ...prev, roomType: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -251,7 +250,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="style">Style</Label>
-              <Select value={config.style} onValueChange={(value) => setConfig(prev => ({ ...prev, style: value }))}>
+              <Select value={config.style} onValueChange={(value: string) => setConfig(prev => ({ ...prev, style: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -312,7 +311,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
             </Button>
             
             {suggestions.length > 0 && (
-              <Button variant="outline" onClick={test3DIntegration} disabled={isGenerating}>
+              <Button className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground" onClick={test3DIntegration} disabled={isGenerating}>
                 {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 Test 3D Integration
               </Button>
@@ -353,7 +352,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
                           <div className={`w-2 h-2 rounded-full ${getConfidenceColor(suggestion.confidence)}`} />
                           <span className="text-sm">{(suggestion.confidence * 100).toFixed(0)}%</span>
                         </div>
-                        <Badge variant="outline">{suggestion.source}</Badge>
+                        <Badge className="border border-border bg-background text-foreground">{suggestion.source}</Badge>
                       </div>
                     </div>
                   ))}

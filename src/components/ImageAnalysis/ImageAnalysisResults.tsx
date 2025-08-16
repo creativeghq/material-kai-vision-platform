@@ -110,21 +110,6 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
     }
   };
 
-  // Get status color
-  const getStatusColor = (status: ImageAnalysisResult['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'secondary';
-      case 'processing':
-        return 'default';
-      case 'completed':
-        return 'default';
-      case 'failed':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
 
   // Copy text to clipboard
   const copyToClipboard = async (text: string) => {
@@ -156,12 +141,11 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
       {ocrResults.map((block, index) => (
         <Card key={index} className="p-3">
           <div className="flex items-start justify-between mb-2">
-            <Badge variant="outline">
+            <Badge className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
               Confidence: {(block.confidence * 100).toFixed(1)}%
             </Badge>
             <Button
-              variant="ghost"
-              size="sm"
+              className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
               onClick={() => copyToClipboard(block.text)}
             >
               <Copy className="h-3 w-3" />
@@ -186,8 +170,8 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
         <Card key={index} className="p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Badge variant="outline">{obj.label}</Badge>
-              <Badge variant="secondary">
+              <Badge className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">{obj.label}</Badge>
+              <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
                 {(obj.confidence * 100).toFixed(1)}%
               </Badge>
             </div>
@@ -214,8 +198,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
               Table {index + 1}
             </h4>
             <Button
-              variant="ghost"
-              size="sm"
+              className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
               onClick={() => copyToClipboard(JSON.stringify(table.data, null, 2))}
             >
               <Copy className="h-3 w-3" />
@@ -359,13 +342,18 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                   <div>
                     <CardTitle className="text-lg">Analysis {result.id}</CardTitle>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={getStatusColor(result.status)}>
+                      <Badge className={
+                        result.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        result.status === 'failed' ? 'bg-red-100 text-red-800' :
+                        result.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }>
                         <span className="flex items-center gap-1">
                           {getStatusIcon(result.status)}
                           {result.status}
                         </span>
                       </Badge>
-                      <Badge variant="outline">
+                      <Badge className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
                         {result.results?.ocr && result.results?.objects ? 'Full Analysis' :
                          result.results?.ocr ? 'OCR' :
                          result.results?.objects ? 'Object Detection' :
@@ -381,16 +369,14 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                 <div className="flex items-center gap-2">
                   {onResultSelect && (
                     <Button
-                      variant="ghost"
-                      size="sm"
+                      className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                       onClick={() => onResultSelect(result)}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
                   )}
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                     onClick={() => downloadResult(result)}
                   >
                     <Download className="h-4 w-4" />

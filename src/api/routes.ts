@@ -1,6 +1,5 @@
 import { MivaaGatewayController } from './mivaa-gateway';
 import { DocumentIntegrationController } from './document-integration';
-import { DocumentWorkflowOrchestrator } from '../orchestrators/DocumentWorkflowOrchestrator';
 
 // Express types (would be imported from @types/express in real implementation)
 interface Request {

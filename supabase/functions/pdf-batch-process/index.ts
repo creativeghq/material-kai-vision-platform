@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-};
+import {
+  corsHeaders,
+  AuthUtils,
+  Logger,
+  Utils,
+  ValidationSchemas
+} from '../_shared/config.ts';
 
 interface BatchProcessRequest {
   documents: Array<{
@@ -86,12 +87,12 @@ serve(async (req) => {
       case 'DELETE':
         return await handleBatchCancel(req, supabase, startTime);
       default:
-        return createErrorResponse('Method not allowed', 405, startTime);
+        return Utils.createErrorResponse('Method not allowed', 405, startTime);
     }
 
   } catch (error) {
     console.error('Batch processing error:', error);
-    return createErrorResponse(
+    return Utils.createErrorResponse(
       'Internal server error during batch processing',
       500,
       startTime
@@ -107,39 +108,51 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
       requestBody = await req.json();
     } catch (error) {
       console.error('Invalid JSON in request body:', error);
-      return createErrorResponse('Invalid JSON in request body', 400, startTime);
+      return Utils.createErrorResponse('Invalid JSON in request body', 400, startTime);
     }
 
     // Validate request
     const validationError = validateBatchRequest(requestBody);
     if (validationError) {
-      return createErrorResponse(validationError, 400, startTime);
+      return Utils.createErrorResponse(validationError, 400, startTime);
     }
 
     console.log(`Batch processing - Creating batch job for ${requestBody.documents.length} documents`);
 
     // Check authentication
-    const authResult = await checkAuthentication(req, supabase);
+    const authResult = await AuthUtils.checkAuthentication(req, supabase);
     if (!authResult.success) {
-      return createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
+      return Utils.createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
+    }
+
+    // Validate workspace membership if workspaceId is provided
+    if (requestBody.workspaceId && authResult.workspaceId !== requestBody.workspaceId) {
+      const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
+        supabase,
+        authResult.userId!,
+        requestBody.workspaceId
+      );
+      if (!workspaceCheck.success) {
+        return Utils.createErrorResponse(workspaceCheck.error || 'Workspace access denied', 403, startTime);
+      }
     }
 
     // Validate all documents exist and user has permissions
     const documentValidation = await validateDocuments(
       supabase,
       requestBody.documents,
-      authResult.userId,
-      requestBody.workspaceId
+      authResult.userId!,
+      requestBody.workspaceId || authResult.workspaceId
     );
 
     if (!documentValidation.success) {
-      return createErrorResponse(documentValidation.error || 'Document validation failed', 403, startTime);
+      return Utils.createErrorResponse(documentValidation.error || 'Document validation failed', 403, startTime);
     }
 
     // Create batch job record
     const batchJob = await createBatchJob(supabase, {
-      userId: authResult.userId,
-      workspaceId: requestBody.workspaceId,
+      userId: authResult.userId!,
+      workspaceId: requestBody.workspaceId || authResult.workspaceId,
       documents: requestBody.documents,
       options: requestBody.options || {},
     });
@@ -151,10 +164,10 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
     console.log(`Batch job created in ${responseTime}ms: ${batchJob.id}`);
 
     // Log API usage
-    await logApiUsage(supabase, {
-      endpoint_id: null,
-      user_id: authResult.userId,
-      ip_address: getClientIP(req),
+    await Logger.logApiUsage(supabase, {
+      endpoint_id: undefined,
+      user_id: authResult.userId!,
+      ip_address: Utils.getClientIP(req),
       user_agent: req.headers.get('user-agent') || undefined,
       request_method: 'POST',
       request_path: '/pdf-batch-process',
@@ -172,7 +185,7 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
         totalDocuments: requestBody.documents.length,
         processedDocuments: 0,
         failedDocuments: 0,
-        estimatedCompletionTime: calculateEstimatedCompletion(requestBody.documents.length),
+        estimatedCompletionTime: Utils.calculateEstimatedCompletion(requestBody.documents.length),
         results: requestBody.documents.map(doc => ({
           documentId: doc.documentId,
           status: 'pending',
@@ -190,7 +203,7 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
 
   } catch (error) {
     console.error('Error creating batch job:', error);
-    return createErrorResponse('Failed to create batch job', 500, startTime);
+    return Utils.createErrorResponse('Failed to create batch job', 500, startTime);
   }
 }
 
@@ -200,19 +213,19 @@ async function handleBatchStatus(req: Request, supabase: any, startTime: number)
     const batchId = url.searchParams.get('batchId');
 
     if (!batchId) {
-      return createErrorResponse('batchId parameter is required', 400, startTime);
+      return Utils.createErrorResponse('batchId parameter is required', 400, startTime);
     }
 
     // Check authentication
-    const authResult = await checkAuthentication(req, supabase);
+    const authResult = await AuthUtils.checkAuthentication(req, supabase);
     if (!authResult.success) {
-      return createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
+      return Utils.createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
     }
 
     // Get batch job status
-    const batchJob = await getBatchJob(supabase, batchId, authResult.userId);
+    const batchJob = await getBatchJob(supabase, batchId, authResult.userId!);
     if (!batchJob) {
-      return createErrorResponse('Batch job not found', 404, startTime);
+      return Utils.createErrorResponse('Batch job not found', 404, startTime);
     }
 
     // Get detailed results
@@ -242,7 +255,7 @@ async function handleBatchStatus(req: Request, supabase: any, startTime: number)
 
   } catch (error) {
     console.error('Error getting batch status:', error);
-    return createErrorResponse('Failed to get batch status', 500, startTime);
+    return Utils.createErrorResponse('Failed to get batch status', 500, startTime);
   }
 }
 
@@ -252,19 +265,19 @@ async function handleBatchCancel(req: Request, supabase: any, startTime: number)
     const batchId = url.searchParams.get('batchId');
 
     if (!batchId) {
-      return createErrorResponse('batchId parameter is required', 400, startTime);
+      return Utils.createErrorResponse('batchId parameter is required', 400, startTime);
     }
 
     // Check authentication
-    const authResult = await checkAuthentication(req, supabase);
+    const authResult = await AuthUtils.checkAuthentication(req, supabase);
     if (!authResult.success) {
-      return createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
+      return Utils.createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);
     }
 
     // Cancel batch job
-    const success = await cancelBatchJob(supabase, batchId, authResult.userId);
+    const success = await cancelBatchJob(supabase, batchId, authResult.userId!);
     if (!success) {
-      return createErrorResponse('Batch job not found or cannot be cancelled', 404, startTime);
+      return Utils.createErrorResponse('Batch job not found or cannot be cancelled', 404, startTime);
     }
 
     const responseTime = Date.now() - startTime;
@@ -279,7 +292,7 @@ async function handleBatchCancel(req: Request, supabase: any, startTime: number)
 
   } catch (error) {
     console.error('Error cancelling batch job:', error);
-    return createErrorResponse('Failed to cancel batch job', 500, startTime);
+    return Utils.createErrorResponse('Failed to cancel batch job', 500, startTime);
   }
 }
 
@@ -295,67 +308,31 @@ function validateBatchRequest(request: BatchProcessRequest): string | null {
   for (let i = 0; i < request.documents.length; i++) {
     const doc = request.documents[i];
     
-    if (!doc.documentId) {
-      return `Document at index ${i} is missing documentId`;
+    if (!doc.documentId || !ValidationSchemas.documentId(doc.documentId)) {
+      return `Document at index ${i} has invalid documentId`;
     }
 
-    if (!doc.extractionType) {
-      return `Document at index ${i} is missing extractionType`;
+    if (!doc.extractionType || !ValidationSchemas.extractionType(doc.extractionType)) {
+      return `Document at index ${i} has invalid extractionType. Must be one of: markdown, tables, images, all`;
     }
 
-    const validTypes = ['markdown', 'tables', 'images', 'all'];
-    if (!validTypes.includes(doc.extractionType)) {
-      return `Document at index ${i} has invalid extractionType. Must be one of: ${validTypes.join(', ')}`;
-    }
-
-    if (doc.priority && !['low', 'normal', 'high'].includes(doc.priority)) {
+    if (doc.priority && !ValidationSchemas.priority(doc.priority)) {
       return `Document at index ${i} has invalid priority. Must be one of: low, normal, high`;
     }
   }
 
-  if (request.options?.maxConcurrent && (request.options.maxConcurrent < 1 || request.options.maxConcurrent > 10)) {
+  if (request.options?.maxConcurrent && !ValidationSchemas.maxConcurrent(request.options.maxConcurrent)) {
     return 'maxConcurrent must be between 1 and 10';
   }
 
-  if (request.options?.chunkSize && (request.options.chunkSize < 100 || request.options.chunkSize > 10000)) {
+  if (request.options?.chunkSize && !ValidationSchemas.chunkSize(request.options.chunkSize)) {
     return 'chunkSize must be between 100 and 10000';
   }
 
   return null;
 }
 
-async function checkAuthentication(req: Request, supabase: any): Promise<{
-  success: boolean;
-  userId?: string;
-  error?: string;
-}> {
-  const authHeader = req.headers.get('authorization');
-  const apiKey = req.headers.get('x-api-key');
-
-  // Check API key authentication
-  if (apiKey && apiKey.startsWith('kai_')) {
-    // TODO: Validate API key against database
-    return { success: true, userId: 'api_user' };
-  }
-
-  // Check JWT authentication
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-      
-      if (error || !user) {
-        return { success: false, error: 'Invalid authentication token' };
-      }
-
-      return { success: true, userId: user.id };
-    } catch (error) {
-      return { success: false, error: 'Authentication verification failed' };
-    }
-  }
-
-  return { success: false, error: 'Authentication required' };
-}
+// Authentication is now handled by AuthUtils from shared config
 
 async function validateDocuments(
   supabase: any,
@@ -368,12 +345,12 @@ async function validateDocuments(
     
     // Check if all documents exist and user has access
     const { data, error } = await supabase
-      .from('pdf_processing_results')
+      .from('processing_results')
       .select('id, user_id, workspace_id')
       .in('id', documentIds);
 
     if (error) {
-      console.error('Error validating documents:', error);
+      Logger.logError('validateDocuments', error, { documentIds, userId });
       return { success: false, error: 'Failed to validate documents' };
     }
 
@@ -387,13 +364,22 @@ async function validateDocuments(
         if (!workspaceId || doc.workspace_id !== workspaceId) {
           return { success: false, error: `Insufficient permissions for document: ${doc.id}` };
         }
-        // TODO: Check if user is member of workspace
+        
+        // Check if user is member of workspace
+        const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
+          supabase,
+          userId,
+          doc.workspace_id
+        );
+        if (!workspaceCheck.success) {
+          return { success: false, error: `Insufficient workspace permissions for document: ${doc.id}` };
+        }
       }
     }
 
     return { success: true };
   } catch (error) {
-    console.error('Error validating documents:', error);
+    Logger.logError('validateDocuments', error, { documentIds, userId, workspaceId });
     return { success: false, error: 'Document validation failed' };
   }
 }

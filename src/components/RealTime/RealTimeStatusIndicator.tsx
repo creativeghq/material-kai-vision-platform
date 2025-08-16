@@ -113,9 +113,9 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
                   config.animate && 'animate-spin'
                 )}
               />
-              <Badge variant={config.variant} className="text-xs">
+              <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
                 {config.label}
-              </Badge>
+              </span>
             </div>
           </TooltipTrigger>
           <TooltipContent>
@@ -157,7 +157,12 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">{config.label}</span>
-                <Badge variant={config.variant} className="text-xs">
+                <Badge className={cn("text-xs",
+                  config.variant === "default" && "bg-primary text-primary-foreground",
+                  config.variant === "secondary" && "bg-secondary text-secondary-foreground",
+                  config.variant === "destructive" && "bg-destructive text-destructive-foreground",
+                  config.variant === "outline" && "border border-input bg-background"
+                )}>
                   Real-time
                 </Badge>
               </div>

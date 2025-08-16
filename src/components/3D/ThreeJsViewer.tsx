@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
 import { TextureLoader } from 'three';
@@ -11,7 +11,7 @@ interface ThreeJsViewerProps {
   className?: string;
 }
 
-const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl }) => {
+const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => {
   // In a real implementation, this would load and render the NeRF model
   // For now, we'll show an enhanced cube representing the 3D reconstruction
   return (
@@ -42,7 +42,7 @@ const Scene: React.FC<{
   imageUrl?: string; 
   modelUrl?: string; 
   meshUrl?: string; 
-}> = ({ imageUrl, modelUrl, meshUrl }) => {
+}> = ({ imageUrl, modelUrl, meshUrl: _meshUrl }) => {
   return (
     <>
       <PerspectiveCamera makeDefault fov={75} position={[0, 0, 5]} />
@@ -88,7 +88,11 @@ export const ThreeJsViewer: React.FC<ThreeJsViewerProps> = ({
       <div className="h-full w-full bg-gradient-to-br from-background to-muted">
         <Canvas>
           <Suspense fallback={null}>
-            <Scene imageUrl={imageUrl} modelUrl={modelUrl} meshUrl={meshUrl} />
+            <Scene
+              {...(imageUrl && { imageUrl })}
+              {...(modelUrl && { modelUrl })}
+              {...(meshUrl && { meshUrl })}
+            />
           </Suspense>
         </Canvas>
       </div>

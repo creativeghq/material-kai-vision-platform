@@ -112,17 +112,25 @@ export const JobControls: React.FC<JobControlsProps> = ({
   };
 
   const getStatusBadge = () => {
-    const variants = {
-      pending: 'secondary' as const,
-      running: 'default' as const,
-      completed: 'default' as const,
-      failed: 'destructive' as const,
-      paused: 'secondary' as const,
-      cancelled: 'outline' as const
+    const getStatusClasses = () => {
+      switch (job.status) {
+        case 'pending':
+        case 'paused':
+          return 'bg-secondary text-secondary-foreground';
+        case 'running':
+        case 'completed':
+          return 'bg-primary text-primary-foreground';
+        case 'failed':
+          return 'bg-destructive text-destructive-foreground';
+        case 'cancelled':
+          return 'border border-border bg-background text-foreground';
+        default:
+          return 'bg-primary text-primary-foreground';
+      }
     };
 
     return (
-      <Badge variant={variants[job.status]} className="flex items-center gap-1">
+      <Badge className={`flex items-center gap-1 ${getStatusClasses()}`}>
         {getStatusIcon()}
         {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
       </Badge>
@@ -140,8 +148,8 @@ export const JobControls: React.FC<JobControlsProps> = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    size="sm"
-                    variant="outline"
+                    
+                    className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('resume', onResume)}
                     disabled={disabled || isLoading === 'resume'}
                   >
@@ -158,8 +166,8 @@ export const JobControls: React.FC<JobControlsProps> = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    size="sm"
-                    variant="outline"
+                    
+                    className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('pause', onPause)}
                     disabled={disabled || isLoading === 'pause'}
                   >
@@ -176,8 +184,8 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  size="sm"
-                  variant="outline"
+                  
+                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                   disabled={disabled || isLoading === 'cancel'}
                 >
                   <Square className="h-3 w-3" />
@@ -206,8 +214,8 @@ export const JobControls: React.FC<JobControlsProps> = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    size="sm"
-                    variant="outline"
+                    
+                    className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('retry', onRetry)}
                     disabled={disabled || isLoading === 'retry'}
                   >
@@ -224,8 +232,8 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  size="sm"
-                  variant="outline"
+                  
+                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                   disabled={disabled || isLoading === 'delete'}
                 >
                   <Trash2 className="h-3 w-3" />
@@ -270,7 +278,7 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <Button
               onClick={() => handleAction('resume', onResume)}
               disabled={disabled || isLoading === 'resume'}
-              className="flex items-center gap-2"
+              
             >
               <Play className="h-4 w-4" />
               Resume
@@ -279,10 +287,9 @@ export const JobControls: React.FC<JobControlsProps> = ({
 
           {job.status === 'running' && job.canPause && onPause && (
             <Button
-              variant="outline"
+              className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
               onClick={() => handleAction('pause', onPause)}
               disabled={disabled || isLoading === 'pause'}
-              className="flex items-center gap-2"
             >
               <Pause className="h-4 w-4" />
               Pause
@@ -294,9 +301,8 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  variant="outline"
+                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
                   disabled={disabled || isLoading === 'cancel'}
-                  className="flex items-center gap-2"
                 >
                   <Square className="h-4 w-4" />
                   Cancel
@@ -322,10 +328,9 @@ export const JobControls: React.FC<JobControlsProps> = ({
           {/* Retry Button */}
           {(job.status === 'failed' || job.status === 'cancelled') && job.canRetry && onRetry && (
             <Button
-              variant="outline"
+              className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
               onClick={() => handleAction('retry', onRetry)}
               disabled={disabled || isLoading === 'retry'}
-              className="flex items-center gap-2"
             >
               <RotateCcw className="h-4 w-4" />
               Retry
@@ -337,9 +342,9 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  variant="destructive"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   disabled={disabled || isLoading === 'delete'}
-                  className="flex items-center gap-2"
+                  
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete
@@ -460,9 +465,9 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle >
           Batch Operations
-          <Badge variant="secondary">{selectedJobs.length} selected</Badge>
+          <Badge className="bg-secondary text-secondary-foreground">{selectedJobs.length} selected</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -470,10 +475,10 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
           {/* Batch Pause */}
           {pausableJobs.length > 0 && onBatchPause && (
             <Button
-              variant="outline"
+              className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleBatchAction('pause', onBatchPause)}
               disabled={disabled || isLoading === 'pause'}
-              className="flex items-center gap-2"
+              
             >
               <Pause className="h-4 w-4" />
               Pause ({pausableJobs.length})
@@ -485,7 +490,7 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
             <Button
               onClick={() => handleBatchAction('resume', onBatchResume)}
               disabled={disabled || isLoading === 'resume'}
-              className="flex items-center gap-2"
+              
             >
               <Play className="h-4 w-4" />
               Resume ({resumableJobs.length})
@@ -497,9 +502,9 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  variant="outline"
+                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                   disabled={disabled || isLoading === 'cancel'}
-                  className="flex items-center gap-2"
+                  
                 >
                   <Square className="h-4 w-4" />
                   Cancel ({cancellableJobs.length})
@@ -525,10 +530,10 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
           {/* Batch Retry */}
           {retryableJobs.length > 0 && onBatchRetry && (
             <Button
-              variant="outline"
+              className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleBatchAction('retry', onBatchRetry)}
               disabled={disabled || isLoading === 'retry'}
-              className="flex items-center gap-2"
+              
             >
               <RotateCcw className="h-4 w-4" />
               Retry ({retryableJobs.length})
@@ -540,9 +545,9 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  variant="destructive"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   disabled={disabled || isLoading === 'delete'}
-                  className="flex items-center gap-2"
+                  
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete ({deletableJobs.length})

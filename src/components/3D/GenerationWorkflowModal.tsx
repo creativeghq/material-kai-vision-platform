@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CheckCircle, XCircle, Clock, Image, AlertCircle, ChevronDown, ChevronRight, Play, Pause, RotateCcw, X } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Image, AlertCircle, ChevronDown, ChevronRight, Play, Pause, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WorkflowStep {
@@ -47,7 +47,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     'models': true
   });
-  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [_showCompletionDialog, setShowCompletionDialog] = useState(false);
 
   // Initialize workflow steps based on actual edge function implementation
   useEffect(() => {
@@ -167,7 +167,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         if (data.generation_status === 'completed') {
           setIsComplete(true);
           setShowCompletionDialog(true);
-          if (data.image_urls?.length > 0) {
+          if (data.image_urls && data.image_urls.length > 0) {
             onComplete(data.image_urls);
             // Don't auto-close - show completion dialog instead
           }
@@ -200,11 +200,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           updatedSteps[stepIndex] = {
             ...updatedSteps[stepIndex],
             status: workflowStep.status,
-            startTime: workflowStep.startTime,
-            endTime: workflowStep.endTime,
-            imageUrl: workflowStep.imageUrl,
-            errorMessage: workflowStep.errorMessage,
-            processingTimeMs: workflowStep.processingTimeMs
+            ...(workflowStep.startTime && { startTime: workflowStep.startTime }),
+            ...(workflowStep.endTime && { endTime: workflowStep.endTime }),
+            ...(workflowStep.imageUrl && { imageUrl: workflowStep.imageUrl }),
+            ...(workflowStep.errorMessage && { errorMessage: workflowStep.errorMessage }),
+            ...(workflowStep.processingTimeMs && { processingTimeMs: workflowStep.processingTimeMs })
           };
         }
       });
@@ -239,15 +239,15 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'running':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-700">Running</Badge>;
+        return <Badge className="bg-blue-100 text-blue-700">Running</Badge>;
       case 'success':
-        return <Badge variant="secondary" className="bg-green-100 text-green-700">Success</Badge>;
+        return <Badge className="bg-green-100 text-green-700">Success</Badge>;
       case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
+        return <Badge className="bg-red-100 text-red-700">Failed</Badge>;
       case 'skipped':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">Skipped</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-700">Skipped</Badge>;
       default:
-        return <Badge variant="outline">Pending</Badge>;
+        return <Badge className="border border-gray-300 text-gray-600">Pending</Badge>;
     }
   };
 
@@ -269,15 +269,13 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     setShowCompletionDialog(false);
     // Reset all steps to pending
     setSteps(prevSteps =>
-      prevSteps.map(step => ({
-        ...step,
-        status: 'pending',
-        startTime: undefined,
-        endTime: undefined,
-        imageUrl: undefined,
-        errorMessage: undefined,
-        processingTimeMs: undefined
-      }))
+      prevSteps.map(step => {
+        const { startTime, endTime, imageUrl, errorMessage, processingTimeMs, ...baseStep } = step;
+        return {
+          ...baseStep,
+          status: 'pending' as const
+        };
+      })
     );
     setOverallProgress(0);
     setCurrentStep('');
@@ -288,15 +286,6 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
       ...prev,
       [section]: !prev[section]
     }));
-  };
-
-  const handleCloseCompletionDialog = () => {
-    setShowCompletionDialog(false);
-    // Reset modal state before closing to ensure clean state
-    setIsComplete(false);
-    setSteps([]);
-    setCurrentStep('');
-    onClose();
   };
 
   // Reset modal state when opened to ensure clean state
@@ -328,36 +317,30 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
               <span className="text-sm font-medium">Workflow Control:</span>
               {!isPaused ? (
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={handlePauseWorkflow}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
                 >
                   <Pause className="h-3 w-3" />
                   Pause
                 </Button>
               ) : (
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={handleResumeWorkflow}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
                 >
                   <Play className="h-3 w-3" />
                   Resume
                 </Button>
               )}
               <Button
-                variant="outline"
-                size="sm"
                 onClick={handleRestartWorkflow}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
               >
                 <RotateCcw className="h-3 w-3" />
                 Restart
               </Button>
             </div>
-            <Badge variant={workflowMode === 'running' ? 'default' : workflowMode === 'paused' ? 'secondary' : 'outline'}>
+            <Badge className={workflowMode === 'running' ? 'bg-green-100 text-green-700' : workflowMode === 'paused' ? 'bg-yellow-100 text-yellow-700' : 'border border-gray-300 text-gray-600'}>
               {workflowMode === 'running' ? 'Running' : workflowMode === 'paused' ? 'Paused' : 'Ready'}
             </Badge>
           </div>
@@ -392,13 +375,13 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                     }
                     <h4 className="font-medium text-sm text-muted-foreground">GENERATION MODELS</h4>
                   </div>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge className="text-xs border border-gray-300 text-gray-600">
                     {steps.length} models
                   </Badge>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
                   <div className="space-y-2">
-                    {steps.map((step, index) => (
+                    {steps.map((step, _index) => (
                       <Card key={step.id} className="ml-4">
                         <CardContent className="p-3">
                           <div className="flex items-center justify-between">

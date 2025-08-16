@@ -74,8 +74,8 @@ const AgentMLCoordination: React.FC = () => {
       if (agentTasksResult.error) throw agentTasksResult.error;
       if (mlTasksResult.error) throw mlTasksResult.error;
 
-      const agentData = agentTasksResult.data || [];
-      const mlData = mlTasksResult.data || [];
+      const agentData = (agentTasksResult.data || []).filter(task => task.status !== null) as AgentTask[];
+      const mlData = (mlTasksResult.data || []).filter(task => task.agent_task_id !== null && task.created_at !== null) as MLTask[];
 
       setAgentTasks(agentData);
       setMLTasks(mlData);
@@ -140,20 +140,16 @@ const AgentMLCoordination: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2"
+                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Brain className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
                 onClick={() => navigate('/admin')}
-                className="flex items-center gap-2"
+                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Activity className="h-4 w-4" />
                 Back to Admin
@@ -168,11 +164,11 @@ const AgentMLCoordination: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={fetchData} variant="outline" size="sm">
+            <Button onClick={fetchData} className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="default" size="sm">
+            <Button className="px-2 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white">
               <Play className="h-4 w-4 mr-2" />
               Start New Task
             </Button>
@@ -282,15 +278,15 @@ const AgentMLCoordination: React.FC = () => {
                   <TableCell>
                     <div className="flex gap-2">
                       {task.status === 'processing' ? (
-                        <Button variant="outline" size="sm">
+                        <Button className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                           <Pause className="h-4 w-4" />
                         </Button>
                       ) : task.status === 'pending' ? (
-                        <Button variant="outline" size="sm">
+                        <Button className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                           <Play className="h-4 w-4" />
                         </Button>
                       ) : (
-                        <Button variant="outline" size="sm">
+                        <Button className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50">
                           <Square className="h-4 w-4" />
                         </Button>
                       )}

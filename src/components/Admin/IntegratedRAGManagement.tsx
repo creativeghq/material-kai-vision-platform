@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
+
 import { Separator } from '@/components/ui/separator';
 import { 
   Loader2, 
@@ -22,17 +22,17 @@ import {
   BookOpen, 
   Package, 
   Lightbulb,
-  ExternalLink,
+  
   BarChart3,
   History,
   Clock,
   TrendingUp,
   ThumbsUp,
   ThumbsDown,
-  Eye
+  
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { ragService, TrainingRequest } from '@/services/ragService';
+import { ragService } from '@/services/ragService';
 import { 
   EnhancedRAGService, 
   type EnhancedRAGRequest, 
@@ -324,7 +324,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                 <CardTitle className="flex items-center gap-2">
                   <Brain className="h-5 w-5" />
                   Enhanced RAG Knowledge Search
-                  <Badge variant="outline" className="ml-auto">AI-Powered</Badge>
+                  <Badge className="ml-auto border border-gray-300 bg-gray-50 text-gray-700">AI-Powered</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -366,7 +366,7 @@ export const IntegratedRAGManagement: React.FC = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="maxResults">Max Results</Label>
-                    <Select value={maxResults.toString()} onValueChange={(value) => setMaxResults(parseInt(value))}>
+                    <Select value={maxResults.toString()} onValueChange={(value: string) => setMaxResults(parseInt(value))}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -425,10 +425,9 @@ export const IntegratedRAGManagement: React.FC = () => {
                     />
                     <div className="flex flex-wrap gap-1">
                       {context.stylePreferences.map((style, i) => (
-                        <Badge 
-                          key={i} 
-                          variant="secondary" 
-                          className="cursor-pointer"
+                        <Badge
+                          key={i}
+                          className="cursor-pointer bg-secondary text-secondary-foreground hover:bg-secondary/80"
                           onClick={() => setContext(prev => ({
                             ...prev,
                             stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i)
@@ -459,10 +458,9 @@ export const IntegratedRAGManagement: React.FC = () => {
                     />
                     <div className="flex flex-wrap gap-1">
                       {context.materialCategories.map((category, i) => (
-                        <Badge 
-                          key={i} 
-                          variant="secondary"
-                          className="cursor-pointer"
+                        <Badge
+                          key={i}
+                          className="cursor-pointer bg-secondary text-secondary-foreground hover:bg-secondary/80"
                           onClick={() => setContext(prev => ({
                             ...prev,
                             materialCategories: prev.materialCategories.filter((_, idx) => idx !== i)
@@ -483,7 +481,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                         <CardTitle className="flex items-center gap-2">
                           {getIntentIcon(searchResults.queryIntent)}
                           Search Results
-                          <Badge variant="outline">{searchResults.queryIntent}</Badge>
+                          <Badge className="border border-border bg-background text-foreground">{searchResults.queryIntent}</Badge>
                         </CardTitle>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -495,7 +493,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                             Complexity: {(searchResults.semanticAnalysis.queryComplexity * 100).toFixed(0)}%
                           </span>
                           {searchResults.analytics.cacheHit && (
-                            <Badge variant="secondary">Cached</Badge>
+                            <Badge className="bg-secondary text-secondary-foreground">Cached</Badge>
                           )}
                         </div>
                       </div>
@@ -511,7 +509,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                           {Object.entries(searchResults.semanticAnalysis.detectedEntities).map(([key, values]) => {
                             if (Array.isArray(values) && values.length > 0) {
                               return values.map((value, i) => (
-                                <Badge key={`${key}-${i}`} variant="outline" className="text-xs">
+                                <Badge key={`${key}-${i}`} className="text-xs border border-border bg-background text-foreground">
                                   {key}: {value}
                                 </Badge>
                               ));
@@ -527,9 +525,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                             {searchResults.semanticAnalysis.suggestedRefinements.map((suggestion, i) => (
                               <Button
                                 key={i}
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
+                                className="bg-transparent hover:bg-accent hover:text-accent-foreground h-6 px-2 text-xs"
                                 onClick={() => setQuery(suggestion)}
                               >
                                 {suggestion}
@@ -594,10 +590,10 @@ export const IntegratedRAGManagement: React.FC = () => {
                                   </p>
 
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">{result.source}</Badge>
+                                    <Badge className="bg-secondary text-secondary-foreground">{result.source}</Badge>
                                     {result.metadata?.tags && (
                                       result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
-                                        <Badge key={i} variant="outline">{tag}</Badge>
+                                        <Badge key={i} className="border border-border bg-background text-foreground">{tag}</Badge>
                                       ))
                                     )}
                                   </div>
@@ -638,8 +634,8 @@ export const IntegratedRAGManagement: React.FC = () => {
                                   </p>
 
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">{result.extractionType}</Badge>
-                                    <Badge variant="outline">Material</Badge>
+                                    <Badge className="bg-secondary text-secondary-foreground">{result.extractionType}</Badge>
+                                    <Badge className="border border-border bg-background text-foreground">Material</Badge>
                                   </div>
                                 </CardContent>
                               </Card>
@@ -674,8 +670,8 @@ export const IntegratedRAGManagement: React.FC = () => {
                                   </p>
 
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">{result.type}</Badge>
-                                    <Badge variant="outline">
+                                    <Badge className="bg-secondary text-secondary-foreground">{result.type}</Badge>
+                                    <Badge className="border border-border bg-background text-foreground">
                                       Recommendation
                                     </Badge>
                                   </div>
@@ -692,15 +688,13 @@ export const IntegratedRAGManagement: React.FC = () => {
                         <span className="text-sm text-muted-foreground">Was this search helpful?</span>
                         <div className="flex gap-2">
                           <Button
-                            variant="ghost"
-                            size="sm"
+                            className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                             onClick={() => handleFeedback(1)}
                           >
                             <ThumbsUp className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="sm"
+                            className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                             onClick={() => handleFeedback(0)}
                           >
                             <ThumbsDown className="h-4 w-4" />
@@ -874,7 +868,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <div className={`w-2 h-2 rounded-full ${getStatusColor(job.status)}`} />
-                              <Badge variant="outline">{job.status}</Badge>
+                              <Badge className="border border-border bg-background text-foreground">{job.status}</Badge>
                             </div>
                           </div>
                         ))}
@@ -950,7 +944,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline">{query.searchType}</Badge>
+                              <Badge className="border border-border bg-background text-foreground">{query.searchType}</Badge>
                               <span className="text-sm text-muted-foreground">
                                 {query.resultCount} results
                               </span>
@@ -1005,7 +999,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                       Embedding generation is handled automatically during material processing.
                       Custom models will be deployed here after training completion.
                     </p>
-                    <Button variant="outline" disabled>
+                    <Button className="border border-border bg-background text-foreground" disabled>
                       <Settings className="h-4 w-4 mr-2" />
                       Configure Custom Models (Coming Soon)
                     </Button>

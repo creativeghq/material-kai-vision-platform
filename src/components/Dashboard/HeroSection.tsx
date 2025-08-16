@@ -34,7 +34,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
             <Button
               key={index}
               className={action.type === 'primary' ? styles.primaryButton : styles.outlineButton}
-              variant={action.type === 'outline' ? 'outline' : undefined}
               onClick={() => onNavigate(action.path)}
             >
               <action.icon className="mr-2 h-5 w-5" />

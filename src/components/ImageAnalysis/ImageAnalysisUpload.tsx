@@ -318,7 +318,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
                 <Label htmlFor="language">Language</Label>
                 <Select
                   value={options.language}
-                  onValueChange={(value) => 
+                  onValueChange={(value: string) =>
                     setOptions(prev => ({ ...prev, language: value }))
                   }
                 >
@@ -342,7 +342,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
                 <Checkbox
                   id="extract-tables"
                   checked={options.extract_tables}
-                  onCheckedChange={(checked) =>
+                  onCheckedChange={(checked: boolean) =>
                     setOptions(prev => ({ ...prev, extract_tables: !!checked }))
                   }
                 />
@@ -353,7 +353,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
                 <Checkbox
                   id="extract-forms"
                   checked={options.extract_forms}
-                  onCheckedChange={(checked) =>
+                  onCheckedChange={(checked: boolean) =>
                     setOptions(prev => ({ ...prev, extract_forms: !!checked }))
                   }
                 />
@@ -371,8 +371,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
             <CardTitle>Files ({files.length})</CardTitle>
             <div className="flex gap-2">
               <Button
-                variant="outline"
-                size="sm"
+                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                 onClick={clearFiles}
                 disabled={isAnalyzing}
               >
@@ -420,7 +419,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-sm font-medium truncate">{file.name}</p>
-                      <Badge variant={getStatusColor(file.status)}>
+                      <Badge className={getStatusColor(file.status)}>
                         <span className="flex items-center gap-1">
                           {getStatusIcon(file.status)}
                           {file.status}
@@ -448,11 +447,9 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
 
                   {/* Remove Button */}
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                     onClick={() => removeFile(index)}
                     disabled={file.status === 'analyzing'}
-                    className="flex-shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </Button>

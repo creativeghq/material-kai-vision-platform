@@ -4,20 +4,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Activity, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  RefreshCw, 
-  Settings, 
+import {
+  Activity,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  Settings,
   Zap,
   Image,
   FileText,
   ExternalLink,
-  Copy,
-  Download
+  Copy
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -50,7 +48,6 @@ const ModelDebuggingPanel: React.FC = () => {
   const { toast } = useToast();
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
   // Initialize with the 7 user-specified models
   useEffect(() => {
@@ -340,7 +337,7 @@ const ModelDebuggingPanel: React.FC = () => {
                           {getStatusIcon(model.status)}
                           <span className="ml-1 capitalize">{model.status}</span>
                         </Badge>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge className="border border-border bg-background text-foreground text-xs">
                           {model.type}
                         </Badge>
                       </div>
@@ -360,7 +357,7 @@ const ModelDebuggingPanel: React.FC = () => {
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Type:</span>
-                                <Badge variant="outline" className="text-xs">
+                                <Badge className="border border-border bg-background text-foreground text-xs">
                                   {getTypeIcon(model.type)}
                                   <span className="ml-1">{model.type}</span>
                                 </Badge>
@@ -372,9 +369,7 @@ const ModelDebuggingPanel: React.FC = () => {
                                     {model.versionHash.slice(0, 8)}...
                                   </code>
                                   <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0"
+                                    className="bg-transparent hover:bg-accent hover:text-accent-foreground h-6 w-6 p-0"
                                     onClick={() => copyToClipboard(model.versionHash)}
                                   >
                                     <Copy className="h-3 w-3" />
@@ -404,19 +399,16 @@ const ModelDebuggingPanel: React.FC = () => {
                           
                           <div className="flex gap-2">
                             <Button
-                              size="sm"
+                              className="h-8 px-3 text-sm flex items-center gap-1"
                               onClick={() => testModel(model.name)}
                               disabled={isLoading}
-                              className="flex items-center gap-1"
                             >
                               <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
                               Test Model
                             </Button>
                             <Button
-                              size="sm"
-                              variant="outline"
+                              className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1"
                               onClick={() => copyToClipboard(model.name)}
-                              className="flex items-center gap-1"
                             >
                               <Copy className="h-3 w-3" />
                               Copy Name
@@ -432,9 +424,8 @@ const ModelDebuggingPanel: React.FC = () => {
                               {model.recentLogs.slice(0, 3).map((log) => (
                                 <div key={log.id} className="border rounded-lg p-3 text-sm">
                                   <div className="flex items-center justify-between mb-1">
-                                    <Badge 
-                                      variant={log.status === 'success' ? 'default' : 'destructive'}
-                                      className="text-xs"
+                                    <Badge
+                                      className={`text-xs ${log.status === 'success' ? 'bg-primary text-primary-foreground' : 'bg-destructive text-destructive-foreground'}`}
                                     >
                                       {log.status === 'success' ? (
                                         <CheckCircle className="h-3 w-3 mr-1" />
@@ -460,10 +451,8 @@ const ModelDebuggingPanel: React.FC = () => {
                                   {log.imageUrl && (
                                     <div className="mt-2">
                                       <Button
-                                        size="sm"
-                                        variant="outline"
+                                        className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1 text-xs"
                                         onClick={() => window.open(log.imageUrl, '_blank')}
-                                        className="flex items-center gap-1 text-xs"
                                       >
                                         <ExternalLink className="h-3 w-3" />
                                         View Result

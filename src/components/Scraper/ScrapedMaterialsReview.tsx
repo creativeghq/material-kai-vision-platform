@@ -3,21 +3,36 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Check, 
-  X, 
-  Eye, 
-  Trash2, 
-  Download, 
+import {
+  Check,
+  X,
+  Trash2,
+  Download,
   Loader2,
   Clock,
-  ExternalLink,
   Search,
   AlertCircle
 } from 'lucide-react';
+
+// Helper function to calculate estimated time remaining
+const calculateEstimatedTime = (sessionData: any): number => {
+  if (!sessionData || sessionData.status !== 'active') return 0;
+  
+  const processed = sessionData.materials_processed || 0;
+  const total = sessionData.total_materials_found || 0;
+  const startTime = new Date(sessionData.created_at).getTime();
+  const currentTime = Date.now();
+  const elapsedMinutes = (currentTime - startTime) / (1000 * 60);
+  
+  if (processed === 0 || elapsedMinutes === 0) return 0;
+  
+  const processingRate = processed / elapsedMinutes; // materials per minute
+  const remaining = Math.max(0, total - processed);
+  
+  return Math.ceil(remaining / processingRate); // minutes remaining
+};
 
 interface ScrapedMaterial {
   name: string;
@@ -54,7 +69,6 @@ interface ScrapedMaterialsReviewProps {
 export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
   sessionId,
   currentResults = [],
-  onMaterialsUpdate,
   onAddAllToCatalog,
   isLoading = false,
   onContinueScraping,
@@ -171,57 +185,58 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
   const loadMaterialsBySession = async (sessionId: string) => {
     setLoading(true);
     try {
-      // First, get the UUID for this session
+      // Load actual scraped materials from database
+      const { data: materialsData, error: materialsError } = await supabase
+        .from('scraped_materials_temp')
+        .select('*')
+        .eq('scraping_session_id', sessionId)
+        .order('scraped_at', { ascending: false });
+
+      if (materialsError) {
+        console.error('Error loading materials:', materialsError);
+        throw materialsError;
+      }
+
+      // Load session data
       const { data: sessionData, error: sessionError } = await supabase
         .from('scraping_sessions')
-        .select('id')
+        .select('*')
         .eq('session_id', sessionId)
         .single();
 
-      if (sessionError) {
-        console.error('Error finding session:', sessionError);
+      if (sessionError && sessionError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error loading session:', sessionError);
         throw sessionError;
       }
 
-      if (!sessionData) {
-        throw new Error('Session not found');
-      }
-
-      // Now query scraped materials using the UUID
-      const { data, error } = await supabase
-        .from('scraped_materials_temp')
-        .select('*')
-        .eq('scraping_session_id', sessionData.id)
-        .order('scraped_at', { ascending: false });
-
-      if (error) throw error;
-      setMaterials((data || []) as ScrapedMaterialTemp[]);
-      console.log('Loaded materials by session:', sessionId, 'Count:', data?.length || 0);
+      const materials = (materialsData || []) as ScrapedMaterialTemp[];
+      setMaterials(materials);
+      console.log('Loaded materials by session:', sessionId, 'Count:', materials.length);
       
-      // Check for session progress info from latest material
-      if (data && data.length > 0) {
-        const latestMaterial = data[0];
-        const materialData = latestMaterial.material_data as any;
-        if (materialData?.metadata?.sessionProgress) {
-          const progress = materialData.metadata.sessionProgress;
-          setSessionStats({
-            totalProcessed: data.length,
-            totalExpected: progress.totalExpected || data.length,
-            isActive: progress.isActive || false,
-            currentUrl: progress.currentUrl,
-            startedAt: progress.startedAt || latestMaterial.scraped_at,
-            estimatedTimeRemaining: progress.estimatedTimeRemaining || 0
-          });
-          
-          setScrapingStatus(progress.isActive ? 'active' : 'idle');
-        } else {
-          setSessionStats({
-            totalProcessed: data.length,
-            totalExpected: data.length,
-            isActive: false,
-            startedAt: latestMaterial.scraped_at
-          });
-        }
+      // Set session stats based on actual session data
+      if (sessionData) {
+        setSessionStats({
+          totalProcessed: sessionData.materials_processed || materials.length,
+          totalExpected: sessionData.total_materials_found || materials.length,
+          isActive: sessionData.status === 'active',
+          currentUrl: sessionData.current_page_url || sessionData.source_url,
+          startedAt: sessionData.created_at,
+          estimatedTimeRemaining: sessionData.status === 'active' ?
+            calculateEstimatedTime(sessionData) : 0
+        });
+        
+        setScrapingStatus(sessionData.status === 'active' ? 'active' :
+                         sessionData.status === 'completed' ? 'completed' :
+                         sessionData.status === 'error' ? 'error' : 'idle');
+      } else if (materials.length > 0) {
+        // Fallback to material-based stats if no session data
+        setSessionStats({
+          totalProcessed: materials.length,
+          totalExpected: materials.length,
+          isActive: false,
+          startedAt: materials[0].scraped_at
+        });
+        setScrapingStatus('idle');
       }
     } catch (error) {
       console.error('Error loading materials by session:', error);
