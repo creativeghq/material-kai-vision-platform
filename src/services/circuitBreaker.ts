@@ -1,6 +1,6 @@
 /**
  * Circuit Breaker Implementation
- * 
+ *
  * Provides fault tolerance by preventing cascading failures when external services
  * are unavailable or experiencing issues.
  */
@@ -25,7 +25,7 @@ export class CircuitBreaker {
       failureThreshold: 5,
       resetTimeout: 60000, // 1 minute
       monitoringPeriod: 10000, // 10 seconds
-      ...options
+      ...options,
     };
   }
 

@@ -1,4 +1,4 @@
-import { supabase } from "../../integrations/supabase/client";
+import { supabase } from '../../integrations/supabase/client';
 
 export interface ApiEndpoint {
   id: string;
@@ -322,7 +322,7 @@ class ApiGatewayService {
     if (error) throw error;
     return (data || []).map(log => ({
       ...log,
-      ip_address: String(log.ip_address || '')
+      ip_address: String(log.ip_address || ''),
     })) as ApiUsageLog[];
   }
 
@@ -346,16 +346,16 @@ class ApiGatewayService {
     });
 
     const totalRequests = logs.length;
-    const successfulRequests = logs.filter(log => 
-      log.response_status && log.response_status >= 200 && log.response_status < 400
+    const successfulRequests = logs.filter(log =>
+      log.response_status && log.response_status >= 200 && log.response_status < 400,
     ).length;
     const rateLimitedRequests = logs.filter(log => log.rate_limit_exceeded).length;
-    
+
     const responseTimesFiltered = logs
       .map(log => log.response_time_ms)
       .filter((time): time is number => time !== null && time !== undefined);
-    const avgResponseTime = responseTimesFiltered.length > 0 
-      ? responseTimesFiltered.reduce((a, b) => a + b, 0) / responseTimesFiltered.length 
+    const avgResponseTime = responseTimesFiltered.length > 0
+      ? responseTimesFiltered.reduce((a, b) => a + b, 0) / responseTimesFiltered.length
       : 0;
 
     // Calculate top endpoints
@@ -399,10 +399,10 @@ class ApiGatewayService {
 
   async getRateLimit(endpointPath: string, ipAddress: string, userId?: string): Promise<number> {
     const { data, error } = await supabase
-      .rpc('get_rate_limit', { 
-        endpoint_path: endpointPath, 
+      .rpc('get_rate_limit', {
+        endpoint_path: endpointPath,
         ip_addr: ipAddress,
-        user_id_param: userId 
+        user_id_param: userId,
       });
 
     if (error) throw error;
@@ -412,7 +412,7 @@ class ApiGatewayService {
   // ============= Batch Operations =============
   async seedDefaultEndpoints(): Promise<void> {
     const defaultEndpoints = await this.getDefaultEndpoints();
-    
+
     for (const endpoint of defaultEndpoints) {
       try {
         await this.createEndpoint(endpoint);
@@ -430,34 +430,34 @@ class ApiGatewayService {
       { path: '/api/auth/login', method: 'POST', category: 'auth', description: 'User login', is_public: true, is_internal: true, rate_limit_per_minute: 20 },
       { path: '/api/auth/register', method: 'POST', category: 'auth', description: 'User registration', is_public: true, is_internal: true, rate_limit_per_minute: 10 },
       { path: '/api/auth/refresh-token', method: 'POST', category: 'auth', description: 'Refresh authentication token', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
-      
+
       // User Management APIs
       { path: '/api/users/profile', method: 'GET', category: 'users', description: 'Get user profile', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
       { path: '/api/users/profile', method: 'PUT', category: 'users', description: 'Update user profile', is_public: true, is_internal: true, rate_limit_per_minute: 10 },
-      
+
       // Material APIs
       { path: '/api/materials', method: 'GET', category: 'materials', description: 'List materials', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
       { path: '/api/materials/:id', method: 'GET', category: 'materials', description: 'Get material by ID', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
       { path: '/api/materials', method: 'POST', category: 'materials', description: 'Create new material', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
       { path: '/api/materials/:id', method: 'PUT', category: 'materials', description: 'Update material', is_public: true, is_internal: true, rate_limit_per_minute: 20 },
       { path: '/api/materials/:id', method: 'DELETE', category: 'materials', description: 'Delete material', is_public: false, is_internal: true, rate_limit_per_minute: 10 },
-      
+
       // Recognition APIs
       { path: '/api/recognition', method: 'POST', category: 'recognition', description: 'Recognize material', is_public: true, is_internal: true, rate_limit_per_minute: 20 },
       { path: '/api/recognition/batch', method: 'POST', category: 'recognition', description: 'Batch recognition', is_public: true, is_internal: true, rate_limit_per_minute: 5 },
-      
+
       // Search APIs
       { path: '/api/search', method: 'GET', category: 'search', description: 'Unified search', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
       { path: '/api/search/vector', method: 'POST', category: 'search', description: 'Vector similarity search', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
-      
+
       // Analytics APIs
       { path: '/api/analytics/events', method: 'POST', category: 'analytics', description: 'Track analytics event', is_public: true, is_internal: true, rate_limit_per_minute: 100 },
       { path: '/api/analytics/events', method: 'GET', category: 'analytics', description: 'Get analytics events', is_public: false, is_internal: true, rate_limit_per_minute: 30 },
-      
+
       // ML Service APIs
       { path: '/api/ml/inference', method: 'POST', category: 'ml', description: 'Run model inference', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
       { path: '/api/ml/embeddings', method: 'POST', category: 'ml', description: 'Generate embeddings', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
-      
+
       // Admin APIs
       { path: '/api/admin/users', method: 'GET', category: 'admin', description: 'List all users (admin)', is_public: false, is_internal: true, rate_limit_per_minute: 20 },
       { path: '/api/admin/settings', method: 'GET', category: 'admin', description: 'Get system settings', is_public: false, is_internal: true, rate_limit_per_minute: 10 },

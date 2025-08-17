@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { CalendarIcon, Info, Upload, Save } from 'lucide-react';
+import { format } from 'date-fns';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,9 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Info, Upload, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface MetadataField {
@@ -44,20 +45,20 @@ const materialCategories = [
   { value: 'glass', label: 'Glass' },
   { value: 'rubber', label: 'Rubber' },
   { value: 'concrete', label: 'Concrete' },
-  { value: 'other', label: 'Other' }
+  { value: 'other', label: 'Other' },
 ];
 
 export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
   selectedCategory,
   onSave,
-  initialData
+  initialData,
 }) => {
   const [metadataFields, setMetadataFields] = useState<MetadataField[]>([]);
   const [formData, setFormData] = useState<Record<string, any>>({
     name: '',
     description: '',
     category: selectedCategory,
-    ...initialData
+    ...initialData,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,7 +72,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
     setFormData(prev => ({
       ...prev,
       category: selectedCategory,
-      ...initialData
+      ...initialData,
     }));
   }, [selectedCategory, initialData]);
 
@@ -93,7 +94,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
   const handleFieldChange = (fieldName: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      [fieldName]: value
+      [fieldName]: value,
     }));
   };
 
@@ -101,12 +102,12 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
     // Validate required fields
     const requiredFields = metadataFields.filter(field => field.is_required);
     const missingFields = requiredFields.filter(field => !formData[field.field_name]);
-    
+
     if (!formData.name) {
       toast({
         title: 'Validation Error',
         description: 'Material name is required',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
@@ -115,7 +116,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
       toast({
         title: 'Validation Error',
         description: `Please fill in required fields: ${missingFields.map(f => f.display_name).join(', ')}`,
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
@@ -138,7 +139,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         properties: {},
         chemical_composition: {},
         safety_data: {},
-        standards: []
+        standards: [],
       };
 
       if (onSave) {
@@ -153,14 +154,14 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
 
         toast({
           title: 'Success',
-          description: 'Material saved successfully'
+          description: 'Material saved successfully',
         });
 
         // Reset form
         setFormData({
           name: '',
           description: '',
-          category: selectedCategory
+          category: selectedCategory,
         });
       }
     } catch (error) {
@@ -168,7 +169,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to save material',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -234,12 +235,12 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
             <PopoverTrigger asChild>
               <Button
                 className={cn(
-                  "w-full justify-start text-left font-normal border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
-                  !value && "text-muted-foreground"
+                  'w-full justify-start text-left font-normal border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
+                  !value && 'text-muted-foreground',
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {value ? format(new Date(value), "PPP") : "Pick a date"}
+                {value ? format(new Date(value), 'PPP') : 'Pick a date'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -280,7 +281,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         {/* Basic Information */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Basic Information</h3>
-          
+
           <div>
             <Label htmlFor="name">
               Material Name <span className="text-destructive">*</span>
@@ -328,7 +329,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         {metadataFields.length > 0 && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Metadata Fields</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {metadataFields.map((field) => (
                 <div key={field.id} className="space-y-2">

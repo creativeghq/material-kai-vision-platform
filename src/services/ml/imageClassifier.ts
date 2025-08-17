@@ -1,7 +1,9 @@
 import { pipeline } from '@huggingface/transformers';
+
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { MLResult, ImageClassificationResult } from './types';
 import { DeviceDetector } from './deviceDetector';
-import { BaseService, ServiceConfig } from '../base/BaseService';
 
 // Configuration interface for ImageClassifierService
 interface ImageClassifierServiceConfig extends ServiceConfig {
@@ -16,10 +18,10 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
   protected async doInitialize(): Promise<void> {
     try {
       console.log('Initializing image classification model...');
-      
+
       const modelName = this.config.modelName || 'onnx-community/mobilenetv4_conv_small.e2400_r224_in1k';
       const device = this.config.device || DeviceDetector.getOptimalDevice();
-      
+
       this.classifier = await pipeline(
         'image-classification',
         modelName,
@@ -27,8 +29,8 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
           device: device as any, // Type assertion to handle device type mismatch
           progress_callback: this.config.enableProgressCallback ? (progress: any) => {
             console.log(`Image classifier loading: ${Math.round(progress.progress * 100)}%`);
-          } : undefined
-        }
+          } : undefined,
+        },
       );
 
       console.log('Image classification model initialized successfully');
@@ -59,7 +61,7 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
   async classify(imageSource: string | File | Blob): Promise<MLResult> {
     return this.executeOperation(async () => {
       await this.initialize();
-      
+
       if (!this.classifier) {
         throw new Error('Image classifier not available');
       }
@@ -70,7 +72,7 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
         success: true,
         data: results,
         confidence: results[0]?.score || 0,
-        processingTime: 0 // Will be set by executeOperation
+        processingTime: 0, // Will be set by executeOperation
       };
     }, 'classify');
   }
@@ -79,7 +81,7 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
     const modelName = this.config.modelName || 'mobilenetv4_conv_small.e2400_r224_in1k';
     return {
       name: modelName,
-      initialized: this.isInitialized
+      initialized: this.isInitialized,
     };
   }
 
@@ -93,13 +95,13 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
     const metrics = this.getMetrics();
     const health = await this.getHealth();
     const modelName = this.config.modelName || 'mobilenetv4_conv_small.e2400_r224_in1k';
-    
+
     return {
       modelName,
       initialized: this.isInitialized,
       health: health.status,
       totalClassifications: metrics.requestCount,
-      averageProcessingTime: metrics.averageLatency
+      averageProcessingTime: metrics.averageLatency,
     };
   }
 
@@ -115,13 +117,13 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
       timeout: 30000,
       retries: 3,
       rateLimit: {
-        requestsPerMinute: 60
+        requestsPerMinute: 60,
       },
       healthCheck: {
         enabled: true,
-        interval: 300000 // 5 minutes
+        interval: 300000, // 5 minutes
       },
-      ...config
+      ...config,
     };
 
     return new ImageClassifierService(defaultConfig);

@@ -58,7 +58,7 @@ export class AppError extends Error {
 
   constructor(details: Omit<ErrorDetails, 'correlationId' | 'timestamp'>) {
     super(details.message);
-    
+
     this.name = 'AppError';
     this.code = details.code;
     this.category = details.category;
@@ -97,8 +97,8 @@ export class AppError extends Error {
       originalError: this.originalError ? {
         name: this.originalError.name,
         message: this.originalError.message,
-        stack: this.originalError.stack
-      } : undefined
+        stack: this.originalError.stack,
+      } : undefined,
     };
   }
 
@@ -109,7 +109,7 @@ export class AppError extends Error {
     return {
       message: this.getUserFriendlyMessage(),
       code: this.code,
-      correlationId: this.correlationId
+      correlationId: this.correlationId,
     };
   }
 
@@ -123,7 +123,7 @@ export class AppError extends Error {
       'AUTHORIZATION_ERROR': 'You do not have permission to perform this action.',
       'DATABASE_ERROR': 'Data storage issue. Please try again later.',
       'EXTERNAL_SERVICE_ERROR': 'External service unavailable. Please try again later.',
-      'CONFIGURATION_ERROR': 'System configuration issue. Please contact support.'
+      'CONFIGURATION_ERROR': 'System configuration issue. Please contact support.',
     };
 
     return userFriendlyMessages[this.code] || 'An unexpected error occurred. Please try again or contact support.';
@@ -141,7 +141,7 @@ export class ValidationError extends AppError {
       category: ErrorCategory.VALIDATION,
       severity: ErrorSeverity.MEDIUM,
       context,
-      originalError
+      originalError,
     });
   }
 }
@@ -154,7 +154,7 @@ export class NetworkError extends AppError {
       category: ErrorCategory.NETWORK,
       severity: ErrorSeverity.HIGH,
       context,
-      originalError
+      originalError,
     });
   }
 }
@@ -167,7 +167,7 @@ export class APIError extends AppError {
       category: ErrorCategory.API,
       severity: ErrorSeverity.HIGH,
       context,
-      originalError
+      originalError,
     });
   }
 }
@@ -180,7 +180,7 @@ export class DatabaseError extends AppError {
       category: ErrorCategory.DATABASE,
       severity: ErrorSeverity.CRITICAL,
       context,
-      originalError
+      originalError,
     });
   }
 }
@@ -193,7 +193,7 @@ export class ExternalServiceError extends AppError {
       category: ErrorCategory.EXTERNAL_SERVICE,
       severity: ErrorSeverity.HIGH,
       context,
-      originalError
+      originalError,
     });
   }
 }
@@ -206,7 +206,7 @@ export class ConfigurationError extends AppError {
       category: ErrorCategory.CONFIGURATION,
       severity: ErrorSeverity.CRITICAL,
       context,
-      originalError
+      originalError,
     });
   }
 }

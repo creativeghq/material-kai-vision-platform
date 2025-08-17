@@ -1,15 +1,16 @@
 import { z } from 'zod';
+
 import { ApiConfigManager } from '../../config';
-import type { 
-  BaseApiConfig, 
+import type {
+  BaseApiConfig,
   ApiConfig,
   ReplicateApiConfig,
-  SupabaseApiConfig 
+  SupabaseApiConfig,
 } from '../../config/apiConfig';
 
 /**
  * Base API Service Class
- * 
+ *
  * Provides a unified interface for all API interactions while preserving
  * each API's unique requirements and parameter schemas.
  */
@@ -19,7 +20,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
 
   constructor(
     protected apiName: string,
-    protected environment: 'development' | 'production' | 'test' = 'development'
+    protected environment: 'development' | 'production' | 'test' = 'development',
   ) {
     const apiConfig = ApiConfigManager.getApiConfig<TConfig>(apiName);
     if (!apiConfig) {
@@ -50,8 +51,8 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
       return schema.parse(params);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessages = error.errors.map(err => 
-          `${err.path.join('.')}: ${err.message}`
+        const errorMessages = error.errors.map(err =>
+          `${err.path.join('.')}: ${err.message}`,
         ).join(', ');
         throw new Error(`Parameter validation failed for ${this.apiName}: ${errorMessages}`);
       }
@@ -84,7 +85,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
    */
   protected handleApiError(error: any, context: string): never {
     console.error(`API Error in ${this.apiName} (${context}):`, error);
-    
+
     // Extract meaningful error information
     let errorMessage = `${this.apiName} API error`;
     let statusCode = 500;
@@ -108,7 +109,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
     const envConfig = this.getEnvironmentConfig();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': `MaterialKaiVisionPlatform/1.0 (${this.apiName})`
+      'User-Agent': `MaterialKaiVisionPlatform/1.0 (${this.apiName})`,
     };
 
     // Add API key if available
@@ -164,24 +165,24 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
     try {
       const start = Date.now();
       const envConfig = this.getEnvironmentConfig();
-      
+
       // Simple ping to base URL
       const response = await fetch(envConfig.baseUrl, {
         method: 'HEAD',
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(5000), // 5 second timeout
       });
 
       const latency = Date.now() - start;
-      
+
       return {
         status: response.ok ? 'healthy' : 'unhealthy',
-        latency
+        latency,
       };
     } catch (error) {
       return {
         status: 'unhealthy',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -209,7 +210,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
       environment: this.environment,
       rateLimitingEnabled: hasRateLimit,
       lastCallTimes,
-      configuredEndpoints: [] // Will be populated based on specific API type
+      configuredEndpoints: [], // Will be populated based on specific API type
     };
   }
 }
@@ -229,7 +230,7 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
       method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
       timeout?: number;
       retries?: number;
-    } = {}
+    } = {},
   ): Promise<TResponse> {
     const { method = 'POST', timeout = 30000, retries = 3 } = options;
 
@@ -246,21 +247,21 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
     await this.checkRateLimit(modelId);
 
     // Build request
-    const url = this.buildUrl(`/v1/predictions`);
+    const url = this.buildUrl('/v1/predictions');
     const requestBody = {
       version: modelConfig.version,
-      input: validatedParams
+      input: validatedParams,
     };
 
     let lastError: Error;
-    
+
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const response = await fetch(url, {
           method,
           headers: this.getHeaders(),
           body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(timeout)
+          signal: AbortSignal.timeout(timeout),
         });
 
         if (!response.ok) {
@@ -272,7 +273,7 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
-        
+
         if (attempt < retries) {
           // Exponential backoff
           const delay = Math.pow(2, attempt) * 1000;
@@ -289,12 +290,12 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
    */
   public async getPredictionStatus(predictionId: string): Promise<any> {
     const url = this.buildUrl(`/v1/predictions/${predictionId}`);
-    
+
     try {
       const response = await fetch(url, {
         method: 'GET',
         headers: this.getHeaders(),
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!response.ok) {
@@ -323,7 +324,7 @@ export class SupabaseApiService extends ApiService<SupabaseApiConfig> {
       method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
       timeout?: number;
       retries?: number;
-    } = {}
+    } = {},
   ): Promise<TResponse> {
     const { method = 'POST', timeout = 60000, retries = 2 } = options;
 
@@ -343,14 +344,14 @@ export class SupabaseApiService extends ApiService<SupabaseApiConfig> {
     const url = this.buildUrl(`/functions/v1/${functionName}`);
 
     let lastError: Error;
-    
+
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const response = await fetch(url, {
           method,
           headers: this.getHeaders(),
           body: JSON.stringify(validatedParams),
-          signal: AbortSignal.timeout(timeout)
+          signal: AbortSignal.timeout(timeout),
         });
 
         if (!response.ok) {
@@ -362,7 +363,7 @@ export class SupabaseApiService extends ApiService<SupabaseApiConfig> {
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
-        
+
         if (attempt < retries) {
           // Linear backoff for Supabase
           const delay = (attempt + 1) * 2000;
@@ -383,10 +384,10 @@ export class ApiServiceFactory {
 
   public static getService<T extends ApiService>(
     apiName: string,
-    environment: 'development' | 'production' | 'test' = 'development'
+    environment: 'development' | 'production' | 'test' = 'development',
   ): T {
     const key = `${apiName}-${environment}`;
-    
+
     if (this.instances.has(key)) {
       return this.instances.get(key) as T;
     }

@@ -3,7 +3,7 @@
  * Integrates with the spaceformer-analysis edge function for spatial reasoning
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 
 export interface SpaceformerRequest {
   nerf_reconstruction_id?: string;
@@ -49,7 +49,7 @@ export interface SpaceformerResult {
 }
 
 class SpaceformerAnalysisService {
-  
+
   /**
    * Perform spatial analysis using Spaceformer AI
    */
@@ -60,8 +60,8 @@ class SpaceformerAnalysisService {
       const { data, error } = await supabase.functions.invoke('spaceformer-analysis', {
         body: {
           user_id: (await supabase.auth.getUser()).data.user?.id,
-          ...request
-        }
+          ...request,
+        },
       });
 
       if (error) {
@@ -129,7 +129,7 @@ class SpaceformerAnalysisService {
     return this.analyzeSpace({
       nerf_reconstruction_id: nerfId,
       room_type: roomType,
-      analysis_type: 'full'
+      analysis_type: 'full',
     });
   }
 
@@ -140,7 +140,7 @@ class SpaceformerAnalysisService {
     return this.analyzeSpace({
       room_type: roomType,
       room_dimensions: dimensions,
-      analysis_type: 'layout'
+      analysis_type: 'layout',
     });
   }
 
@@ -149,12 +149,12 @@ class SpaceformerAnalysisService {
    */
   async optimizeMaterialPlacements(
     spatialFeatures: SpatialFeature[],
-    roomType: string
+    roomType: string,
   ): Promise<any> {
     return this.analyzeSpace({
       room_type: roomType,
       analysis_type: 'materials',
-      user_preferences: { spatial_features: spatialFeatures }
+      user_preferences: { spatial_features: spatialFeatures },
     });
   }
 
@@ -163,12 +163,12 @@ class SpaceformerAnalysisService {
    */
   async analyzeAccessibility(
     spatialFeatures: SpatialFeature[],
-    roomType: string
+    roomType: string,
   ): Promise<any> {
     return this.analyzeSpace({
       room_type: roomType,
       analysis_type: 'accessibility',
-      user_preferences: { spatial_features: spatialFeatures }
+      user_preferences: { spatial_features: spatialFeatures },
     });
   }
 }

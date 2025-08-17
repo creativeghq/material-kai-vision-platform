@@ -1,22 +1,23 @@
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-  FileText, 
-  Image, 
-  Database, 
-  BarChart3, 
-  ExternalLink, 
-  Download, 
-  Eye, 
+import {
+  FileText,
+  Image,
+  Database,
+  BarChart3,
+  ExternalLink,
+  Download,
+  Eye,
   Star,
   Clock,
   User,
   Tag,
-  TrendingUp
+  TrendingUp,
 } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 // Types for search results
@@ -76,7 +77,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
   className,
 }) => {
   const TypeIcon = typeIcons[result.type];
-  
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -114,20 +115,20 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
       <div
         className={cn(
           'flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors',
-          className
+          className,
         )}
         onClick={handleView}
       >
         <div className="flex-shrink-0">
           <TypeIcon className="h-4 w-4 text-gray-500" />
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-medium text-gray-900 truncate">
               {result.title}
             </h4>
-            <Badge variant="outline" className={cn('text-xs', typeColors[result.type])}>
+            <Badge className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80', typeColors[result.type])}>
               {result.type}
             </Badge>
           </div>
@@ -152,7 +153,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
       <div
         className={cn(
           'flex gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors',
-          className
+          className,
         )}
         onClick={handleView}
       >
@@ -179,14 +180,14 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 <h3 className="text-lg font-semibold text-gray-900 truncate">
                   {result.title}
                 </h3>
-                <Badge variant="outline" className={cn('text-xs', typeColors[result.type])}>
+                <Badge className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80', typeColors[result.type])}>
                   {result.type}
                 </Badge>
                 {result.isFavorite && (
                   <Star className="h-4 w-4 text-yellow-500 fill-current" />
                 )}
               </div>
-              
+
               <p className="text-sm text-gray-600 line-clamp-2 mb-2">
                 {result.description}
               </p>
@@ -208,8 +209,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                   {result.tags.slice(0, 4).map((tag) => (
                     <Badge
                       key={tag}
-                      variant="secondary"
-                      className="text-xs cursor-pointer hover:bg-gray-200"
+                      className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer"
                       onClick={(e) => handleTagClick(e, tag)}
                     >
                       <Tag className="h-3 w-3 mr-1" />
@@ -217,7 +217,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     </Badge>
                   ))}
                   {result.tags.length > 4 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80">
                       +{result.tags.length - 4} more
                     </Badge>
                   )}
@@ -263,7 +263,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                
+
                 {result.semanticScore && (
                   <TooltipProvider>
                     <Tooltip>
@@ -286,14 +286,13 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        variant="ghost"
-                        size="sm"
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
                         onClick={handleFavorite}
-                        className="h-8 w-8 p-0"
+
                       >
                         <Star className={cn(
                           'h-4 w-4',
-                          result.isFavorite ? 'text-yellow-500 fill-current' : 'text-gray-400'
+                          result.isFavorite ? 'text-yellow-500 fill-current' : 'text-gray-400',
                         )} />
                       </Button>
                     </TooltipTrigger>
@@ -308,10 +307,9 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          variant="ghost"
-                          size="sm"
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
                           onClick={handleDownload}
-                          className="h-8 w-8 p-0"
+
                         >
                           <Download className="h-4 w-4 text-gray-400" />
                         </Button>
@@ -328,13 +326,12 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          variant="ghost"
-                          size="sm"
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
                           onClick={(e) => {
                             e.stopPropagation();
                             window.open(result.url, '_blank');
                           }}
-                          className="h-8 w-8 p-0"
+
                         >
                           <ExternalLink className="h-4 w-4 text-gray-400" />
                         </Button>
@@ -358,7 +355,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
     <Card
       className={cn(
         'cursor-pointer hover:shadow-md transition-shadow',
-        className
+        className,
       )}
       onClick={handleView}
     >
@@ -376,7 +373,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 <TypeIcon className="h-6 w-6 text-gray-400" />
               </div>
             )}
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="font-semibold text-gray-900 truncate">
@@ -386,7 +383,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                   <Star className="h-4 w-4 text-yellow-500 fill-current flex-shrink-0" />
                 )}
               </div>
-              <Badge variant="outline" className={cn('text-xs', typeColors[result.type])}>
+              <Badge className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80', typeColors[result.type])}>
                 {result.type}
               </Badge>
             </div>
@@ -428,8 +425,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
             {result.tags.slice(0, 3).map((tag) => (
               <Badge
                 key={tag}
-                variant="secondary"
-                className="text-xs cursor-pointer hover:bg-gray-200"
+                className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer"
                 onClick={(e) => handleTagClick(e, tag)}
               >
                 <Tag className="h-3 w-3 mr-1" />
@@ -437,7 +433,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
               </Badge>
             ))}
             {result.tags.length > 3 && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80">
                 +{result.tags.length - 3}
               </Badge>
             )}
@@ -465,14 +461,13 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
                     onClick={handleFavorite}
-                    className="h-8 w-8 p-0"
+
                   >
                     <Star className={cn(
                       'h-4 w-4',
-                      result.isFavorite ? 'text-yellow-500 fill-current' : 'text-gray-400'
+                      result.isFavorite ? 'text-yellow-500 fill-current' : 'text-gray-400',
                     )} />
                   </Button>
                 </TooltipTrigger>
@@ -487,10 +482,9 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="sm"
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
                       onClick={handleDownload}
-                      className="h-8 w-8 p-0"
+
                     >
                       <Download className="h-4 w-4 text-gray-400" />
                     </Button>
@@ -507,13 +501,12 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant="ghost"
-                      size="sm"
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
                       onClick={(e) => {
                         e.stopPropagation();
                         window.open(result.url, '_blank');
                       }}
-                      className="h-8 w-8 p-0"
+
                     >
                       <ExternalLink className="h-4 w-4 text-gray-400" />
                     </Button>

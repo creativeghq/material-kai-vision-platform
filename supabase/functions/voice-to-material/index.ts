@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface VoiceToMaterialRequest {
@@ -110,7 +110,7 @@ async function transcribeAudio(audioData: Uint8Array, format: string, language?:
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'segment');
-    
+
     if (language) {
       formData.append('language', language);
     }
@@ -146,18 +146,18 @@ async function analyzeMaterialContent(text: string, processingOptions: any): Pro
     textiles: ['cotton', 'wool', 'silk', 'polyester', 'nylon', 'fabric', 'textile', 'fiber'],
     wood: ['wood', 'timber', 'oak', 'pine', 'maple', 'bamboo', 'plywood'],
     concrete: ['concrete', 'cement', 'mortar', 'aggregate', 'rebar'],
-    electronic: ['semiconductor', 'silicon', 'gallium', 'germanium', 'conductor', 'insulator']
+    electronic: ['semiconductor', 'silicon', 'gallium', 'germanium', 'conductor', 'insulator'],
   };
 
   const propertyKeywords = [
     'strength', 'hardness', 'flexibility', 'durability', 'conductivity', 'resistance',
     'density', 'weight', 'temperature', 'corrosion', 'wear', 'fatigue', 'elastic',
-    'thermal', 'electrical', 'magnetic', 'optical', 'chemical', 'mechanical'
+    'thermal', 'electrical', 'magnetic', 'optical', 'chemical', 'mechanical',
   ];
 
   const applicationKeywords = [
     'automotive', 'aerospace', 'construction', 'electronics', 'medical', 'packaging',
-    'furniture', 'clothing', 'sports', 'marine', 'industrial', 'consumer'
+    'furniture', 'clothing', 'sports', 'marine', 'industrial', 'consumer',
   ];
 
   const materialsIdentified: MaterialMention[] = [];
@@ -174,19 +174,19 @@ async function analyzeMaterialContent(text: string, processingOptions: any): Pro
     keywords.forEach(keyword => {
       const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
       const matches = text.match(regex);
-      
+
       if (matches) {
         materialCategories[category] = (materialCategories[category] || 0) + matches.length;
-        
+
         // Find context for each mention
         sentences.forEach((sentence, index) => {
           if (sentence.toLowerCase().includes(keyword.toLowerCase())) {
-            const propertiesMentioned = propertyKeywords.filter(prop => 
-              sentence.toLowerCase().includes(prop)
+            const propertiesMentioned = propertyKeywords.filter(prop =>
+              sentence.toLowerCase().includes(prop),
             );
-            
-            const applicationsMentioned = applicationKeywords.filter(app => 
-              sentence.toLowerCase().includes(app)
+
+            const applicationsMentioned = applicationKeywords.filter(app =>
+              sentence.toLowerCase().includes(app),
             );
 
             materialsIdentified.push({
@@ -196,7 +196,7 @@ async function analyzeMaterialContent(text: string, processingOptions: any): Pro
               context: sentence.trim(),
               timestamp: index * 5, // Approximate timestamp
               properties_mentioned: propertiesMentioned,
-              applications_mentioned: applicationsMentioned
+              applications_mentioned: applicationsMentioned,
             });
           }
         });
@@ -213,7 +213,7 @@ async function analyzeMaterialContent(text: string, processingOptions: any): Pro
     /cost\s+analysis/gi,
     /sustainability/gi,
     /recycling/gi,
-    /environmental\s+impact/gi
+    /environmental\s+impact/gi,
   ];
 
   topicPatterns.forEach(pattern => {
@@ -228,7 +228,7 @@ async function analyzeMaterialContent(text: string, processingOptions: any): Pro
     /\b[A-Z]{2,}\b/g, // Acronyms
     /\d+\s*(MPa|GPa|kPa|PSI|°C|°F|K)/gi, // Units
     /ISO\s+\d+/gi, // Standards
-    /ASTM\s+[A-Z]\d+/gi // ASTM standards
+    /ASTM\s+[A-Z]\d+/gi, // ASTM standards
   ];
 
   technicalPatterns.forEach(pattern => {
@@ -240,7 +240,7 @@ async function analyzeMaterialContent(text: string, processingOptions: any): Pro
 
   const confidenceScore = Math.min(
     0.5 + (materialsIdentified.length * 0.1) + (keyTopics.length * 0.05),
-    1.0
+    1.0,
   );
 
   return {
@@ -248,14 +248,14 @@ async function analyzeMaterialContent(text: string, processingOptions: any): Pro
     material_categories: materialCategories,
     key_topics: [...new Set(keyTopics)].slice(0, 10),
     technical_terms: [...new Set(technicalTerms)].slice(0, 15),
-    confidence_score: confidenceScore
+    confidence_score: confidenceScore,
   };
 }
 
 function analyzeAudioQuality(segments: TranscriptionSegment[]): any {
   // Simulate audio quality analysis based on transcription confidence
   const avgConfidence = segments.reduce((sum, seg) => sum + seg.confidence, 0) / segments.length;
-  
+
   let quality: 'excellent' | 'good' | 'fair' | 'poor';
   if (avgConfidence > 0.9) quality = 'excellent';
   else if (avgConfidence > 0.8) quality = 'good';
@@ -284,8 +284,8 @@ function analyzeAudioQuality(segments: TranscriptionSegment[]): any {
     pause_analysis: {
       total_pauses: pauses.length,
       avg_pause_duration: pauses.length > 0 ? pauses.reduce((a, b) => a + b, 0) / pauses.length : 0,
-      longest_pause: pauses.length > 0 ? Math.max(...pauses) : 0
-    }
+      longest_pause: pauses.length > 0 ? Math.max(...pauses) : 0,
+    },
   };
 }
 
@@ -301,7 +301,7 @@ function generateInsights(materialAnalysis: any, transcription: any): any {
       recommendations.push({
         material: `Advanced ${category}`,
         reason: `High interest in ${category} materials detected`,
-        confidence: 0.8
+        confidence: 0.8,
       });
     }
   });
@@ -310,7 +310,7 @@ function generateInsights(materialAnalysis: any, transcription: any): any {
   if (materialAnalysis.materials_identified.length < 3) {
     knowledgeGaps.push('Limited material variety discussed');
   }
-  
+
   if (materialAnalysis.technical_terms.length < 5) {
     knowledgeGaps.push('Few technical specifications mentioned');
   }
@@ -320,7 +320,7 @@ function generateInsights(materialAnalysis: any, transcription: any): any {
     'What specific performance requirements are most critical?',
     'Have you considered environmental impact and sustainability?',
     'What is the target cost range for this application?',
-    'Are there any regulatory standards that must be met?'
+    'Are there any regulatory standards that must be met?',
   );
 
   // Related research topics
@@ -329,27 +329,27 @@ function generateInsights(materialAnalysis: any, transcription: any): any {
     'Cost-performance optimization',
     'Sustainable material alternatives',
     'Quality testing methodologies',
-    'Supply chain considerations'
+    'Supply chain considerations',
   );
 
   return {
     material_recommendations: recommendations.slice(0, 5),
     knowledge_gaps: knowledgeGaps,
     follow_up_questions: followUpQuestions.slice(0, 4),
-    related_research_topics: relatedTopics.slice(0, 5)
+    related_research_topics: relatedTopics.slice(0, 5),
   };
 }
 
 async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<VoiceToMaterialResult> {
   const startTime = Date.now();
-  
+
   try {
     console.log('Processing voice to material analysis');
-    
+
     // Get audio data
     let audioData: Uint8Array;
     let audioFormat = request.audio_format || 'mp3';
-    
+
     if (request.audio_data) {
       // Decode base64 audio data
       const binaryString = atob(request.audio_data);
@@ -370,20 +370,20 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
 
     // Transcribe audio using OpenAI Whisper
     const transcriptionData = await transcribeAudio(audioData, audioFormat, request.language);
-    
+
     // Process transcription segments
     const segments: TranscriptionSegment[] = transcriptionData.segments?.map((seg: any) => ({
       start_time: seg.start,
       end_time: seg.end,
       text: seg.text,
       confidence: seg.avg_logprob ? Math.exp(seg.avg_logprob) : 0.8,
-      speaker_id: 'speaker_1' // Simplified for demo
+      speaker_id: 'speaker_1', // Simplified for demo
     })) || [];
 
     // Analyze material content
     const materialAnalysis = await analyzeMaterialContent(
       transcriptionData.text,
-      request.processing_options || {}
+      request.processing_options || {},
     );
 
     // Analyze audio quality
@@ -400,7 +400,7 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
         segments: segments,
         language_detected: transcriptionData.language || request.language || 'en',
         duration_seconds: transcriptionData.duration || 0,
-        word_count: transcriptionData.text.split(/\s+/).length
+        word_count: transcriptionData.text.split(/\s+/).length,
       },
       material_analysis: materialAnalysis,
       audio_analysis: audioAnalysis,
@@ -409,8 +409,8 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
         processing_time_ms: processingTime,
         audio_duration_ms: (transcriptionData.duration || 0) * 1000,
         transcription_model: request.processing_options?.transcription_model || 'whisper-1',
-        analysis_timestamp: new Date().toISOString()
-      }
+        analysis_timestamp: new Date().toISOString(),
+      },
     };
 
     // Store analysis results
@@ -424,7 +424,7 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
         processing_time_ms: processingTime,
         confidence_score: materialAnalysis.confidence_score,
         user_id: request.user_id,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       });
 
     // Log analytics
@@ -440,8 +440,8 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
             materials_found: materialAnalysis.materials_identified.length,
             confidence_score: materialAnalysis.confidence_score,
             processing_time_ms: processingTime,
-            language: result.transcription.language_detected
-          }
+            language: result.transcription.language_detected,
+          },
         });
     }
 
@@ -460,32 +460,32 @@ serve(async (req) => {
 
   try {
     const request: VoiceToMaterialRequest = await req.json();
-    
+
     console.log('Processing voice to material request:', {
       has_audio_data: !!request.audio_data,
       has_audio_url: !!request.audio_url,
       audio_format: request.audio_format,
       language: request.language,
-      processing_options: request.processing_options
+      processing_options: request.processing_options,
     });
 
     if (!request.audio_data && !request.audio_url) {
       return new Response(
         JSON.stringify({ error: 'Either audio_data or audio_url is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
     if (request.audio_format && !['mp3', 'wav', 'ogg', 'webm', 'm4a'].includes(request.audio_format)) {
       return new Response(
         JSON.stringify({ error: 'Invalid audio_format. Must be one of: mp3, wav, ogg, webm, m4a' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -493,23 +493,23 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Voice to material analysis error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Voice to material analysis failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Voice to material analysis failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

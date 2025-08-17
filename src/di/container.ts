@@ -1,6 +1,6 @@
 /**
  * Dependency Injection Container Implementation
- * 
+ *
  * Core implementation of the DI container with service registration, resolution,
  * lifecycle management, and circular dependency detection.
  */
@@ -19,7 +19,7 @@ import {
   CircularDependencyError,
   ServiceNotFoundError,
   ServiceResolutionError,
-  Logger
+  Logger,
 } from './types';
 
 /**
@@ -33,14 +33,14 @@ export class ServiceRegistrationBuilder<T> implements IServiceRegistrationBuilde
     identifier: ServiceIdentifier<T>,
     implementation?: ServiceConstructor<T>,
     factory?: ServiceFactory<T>,
-    instance?: T
+    instance?: T,
   ) {
     this.descriptor = {
       identifier,
       lifetime: ServiceLifetime.Transient,
       dependencies: [],
       required: false,
-      tags: []
+      tags: [],
     };
 
     if (implementation) {
@@ -106,7 +106,7 @@ export class ServiceScope implements IServiceScope {
   async dispose(): Promise<void> {
     // Dispose instances in reverse order of creation
     const instances = Array.from(this.instances.values()).reverse();
-    
+
     for (const instance of instances) {
       if (instance && typeof instance.dispose === 'function') {
         try {
@@ -117,7 +117,7 @@ export class ServiceScope implements IServiceScope {
         }
       }
     }
-    
+
     this.instances.clear();
   }
 }
@@ -140,7 +140,7 @@ export class ServiceContainer implements IServiceContainer {
       enableHealthChecks: options.enableHealthChecks ?? false,
       healthCheckInterval: options.healthCheckInterval ?? 30000,
       logger: options.logger,
-      developmentMode: options.developmentMode ?? false
+      developmentMode: options.developmentMode ?? false,
     };
 
     this.logger = this.options.logger;
@@ -157,27 +157,27 @@ export class ServiceContainer implements IServiceContainer {
 
     this.validateDescriptor(descriptor);
     this.services.set(descriptor.identifier, descriptor);
-    
+
     this.log('debug', `Registered service: ${this.getServiceName(descriptor.identifier)} (${descriptor.lifetime})`);
   }
 
   registerType<T>(
     identifier: ServiceIdentifier<T>,
-    implementation: ServiceConstructor<T>
+    implementation: ServiceConstructor<T>,
   ): IServiceRegistrationBuilder<T> {
     return new ServiceRegistrationBuilder(this, identifier, implementation);
   }
 
   registerFactory<T>(
     identifier: ServiceIdentifier<T>,
-    factory: ServiceFactory<T>
+    factory: ServiceFactory<T>,
   ): IServiceRegistrationBuilder<T> {
     return new ServiceRegistrationBuilder(this, identifier, undefined, factory);
   }
 
   registerInstance<T>(
     identifier: ServiceIdentifier<T>,
-    instance: T
+    instance: T,
   ): IServiceRegistrationBuilder<T> {
     return new ServiceRegistrationBuilder(this, identifier, undefined, undefined, instance);
   }
@@ -219,13 +219,13 @@ export class ServiceContainer implements IServiceContainer {
 
   getServicesByTag(tag: string): ServiceIdentifier[] {
     const result: ServiceIdentifier[] = [];
-    
-    for (const [identifier, descriptor] of this.services.entries()) {
+
+    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
       if (descriptor.tags?.includes(tag)) {
         result.push(identifier);
       }
     }
-    
+
     return result;
   }
 
@@ -273,7 +273,7 @@ export class ServiceContainer implements IServiceContainer {
       try {
         // Get instance for health check
         let instance: any;
-        
+
         if (descriptor.lifetime === ServiceLifetime.Singleton && this.singletonInstances.has(identifier)) {
           instance = this.singletonInstances.get(identifier);
         } else if (descriptor.instance) {
@@ -294,7 +294,7 @@ export class ServiceContainer implements IServiceContainer {
         identifier,
         healthy,
         lastChecked: new Date(),
-        ...(error && { error })
+        ...(error && { error }),
       });
     }
 
@@ -357,7 +357,7 @@ export class ServiceContainer implements IServiceContainer {
 
     // Dispose singleton instances in reverse order of creation
     const instances = Array.from(this.singletonInstances.values()).reverse();
-    
+
     for (const instance of instances) {
       if (instance && typeof instance.dispose === 'function') {
         try {
@@ -379,12 +379,12 @@ export class ServiceContainer implements IServiceContainer {
   private resolveInternal<T>(
     identifier: ServiceIdentifier<T>,
     resolutionChain: Set<ServiceIdentifier>,
-    depth: number
+    depth: number,
   ): T {
     if (depth > this.options.maxResolutionDepth) {
       throw new ServiceResolutionError(
         identifier,
-        new Error(`Maximum resolution depth (${this.options.maxResolutionDepth}) exceeded`)
+        new Error(`Maximum resolution depth (${this.options.maxResolutionDepth}) exceeded`),
       );
     }
 
@@ -415,7 +415,7 @@ export class ServiceContainer implements IServiceContainer {
   private async resolveInternalAsync<T>(
     identifier: ServiceIdentifier<T>,
     resolutionChain: Set<ServiceIdentifier>,
-    depth: number
+    depth: number,
   ): Promise<T> {
     // For now, delegate to sync resolution
     // In the future, this could handle async factories
@@ -426,7 +426,7 @@ export class ServiceContainer implements IServiceContainer {
     descriptor: IServiceDescriptor<T>,
     resolutionChain: Set<ServiceIdentifier>,
     depth: number,
-    scope?: IServiceScope
+    scope?: IServiceScope,
   ): T {
     try {
       resolutionChain.add(descriptor.identifier);
@@ -443,7 +443,7 @@ export class ServiceContainer implements IServiceContainer {
         if (result instanceof Promise) {
           throw new ServiceResolutionError(
             descriptor.identifier,
-            new Error('Async factories are not supported in synchronous resolution. Use resolveAsync instead.')
+            new Error('Async factories are not supported in synchronous resolution. Use resolveAsync instead.'),
           );
         }
         return result;
@@ -457,7 +457,7 @@ export class ServiceContainer implements IServiceContainer {
 
       throw new ServiceResolutionError(
         descriptor.identifier,
-        new Error('No implementation, factory, or instance provided')
+        new Error('No implementation, factory, or instance provided'),
       );
     } catch (error) {
       if (error instanceof CircularDependencyError || error instanceof ServiceNotFoundError) {
@@ -473,7 +473,7 @@ export class ServiceContainer implements IServiceContainer {
     descriptor: IServiceDescriptor,
     resolutionChain: Set<ServiceIdentifier>,
     depth: number,
-    scope?: IServiceScope
+    scope?: IServiceScope,
   ): any[] {
     if (!descriptor.dependencies || descriptor.dependencies.length === 0) {
       return [];
@@ -513,7 +513,7 @@ export class ServiceContainer implements IServiceContainer {
 
   private checkCircularDependencies(
     identifier: ServiceIdentifier,
-    visited: Set<ServiceIdentifier>
+    visited: Set<ServiceIdentifier>,
   ): void {
     if (visited.has(identifier)) {
       throw new CircularDependencyError(Array.from(visited));
@@ -536,10 +536,10 @@ export class ServiceContainer implements IServiceContainer {
   private validateCanResolve(
     identifier: ServiceIdentifier,
     visited: Set<ServiceIdentifier>,
-    depth: number
+    depth: number,
   ): void {
     if (depth > this.options.maxResolutionDepth) {
-      throw new Error(`Maximum resolution depth exceeded`);
+      throw new Error('Maximum resolution depth exceeded');
     }
 
     if (visited.has(identifier)) {
@@ -567,7 +567,7 @@ export class ServiceContainer implements IServiceContainer {
       try {
         const healthStatuses = await this.getHealthStatus();
         const unhealthyServices = healthStatuses.filter(status => !status.healthy);
-        
+
         if (unhealthyServices.length > 0) {
           this.log('warn', `Unhealthy services detected: ${unhealthyServices.map(s => this.getServiceName(s.identifier)).join(', ')}`);
         }

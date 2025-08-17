@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 // Database helper functions for retrieving analysis data
@@ -35,7 +35,7 @@ async function getSpectralDataFromDatabase(fileId: string): Promise<any> {
       peaks: [1650, 2850, 3300],
       intensities: [0.8, 0.6, 0.9],
       baseline_quality: 0.85,
-      noise_level: 0.05
+      noise_level: 0.05,
     };
   }
 
@@ -43,7 +43,7 @@ async function getSpectralDataFromDatabase(fileId: string): Promise<any> {
     peaks: spectralData.peaks || [1650, 2850, 3300],
     intensities: spectralData.intensities || [0.8, 0.6, 0.9],
     baseline_quality: spectralData.baseline_quality || 0.85,
-    noise_level: spectralData.noise_level || 0.05
+    noise_level: spectralData.noise_level || 0.05,
   };
 }
 
@@ -69,7 +69,7 @@ async function getChemicalDataFromDatabase(fileId: string): Promise<any> {
       elements: { 'C': 85.2, 'H': 12.1, 'O': 2.7 },
       molecular_weight: 180.5,
       purity: 0.90,
-      accuracy: 0.92
+      accuracy: 0.92,
     };
   }
 
@@ -77,7 +77,7 @@ async function getChemicalDataFromDatabase(fileId: string): Promise<any> {
     elements: chemicalData.elemental_composition || { 'C': 85.2, 'H': 12.1, 'O': 2.7 },
     molecular_weight: chemicalData.molecular_weight || 180.5,
     purity: chemicalData.purity_level || 0.90,
-    accuracy: chemicalData.accuracy || 0.92
+    accuracy: chemicalData.accuracy || 0.92,
   };
 }
 
@@ -104,7 +104,7 @@ async function getMechanicalDataFromDatabase(fileId: string): Promise<any> {
       elastic_modulus: 3.2,
       tensile_strength: 45,
       elongation: 15,
-      yield_strength: 38
+      yield_strength: 38,
     };
   }
 
@@ -113,7 +113,7 @@ async function getMechanicalDataFromDatabase(fileId: string): Promise<any> {
     elastic_modulus: mechanicalData.elastic_modulus_gpa || 3.2,
     tensile_strength: mechanicalData.tensile_strength_mpa || 45,
     elongation: mechanicalData.elongation_percent || 15,
-    yield_strength: mechanicalData.yield_strength_mpa || 38
+    yield_strength: mechanicalData.yield_strength_mpa || 38,
   };
 }
 
@@ -140,7 +140,7 @@ async function getThermalDataFromDatabase(fileId: string): Promise<any> {
       glass_transition: 85,
       thermal_conductivity: 0.2,
       thermal_expansion: 65e-6,
-      heat_capacity: 1.5
+      heat_capacity: 1.5,
     };
   }
 
@@ -149,7 +149,7 @@ async function getThermalDataFromDatabase(fileId: string): Promise<any> {
     glass_transition: thermalData.glass_transition_c || 85,
     thermal_conductivity: thermalData.thermal_conductivity_w_mk || 0.2,
     thermal_expansion: thermalData.thermal_expansion_k || 65e-6,
-    heat_capacity: thermalData.heat_capacity_j_gk || 1.5
+    heat_capacity: thermalData.heat_capacity_j_gk || 1.5,
   };
 }
 
@@ -233,7 +233,7 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
       messages: [
         {
           role: 'system',
-          content: `You are an expert materials scientist specializing in visual material analysis. Analyze the image to identify the material, its properties, and quality indicators. Respond with structured JSON matching the AnalysisResult interface.`
+          content: 'You are an expert materials scientist specializing in visual material analysis. Analyze the image to identify the material, its properties, and quality indicators. Respond with structured JSON matching the AnalysisResult interface.',
         },
         {
           role: 'user',
@@ -247,20 +247,20 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
               4. Any visible defects or irregularities
               5. Estimated composition if determinable
               
-              Provide detailed analysis in JSON format.`
+              Provide detailed analysis in JSON format.`,
             },
             {
               type: 'image_url',
               image_url: {
                 url: imageUrl,
-                detail: 'high'
-              }
-            }
-          ]
-        }
+                detail: 'high',
+              },
+            },
+          ],
+        },
       ],
       max_tokens: 1500,
-      temperature: 0.1
+      temperature: 0.1,
     }),
   });
 
@@ -271,7 +271,7 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
 
   const data = await response.json();
   const analysisText = data.choices[0].message.content;
-  
+
   try {
     const analysis = JSON.parse(analysisText);
     return {
@@ -283,8 +283,8 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
       processing_metadata: {
         method: 'gpt-4o-vision',
         processing_time_ms: Date.now() - startTime,
-        model_version: 'gpt-4o-2024-05-13'
-      }
+        model_version: 'gpt-4o-2024-05-13',
+      },
     };
   } catch (error) {
     console.error('Failed to parse visual analysis response:', analysisText);
@@ -294,7 +294,7 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
 
 async function performSpectralAnalysis(fileData: any): Promise<AnalysisResult> {
   const startTime = Date.now();
-  
+
   // Get spectral data from database or use fallback
   const spectralData = await getSpectralDataFromDatabase(fileData.id);
 
@@ -310,7 +310,7 @@ async function performSpectralAnalysis(fileData: any): Promise<AnalysisResult> {
       if (material.spectral_properties?.peaks) {
         spectralSignatures[material.name] = {
           peaks: material.spectral_properties.peaks,
-          confidence: material.spectral_properties.confidence || 0.8
+          confidence: material.spectral_properties.confidence || 0.8,
         };
       }
     });
@@ -322,12 +322,12 @@ async function performSpectralAnalysis(fileData: any): Promise<AnalysisResult> {
       'polymer': { peaks: [1650, 2850], confidence: 0.9 },
       'metal': { peaks: [500, 800], confidence: 0.85 },
       'ceramic': { peaks: [1000, 1200], confidence: 0.8 },
-      'composite': { peaks: [1650, 1200, 2850], confidence: 0.75 }
+      'composite': { peaks: [1650, 1200, 2850], confidence: 0.75 },
     });
   }
 
   let bestMatch = { material: 'unknown', confidence: 0.5 };
-  
+
   for (const [material, signature] of Object.entries(spectralSignatures)) {
     const matchScore = calculateSpectralMatch(spectralData.peaks, signature.peaks);
     if (matchScore > bestMatch.confidence) {
@@ -341,34 +341,34 @@ async function performSpectralAnalysis(fileData: any): Promise<AnalysisResult> {
     material_identification: {
       primary_material: bestMatch.material,
       category: getCategoryFromMaterial(bestMatch.material),
-      composition: estimateComposition(bestMatch.material)
+      composition: estimateComposition(bestMatch.material),
     },
     properties: {
       chemical: {
         functional_groups: identifyFunctionalGroups(spectralData.peaks),
-        purity_estimate: spectralData.baseline_quality
-      }
+        purity_estimate: spectralData.baseline_quality,
+      },
     },
     quality_indicators: {
       purity_level: spectralData.baseline_quality,
-      uniformity_score: 0.85
+      uniformity_score: 0.85,
     },
     processing_metadata: {
       method: 'ftir-simulation',
       processing_time_ms: Date.now() - startTime,
-      model_version: 'spectral-v1.0'
-    }
+      model_version: 'spectral-v1.0',
+    },
   };
 }
 
 async function performChemicalAnalysis(fileData: any): Promise<AnalysisResult> {
   const startTime = Date.now();
-  
+
   // Simulate chemical analysis (XRF, EDS, etc.)
   const mockElementalData = {
     elements: { 'C': 85.2, 'H': 12.1, 'O': 2.7 },
     detection_limit: 0.1,
-    accuracy: 0.95
+    accuracy: 0.95,
   };
 
   const materialFromComposition = identifyMaterialFromComposition(mockElementalData.elements);
@@ -379,36 +379,36 @@ async function performChemicalAnalysis(fileData: any): Promise<AnalysisResult> {
     material_identification: {
       primary_material: materialFromComposition.name,
       category: materialFromComposition.category,
-      composition: mockElementalData.elements
+      composition: mockElementalData.elements,
     },
     properties: {
       chemical: {
         elemental_composition: mockElementalData.elements,
         molecular_weight: calculateMolecularWeight(mockElementalData.elements),
-        reactivity_indicators: assessReactivity(mockElementalData.elements)
-      }
+        reactivity_indicators: assessReactivity(mockElementalData.elements),
+      },
     },
     quality_indicators: {
       purity_level: mockElementalData.accuracy,
-      uniformity_score: 0.9
+      uniformity_score: 0.9,
     },
     processing_metadata: {
       method: 'xrf-simulation',
       processing_time_ms: Date.now() - startTime,
-      model_version: 'chemical-v1.0'
-    }
+      model_version: 'chemical-v1.0',
+    },
   };
 }
 
 async function performMechanicalAnalysis(fileData: any): Promise<AnalysisResult> {
   const startTime = Date.now();
-  
+
   // Simulate mechanical property analysis
   const mockMechanicalData = {
     hardness: 85, // HV
     elastic_modulus: 3.2, // GPa
     tensile_strength: 45, // MPa
-    elongation: 15 // %
+    elongation: 15, // %
   };
 
   const materialFromMechanical = identifyMaterialFromMechanical(mockMechanicalData);
@@ -418,7 +418,7 @@ async function performMechanicalAnalysis(fileData: any): Promise<AnalysisResult>
     confidence: 0.8,
     material_identification: {
       primary_material: materialFromMechanical.name,
-      category: materialFromMechanical.category
+      category: materialFromMechanical.category,
     },
     properties: {
       mechanical: {
@@ -426,30 +426,30 @@ async function performMechanicalAnalysis(fileData: any): Promise<AnalysisResult>
         elastic_modulus_gpa: mockMechanicalData.elastic_modulus,
         tensile_strength_mpa: mockMechanicalData.tensile_strength,
         elongation_percent: mockMechanicalData.elongation,
-        toughness_estimate: calculateToughness(mockMechanicalData)
-      }
+        toughness_estimate: calculateToughness(mockMechanicalData),
+      },
     },
     quality_indicators: {
       uniformity_score: 0.88,
-      defects: assessMechanicalDefects(mockMechanicalData)
+      defects: assessMechanicalDefects(mockMechanicalData),
     },
     processing_metadata: {
       method: 'nanoindentation-simulation',
       processing_time_ms: Date.now() - startTime,
-      model_version: 'mechanical-v1.0'
-    }
+      model_version: 'mechanical-v1.0',
+    },
   };
 }
 
 async function performThermalAnalysis(fileData: any): Promise<AnalysisResult> {
   const startTime = Date.now();
-  
+
   // Simulate thermal analysis (DSC, TGA, etc.)
   const mockThermalData = {
     melting_point: 165, // °C
     glass_transition: 85, // °C
     thermal_conductivity: 0.2, // W/m·K
-    thermal_expansion: 70e-6 // 1/K
+    thermal_expansion: 70e-6, // 1/K
   };
 
   const materialFromThermal = identifyMaterialFromThermal(mockThermalData);
@@ -459,7 +459,7 @@ async function performThermalAnalysis(fileData: any): Promise<AnalysisResult> {
     confidence: 0.85,
     material_identification: {
       primary_material: materialFromThermal.name,
-      category: materialFromThermal.category
+      category: materialFromThermal.category,
     },
     properties: {
       thermal: {
@@ -467,18 +467,18 @@ async function performThermalAnalysis(fileData: any): Promise<AnalysisResult> {
         glass_transition_c: mockThermalData.glass_transition,
         thermal_conductivity_w_mk: mockThermalData.thermal_conductivity,
         thermal_expansion_k: mockThermalData.thermal_expansion,
-        heat_capacity_estimate: estimateHeatCapacity(materialFromThermal.name)
-      }
+        heat_capacity_estimate: estimateHeatCapacity(materialFromThermal.name),
+      },
     },
     quality_indicators: {
       uniformity_score: 0.92,
-      purity_level: 0.88
+      purity_level: 0.88,
     },
     processing_metadata: {
       method: 'dsc-simulation',
       processing_time_ms: Date.now() - startTime,
-      model_version: 'thermal-v1.0'
-    }
+      model_version: 'thermal-v1.0',
+    },
   };
 }
 
@@ -499,7 +499,7 @@ function generateConsensusAnalysis(results: AnalysisResult[]): any {
 
   const consensusMaterial = Array.from(materialVotes.entries())
     .sort((a, b) => b[1] - a[1])[0];
-  
+
   const consensusCategory = Array.from(categoryVotes.entries())
     .sort((a, b) => b[1] - a[1])[0];
 
@@ -514,7 +514,7 @@ function generateConsensusAnalysis(results: AnalysisResult[]): any {
     category: consensusCategory[0],
     confidence: totalConfidence / results.length,
     properties: combinedProperties,
-    quality_assessment: generateQualityAssessment(results)
+    quality_assessment: generateQualityAssessment(results),
   };
 }
 
@@ -533,13 +533,13 @@ function calculateSpectralMatch(peaks1: number[], peaks2: number[]): number {
   // Simplified spectral matching algorithm
   let matches = 0;
   const tolerance = 50; // wavenumber tolerance
-  
+
   peaks1.forEach(peak1 => {
     if (peaks2.some(peak2 => Math.abs(peak1 - peak2) <= tolerance)) {
       matches++;
     }
   });
-  
+
   return matches / Math.max(peaks1.length, peaks2.length);
 }
 
@@ -548,7 +548,7 @@ function getCategoryFromMaterial(material: string): string {
     'polymer': 'plastics',
     'metal': 'metals',
     'ceramic': 'ceramics',
-    'composite': 'composites'
+    'composite': 'composites',
   };
   return categories[material] || 'unknown';
 }
@@ -558,7 +558,7 @@ function estimateComposition(material: string): Record<string, number> {
     'polymer': { 'C': 85, 'H': 12, 'O': 3 },
     'metal': { 'Fe': 95, 'C': 3, 'Mn': 2 },
     'ceramic': { 'Al': 40, 'O': 60 },
-    'composite': { 'C': 60, 'Si': 25, 'O': 15 }
+    'composite': { 'C': 60, 'Si': 25, 'O': 15 },
   };
   return compositions[material] || {};
 }
@@ -585,11 +585,11 @@ function identifyMaterialFromComposition(elements: Record<string, number>): { na
 function calculateMolecularWeight(elements: Record<string, number>): number {
   const atomicWeights: Record<string, number> = { 'C': 12.01, 'H': 1.008, 'O': 15.999, 'Fe': 55.845, 'Al': 26.982 };
   let totalWeight = 0;
-  
+
   Object.entries(elements).forEach(([element, percentage]) => {
     totalWeight += (atomicWeights[element] || 0) * (percentage / 100);
   });
-  
+
   return totalWeight;
 }
 
@@ -631,14 +631,14 @@ function estimateHeatCapacity(material: string): number {
     'polymer': 1.5,
     'metal': 0.5,
     'ceramic': 0.8,
-    'composite': 1.0
+    'composite': 1.0,
   };
   return capacities[material] || 1.0;
 }
 
 async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<HybridAnalysisResponse> {
   const startTime = Date.now();
-  
+
   try {
     // Get file information
     const { data: file, error: fileError } = await supabase
@@ -657,14 +657,14 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
       .getPublicUrl(file.storage_path);
 
     console.log(`Performing hybrid analysis with modes: ${request.analysis_modes.join(', ')}`);
-    
+
     const analysisResults: AnalysisResult[] = [];
-    
+
     // Perform analyses based on requested modes
     for (const mode of request.analysis_modes) {
       try {
         let result: AnalysisResult;
-        
+
         switch (mode) {
           case 'visual':
             result = await performVisualAnalysis(urlData.publicUrl);
@@ -685,7 +685,7 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
             console.warn(`Unknown analysis mode: ${mode}`);
             continue;
         }
-        
+
         // Filter by confidence threshold if specified
         if (!request.confidence_threshold || result.confidence >= request.confidence_threshold) {
           analysisResults.push(result);
@@ -702,7 +702,7 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
 
     // Generate consensus analysis
     const consensusAnalysis = generateConsensusAnalysis(analysisResults);
-    
+
     // Generate recommendations
     const recommendations = generateRecommendations(analysisResults, consensusAnalysis);
 
@@ -714,8 +714,8 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
       processing_summary: {
         total_time_ms: Date.now() - startTime,
         modes_analyzed: request.analysis_modes,
-        overall_confidence: consensusAnalysis.confidence
-      }
+        overall_confidence: consensusAnalysis.confidence,
+      },
     };
 
     // Store results in database
@@ -729,7 +729,7 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
         recommendations,
         processing_summary: response.processing_summary,
         user_id: request.user_id,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       });
 
     // Log analytics
@@ -744,8 +744,8 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
             modes_used: request.analysis_modes,
             results_count: analysisResults.length,
             overall_confidence: consensusAnalysis.confidence,
-            processing_time_ms: response.processing_summary.total_time_ms
-          }
+            processing_time_ms: response.processing_summary.total_time_ms,
+          },
         });
     }
 
@@ -759,22 +759,22 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
 
 function generateRecommendations(results: AnalysisResult[], consensus: any): string[] {
   const recommendations: string[] = [];
-  
+
   if (consensus.confidence < 0.7) {
     recommendations.push('Consider additional analysis methods for higher confidence');
   }
-  
+
   if (results.length < 3) {
     recommendations.push('Perform additional analysis modes for comprehensive characterization');
   }
-  
+
   const qualityScore = results.reduce((sum, r) => sum + (r.quality_indicators.uniformity_score || 0.8), 0) / results.length;
   if (qualityScore < 0.8) {
     recommendations.push('Material quality may be suboptimal - consider quality control measures');
   }
-  
+
   recommendations.push(`Material identified as ${consensus.material_name} with ${(consensus.confidence * 100).toFixed(1)}% confidence`);
-  
+
   return recommendations;
 }
 
@@ -785,30 +785,30 @@ serve(async (req: Request) => {
 
   try {
     const request: HybridAnalysisRequest = await req.json();
-    
+
     console.log('Processing hybrid material analysis request:', {
       file_id: request.file_id,
       analysis_modes: request.analysis_modes,
-      confidence_threshold: request.confidence_threshold
+      confidence_threshold: request.confidence_threshold,
     });
 
     if (!request.file_id) {
       return new Response(
         JSON.stringify({ error: 'file_id is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
     if (!request.analysis_modes || request.analysis_modes.length === 0) {
       return new Response(
         JSON.stringify({ error: 'analysis_modes array is required and cannot be empty' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -816,23 +816,23 @@ serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Hybrid material analysis error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Hybrid analysis failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Hybrid analysis failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

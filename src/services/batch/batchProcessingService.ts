@@ -1,8 +1,10 @@
 import { EventEmitter } from 'events';
-import { BatchJobQueue, BatchJob, JobResult, JobPriority, QueueConfig } from './batchJobQueue';
+
 import { DocumentChunkingService } from '../documentChunkingService';
 import { MivaaEmbeddingIntegration } from '../mivaaEmbeddingIntegration';
 import { ValidationIntegrationService } from '../validationIntegrationService';
+
+import { BatchJobQueue, BatchJob, JobResult, JobPriority, QueueConfig } from './batchJobQueue';
 
 // Simple logger interface to avoid winston dependency
 interface Logger {
@@ -138,9 +140,9 @@ export interface BatchProgress {
 /**
  * Job types for the PDF transformation pipeline
  */
-export type BatchJobType = 
+export type BatchJobType =
   | 'batch_validate_documents'
-  | 'batch_chunk_documents' 
+  | 'batch_chunk_documents'
   | 'batch_generate_embeddings'
   | 'batch_finalize_processing';
 
@@ -154,11 +156,11 @@ export class BatchProcessingService extends EventEmitter {
   private readonly embeddingService: MivaaEmbeddingIntegration;
   private readonly logger: Logger;
   private readonly validationService: ValidationIntegrationService;
-  
+
   private readonly activeBatches: Map<string, BatchProgress> = new Map();
   private readonly batchResults: Map<string, BatchProcessingResult> = new Map();
   private readonly resourcePool: Map<string, any> = new Map();
-  
+
   private isInitialized = false;
   private performanceMetrics: {
     totalBatchesProcessed: number;
@@ -171,20 +173,20 @@ export class BatchProcessingService extends EventEmitter {
     totalDocumentsProcessed: 0,
     averageBatchTime: 0,
     systemLoad: 0,
-    memoryUsage: 0
+    memoryUsage: 0,
   };
 
   constructor(config: Partial<BatchProcessingConfig> = {}) {
     super();
-    
+
     // Initialize logger first
     this.logger = {
       info: (message: string) => console.log(`[INFO] ${message}`),
       error: (message: string) => console.error(`[ERROR] ${message}`),
       warn: (message: string) => console.warn(`[WARN] ${message}`),
-      debug: (message: string) => console.debug(`[DEBUG] ${message}`)
+      debug: (message: string) => console.debug(`[DEBUG] ${message}`),
     };
-    
+
     this.config = {
       queue: {
         maxSize: 1000,
@@ -195,8 +197,8 @@ export class BatchProcessingService extends EventEmitter {
           baseDelay: 2000,
           maxDelay: 30000,
           backoffMultiplier: 2,
-          jitterEnabled: true
-        }
+          jitterEnabled: true,
+        },
       },
       processing: {
         maxConcurrentBatches: 3,
@@ -204,44 +206,44 @@ export class BatchProcessingService extends EventEmitter {
         maxDocumentsPerBatch: 100,
         timeoutMs: 300000, // 5 minutes
         enableProgressTracking: true,
-        enablePerformanceMetrics: true
+        enablePerformanceMetrics: true,
       },
       services: {
         chunking: {
           strategy: 'hybrid',
           chunkSize: 1000,
-          overlap: 200
+          overlap: 200,
         },
         embedding: {
           batchSize: 50,
           enableCaching: true,
-          rateLimitRpm: 3000
+          rateLimitRpm: 3000,
         },
         validation: {
           enabled: true,
-          strictMode: false
-        }
+          strictMode: false,
+        },
       },
       performance: {
         memoryLimitMB: 2048,
         cpuThrottleThreshold: 80,
-        enableResourcePooling: true
+        enableResourcePooling: true,
       },
       storage: {
         tempDirectory: './temp/batch',
         cleanupAfterMs: 3600000, // 1 hour
-        enableCompression: true
+        enableCompression: true,
       },
-      ...config
+      ...config,
     };
 
     this.jobQueue = new BatchJobQueue(this.config.queue);
     this.chunkingService = new DocumentChunkingService();
-    
+
     // Initialize MIVAA embedding integration service
     this.embeddingService = new MivaaEmbeddingIntegration();
-    
-    
+
+
     // ValidationIntegrationService is a singleton
     this.validationService = ValidationIntegrationService.getInstance();
 
@@ -289,7 +291,7 @@ export class BatchProcessingService extends EventEmitter {
       workspaceId: string;
       userId?: string;
       tags?: string[];
-    }
+    },
   ): Promise<string> {
     if (!this.isInitialized) {
       await this.initialize();
@@ -316,7 +318,7 @@ export class BatchProcessingService extends EventEmitter {
       currentOperation: 'Initializing batch',
       errors: [],
       warnings: [],
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     };
 
     this.activeBatches.set(batchId, progress);
@@ -327,19 +329,19 @@ export class BatchProcessingService extends EventEmitter {
         priority,
         workspaceId: options.workspaceId,
         ...(options.userId && { userId: options.userId }),
-        ...(options.tags && { tags: options.tags })
+        ...(options.tags && { tags: options.tags }),
       });
 
       this.emit('batchStarted', { batchId, documentCount: documents.length, jobIds });
-      
+
       return batchId;
     } catch (error) {
       this.updateBatchProgress(batchId, {
         stage: 'failed',
         progress: 0,
-        errors: [error instanceof Error ? error.message : String(error)]
+        errors: [error instanceof Error ? error.message : String(error)],
       });
-      
+
       this.emit('batchFailed', { batchId, error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
@@ -377,7 +379,7 @@ export class BatchProcessingService extends EventEmitter {
       this.updateBatchProgress(batchId, {
         stage: 'failed',
         progress: progress.progress,
-        errors: [...progress.errors, 'Batch cancelled by user']
+        errors: [...progress.errors, 'Batch cancelled by user'],
       });
 
       this.emit('batchCancelled', { batchId });
@@ -402,7 +404,7 @@ export class BatchProcessingService extends EventEmitter {
       queue: this.jobQueue.getMetrics(),
       performance: { ...this.performanceMetrics },
       activeBatches: this.activeBatches.size,
-      completedBatches: this.batchResults.size
+      completedBatches: this.batchResults.size,
     };
   }
 
@@ -423,9 +425,9 @@ export class BatchProcessingService extends EventEmitter {
 
     // Clean job queue
     const queueCleaned = this.jobQueue.cleanup(olderThanMs);
-    
+
     this.emit('cleanup', { batchesCleaned: cleaned, jobsCleaned: queueCleaned });
-    
+
     return cleaned + queueCleaned;
   }
 
@@ -501,7 +503,7 @@ export class BatchProcessingService extends EventEmitter {
       workspaceId: string;
       userId?: string;
       tags?: string[];
-    }
+    },
   ): Promise<string[]> {
     const jobIds: string[] = [];
 
@@ -515,8 +517,8 @@ export class BatchProcessingService extends EventEmitter {
           workspaceId: batchId,
           ...(options.userId && { userId: options.userId }),
           source: 'batch-processing',
-          tags: ['validation', ...(options.tags || [])]
-        }
+          tags: ['validation', ...(options.tags || [])],
+        },
       );
       jobIds.push(validationJobId);
     }
@@ -531,8 +533,8 @@ export class BatchProcessingService extends EventEmitter {
         ...(options.userId && { userId: options.userId }),
         source: 'batch-processing',
         ...(this.config.services.validation.enabled && jobIds.length > 0 && jobIds[0] && { dependencies: [jobIds[0]] }),
-        tags: ['chunking', ...(options.tags || [])]
-      }
+        tags: ['chunking', ...(options.tags || [])],
+      },
     );
     jobIds.push(chunkingJobId);
 
@@ -546,8 +548,8 @@ export class BatchProcessingService extends EventEmitter {
         ...(options.userId && { userId: options.userId }),
         source: 'batch-processing',
         dependencies: [chunkingJobId],
-        tags: ['embedding', ...(options.tags || [])]
-      }
+        tags: ['embedding', ...(options.tags || [])],
+      },
     );
     jobIds.push(embeddingJobId);
 
@@ -561,8 +563,8 @@ export class BatchProcessingService extends EventEmitter {
         ...(options.userId && { userId: options.userId }),
         source: 'batch-processing',
         dependencies: [embeddingJobId],
-        tags: ['finalization', ...(options.tags || [])]
-      }
+        tags: ['finalization', ...(options.tags || [])],
+      },
     );
     jobIds.push(finalizationJobId);
 
@@ -574,41 +576,41 @@ export class BatchProcessingService extends EventEmitter {
    */
   private async processValidationJob(job: BatchJob): Promise<any> {
     const { batchId, documents } = job.payload;
-    
+
     this.updateBatchProgress(batchId, {
       stage: 'validating',
       progress: 10,
-      currentOperation: 'Validating documents'
+      currentOperation: 'Validating documents',
     });
 
     const validationResults = [];
-    
+
     for (let i = 0; i < documents.length; i++) {
       const document = documents[i];
-      
+
       try {
         const validatedDocument = await this.validationService.validateMivaaDocument(
           document,
-          { partial: false, sanitize: true, trackPerformance: true }
+          { partial: false, sanitize: true, trackPerformance: true },
         );
         const isValid = !!validatedDocument;
-        
+
         validationResults.push({
           documentId: document.id,
           isValid,
-          errors: isValid ? [] : ['Content validation failed']
+          errors: isValid ? [] : ['Content validation failed'],
         });
 
         this.updateBatchProgress(batchId, {
           progress: 10 + (i / documents.length) * 20,
           currentDocument: i + 1,
-          currentOperation: `Validating document ${i + 1}/${documents.length}`
+          currentOperation: `Validating document ${i + 1}/${documents.length}`,
         });
       } catch (error) {
         validationResults.push({
           documentId: document.id,
           isValid: false,
-          errors: [error instanceof Error ? error.message : String(error)]
+          errors: [error instanceof Error ? error.message : String(error)],
         });
       }
     }
@@ -621,29 +623,29 @@ export class BatchProcessingService extends EventEmitter {
    */
   private async processChunkingJob(job: BatchJob): Promise<any> {
     const { batchId, documents } = job.payload;
-    
+
     this.updateBatchProgress(batchId, {
       stage: 'chunking',
       progress: 30,
-      currentOperation: 'Chunking documents'
+      currentOperation: 'Chunking documents',
     });
 
     const chunkingResults = [];
-    
+
     for (let i = 0; i < documents.length; i++) {
       const document = documents[i];
-      
+
       try {
         const strategy = document.processingOptions?.chunkingStrategy || this.config.services.chunking.strategy;
-        
+
         const chunks = await this.chunkingService.chunkDocument(
           document.content,
           {
             type: strategy,
             maxChunkSize: this.config.services.chunking.chunkSize,
             overlapSize: this.config.services.chunking.overlap,
-            preserveStructure: true
-          }
+            preserveStructure: true,
+          },
         );
 
         chunkingResults.push({
@@ -654,21 +656,21 @@ export class BatchProcessingService extends EventEmitter {
             metadata: {
               ...chunk.metadata,
               documentId: document.id,
-              chunkIndex: index
-            }
-          }))
+              chunkIndex: index,
+            },
+          })),
         });
 
         this.updateBatchProgress(batchId, {
           progress: 30 + (i / documents.length) * 30,
           currentDocument: i + 1,
-          currentOperation: `Chunking document ${i + 1}/${documents.length}`
+          currentOperation: `Chunking document ${i + 1}/${documents.length}`,
         });
       } catch (error) {
         chunkingResults.push({
           documentId: document.id,
           error: error instanceof Error ? error.message : String(error),
-          chunks: []
+          chunks: [],
         });
       }
     }
@@ -681,11 +683,11 @@ export class BatchProcessingService extends EventEmitter {
    */
   private async processEmbeddingJob(job: BatchJob): Promise<any> {
     const { batchId, chunkingJobId } = job.payload;
-    
+
     this.updateBatchProgress(batchId, {
       stage: 'embedding',
       progress: 60,
-      currentOperation: 'Generating embeddings'
+      currentOperation: 'Generating embeddings',
     });
 
     // Get chunking results from previous job
@@ -697,15 +699,15 @@ export class BatchProcessingService extends EventEmitter {
     // Process embeddings in batches
     const embeddingResults: any[] = [];
     const allChunks: any[] = [];
-    
+
     // Collect all chunks from chunking results
     // This would need to be implemented based on how job results are stored
-    
+
     // Generate embeddings in batches
     const batchSize = this.config.services.embedding.batchSize;
     for (let i = 0; i < allChunks.length; i += batchSize) {
       const chunkBatch = allChunks.slice(i, i + batchSize);
-      
+
       try {
         const texts = chunkBatch.map(chunk => chunk.content);
         const result = await this.embeddingService.generateEmbeddings({
@@ -716,8 +718,8 @@ export class BatchProcessingService extends EventEmitter {
           metadata: {
             source: 'batch-processing',
             batch_id: batchId,
-            chunk_count: texts.length
-          }
+            chunk_count: texts.length,
+          },
         });
 
         if (result.embeddings && result.embeddings.length > 0) {
@@ -725,7 +727,7 @@ export class BatchProcessingService extends EventEmitter {
             embeddingResults.push({
               chunkId: chunk.id,
               embedding: result.embeddings[index],
-              metadata: chunk.metadata
+              metadata: chunk.metadata,
             });
           });
         } else {
@@ -734,14 +736,14 @@ export class BatchProcessingService extends EventEmitter {
             embeddingResults.push({
               chunkId: chunk.id,
               error: 'Failed to generate embedding',
-              embedding: null
+              embedding: null,
             });
           });
         }
 
         this.updateBatchProgress(batchId, {
           progress: 60 + ((i + chunkBatch.length) / allChunks.length) * 30,
-          currentOperation: `Generated embeddings for ${i + chunkBatch.length}/${allChunks.length} chunks`
+          currentOperation: `Generated embeddings for ${i + chunkBatch.length}/${allChunks.length} chunks`,
         });
       } catch (error) {
         // Handle embedding errors
@@ -749,7 +751,7 @@ export class BatchProcessingService extends EventEmitter {
           embeddingResults.push({
             chunkId: chunk.id,
             error: error instanceof Error ? error.message : String(error),
-            embedding: null
+            embedding: null,
           });
         });
       }
@@ -763,11 +765,11 @@ export class BatchProcessingService extends EventEmitter {
    */
   private async processFinalizationJob(job: BatchJob): Promise<any> {
     const { batchId } = job.payload;
-    
+
     this.updateBatchProgress(batchId, {
       stage: 'finalizing',
       progress: 90,
-      currentOperation: 'Finalizing batch processing'
+      currentOperation: 'Finalizing batch processing',
     });
 
     // Collect all results and create final batch result
@@ -783,10 +785,10 @@ export class BatchProcessingService extends EventEmitter {
         averageDocumentTime: 0,
         throughputPerMinute: 0,
         memoryUsage: process.memoryUsage().heapUsed,
-        errorRate: 0
+        errorRate: 0,
       },
       createdAt: new Date(),
-      completedAt: new Date()
+      completedAt: new Date(),
     };
 
     // Store final result
@@ -796,7 +798,7 @@ export class BatchProcessingService extends EventEmitter {
     this.updateBatchProgress(batchId, {
       stage: 'completed',
       progress: 100,
-      currentOperation: 'Batch processing completed'
+      currentOperation: 'Batch processing completed',
     });
 
     // Remove from active batches
@@ -822,7 +824,7 @@ export class BatchProcessingService extends EventEmitter {
     const batchId = job.payload.batchId;
     if (batchId) {
       this.updateBatchProgress(batchId, {
-        errors: [`Job ${job.type} failed: ${result.error}`]
+        errors: [`Job ${job.type} failed: ${result.error}`],
       });
     }
   }
@@ -845,7 +847,7 @@ export class BatchProcessingService extends EventEmitter {
     const updated: BatchProgress = {
       ...current,
       ...updates,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     };
 
     this.activeBatches.set(batchId, updated);

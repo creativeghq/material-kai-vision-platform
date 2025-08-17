@@ -1,6 +1,6 @@
 /**
  * Retry Helper Utility
- * 
+ *
  * Provides configurable retry logic with exponential backoff for handling
  * transient failures in external service calls.
  */
@@ -19,14 +19,14 @@ export class RetryHelper {
    */
   static async withRetry<T>(
     operation: () => Promise<T>,
-    options: RetryOptions
+    options: RetryOptions,
   ): Promise<T> {
     const {
       maxAttempts,
       delay,
       backoffMultiplier = 2,
       maxDelay = 30000,
-      retryCondition = RetryHelper.defaultRetryCondition
+      retryCondition = RetryHelper.defaultRetryCondition,
     } = options;
 
     let lastError: any;
@@ -64,8 +64,8 @@ export class RetryHelper {
    */
   private static defaultRetryCondition(error: any): boolean {
     // Network errors
-    if (error.code === 'ECONNRESET' || 
-        error.code === 'ENOTFOUND' || 
+    if (error.code === 'ECONNRESET' ||
+        error.code === 'ENOTFOUND' ||
         error.code === 'ECONNREFUSED' ||
         error.code === 'ETIMEDOUT') {
       return true;

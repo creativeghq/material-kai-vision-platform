@@ -1,5 +1,7 @@
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 export interface ServerMLRequest {
@@ -58,19 +60,19 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
     // Verify Supabase connection
     await this.executeOperation(
       () => this.verifySupabaseConnection(),
-      'verify-supabase-connection'
+      'verify-supabase-connection',
     );
 
     // Test edge function availability
     await this.executeOperation(
       () => this.testEdgeFunctionAvailability(),
-      'test-edge-function-availability'
+      'test-edge-function-availability',
     );
 
     // Initialize storage bucket access
     await this.executeOperation(
       () => this.verifyStorageAccess(),
-      'verify-storage-access'
+      'verify-storage-access',
     );
   }
 
@@ -94,7 +96,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
     // Test edge function availability
     try {
       const { error } = await supabase.functions.invoke('material-recognition', {
-        body: { action: 'health_check' }
+        body: { action: 'health_check' },
       });
       if (error && !error.message.includes('health_check')) {
         throw new Error(`Edge function health check failed: ${error.message}`);
@@ -115,7 +117,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
     try {
       // Test with a minimal request to check if functions are available
       await supabase.functions.invoke('material-recognition', {
-        body: { action: 'test' }
+        body: { action: 'test' },
       });
     } catch (error) {
       console.warn('Edge function test failed (may be expected):', error);
@@ -133,8 +135,8 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
    * Submit files for server-side material recognition
    */
   async recognizeMaterials(
-    files: File[], 
-    options: Partial<ServerMLRequest['options']> = {}
+    files: File[],
+    options: Partial<ServerMLRequest['options']> = {},
   ): Promise<ServerMLResult> {
     return this.executeOperation(async () => {
       // Validate input
@@ -160,7 +162,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
 
       // Upload files first
       const fileIds = await this.uploadFiles(files);
-      
+
       if (fileIds.length === 0) {
         throw new Error('No files were successfully uploaded');
       }
@@ -178,7 +180,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         include_similar_materials: true,
         extract_properties: true,
         use_ai_vision: true,
-        ...options
+        ...options,
       };
 
       // Create processing job
@@ -189,10 +191,10 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
           job_type: 'material_recognition',
           input_data: {
             file_ids: fileIds,
-            options: finalOptions
+            options: finalOptions,
           },
           status: 'pending',
-          priority: 5
+          priority: 5,
         })
         .select()
         .single();
@@ -205,7 +207,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       if (this.config.enableCaching) {
         this.jobCache.set(job.id, {
           ...job,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
 
@@ -214,8 +216,8 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         body: {
           job_id: job.id,
           file_ids: fileIds,
-          options: finalOptions
-        }
+          options: finalOptions,
+        },
       });
 
       if (error) {
@@ -228,7 +230,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         results: data.results,
         processing_time_ms: data.processing_time_ms,
         provider: 'supabase-edge',
-        modelVersion: 'gpt-4o-mini'
+        modelVersion: 'gpt-4o-mini',
       };
     }, 'recognize-materials');
   }
@@ -248,7 +250,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
+
         try {
           // Check cache first
           const cacheKey = `${file.name}-${file.size}-${file.lastModified}`;
@@ -278,9 +280,9 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
               .from('material-images')
               .upload(filePath, file, {
                 cacheControl: '3600',
-                upsert: false
+                upsert: false,
               });
-            
+
             uploadData = result.data;
             uploadError = result.error;
 
@@ -307,8 +309,8 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
               metadata: {
                 original_name: file.name,
                 upload_source: 'material_recognition',
-                upload_timestamp: timestamp
-              }
+                upload_timestamp: timestamp,
+              },
             })
             .select()
             .single();
@@ -365,7 +367,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         // Get recognition results
         const resultData = job.result as any;
         const fileIds = resultData?.results || [];
-        
+
         if (fileIds.length > 0) {
           const { data: results, error: resultsError } = await supabase
             .from('recognition_results')
@@ -385,14 +387,14 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
           const finalResult = {
             status: job.status,
             results,
-            processing_time_ms: job.processing_time_ms
+            processing_time_ms: job.processing_time_ms,
           };
 
           // Update cache
           if (this.config.enableCaching) {
             this.jobCache.set(jobId, {
               ...finalResult,
-              timestamp: Date.now()
+              timestamp: Date.now(),
             });
           }
 
@@ -403,14 +405,14 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       const result = {
         status: job.status,
         error_message: job.error_message,
-        results: []
+        results: [],
       };
 
       // Update cache for non-completed jobs too
       if (this.config.enableCaching) {
         this.jobCache.set(jobId, {
           ...result,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
       }
 
@@ -422,9 +424,9 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
    * Poll for job completion
    */
   async waitForCompletion(
-    jobId: string, 
+    jobId: string,
     onProgress?: (status: string) => void,
-    timeoutMs: number = this.config.defaultTimeout
+    timeoutMs: number = this.config.defaultTimeout,
   ): Promise<any> {
     return this.executeOperation(async () => {
       if (!this.config.enableJobPolling) {
@@ -442,7 +444,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
             }
 
             const result = await this.getRecognitionResults(jobId);
-            
+
             if (onProgress) {
               onProgress(result.status);
             }
@@ -476,19 +478,19 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       extractStructuredData?: boolean;
       documentType?: 'certificate' | 'label' | 'specification' | 'general';
       materialContext?: string;
-    } = {}
+    } = {},
   ): Promise<ServerMLResult> {
     return this.executeOperation(async () => {
       console.log('ServerML: Starting OCR processing');
-      
+
       const { imageUrl } = await this.uploadImage(imageFile);
-      
+
       const response = await supabase.functions.invoke('ocr-processing', {
         body: {
           imageUrl,
           options,
-          userId: (await supabase.auth.getUser()).data.user?.id
-        }
+          userId: (await supabase.auth.getUser()).data.user?.id,
+        },
       });
 
       if (response.error) {
@@ -500,7 +502,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         data: response.data,
         processingTime: response.data?.processingTime || 0,
         provider: 'supabase-edge',
-        modelVersion: 'gpt-4o-mini'
+        modelVersion: 'gpt-4o-mini',
       };
     }, 'process-ocr');
   }
@@ -520,7 +522,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         .from('material-images')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
         });
 
       if (uploadError) {
@@ -540,19 +542,19 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
    */
   async analyzeAdvancedMaterialProperties(
     imageFile: File,
-    options: any = {}
+    options: any = {},
   ): Promise<any> {
     return this.executeOperation(async () => {
       console.log('ServerML: Starting advanced material properties analysis');
-      
+
       const { imageUrl } = await this.uploadImage(imageFile);
-      
+
       const response = await supabase.functions.invoke('material-properties-analysis', {
         body: {
           imageUrl,
           options,
-          userId: (await supabase.auth.getUser()).data.user?.id
-        }
+          userId: (await supabase.auth.getUser()).data.user?.id,
+        },
       });
 
       if (response.error) {
@@ -564,7 +566,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         data: response.data,
         processingTime: response.data?.processingTime || 0,
         provider: 'supabase-edge',
-        modelVersion: 'gpt-4o-mini'
+        modelVersion: 'gpt-4o-mini',
       };
     }, 'analyze-advanced-material-properties');
   }
@@ -577,8 +579,8 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       const { data, error } = await supabase.functions.invoke('material-recognition', {
         body: {
           action: 'generate_embedding',
-          text: text
-        }
+          text: text,
+        },
       });
 
       if (error) {
@@ -604,8 +606,8 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
         'Batch Processing',
         'Job Polling',
         'File Upload Retry',
-        'Result Caching'
-      ]
+        'Result Caching',
+      ],
     };
   }
 
@@ -623,7 +625,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
   getCacheStats(): { jobCache: number; uploadCache: number } {
     return {
       jobCache: this.jobCache.size,
-      uploadCache: this.uploadCache.size
+      uploadCache: this.uploadCache.size,
     };
   }
 
@@ -648,7 +650,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       maxBatchSize: 5,
       enableAdvancedAnalysis: true,
       storageBasePath: 'recognition',
-      supportedFileTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      supportedFileTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
     };
 
     const finalConfig = { ...defaultConfig, ...config };

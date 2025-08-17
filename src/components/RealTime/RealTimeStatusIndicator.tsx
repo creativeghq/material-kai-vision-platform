@@ -1,16 +1,17 @@
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useWebSocket, UseWebSocketOptions } from '@/hooks/useWebSocket';
-import { WebSocketState } from '@/services/websocket/WebSocketManager';
 import {
   WifiOff,
   Loader2,
   AlertTriangle,
   CheckCircle,
-  RotateCcw
+  RotateCcw,
 } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useWebSocket, UseWebSocketOptions } from '@/hooks/useWebSocket';
+import { WebSocketState } from '@/services/websocket/WebSocketManager';
 import { cn } from '@/lib/utils';
 
 export interface RealTimeStatusIndicatorProps {
@@ -31,7 +32,7 @@ const getStatusConfig = (state: WebSocketState, error: string | null) => {
         borderColor: 'border-green-200',
         label: 'Connected',
         description: 'Real-time connection active',
-        variant: 'default' as const
+        variant: 'default' as const,
       };
     case WebSocketState.CONNECTING:
       return {
@@ -42,7 +43,7 @@ const getStatusConfig = (state: WebSocketState, error: string | null) => {
         label: 'Connecting',
         description: 'Establishing connection...',
         variant: 'secondary' as const,
-        animate: true
+        animate: true,
       };
     case WebSocketState.RECONNECTING:
       return {
@@ -53,7 +54,7 @@ const getStatusConfig = (state: WebSocketState, error: string | null) => {
         label: 'Reconnecting',
         description: 'Attempting to reconnect...',
         variant: 'outline' as const,
-        animate: true
+        animate: true,
       };
     case WebSocketState.FAILED:
       return {
@@ -63,7 +64,7 @@ const getStatusConfig = (state: WebSocketState, error: string | null) => {
         borderColor: 'border-red-200',
         label: 'Failed',
         description: error || 'Connection failed after maximum attempts',
-        variant: 'destructive' as const
+        variant: 'destructive' as const,
       };
     case WebSocketState.DISCONNECTED:
     default:
@@ -74,7 +75,7 @@ const getStatusConfig = (state: WebSocketState, error: string | null) => {
         borderColor: 'border-gray-200',
         label: 'Disconnected',
         description: 'Real-time connection inactive',
-        variant: 'outline' as const
+        variant: 'outline' as const,
       };
   }
 };
@@ -84,11 +85,11 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
   className,
   showDetails = false,
   compact = false,
-  wsOptions = {}
+  wsOptions = {},
 }) => {
   const { state, error, stats, connect } = useWebSocket(url, {
     autoConnect: true,
-    ...wsOptions
+    ...wsOptions,
   });
 
   const config = getStatusConfig(state, error);
@@ -106,11 +107,11 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
         <Tooltip>
           <TooltipTrigger asChild>
             <div className={cn('flex items-center gap-1', className)}>
-              <Icon 
+              <Icon
                 className={cn(
                   'h-4 w-4',
                   config.color,
-                  config.animate && 'animate-spin'
+                  config.animate && 'animate-spin',
                 )}
               />
               <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
@@ -144,24 +145,24 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
               'p-2 rounded-full',
               config.bgColor,
               config.borderColor,
-              'border'
+              'border',
             )}>
-              <Icon 
+              <Icon
                 className={cn(
                   'h-5 w-5',
                   config.color,
-                  config.animate && 'animate-spin'
+                  config.animate && 'animate-spin',
                 )}
               />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">{config.label}</span>
-                <Badge className={cn("text-xs",
-                  config.variant === "default" && "bg-primary text-primary-foreground",
-                  config.variant === "secondary" && "bg-secondary text-secondary-foreground",
-                  config.variant === "destructive" && "bg-destructive text-destructive-foreground",
-                  config.variant === "outline" && "border border-input bg-background"
+                <Badge className={cn('text-xs',
+                  config.variant === 'default' && 'bg-primary text-primary-foreground',
+                  config.variant === 'secondary' && 'bg-secondary text-secondary-foreground',
+                  config.variant === 'destructive' && 'bg-destructive text-destructive-foreground',
+                  config.variant === 'outline' && 'border border-input bg-background',
                 )}>
                   Real-time
                 </Badge>
@@ -204,7 +205,7 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
                 <span className="ml-2 font-medium">{stats.queuedMessages}</span>
               </div>
             </div>
-            
+
             {error && (
               <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-md">
                 <div className="flex items-center gap-2">
@@ -230,7 +231,7 @@ export const RealTimeStatusDot: React.FC<{
 }> = ({ url, className, wsOptions = {} }) => {
   const { state, error } = useWebSocket(url, {
     autoConnect: true,
-    ...wsOptions
+    ...wsOptions,
   });
 
   const config = getStatusConfig(state, error);
@@ -240,17 +241,17 @@ export const RealTimeStatusDot: React.FC<{
       <Tooltip>
         <TooltipTrigger asChild>
           <div className={cn('relative', className)}>
-            <div 
+            <div
               className={cn(
                 'h-3 w-3 rounded-full border-2 border-white shadow-sm',
-                config.bgColor.replace('bg-', 'bg-').replace('-100', '-500')
+                config.bgColor.replace('bg-', 'bg-').replace('-100', '-500'),
               )}
             />
             {config.animate && (
-              <div 
+              <div
                 className={cn(
                   'absolute inset-0 h-3 w-3 rounded-full animate-ping',
-                  config.bgColor.replace('bg-', 'bg-').replace('-100', '-400')
+                  config.bgColor.replace('bg-', 'bg-').replace('-100', '-400'),
                 )}
               />
             )}

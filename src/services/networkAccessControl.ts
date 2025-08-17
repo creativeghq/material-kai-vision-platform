@@ -61,19 +61,19 @@ export class NetworkAccessControl {
         return {
           isInternal: false,
           isAllowed: true, // Default allow on error
-          reason: 'Error checking access rules - defaulting to allow'
+          reason: 'Error checking access rules - defaulting to allow',
         };
       }
 
       // Check specific rules for this IP
       const matchingRule = this.findMatchingRule(ipAddress);
-      
+
       if (matchingRule && !matchingRule.is_active) {
         return {
           isInternal: !!isInternal,
           isAllowed: false,
           rule: matchingRule,
-          reason: `Access denied by rule: ${matchingRule.name}`
+          reason: `Access denied by rule: ${matchingRule.name}`,
         };
       }
 
@@ -81,7 +81,7 @@ export class NetworkAccessControl {
         isInternal: !!isInternal,
         isAllowed: true,
         rule: matchingRule,
-        reason: isInternal ? 'Internal network access' : 'External access allowed'
+        reason: isInternal ? 'Internal network access' : 'External access allowed',
       };
 
     } catch (error) {
@@ -89,7 +89,7 @@ export class NetworkAccessControl {
       return {
         isInternal: false,
         isAllowed: true, // Fail open for availability
-        reason: 'Access check failed - defaulting to allow'
+        reason: 'Access check failed - defaulting to allow',
       };
     }
   }
@@ -178,7 +178,7 @@ export class NetworkAccessControl {
     try {
       const [network, prefixLength] = cidr.split('/');
       const prefixLengthNum = parseInt(prefixLength, 10);
-      
+
       if (prefixLengthNum === 32) {
         return ip === network;
       }
@@ -186,7 +186,7 @@ export class NetworkAccessControl {
       const ipNum = this.ipToNumber(ip);
       const networkNum = this.ipToNumber(network);
       const mask = (-1 << (32 - prefixLengthNum)) >>> 0;
-      
+
       return (ipNum & mask) === (networkNum & mask);
     } catch (error) {
       console.error('Error checking CIDR:', error);
@@ -205,7 +205,7 @@ export class NetworkAccessControl {
         rateLimitInternal: 1000, // requests per minute
         rateLimitExternal: 100,
         blacklist: [],
-        whitelist: ['*'] // All internal IPs allowed
+        whitelist: ['*'], // All internal IPs allowed
       },
       external: {
         allowInternal: false,
@@ -215,10 +215,10 @@ export class NetworkAccessControl {
         blacklist: [
           '0.0.0.0/8',     // Invalid addresses
           '127.0.0.0/8',   // Loopback (shouldn't reach here anyway)
-          '169.254.0.0/16' // Link-local
+          '169.254.0.0/16', // Link-local
         ],
-        whitelist: []
-      }
+        whitelist: [],
+      },
     };
   }
 
@@ -233,7 +233,7 @@ export class NetworkAccessControl {
 
     const [ip, prefix] = cidr.split('/');
     const prefixNum = parseInt(prefix, 10);
-    
+
     if (prefixNum < 0 || prefixNum > 32) {
       return false;
     }
@@ -250,28 +250,28 @@ export class NetworkAccessControl {
       {
         name: 'Private Class A',
         cidr: '10.0.0.0/8',
-        description: 'Large private networks (10.0.0.0 - 10.255.255.255)'
+        description: 'Large private networks (10.0.0.0 - 10.255.255.255)',
       },
       {
         name: 'Private Class B',
         cidr: '172.16.0.0/12',
-        description: 'Medium private networks (172.16.0.0 - 172.31.255.255)'
+        description: 'Medium private networks (172.16.0.0 - 172.31.255.255)',
       },
       {
         name: 'Private Class C',
         cidr: '192.168.0.0/16',
-        description: 'Small private networks (192.168.0.0 - 192.168.255.255)'
+        description: 'Small private networks (192.168.0.0 - 192.168.255.255)',
       },
       {
         name: 'Localhost',
         cidr: '127.0.0.0/8',
-        description: 'Local machine only'
+        description: 'Local machine only',
       },
       {
         name: 'Single IP',
         cidr: '0.0.0.0/32',
-        description: 'Specific single IP address'
-      }
+        description: 'Specific single IP address',
+      },
     ];
   }
 
@@ -322,7 +322,7 @@ export class NetworkAccessControl {
       externalRequests,
       blockedRequests,
       topIPs,
-      ruleUsage: [] // Would need additional tracking for rule-specific hits
+      ruleUsage: [], // Would need additional tracking for rule-specific hits
     };
   }
 
@@ -353,8 +353,8 @@ export class NetworkAccessControl {
   }
 
   private findMatchingRule(ipAddress: string): AccessControlRule | undefined {
-    return this.cachedRules.find(rule => 
-      rule.is_active && this.isIPInCIDR(ipAddress, rule.cidr_range)
+    return this.cachedRules.find(rule =>
+      rule.is_active && this.isIPInCIDR(ipAddress, rule.cidr_range),
     );
   }
 

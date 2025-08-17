@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Content Sanitization Utilities
- * 
+ *
  * Provides secure sanitization of markdown content to prevent XSS attacks
  * and malicious script injection while preserving legitimate markdown formatting.
  */
@@ -25,13 +25,13 @@ export const DEFAULT_SANITIZATION_CONFIG: Required<SanitizationConfig> = {
     'a': ['href', 'title'],
     'img': ['src', 'alt', 'title', 'width', 'height'],
     'code': ['class'],
-    'pre': ['class']
+    'pre': ['class'],
   },
   removeScripts: true,
   removeIframes: true,
   removeObjects: true,
   preserveCodeBlocks: true,
-  maxContentLength: 1000000 // 1MB limit
+  maxContentLength: 1000000, // 1MB limit
 };
 
 // Validation schema for sanitization config
@@ -42,7 +42,7 @@ export const sanitizationConfigSchema = z.object({
   removeIframes: z.boolean().optional(),
   removeObjects: z.boolean().optional(),
   preserveCodeBlocks: z.boolean().optional(),
-  maxContentLength: z.number().positive().max(10000000).optional() // 10MB max
+  maxContentLength: z.number().positive().max(10000000).optional(), // 10MB max
 });
 
 /**
@@ -169,15 +169,15 @@ export class ContentSanitizer {
    */
   private removeDisallowedTags(content: string): string {
     const allowedTags = this.config.allowedHtmlTags.map(tag => tag.toLowerCase());
-    
+
     return content.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (match, tagName) => {
       const tag = tagName.toLowerCase();
-      
+
       // If tag is allowed, keep it (but still sanitize attributes later)
       if (allowedTags.includes(tag)) {
         return match;
       }
-      
+
       // Remove disallowed tags
       return '';
     });
@@ -190,13 +190,13 @@ export class ContentSanitizer {
     return content.replace(/<([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (match, tagName, attributes) => {
       const tag = tagName.toLowerCase();
       const allowedAttrs = this.config.allowedAttributes[tag] || [];
-      
+
       if (allowedAttrs.length === 0) {
         return `<${tagName}>`;
       }
 
       // Parse and filter attributes
-      const sanitizedAttrs = attributes.replace(/\s*([a-zA-Z-]+)\s*=\s*["']([^"']*)["']/g, 
+      const sanitizedAttrs = attributes.replace(/\s*([a-zA-Z-]+)\s*=\s*["']([^"']*)["']/g,
         (attrMatch: string, attrName: string, attrValue: string) => {
           if (allowedAttrs.includes(attrName.toLowerCase())) {
             // Additional sanitization for specific attributes
@@ -215,17 +215,17 @@ export class ContentSanitizer {
    */
   private sanitizeAttributeValue(attrName: string, value: string): string {
     const attr = attrName.toLowerCase();
-    
+
     // For URL attributes, remove dangerous protocols
     if (['href', 'src'].includes(attr)) {
       return this.sanitizeUrl(value);
     }
-    
+
     // For class attributes, remove potentially dangerous values
     if (attr === 'class') {
       return value.replace(/[^a-zA-Z0-9\s\-_]/g, '');
     }
-    
+
     // For other attributes, basic sanitization
     return value.replace(/[<>"']/g, '');
   }
@@ -246,17 +246,17 @@ export class ContentSanitizer {
    */
   private sanitizeUrl(url: string): string {
     const trimmedUrl = url.trim();
-    
+
     // Remove dangerous protocols
     if (/^(javascript|data|vbscript|file|about):/i.test(trimmedUrl)) {
       return '#';
     }
-    
+
     // Allow relative URLs, http, https, mailto, tel
     if (/^(https?|mailto|tel):/i.test(trimmedUrl) || /^[/#]/.test(trimmedUrl)) {
       return trimmedUrl;
     }
-    
+
     // For other cases, assume it's a relative URL
     return trimmedUrl;
   }

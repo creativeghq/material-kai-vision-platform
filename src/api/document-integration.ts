@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { DocumentWorkflowOrchestrator, ProcessingRequest, WorkflowJob, WorkflowStatus } from '../orchestrators/DocumentWorkflowOrchestrator';
 import { JWTAuthMiddleware, AuthenticatedRequest, AuthenticationResult } from '../middleware/jwtAuthMiddleware';
 
@@ -27,19 +28,19 @@ class RateLimitHelper {
   static async checkRateLimit(identifier: string, limit: number = 100, windowMs: number = 60000): Promise<boolean> {
     const now = Date.now();
     const key = identifier;
-    
+
     const current = this.rateLimitStore.get(key);
-    
+
     if (!current || now > current.resetTime) {
       // Reset or initialize
       this.rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
       return true;
     }
-    
+
     if (current.count >= limit) {
       return false;
     }
-    
+
     current.count++;
     return true;
   }
@@ -62,7 +63,7 @@ const ProcessDocumentSchema = z.object({
       fileSize: z.number().min(1),
       mimeType: z.string().min(1),
       extractedAt: z.string().datetime(),
-      confidence: z.number().min(0).max(1)
+      confidence: z.number().min(0).max(1),
     }),
     pages: z.array(z.object({
       pageNumber: z.number().min(1),
@@ -70,27 +71,27 @@ const ProcessDocumentSchema = z.object({
       images: z.array(z.object({
         id: z.string(),
         description: z.string().optional(),
-        extractedText: z.string().optional()
+        extractedText: z.string().optional(),
       })).optional(),
       tables: z.array(z.object({
         id: z.string(),
         headers: z.array(z.string()),
         rows: z.array(z.array(z.string())),
-        summary: z.string().optional()
-      })).optional()
+        summary: z.string().optional(),
+      })).optional(),
     })),
     tables: z.array(z.object({
       id: z.string(),
       headers: z.array(z.string()),
       rows: z.array(z.array(z.string())),
-      summary: z.string().optional()
+      summary: z.string().optional(),
     })).optional(),
     images: z.array(z.object({
       id: z.string(),
       description: z.string().optional(),
-      extractedText: z.string().optional()
+      extractedText: z.string().optional(),
     })).optional(),
-    extractionTimestamp: z.string().datetime()
+    extractionTimestamp: z.string().datetime(),
   }),
   config: z.object({
     transformation: z.object({
@@ -100,58 +101,58 @@ const ProcessDocumentSchema = z.object({
         overlapSize: z.number().min(0).max(500).optional(),
         preserveStructure: z.boolean().optional(),
         sentenceBoundary: z.boolean().optional(),
-        paragraphBoundary: z.boolean().optional()
+        paragraphBoundary: z.boolean().optional(),
       }).optional(),
       embeddings: z.object({
         enabled: z.boolean().optional(),
         generateDocumentEmbedding: z.boolean().optional(),
-        generateChunkEmbeddings: z.boolean().optional()
+        generateChunkEmbeddings: z.boolean().optional(),
       }).optional(),
       tables: z.object({
         includeInChunks: z.boolean().optional(),
         generateSummaries: z.boolean().optional(),
-        extractSearchableText: z.boolean().optional()
+        extractSearchableText: z.boolean().optional(),
       }).optional(),
       images: z.object({
         includeInChunks: z.boolean().optional(),
         extractText: z.boolean().optional(),
-        generateDescriptions: z.boolean().optional()
+        generateDescriptions: z.boolean().optional(),
       }).optional(),
       structure: z.object({
         preserveHeaders: z.boolean().optional(),
         generateTableOfContents: z.boolean().optional(),
-        detectSections: z.boolean().optional()
+        detectSections: z.boolean().optional(),
       }).optional(),
       quality: z.object({
         minimumChunkSize: z.number().min(10).optional(),
         maximumChunkSize: z.number().max(10000).optional(),
-        minimumConfidence: z.number().min(0).max(1).optional()
-      }).optional()
+        minimumConfidence: z.number().min(0).max(1).optional(),
+      }).optional(),
     }).optional(),
     processing: z.object({
       enableParallelProcessing: z.boolean().optional(),
       maxConcurrentJobs: z.number().min(1).max(20).optional(),
       retryAttempts: z.number().min(0).max(5).optional(),
       retryDelay: z.number().min(1000).optional(),
-      timeout: z.number().min(30000).optional()
+      timeout: z.number().min(30000).optional(),
     }).optional(),
     persistence: z.object({
       saveIntermediateResults: z.boolean().optional(),
       enableRollback: z.boolean().optional(),
-      stateCheckpointInterval: z.number().min(5000).optional()
+      stateCheckpointInterval: z.number().min(5000).optional(),
     }).optional(),
     notifications: z.object({
       enableProgressUpdates: z.boolean().optional(),
       enableCompletionNotification: z.boolean().optional(),
-      webhookUrl: z.string().url().optional()
-    }).optional()
+      webhookUrl: z.string().url().optional(),
+    }).optional(),
   }).optional(),
   priority: z.enum(['low', 'normal', 'high']).optional(),
-  metadata: z.record(z.string(), z.any()).optional()
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const JobIdSchema = z.object({
-  jobId: z.string().uuid('Invalid job ID format')
+  jobId: z.string().uuid('Invalid job ID format'),
 });
 
 // Response Interfaces
@@ -230,7 +231,7 @@ interface JobProgressResponse {
 
 /**
  * Document Integration API Controller
- * 
+ *
  * Provides comprehensive endpoints for document processing workflow integration
  * with the DocumentWorkflowOrchestrator. Includes authentication, validation,
  * rate limiting, and comprehensive error handling.
@@ -252,7 +253,7 @@ export class DocumentIntegrationController {
       // Convert Express Request to AuthenticatedRequest format
       const authRequest: AuthenticatedRequest = {
         headers: req.headers as Record<string, string>,
-        body: req.body
+        body: req.body,
       };
 
       // Extract workspace ID if provided
@@ -265,7 +266,7 @@ export class DocumentIntegrationController {
       const authResult: AuthenticationResult = await JWTAuthMiddleware.authenticate(authRequest, {
         allowApiKey: true,
         requiredScopes: [],
-        workspaceRequired: false
+        workspaceRequired: false,
       });
 
       if (!authResult.success) {
@@ -273,14 +274,14 @@ export class DocumentIntegrationController {
           success: false,
           error: {
             code: authResult.error?.code || 'AUTH_FAILED',
-            message: authResult.error?.message || 'Authentication failed'
+            message: authResult.error?.message || 'Authentication failed',
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(authResult.error?.statusCode || 401).json(errorResponse);
         return;
       }
@@ -294,14 +295,14 @@ export class DocumentIntegrationController {
         error: {
           code: 'AUTH_ERROR',
           message: 'Authentication failed',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
         },
         metadata: {
           timestamp: new Date().toISOString(),
-          version: this.API_VERSION
-        }
+          version: this.API_VERSION,
+        },
       };
-      
+
       res.status(500).json(errorResponse);
     }
   }
@@ -326,14 +327,14 @@ export class DocumentIntegrationController {
           success: false,
           error: {
             code: 'RATE_LIMIT_EXCEEDED',
-            message: 'Rate limit exceeded. Please try again later.'
+            message: 'Rate limit exceeded. Please try again later.',
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(429).json(errorResponse);
         return;
       }
@@ -358,14 +359,14 @@ export class DocumentIntegrationController {
           success: false,
           error: {
             code: 'WORKSPACE_ACCESS_DENIED',
-            message: 'Access denied to the requested workspace'
+            message: 'Access denied to the requested workspace',
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(403).json(errorResponse);
         return;
       }
@@ -385,10 +386,10 @@ export class DocumentIntegrationController {
       // Apply middleware
       await this.authenticateRequest(req, res, () => {});
       if (res.headersSent) return;
-      
+
       await this.rateLimitMiddleware(req, res, () => {});
       if (res.headersSent) return;
-      
+
       await this.authorizeWorkspace(req, res, () => {});
       if (res.headersSent) return;
 
@@ -402,15 +403,15 @@ export class DocumentIntegrationController {
             message: 'Request validation failed',
             details: validationResult.error.issues.map(err => ({
               field: err.path.join('.'),
-              message: err.message
-            }))
+              message: err.message,
+            })),
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(400).json(errorResponse);
         return;
       }
@@ -432,11 +433,11 @@ export class DocumentIntegrationController {
               x: 0,
               y: 0,
               width: 100,
-              height: 50
+              height: 50,
             },
             confidence: 1.0,
             format: 'json' as const,
-            rawData: JSON.stringify(table)
+            rawData: JSON.stringify(table),
           })),
           images: (mivaaDocument.images || []).map(image => {
             const imageMetadata: any = {
@@ -447,13 +448,13 @@ export class DocumentIntegrationController {
                 x: 0,
                 y: 0,
                 width: 100,
-                height: 50
+                height: 50,
               },
               format: 'png',
               size: 0,
-              confidence: 1.0
+              confidence: 1.0,
             };
-            
+
             // Only add optional properties if they have values
             if (image.description) {
               imageMetadata.caption = image.description;
@@ -462,7 +463,7 @@ export class DocumentIntegrationController {
               imageMetadata.altText = image.extractedText;
               imageMetadata.extractedText = image.extractedText;
             }
-            
+
             return imageMetadata;
           }),
           // Fix metadata to match MivaaDocumentMetadata interface
@@ -470,15 +471,15 @@ export class DocumentIntegrationController {
             pages: mivaaDocument.metadata?.pageCount || 1,
             extractionMethod: 'mivaa-pdf-extractor',
             processingVersion: '1.0.0',
-            confidence: mivaaDocument.metadata?.confidence || 1.0
-          }
+            confidence: mivaaDocument.metadata?.confidence || 1.0,
+          },
         },
         priority: priority || 'normal', // Provide default value to handle exactOptionalPropertyTypes
         metadata: {
           ...metadata,
           userId: authContext.userId,
-          requestedAt: new Date().toISOString()
-        }
+          requestedAt: new Date().toISOString(),
+        },
       };
 
       // Add config only if it exists to handle exactOptionalPropertyTypes
@@ -494,7 +495,7 @@ export class DocumentIntegrationController {
         authContext.userId,
         authContext.workspaceId,
         'POST /api/documents/process',
-        { jobId: workflowJob.id, documentId: mivaaDocument.id }
+        { jobId: workflowJob.id, documentId: mivaaDocument.id },
       );
 
       // Prepare response
@@ -504,8 +505,8 @@ export class DocumentIntegrationController {
         estimatedCompletionTime: this.calculateEstimatedCompletion(workflowJob),
         stages: workflowJob.stages.map(stage => ({
           name: stage.name,
-          status: stage.status
-        }))
+          status: stage.status,
+        })),
       };
 
       const successResponse: ApiResponse<ProcessDocumentResponse> = {
@@ -514,8 +515,8 @@ export class DocumentIntegrationController {
         metadata: {
           timestamp: new Date().toISOString(),
           requestId: processingRequest.id,
-          version: this.API_VERSION
-        }
+          version: this.API_VERSION,
+        },
       };
 
       res.status(202).json(successResponse);
@@ -526,12 +527,12 @@ export class DocumentIntegrationController {
         error: {
           code: 'PROCESSING_ERROR',
           message: 'Failed to initiate document processing',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
         },
         metadata: {
           timestamp: new Date().toISOString(),
-          version: this.API_VERSION
-        }
+          version: this.API_VERSION,
+        },
       };
 
       res.status(500).json(errorResponse);
@@ -547,7 +548,7 @@ export class DocumentIntegrationController {
       // Apply middleware
       await this.authenticateRequest(req, res, () => {});
       if (res.headersSent) return;
-      
+
       await this.rateLimitMiddleware(req, res, () => {});
       if (res.headersSent) return;
 
@@ -559,14 +560,14 @@ export class DocumentIntegrationController {
           error: {
             code: 'INVALID_JOB_ID',
             message: 'Invalid job ID format',
-            details: validationResult.error.issues
+            details: validationResult.error.issues,
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(400).json(errorResponse);
         return;
       }
@@ -576,24 +577,24 @@ export class DocumentIntegrationController {
 
       // Get workflow status
       const status = await this.orchestrator.getWorkflowStatus(jobId);
-      
+
       // Get job details (this would need to be implemented in the orchestrator)
       const jobDetails = await this.getJobDetails(jobId);
-      
+
       // Verify workspace access
       if (jobDetails.workspaceId !== authContext.workspaceId) {
         const errorResponse: ApiResponse = {
           success: false,
           error: {
             code: 'JOB_ACCESS_DENIED',
-            message: 'Access denied to the requested job'
+            message: 'Access denied to the requested job',
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(403).json(errorResponse);
         return;
       }
@@ -606,7 +607,7 @@ export class DocumentIntegrationController {
         authContext.userId,
         authContext.workspaceId,
         'GET /api/documents/status',
-        { jobId }
+        { jobId },
       );
 
       // Prepare response
@@ -619,7 +620,7 @@ export class DocumentIntegrationController {
         createdAt: jobDetails.createdAt.toISOString(),
         updatedAt: jobDetails.updatedAt.toISOString(),
         completedAt: jobDetails.completedAt?.toISOString(),
-        estimatedTimeRemaining: this.calculateEstimatedTimeRemaining(jobDetails)
+        estimatedTimeRemaining: this.calculateEstimatedTimeRemaining(jobDetails),
       };
 
       const successResponse: ApiResponse<JobStatusResponse> = {
@@ -627,8 +628,8 @@ export class DocumentIntegrationController {
         data: responseData,
         metadata: {
           timestamp: new Date().toISOString(),
-          version: this.API_VERSION
-        }
+          version: this.API_VERSION,
+        },
       };
 
       res.status(200).json(successResponse);
@@ -639,14 +640,14 @@ export class DocumentIntegrationController {
           success: false,
           error: {
             code: 'JOB_NOT_FOUND',
-            message: 'Job not found'
+            message: 'Job not found',
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(404).json(errorResponse);
         return;
       }
@@ -656,12 +657,12 @@ export class DocumentIntegrationController {
         error: {
           code: 'STATUS_RETRIEVAL_ERROR',
           message: 'Failed to retrieve job status',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
         },
         metadata: {
           timestamp: new Date().toISOString(),
-          version: this.API_VERSION
-        }
+          version: this.API_VERSION,
+        },
       };
 
       res.status(500).json(errorResponse);
@@ -677,7 +678,7 @@ export class DocumentIntegrationController {
       // Apply middleware
       await this.authenticateRequest(req, res, () => {});
       if (res.headersSent) return;
-      
+
       await this.rateLimitMiddleware(req, res, () => {});
       if (res.headersSent) return;
 
@@ -689,14 +690,14 @@ export class DocumentIntegrationController {
           error: {
             code: 'INVALID_JOB_ID',
             message: 'Invalid job ID format',
-            details: validationResult.error.issues
+            details: validationResult.error.issues,
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(400).json(errorResponse);
         return;
       }
@@ -706,21 +707,21 @@ export class DocumentIntegrationController {
 
       // Get job details
       const jobDetails = await this.getJobDetails(jobId);
-      
+
       // Verify workspace access
       if (jobDetails.workspaceId !== authContext.workspaceId) {
         const errorResponse: ApiResponse = {
           success: false,
           error: {
             code: 'JOB_ACCESS_DENIED',
-            message: 'Access denied to the requested job'
+            message: 'Access denied to the requested job',
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(403).json(errorResponse);
         return;
       }
@@ -730,7 +731,7 @@ export class DocumentIntegrationController {
         authContext.userId,
         authContext.workspaceId,
         'GET /api/documents/progress',
-        { jobId }
+        { jobId },
       );
 
       // Prepare detailed progress response
@@ -742,17 +743,17 @@ export class DocumentIntegrationController {
           status: stage.status,
           startTime: stage.startTime?.toISOString(),
           endTime: stage.endTime?.toISOString(),
-          duration: stage.startTime && stage.endTime 
+          duration: stage.startTime && stage.endTime
             ? stage.endTime.getTime() - stage.startTime.getTime()
             : undefined,
           error: stage.error,
-          metrics: stage.metrics
+          metrics: stage.metrics,
         })),
         metrics: jobDetails.metrics,
         realTimeUpdates: {
           lastUpdate: jobDetails.updatedAt.toISOString(),
-          nextUpdate: this.calculateNextUpdateTime(jobDetails)
-        }
+          nextUpdate: this.calculateNextUpdateTime(jobDetails),
+        },
       };
 
       const successResponse: ApiResponse<JobProgressResponse> = {
@@ -760,8 +761,8 @@ export class DocumentIntegrationController {
         data: responseData,
         metadata: {
           timestamp: new Date().toISOString(),
-          version: this.API_VERSION
-        }
+          version: this.API_VERSION,
+        },
       };
 
       res.status(200).json(successResponse);
@@ -772,14 +773,14 @@ export class DocumentIntegrationController {
           success: false,
           error: {
             code: 'JOB_NOT_FOUND',
-            message: 'Job not found'
+            message: 'Job not found',
           },
           metadata: {
             timestamp: new Date().toISOString(),
-            version: this.API_VERSION
-          }
+            version: this.API_VERSION,
+          },
         };
-        
+
         res.status(404).json(errorResponse);
         return;
       }
@@ -789,12 +790,12 @@ export class DocumentIntegrationController {
         error: {
           code: 'PROGRESS_RETRIEVAL_ERROR',
           message: 'Failed to retrieve job progress',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
         },
         metadata: {
           timestamp: new Date().toISOString(),
-          version: this.API_VERSION
-        }
+          version: this.API_VERSION,
+        },
       };
 
       res.status(500).json(errorResponse);
@@ -812,17 +813,17 @@ export class DocumentIntegrationController {
   private calculateProgress(job: WorkflowJob): { currentStage: string; completedStages: number; totalStages: number; percentage: number } {
     const totalStages = job.stages.length;
     const completedStages = job.stages.filter(stage => stage.status === 'completed').length;
-    const currentStage = job.stages.find(stage => stage.status === 'processing')?.name || 
-                        job.stages.find(stage => stage.status === 'pending')?.name || 
+    const currentStage = job.stages.find(stage => stage.status === 'processing')?.name ||
+                        job.stages.find(stage => stage.status === 'pending')?.name ||
                         'completed';
-    
+
     const percentage = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
 
     return {
       currentStage,
       completedStages,
       totalStages,
-      percentage
+      percentage,
     };
   }
 
@@ -839,10 +840,10 @@ export class DocumentIntegrationController {
     }
 
     // Simple estimation based on remaining stages
-    const remainingStages = job.stages.filter(stage => 
-      stage.status === 'pending' || stage.status === 'processing'
+    const remainingStages = job.stages.filter(stage =>
+      stage.status === 'pending' || stage.status === 'processing',
     ).length;
-    
+
     return remainingStages * 60000; // 1 minute per stage estimate
   }
 

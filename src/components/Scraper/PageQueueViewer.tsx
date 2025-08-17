@@ -1,11 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import {
   CheckCircle,
   XCircle,
@@ -13,9 +6,17 @@ import {
   RefreshCw,
   Search,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 
 interface ScrapingPage {
   id: string;
@@ -45,7 +46,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
 
   useEffect(() => {
     loadPages();
-    
+
     // Set up real-time subscription for page updates
     const channel = supabase
       .channel(`pages_${sessionId}`)
@@ -55,11 +56,11 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
           event: '*',
           schema: 'public',
           table: 'scraping_pages',
-          filter: `session_id=eq.${sessionId}`
+          filter: `session_id=eq.${sessionId}`,
         },
         () => {
           loadPages();
-        }
+        },
       )
       .subscribe();
 
@@ -113,16 +114,16 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
           page_index: 3,
           created_at: new Date(Date.now() - 60000).toISOString(),
           updated_at: new Date(Date.now() - 60000).toISOString(),
-        }
+        },
       ];
 
       setPages(mockPages);
     } catch (error) {
       console.error('Error loading pages:', error);
       toast({
-        title: "Error",
-        description: "Failed to load pages",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load pages',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -131,18 +132,18 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
 
   const retryPage = async (pageId: string) => {
     const apiService = ApiIntegrationService.getInstance();
-    
+
     try {
       // Mock: Reset page status to pending (replace with actual database call when available)
       console.log('Mock: Resetting page status to pending for page:', pageId);
-      
+
       // Update local state to reflect the retry
       setPages(prevPages =>
         prevPages.map(p =>
           p.id === pageId
             ? { ...p, status: 'pending', error_message: null, started_at: null, completed_at: null }
-            : p
-        )
+            : p,
+        ),
       );
 
       // Trigger single page processing
@@ -154,23 +155,23 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
           pageId: pageId,
           options: {
             service: 'firecrawl',
-            retryAttempt: page.retry_count + 1
-          }
+            retryAttempt: page.retry_count + 1,
+          },
         });
 
         if (!result.success) throw new Error(result.error?.message || 'Unknown error');
       }
 
       toast({
-        title: "Success",
-        description: "Page retry started",
+        title: 'Success',
+        description: 'Page retry started',
       });
     } catch (error) {
       console.error('Error retrying page:', error);
       toast({
-        title: "Error",
-        description: "Failed to retry page",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to retry page',
+        variant: 'destructive',
       });
     }
   };
@@ -233,7 +234,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
             Refresh
           </Button>
         </div>
-        
+
         {/* Status Summary */}
         <div className="flex gap-2 flex-wrap">
           <Badge className="border border-input bg-background hover:bg-accent hover:text-accent-foreground">
@@ -314,30 +315,30 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
                     )}
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <Badge className={getStatusColor(page.status)}>
                     {page.status}
                   </Badge>
-                  
+
                   {page.materials_found > 0 && (
                     <Badge className="border border-input bg-background hover:bg-accent hover:text-accent-foreground">
                       {page.materials_found} materials
                     </Badge>
                   )}
-                  
+
                   {page.processing_time_ms && (
                     <span className="text-xs text-gray-500">
                       {(page.processing_time_ms / 1000).toFixed(1)}s
                     </span>
                   )}
-                  
+
                   {page.retry_count > 0 && (
                     <Badge className="border border-input bg-background hover:bg-accent hover:text-accent-foreground text-orange-600">
                       Retry {page.retry_count}
                     </Badge>
                   )}
-                  
+
                   {page.status === 'failed' && (
                     <Button
                       className="border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
@@ -346,7 +347,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
                       Retry
                     </Button>
                   )}
-                  
+
                   {page.completed_at && (
                     <span className="text-xs text-gray-500">
                       {formatDistanceToNow(new Date(page.completed_at), { addSuffix: true })}

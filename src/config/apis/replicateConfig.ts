@@ -1,16 +1,17 @@
 /**
  * Replicate API Configuration
- * 
+ *
  * Centralized configuration for all Replicate models used in the platform.
  * Each model maintains its own specific parameter schema and requirements.
  */
 
 import { z } from 'zod';
-import { ReplicateApiConfig, ApiConfigUtils } from '../apiConfig';
+
+import { ReplicateApiConfig } from '../apiConfig';
 
 // Common Replicate parameter schemas
 const commonImageParams = z.object({
-  prompt: z.string().min(1, "Prompt is required"),
+  prompt: z.string().min(1, 'Prompt is required'),
   negative_prompt: z.string().optional(),
   width: z.number().int().min(64).max(2048).optional(),
   height: z.number().int().min(64).max(2048).optional(),
@@ -21,15 +22,15 @@ const commonImageParams = z.object({
 
 // Interior AI model schema (erayyavuz/interior-ai)
 const interiorAISchema = z.object({
-  image: z.string().url("Image URL is required"),
-  prompt: z.string().min(1, "Prompt is required"),
+  image: z.string().url('Image URL is required'),
+  prompt: z.string().min(1, 'Prompt is required'),
   room_type: z.enum([
-    "Living room", "Dining room", "Bedroom", "Bathroom", 
-    "Kitchen", "Reading room", "Home office"
+    'Living room', 'Dining room', 'Bedroom', 'Bathroom',
+    'Kitchen', 'Reading room', 'Home office',
   ]).optional(),
   style: z.enum([
-    "Modern", "Minimalist", "Contemporary", "Transitional",
-    "Traditional", "Rustic", "Industrial"
+    'Modern', 'Minimalist', 'Contemporary', 'Transitional',
+    'Traditional', 'Rustic', 'Industrial',
   ]).optional(),
   num_inference_steps: z.number().int().min(10).max(50).default(20),
   guidance_scale: z.number().min(1).max(20).default(7),
@@ -38,8 +39,8 @@ const interiorAISchema = z.object({
 
 // ComfyUI Interior Remodel schema (jschoormans/comfyui-interior-remodel)
 const comfyUIInteriorSchema = z.object({
-  image: z.string().url("Image URL is required"),
-  prompt: z.string().min(1, "Prompt is required"),
+  image: z.string().url('Image URL is required'),
+  prompt: z.string().min(1, 'Prompt is required'),
   negative_prompt: z.string().optional(),
   strength: z.number().min(0).max(1).default(0.8),
   num_inference_steps: z.number().int().min(10).max(50).default(20),
@@ -49,8 +50,8 @@ const comfyUIInteriorSchema = z.object({
 
 // Interior V2 schema (jschoormans/interior-v2)
 const interiorV2Schema = z.object({
-  image: z.string().url("Image URL is required"),
-  prompt: z.string().min(1, "Prompt is required"),
+  image: z.string().url('Image URL is required'),
+  prompt: z.string().min(1, 'Prompt is required'),
   negative_prompt: z.string().optional(),
   room_type: z.string().optional(),
   design_style: z.string().optional(),
@@ -63,16 +64,16 @@ const interiorV2Schema = z.object({
 
 // Interiorly Gen1 Dev schema (julian-at/interiorly-gen1-dev)
 const interiorlyGen1Schema = z.object({
-  image: z.string().url("Image URL is required"),
-  prompt: z.string().min(1, "Prompt is required"),
+  image: z.string().url('Image URL is required'),
+  prompt: z.string().min(1, 'Prompt is required'),
   negative_prompt: z.string().optional(),
   room_type: z.enum([
-    "living_room", "bedroom", "kitchen", "bathroom", 
-    "dining_room", "office", "outdoor"
+    'living_room', 'bedroom', 'kitchen', 'bathroom',
+    'dining_room', 'office', 'outdoor',
   ]).optional(),
   design_style: z.enum([
-    "modern", "traditional", "minimalist", "rustic", 
-    "industrial", "scandinavian", "bohemian"
+    'modern', 'traditional', 'minimalist', 'rustic',
+    'industrial', 'scandinavian', 'bohemian',
   ]).optional(),
   num_inference_steps: z.number().int().min(10).max(50).default(25),
   guidance_scale: z.number().min(1).max(20).default(7.5),
@@ -112,7 +113,7 @@ export const replicateConfig: ReplicateApiConfig = {
       description: 'AI-powered interior design transformation',
       category: 'interior-design',
     },
-    
+
     'jschoormans/comfyui-interior-remodel': {
       version: 'latest',
       inputSchema: comfyUIInteriorSchema,
@@ -125,7 +126,7 @@ export const replicateConfig: ReplicateApiConfig = {
       description: 'ComfyUI-based interior remodeling',
       category: 'interior-design',
     },
-    
+
     'jschoormans/interior-v2': {
       version: 'latest',
       inputSchema: interiorV2Schema,
@@ -138,7 +139,7 @@ export const replicateConfig: ReplicateApiConfig = {
       description: 'Advanced interior design transformation v2',
       category: 'interior-design',
     },
-    
+
     'julian-at/interiorly-gen1-dev': {
       version: 'latest',
       inputSchema: interiorlyGen1Schema,
@@ -185,7 +186,7 @@ export const replicateConfig: ReplicateApiConfig = {
     'threestudio-project/threestudio': {
       version: 'latest',
       inputSchema: z.object({
-        prompt: z.string().min(1, "Prompt is required"),
+        prompt: z.string().min(1, 'Prompt is required'),
         negative_prompt: z.string().optional(),
         guidance_scale: z.number().min(1).max(20).default(7.5),
         num_inference_steps: z.number().int().min(10).max(100).default(50),
@@ -211,8 +212,8 @@ export const replicateConfig: ReplicateApiConfig = {
     'adirik/interior-design': {
       version: 'latest',
       inputSchema: z.object({
-        image: z.string().url("Image URL is required"),
-        prompt: z.string().min(1, "Prompt is required"),
+        image: z.string().url('Image URL is required'),
+        prompt: z.string().min(1, 'Prompt is required'),
         negative_prompt: z.string().optional(),
         num_inference_steps: z.number().int().min(10).max(50).default(20),
         guidance_scale: z.number().min(1).max(20).default(7.5),
@@ -233,7 +234,7 @@ export const replicateConfig: ReplicateApiConfig = {
     'davisbrown/designer-architecture': {
       version: 'latest',
       inputSchema: z.object({
-        prompt: z.string().min(1, "Prompt is required"),
+        prompt: z.string().min(1, 'Prompt is required'),
         negative_prompt: z.string().optional(),
         width: z.number().int().min(64).max(2048).default(512),
         height: z.number().int().min(64).max(2048).default(512),
@@ -256,8 +257,8 @@ export const replicateConfig: ReplicateApiConfig = {
     'rocketdigitalai/interior-design-sdxl': {
       version: 'latest',
       inputSchema: z.object({
-        image: z.string().url("Image URL is required"),
-        prompt: z.string().min(1, "Prompt is required"),
+        image: z.string().url('Image URL is required'),
+        prompt: z.string().min(1, 'Prompt is required'),
         negative_prompt: z.string().optional(),
         num_inference_steps: z.number().int().min(10).max(50).default(20),
         guidance_scale: z.number().min(1).max(20).default(7.5),
@@ -300,9 +301,9 @@ export class ReplicateConfigUtils {
       return { success: true, data: validatedData };
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return { 
-          success: false, 
-          error: `Validation error: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}` 
+        return {
+          success: false,
+          error: `Validation error: ${error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         };
       }
       return { success: false, error: 'Unknown validation error' };
@@ -342,9 +343,9 @@ export class ReplicateConfigUtils {
    */
   public static getCategories(): string[] {
     const categories = new Set(
-      Object.values(replicateConfig.models).map(model => model.category).filter(Boolean)
+      Object.values(replicateConfig.models).map(model => model.category).filter(Boolean),
     );
-    return Array.from(categories);
+    return Array.from(categories).filter((cat): cat is string => cat !== undefined);
   }
 }
 

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+
 import { htmlDOMAnalyzer, type LayoutAnalysisResult, type DOMElement } from './htmlDOMAnalyzer';
 import { TextEmbedderService } from './ml/textEmbedder';
 import { MivaaEmbeddingIntegration } from './mivaaEmbeddingIntegration';
@@ -74,7 +75,7 @@ export class LayoutAwareChunker {
       version: '1.0.0',
       environment: 'development',
       enabled: true,
-      modelName: 'mixedbread-ai/mxbai-embed-xsmall-v1'
+      modelName: 'mixedbread-ai/mxbai-embed-xsmall-v1',
     });
     this.mivaaEmbedder = new MivaaEmbeddingIntegration();
   }
@@ -85,13 +86,13 @@ export class LayoutAwareChunker {
   async chunkDocument(
     documentId: string,
     htmlContent: string,
-    options: Partial<ChunkingOptions> = {}
+    options: Partial<ChunkingOptions> = {},
   ): Promise<ChunkingResult> {
     const startTime = Date.now();
-    
+
     try {
       console.log('Starting layout-aware chunking for document:', documentId);
-      
+
       // Set default options
       const chunkingOptions: ChunkingOptions = {
         chunkSize: 1000,
@@ -101,27 +102,27 @@ export class LayoutAwareChunker {
         minChunkSize: 300,
         maxChunkSize: 2000,
         respectHierarchy: true,
-        ...options
+        ...options,
       };
-      
+
       // Analyze HTML structure
       const layoutAnalysis = await htmlDOMAnalyzer.analyzeHTML(htmlContent, documentId);
-      
+
       // Create chunks based on layout analysis
       const chunks = await this.createLayoutAwareChunks(
         documentId,
         layoutAnalysis,
-        chunkingOptions
+        chunkingOptions,
       );
-      
+
       // Generate embeddings for chunks
       await this.generateChunkEmbeddings(chunks);
-      
+
       // Store chunks in enhanced knowledge base
       await this.storeChunksInKnowledgeBase(chunks, documentId);
-      
+
       const processingTime = Date.now() - startTime;
-      
+
       const result: ChunkingResult = {
         chunks,
         totalChunks: chunks.length,
@@ -131,13 +132,13 @@ export class LayoutAwareChunker {
           originalElementCount: layoutAnalysis.elements.length,
           chunkingStrategy: 'layout_aware_semantic',
           preservedStructures: this.countPreservedStructures(chunks),
-          imageAssociations: chunks.reduce((sum, chunk) => sum + chunk.metadata.imageIds.length, 0)
-        }
+          imageAssociations: chunks.reduce((sum, chunk) => sum + chunk.metadata.imageIds.length, 0),
+        },
       };
-      
+
       console.log(`Chunking completed: ${chunks.length} chunks created in ${processingTime}ms`);
       return result;
-      
+
     } catch (error) {
       console.error('Layout-aware chunking error:', error);
       throw new Error(`Chunking failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -150,27 +151,27 @@ export class LayoutAwareChunker {
   private async createLayoutAwareChunks(
     documentId: string,
     layoutAnalysis: LayoutAnalysisResult,
-    options: ChunkingOptions
+    options: ChunkingOptions,
   ): Promise<DocumentChunk[]> {
     const chunks: DocumentChunk[] = [];
-    
+
     // Group elements by semantic structure
     const structuredGroups = this.groupElementsByStructure(layoutAnalysis, options);
-    
+
     // Process each group
     for (const group of structuredGroups) {
       const groupChunks = await this.processElementGroup(documentId, group, options);
       chunks.push(...groupChunks);
     }
-    
+
     // Apply overlap between chunks if needed
     if (options.overlap > 0) {
       this.applyChunkOverlap(chunks, options.overlap);
     }
-    
+
     // Validate and adjust chunk sizes
     this.validateChunkSizes(chunks, options);
-    
+
     return chunks;
   }
 
@@ -179,10 +180,10 @@ export class LayoutAwareChunker {
    */
   private groupElementsByStructure(
     layoutAnalysis: LayoutAnalysisResult,
-    options: ChunkingOptions
+    options: ChunkingOptions,
   ): ElementGroup[] {
     const groups: ElementGroup[] = [];
-    
+
     if (options.preserveStructure) {
       // Group by document sections
       for (const section of layoutAnalysis.structure.sections) {
@@ -191,9 +192,9 @@ export class LayoutAwareChunker {
           elements: section.elements,
           hierarchy: section.level,
           title: section.title,
-          pageNumber: section.pageNumber || 1
+          pageNumber: section.pageNumber || 1,
         });
-        
+
         // Process subsections
         for (const subsection of section.subsections) {
           groups.push({
@@ -201,7 +202,7 @@ export class LayoutAwareChunker {
             elements: subsection.elements,
             hierarchy: subsection.level,
             title: subsection.title,
-            pageNumber: subsection.pageNumber || 1
+            pageNumber: subsection.pageNumber || 1,
           });
         }
       }
@@ -210,16 +211,16 @@ export class LayoutAwareChunker {
       const elementsInOrder = layoutAnalysis.structure.readingOrder
         .map(id => layoutAnalysis.elements.find(el => el.id === id))
         .filter(Boolean) as DOMElement[];
-      
+
       groups.push({
         type: 'sequential',
         elements: elementsInOrder,
         hierarchy: 1,
         title: 'Sequential Content',
-        pageNumber: 1
+        pageNumber: 1,
       });
     }
-    
+
     return groups;
   }
 
@@ -229,26 +230,26 @@ export class LayoutAwareChunker {
   private async processElementGroup(
     documentId: string,
     group: ElementGroup,
-    options: ChunkingOptions
+    options: ChunkingOptions,
   ): Promise<DocumentChunk[]> {
     const chunks: DocumentChunk[] = [];
     let currentChunk: Partial<DocumentChunk> | null = null;
     let currentSize = 0;
-    
+
     for (const element of group.elements) {
       const elementText = element.textContent;
       const elementSize = elementText.length;
-      
+
       // Check if we need to start a new chunk
-      if (!currentChunk || 
+      if (!currentChunk ||
           currentSize + elementSize > options.chunkSize ||
           this.shouldStartNewChunk(element, currentChunk, options)) {
-        
+
         // Finalize current chunk
         if (currentChunk) {
           chunks.push(await this.finalizeChunk(documentId, currentChunk));
         }
-        
+
         // Start new chunk
         currentChunk = this.initializeChunk(documentId, element, group);
         currentSize = elementSize;
@@ -258,12 +259,12 @@ export class LayoutAwareChunker {
         currentSize += elementSize;
       }
     }
-    
+
     // Finalize last chunk
     if (currentChunk) {
       chunks.push(await this.finalizeChunk(documentId, currentChunk));
     }
-    
+
     return chunks;
   }
 
@@ -273,10 +274,10 @@ export class LayoutAwareChunker {
   private initializeChunk(
     documentId: string,
     element: DOMElement,
-    _group: ElementGroup
+    _group: ElementGroup,
   ): Partial<DocumentChunk> {
     const chunkId = this.generateChunkId();
-    
+
     return {
       id: chunkId,
       documentId,
@@ -297,9 +298,9 @@ export class LayoutAwareChunker {
         wordCount: this.countWords(element.textContent),
         characterCount: element.textContent.length,
         readingTime: this.estimateReadingTime(element.textContent),
-        complexity: this.calculateComplexity(element.textContent)
+        complexity: this.calculateComplexity(element.textContent),
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
   }
 
@@ -309,18 +310,18 @@ export class LayoutAwareChunker {
   private addElementToChunk(chunk: Partial<DocumentChunk>, element: DOMElement): void {
     chunk.text += '\n\n' + element.textContent;
     chunk.htmlContent += '\n' + element.innerHTML;
-    
+
     // Update metadata
     chunk.metadata!.elementIds.push(element.id);
     chunk.metadata!.wordCount += this.countWords(element.textContent);
     chunk.metadata!.characterCount += element.textContent.length;
     chunk.metadata!.readingTime = this.estimateReadingTime(chunk.text!);
     chunk.metadata!.complexity = Math.max(chunk.metadata!.complexity, this.calculateComplexity(element.textContent));
-    
+
     // Merge semantic tags
     const newTags = this.extractSemanticTags(element);
     chunk.metadata!.semanticTags = [...new Set([...chunk.metadata!.semanticTags, ...newTags])];
-    
+
     // Update confidence (weighted average)
     const totalElements = chunk.metadata!.elementIds.length;
     chunk.metadata!.confidence = (chunk.metadata!.confidence * (totalElements - 1) + element.confidence) / totalElements;
@@ -331,7 +332,7 @@ export class LayoutAwareChunker {
    */
   private async finalizeChunk(
     documentId: string,
-    partialChunk: Partial<DocumentChunk>
+    partialChunk: Partial<DocumentChunk>,
   ): Promise<DocumentChunk> {
     // Ensure all required fields are present
     const chunk: DocumentChunk = {
@@ -347,12 +348,12 @@ export class LayoutAwareChunker {
       ...(partialChunk.parentChunkId ? { parentChunkId: partialChunk.parentChunkId } : {}),
       childChunkIds: partialChunk.childChunkIds!,
       metadata: partialChunk.metadata!,
-      createdAt: partialChunk.createdAt!
+      createdAt: partialChunk.createdAt!,
     };
-    
+
     // Clean up text
     chunk.text = this.cleanText(chunk.text);
-    
+
     return chunk;
   }
 
@@ -362,30 +363,30 @@ export class LayoutAwareChunker {
   private shouldStartNewChunk(
     element: DOMElement,
     currentChunk: Partial<DocumentChunk>,
-    options: ChunkingOptions
+    options: ChunkingOptions,
   ): boolean {
     // Always start new chunk for headings if respecting hierarchy
     if (options.respectHierarchy && element.elementType === 'heading') {
       return true;
     }
-    
+
     // Start new chunk if hierarchy level changes significantly
-    if (options.respectHierarchy && 
+    if (options.respectHierarchy &&
         Math.abs(element.hierarchy - currentChunk.hierarchyLevel!) > 1) {
       return true;
     }
-    
+
     // Start new chunk for tables
     if (element.elementType === 'table') {
       return true;
     }
-    
+
     // Start new chunk if page changes
     const currentPage = this.extractPageNumber(element);
     if (currentPage !== currentChunk.pageNumber) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -394,10 +395,10 @@ export class LayoutAwareChunker {
    */
   private async generateChunkEmbeddings(chunks: DocumentChunk[]): Promise<void> {
     console.log(`Generating embeddings for ${chunks.length} chunks using MIVAA service...`);
-    
+
     // Configuration option to choose embedding service
     const useMivaa = process.env.USE_MIVAA_EMBEDDINGS !== 'false'; // Default to MIVAA for new configuration
-    
+
     if (useMivaa) {
       // Use MIVAA embedding service (text-embedding-3-large, 1536 dimensions)
       try {
@@ -405,14 +406,14 @@ export class LayoutAwareChunker {
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
           if (!chunk) continue; // Skip undefined chunks
-          
+
           try {
             const result = await this.mivaaEmbedder.generateEmbedding({
               model: 'text-embedding-3-large',
               dimensions: 1536,
-              text: chunk.text
+              text: chunk.text,
             });
-            
+
             if (result.embedding && result.embedding.length > 0) {
               chunk.embedding = result.embedding;
             }
@@ -437,7 +438,7 @@ export class LayoutAwareChunker {
   private async generateHuggingFaceEmbeddings(chunks: DocumentChunk[]): Promise<void> {
     try {
       await this.textEmbedder.initialize();
-      
+
       for (const chunk of chunks) {
         try {
           const result = await this.textEmbedder.generateEmbedding(chunk.text);
@@ -472,7 +473,7 @@ export class LayoutAwareChunker {
           confidence_scores: {
             chunking: chunk.metadata.confidence,
             layout_analysis: 0.9,
-            overall: chunk.metadata.confidence * 0.9
+            overall: chunk.metadata.confidence * 0.9,
           },
           search_keywords: chunk.metadata.semanticTags,
           metadata: {
@@ -491,9 +492,9 @@ export class LayoutAwareChunker {
             // Embedding service metadata
             embedding_service: process.env.USE_OPENAI_EMBEDDINGS === 'true' || true ? 'openai' : 'huggingface',
             embedding_model: process.env.USE_OPENAI_EMBEDDINGS === 'true' || true ? 'text-embedding-3-large' : 'mixedbread-ai/mxbai-embed-xsmall-v1',
-            embedding_dimensions: chunk.embedding ? chunk.embedding.length : null
+            embedding_dimensions: chunk.embedding ? chunk.embedding.length : null,
           },
-          status: 'published'
+          status: 'published',
         };
 
         const { error } = await supabase
@@ -504,7 +505,7 @@ export class LayoutAwareChunker {
           console.warn(`Failed to store chunk ${chunk.id}:`, error);
         }
       }
-      
+
       console.log(`Successfully stored ${chunks.length} chunks in knowledge base`);
     } catch (error) {
       console.error('Error storing chunks in knowledge base:', error);
@@ -519,15 +520,15 @@ export class LayoutAwareChunker {
     for (let i = 1; i < chunks.length; i++) {
       const prevChunk = chunks[i - 1];
       const currentChunk = chunks[i];
-      
+
       if (!prevChunk || !currentChunk) {
         continue;
       }
-      
+
       // Get overlap text from previous chunk
       const prevText = prevChunk.text;
       const overlapText = prevText.slice(-overlapSize);
-      
+
       // Prepend to current chunk
       currentChunk.text = overlapText + '\n\n' + currentChunk.text;
       currentChunk.metadata.characterCount += overlapText.length;
@@ -541,13 +542,13 @@ export class LayoutAwareChunker {
   private validateChunkSizes(chunks: DocumentChunk[], options: ChunkingOptions): void {
     for (const chunk of chunks) {
       const size = chunk.metadata.characterCount;
-      
+
       // Split oversized chunks
       if (size > options.maxChunkSize) {
         console.warn(`Chunk ${chunk.id} exceeds maximum size: ${size} > ${options.maxChunkSize}`);
         // In a production system, we would split this chunk
       }
-      
+
       // Flag undersized chunks
       if (size < options.minChunkSize) {
         console.warn(`Chunk ${chunk.id} below minimum size: ${size} < ${options.minChunkSize}`);
@@ -580,23 +581,23 @@ export class LayoutAwareChunker {
 
   private extractSemanticTags(element: DOMElement): string[] {
     const tags: string[] = [];
-    
+
     // Add tags based on element type
     tags.push(element.elementType);
-    
+
     // Add tags based on class names
     if (element.className) {
       const classNames = element.className.split(' ');
       tags.push(...classNames.filter(name => name.length > 2));
     }
-    
+
     // Add content-based tags
     const text = element.textContent.toLowerCase();
     if (text.includes('specification')) tags.push('specification');
     if (text.includes('property')) tags.push('property');
     if (text.includes('material')) tags.push('material');
     if (text.includes('technical')) tags.push('technical');
-    
+
     return [...new Set(tags)];
   }
 
@@ -614,7 +615,7 @@ export class LayoutAwareChunker {
     // Simple complexity calculation based on sentence length and vocabulary
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const avgSentenceLength = sentences.reduce((sum, s) => sum + s.split(' ').length, 0) / sentences.length;
-    
+
     // Normalize to 1-10 scale
     return Math.min(10, Math.max(1, Math.round(avgSentenceLength / 5)));
   }
@@ -627,10 +628,10 @@ export class LayoutAwareChunker {
   }
 
   private countPreservedStructures(chunks: DocumentChunk[]): number {
-    return chunks.filter(chunk => 
-      chunk.chunkType === 'heading' || 
-      chunk.chunkType === 'table' || 
-      chunk.metadata.semanticTags.includes('structure')
+    return chunks.filter(chunk =>
+      chunk.chunkType === 'heading' ||
+      chunk.chunkType === 'table' ||
+      chunk.metadata.semanticTags.includes('structure'),
     ).length;
   }
 
@@ -645,11 +646,11 @@ export class LayoutAwareChunker {
         .eq('content_type', 'document_chunk')
         .contains('metadata', { document_id: documentId })
         .order('created_at');
-      
+
       if (error) {
         throw error;
       }
-      
+
       return data.map(row => this.convertKnowledgeEntryToChunk(row));
     } catch (error) {
       console.error('Error retrieving document chunks:', error);
@@ -663,34 +664,34 @@ export class LayoutAwareChunker {
   async searchChunks(
     query: string,
     documentId?: string,
-    limit: number = 10
+    limit: number = 10,
   ): Promise<DocumentChunk[]> {
     try {
       // Generate query embedding
       await this.textEmbedder.initialize();
       const queryResult = await this.textEmbedder.generateEmbedding(query);
-      
+
       if (!queryResult.success || !('embedding' in queryResult)) {
         throw new Error('Failed to generate query embedding');
       }
-      
+
       // Search using enhanced knowledge base
       let queryBuilder = supabase
         .from('enhanced_knowledge_base')
         .select('*')
         .eq('content_type', 'document_chunk')
         .order('created_at');
-      
+
       if (documentId) {
         queryBuilder = queryBuilder.contains('metadata', { document_id: documentId });
       }
-      
+
       const { data, error } = await queryBuilder.limit(limit);
-      
+
       if (error) {
         throw error;
       }
-      
+
       // Convert and return chunks
       return data.map(row => this.convertKnowledgeEntryToChunk(row));
     } catch (error) {
@@ -704,7 +705,7 @@ export class LayoutAwareChunker {
    */
   private convertKnowledgeEntryToChunk(row: any): DocumentChunk {
     const metadata = row.metadata || {};
-    
+
     return {
       id: row.id,
       documentId: metadata.document_id || '',
@@ -727,9 +728,9 @@ export class LayoutAwareChunker {
         wordCount: metadata.word_count || 0,
         characterCount: metadata.character_count || 0,
         readingTime: metadata.reading_time || 0,
-        complexity: metadata.complexity || 5
+        complexity: metadata.complexity || 5,
       },
-      createdAt: row.created_at
+      createdAt: row.created_at,
     };
   }
 }

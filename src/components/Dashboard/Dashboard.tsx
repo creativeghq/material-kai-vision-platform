@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import { SearchHub } from './SearchHub';
 import { HeroSection } from './HeroSection';
 import { FeatureGrid } from './FeatureGrid';

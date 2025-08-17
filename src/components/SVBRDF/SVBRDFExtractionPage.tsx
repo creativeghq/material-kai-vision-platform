@@ -1,4 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { Upload, Camera, Download, Link, Eye, AlertCircle, CheckCircle, Clock, Palette, Layers, Settings } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +10,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { SVBRDFExtractionAPI, SVBRDFExtractionRecord } from '@/services/svbrdfExtractionAPI';
-import { Upload, Camera, Download, Link, Eye, AlertCircle, CheckCircle, Clock, Palette, Layers, Settings } from 'lucide-react';
-import { useDropzone } from 'react-dropzone';
 
 interface SVBRDFExtractionPageProps {}
 
@@ -22,15 +23,15 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
   const [extractionHistory, setExtractionHistory] = useState<SVBRDFExtractionRecord[]>([]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const imageFile = acceptedFiles.find(file => 
-      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024 // 10MB limit
+    const imageFile = acceptedFiles.find(file =>
+      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024, // 10MB limit
     );
-    
+
     if (!imageFile && acceptedFiles.length > 0) {
       toast({
-        title: "Invalid file",
-        description: "Please upload an image file under 10MB.",
-        variant: "destructive"
+        title: 'Invalid file',
+        description: 'Please upload an image file under 10MB.',
+        variant: 'destructive',
       });
       return;
     }
@@ -43,17 +44,17 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
     },
-    multiple: false
+    multiple: false,
   });
 
   const handleStartExtraction = async () => {
     if (!uploadedFile) {
       toast({
-        title: "No image selected",
-        description: "Please upload an image first.",
-        variant: "destructive"
+        title: 'No image selected',
+        description: 'Please upload an image first.',
+        variant: 'destructive',
       });
       return;
     }
@@ -63,8 +64,8 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
 
     try {
       toast({
-        title: "Starting extraction",
-        description: "Uploading image and initializing SVBRDF processing..."
+        title: 'Starting extraction',
+        description: 'Uploading image and initializing SVBRDF processing...',
       });
 
       // Simulate progress updates
@@ -79,8 +80,8 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
       }, 800);
 
       const result = await SVBRDFExtractionAPI.uploadImageAndExtract(
-        uploadedFile, 
-        selectedMaterialId || undefined
+        uploadedFile,
+        selectedMaterialId || undefined,
       );
 
       clearInterval(progressInterval);
@@ -90,10 +91,10 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
         // Fetch the complete extraction record
         const extractionRecord = await SVBRDFExtractionAPI.getExtraction(result.extraction_id);
         setExtraction(extractionRecord);
-        
+
         toast({
-          title: "Extraction completed!",
-          description: `Material properties extracted with ${(result.confidence_score || 0 * 100).toFixed(1)}% confidence`
+          title: 'Extraction completed!',
+          description: `Material properties extracted with ${(result.confidence_score || 0 * 100).toFixed(1)}% confidence`,
         });
 
         // Refresh history
@@ -105,9 +106,9 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
     } catch (error) {
       console.error('Extraction error:', error);
       toast({
-        title: "Extraction failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive"
+        title: 'Extraction failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
@@ -131,13 +132,13 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
+        return <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-green-500 border-transparent text-primary-foreground hover:bg-green-500/80"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
       case 'processing':
-        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Processing</Badge>;
+        return <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"><Clock className="w-3 h-3 mr-1" />Processing</Badge>;
       case 'failed':
-        return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />Failed</Badge>;
+        return <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80"><AlertCircle className="w-3 h-3 mr-1" />Failed</Badge>;
       default:
-        return <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+        return <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-foreground"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
     }
   };
 
@@ -147,7 +148,7 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
       { name: 'Normal', url: extraction.normal_map_url, icon: Layers, description: 'Surface detail and bumps' },
       { name: 'Roughness', url: extraction.roughness_map_url, icon: Settings, description: 'Surface roughness' },
       { name: 'Metallic', url: extraction.metallic_map_url, icon: Eye, description: 'Metallic properties' },
-      { name: 'Height', url: extraction.height_map_url, icon: Layers, description: 'Surface displacement' }
+      { name: 'Height', url: extraction.height_map_url, icon: Layers, description: 'Surface displacement' },
     ];
 
     return (
@@ -156,8 +157,8 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
           <div key={map.name} className="space-y-2">
             <div className="relative aspect-square bg-muted rounded-lg overflow-hidden">
               {map.url ? (
-                <img 
-                  src={map.url} 
+                <img
+                  src={map.url}
                   alt={`${map.name} map`}
                   className="w-full h-full object-cover"
                 />
@@ -184,7 +185,7 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
           SVBRDF Material Extraction
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Upload an image to extract physically-based material properties including albedo, normal, roughness, 
+          Upload an image to extract physically-based material properties including albedo, normal, roughness,
           metallic, and height maps for realistic 3D rendering.
         </p>
       </div>
@@ -225,8 +226,8 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
                 <div className="flex items-center justify-between p-3 bg-muted rounded">
                   <span className="text-sm font-medium">{uploadedFile.name}</span>
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"
+
                     onClick={() => setUploadedFile(null)}
                   >
                     ×
@@ -255,7 +256,7 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
               </div>
             )}
 
-            <Button 
+            <Button
               onClick={handleStartExtraction}
               disabled={!uploadedFile || isProcessing}
               className="w-full"
@@ -289,17 +290,17 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
                   <div className="flex items-center gap-2">
                     {getStatusBadge(extraction.extraction_status)}
                     {extraction.confidence_score && (
-                      <Badge variant="outline">
+                      <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
                         Confidence: {(extraction.confidence_score * 100).toFixed(1)}%
                       </Badge>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3">
                       <Download className="w-4 h-4 mr-1" />
                       Download Maps
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3">
                       <Link className="w-4 h-4 mr-1" />
                       Link to Material
                     </Button>
@@ -346,7 +347,7 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
                     )}
 
                     <div className="text-sm text-muted-foreground">
-                      <p>Processing time: {extraction.processing_time_ms ? 
+                      <p>Processing time: {extraction.processing_time_ms ?
                         `${(extraction.processing_time_ms / 1000).toFixed(1)}s` : 'N/A'}</p>
                     </div>
                   </>
@@ -386,8 +387,8 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-muted rounded overflow-hidden">
                       {item.albedo_map_url && (
-                        <img 
-                          src={item.albedo_map_url} 
+                        <img
+                          src={item.albedo_map_url}
                           alt="Albedo preview"
                           className="w-full h-full object-cover"
                         />
@@ -405,8 +406,8 @@ export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
                   <div className="flex items-center gap-2">
                     {getStatusBadge(item.extraction_status)}
                     <Button
-                      variant="ghost"
-                      size="sm"
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"
+
                       onClick={() => setExtraction(item)}
                     >
                       <Eye className="w-4 h-4" />

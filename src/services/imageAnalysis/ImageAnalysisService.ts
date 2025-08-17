@@ -139,10 +139,10 @@ class ImageAnalysisService {
       }
 
       const { analysisId } = await response.json();
-      
+
       // Store the request
       this.activeRequests.set(analysisId, { ...request, id: analysisId });
-      
+
       // Initialize result
       const initialResult: ImageAnalysisResult = {
         id: analysisId,
@@ -150,7 +150,7 @@ class ImageAnalysisService {
         progress: 0,
         createdAt: new Date(),
       };
-      
+
       this.results.set(analysisId, initialResult);
       this.notifyListeners(analysisId, initialResult);
 
@@ -176,7 +176,7 @@ class ImageAnalysisService {
    */
   getAllResults(): ImageAnalysisResult[] {
     return Array.from(this.results.values()).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
     );
   }
 
@@ -219,7 +219,7 @@ class ImageAnalysisService {
     if (!this.eventListeners.has(analysisId)) {
       this.eventListeners.set(analysisId, []);
     }
-    
+
     this.eventListeners.get(analysisId)!.push(callback);
 
     // Return unsubscribe function
@@ -276,7 +276,7 @@ class ImageAnalysisService {
     const poll = async () => {
       try {
         const response = await fetch(`${this.baseUrl}/status/${analysisId}`);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to get analysis status: ${response.statusText}`);
         }
@@ -311,7 +311,7 @@ class ImageAnalysisService {
         }
       } catch (error) {
         console.error('Failed to poll analysis status:', error);
-        
+
         // Update with error
         const currentResult = this.results.get(analysisId);
         if (currentResult) {
@@ -323,7 +323,7 @@ class ImageAnalysisService {
           this.results.set(analysisId, errorResult);
           this.notifyListeners(analysisId, errorResult);
         }
-        
+
         this.activeRequests.delete(analysisId);
       }
     };
@@ -381,7 +381,7 @@ class ImageAnalysisService {
   async exportResult(analysisId: string, format: 'json' | 'csv' | 'pdf'): Promise<Blob> {
     try {
       const response = await fetch(`${this.baseUrl}/export/${analysisId}?format=${format}`);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to export result: ${response.statusText}`);
       }

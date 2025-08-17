@@ -1,7 +1,9 @@
 import { pipeline } from '@huggingface/transformers';
+
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { MLResult, TextEmbeddingResult, FeatureExtractionOptions } from './types';
 import { DeviceDetector } from './deviceDetector';
-import { BaseService, ServiceConfig } from '../base/BaseService';
 
 /**
  * Configuration interface for TextEmbedderService
@@ -27,10 +29,10 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
   protected async doInitialize(): Promise<void> {
     try {
       console.log('Initializing text embedding model...');
-      
+
       const modelName = this.config.modelName || 'mixedbread-ai/mxbai-embed-xsmall-v1';
       const device = this.config.device || DeviceDetector.getOptimalDevice();
-      
+
       this.embedder = await pipeline(
         'feature-extraction',
         modelName,
@@ -38,8 +40,8 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
           device: device as any, // Type assertion for device compatibility
           progress_callback: this.config.enableProgressCallback ? (progress: any) => {
             console.log(`Text embedder loading: ${Math.round(progress.progress * 100)}%`);
-          } : undefined
-        }
+          } : undefined,
+        },
       );
 
       console.log('Text embedding model initialized successfully');
@@ -73,8 +75,8 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
     text: string | string[],
     options: FeatureExtractionOptions = {
       pooling: this.config.defaultPooling || 'mean',
-      normalize: this.config.defaultNormalize !== false
-    }
+      normalize: this.config.defaultNormalize !== false,
+    },
   ): Promise<MLResult> {
     return this.executeOperation(async () => {
       if (!this.embedder) {
@@ -91,16 +93,16 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
       const result: TextEmbeddingResult = Array.isArray(text)
         ? {
             embedding: embeddingData,
-            dimensions: embeddingData[0]?.length || 0
+            dimensions: embeddingData[0]?.length || 0,
           }
         : {
             embedding: embeddingData,
-            dimensions: embeddingData?.length || 0
+            dimensions: embeddingData?.length || 0,
           };
 
       return {
         success: true,
-        data: result
+        data: result,
       };
     }, 'generateEmbedding');
   }
@@ -124,7 +126,7 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
       const dotProduct = emb1.reduce((sum, a, i) => sum + a * emb2[i], 0);
       const magnitude1 = Math.sqrt(emb1.reduce((sum, a) => sum + a * a, 0));
       const magnitude2 = Math.sqrt(emb2.reduce((sum, a) => sum + a * a, 0));
-      
+
       const similarity = dotProduct / (magnitude1 * magnitude2);
 
       return {
@@ -134,8 +136,8 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
           text1,
           text2,
           embedding1: emb1,
-          embedding2: emb2
-        }
+          embedding2: emb2,
+        },
       };
     }, 'calculateSimilarity');
   }
@@ -147,7 +149,7 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
     return {
       name: this.config.modelName || 'mxbai-embed-xsmall-v1',
       initialized: this.isInitialized,
-      device: this.config.device
+      device: this.config.device,
     };
   }
 
@@ -181,14 +183,14 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
       retries: 3,
       rateLimit: {
         requestsPerMinute: 60,
-        burstLimit: 10
+        burstLimit: 10,
       },
       healthCheck: {
         enabled: true,
         interval: 30000,
-        timeout: 5000
+        timeout: 5000,
       },
-      ...config
+      ...config,
     };
 
     const instance = TextEmbedderService.getInstance<TextEmbedderService>();

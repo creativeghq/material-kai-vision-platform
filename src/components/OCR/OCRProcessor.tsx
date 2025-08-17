@@ -1,5 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, FileText, Eye, Server, Cpu, Zap } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+import { toast } from 'sonner';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,8 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { useDropzone } from 'react-dropzone';
-import { toast } from 'sonner';
 import { HybridOCRService, HybridOCROptions, HybridOCRResult } from '@/services/ml';
 
 export const OCRProcessor: React.FC = () => {
@@ -19,7 +20,7 @@ export const OCRProcessor: React.FC = () => {
   const [options, setOptions] = useState<HybridOCROptions>({
     language: 'en',
     extractStructuredData: true,
-    documentType: 'general'
+    documentType: 'general',
   });
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -32,9 +33,9 @@ export const OCRProcessor: React.FC = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff']
+      'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff'],
     },
-    maxFiles: 1
+    maxFiles: 1,
   });
 
   const processOCR = async () => {
@@ -53,7 +54,7 @@ export const OCRProcessor: React.FC = () => {
 
     try {
       const result = await (HybridOCRService as any).processOCR(selectedFile, options);
-      
+
       clearInterval(progressInterval);
       setProgress(100);
 
@@ -112,8 +113,8 @@ export const OCRProcessor: React.FC = () => {
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragActive 
-                ? 'border-primary bg-primary/5' 
+              isDragActive
+                ? 'border-primary bg-primary/5'
                 : 'border-border hover:border-primary/50'
             }`}
           >
@@ -140,8 +141,8 @@ export const OCRProcessor: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="language">Language</Label>
-              <Select 
-                value={options.language} 
+              <Select
+                value={options.language}
                 onValueChange={(value: string) => setOptions(prev => ({ ...prev, language: value }))}
               >
                 <SelectTrigger>
@@ -159,8 +160,8 @@ export const OCRProcessor: React.FC = () => {
 
             <div className="space-y-2">
               <Label htmlFor="documentType">Document Type</Label>
-              <Select 
-                value={options.documentType} 
+              <Select
+                value={options.documentType}
                 onValueChange={(value: any) => setOptions(prev => ({ ...prev, documentType: value }))}
               >
                 <SelectTrigger>
@@ -205,8 +206,8 @@ export const OCRProcessor: React.FC = () => {
           )}
 
           {/* Process Button */}
-          <Button 
-            onClick={processOCR} 
+          <Button
+            onClick={processOCR}
             disabled={!selectedFile || isProcessing}
             className="w-full"
           >
@@ -242,7 +243,7 @@ export const OCRProcessor: React.FC = () => {
                 <TabsTrigger value="structured">Structured Data</TabsTrigger>
                 <TabsTrigger value="metadata">Metadata</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="text" className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -260,7 +261,7 @@ export const OCRProcessor: React.FC = () => {
                   </div>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="structured" className="space-y-4">
                 {ocrResult.structuredData ? (
                   <div className="bg-muted p-4 rounded-lg">
@@ -272,7 +273,7 @@ export const OCRProcessor: React.FC = () => {
                   <p className="text-muted-foreground">No structured data extracted</p>
                 )}
               </TabsContent>
-              
+
               <TabsContent value="metadata" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>

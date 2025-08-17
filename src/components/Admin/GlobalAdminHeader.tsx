@@ -1,7 +1,8 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import { Home, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
 
 interface GlobalAdminHeaderProps {
   title: string;
@@ -9,10 +10,10 @@ interface GlobalAdminHeaderProps {
   breadcrumbs?: { label: string; path?: string }[];
 }
 
-export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({ 
-  title, 
-  description, 
-  breadcrumbs = [] 
+export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
+  title,
+  description,
+  breadcrumbs = [],
 }) => {
   const navigate = useNavigate();
 
@@ -63,7 +64,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
           )}
 
           <div className="h-6 w-px bg-border" />
-          
+
           {/* Title and Description */}
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>

@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
-import { RagDocument } from './mivaaToRagTransformer';
+
 import { ErrorHandler } from '../utils/errorHandler';
+
+import { RagDocument } from './mivaaToRagTransformer';
 
 export interface EnhancedRAGRequest {
   query: string;
@@ -136,12 +138,12 @@ export class EnhancedRAGService {
   static async search(request: EnhancedRAGRequest): Promise<EnhancedRAGResponse> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { data, error } = await supabase.functions.invoke('enhanced-rag-search', {
         body: {
           ...request,
-          userId: user?.id
-        }
+          userId: user?.id,
+        },
       });
 
       if (error) {
@@ -152,7 +154,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Enhanced RAG search failed',
-        { query: request.query, searchType: request.searchType, originalError: (error as Error).message }
+        { query: request.query, searchType: request.searchType, originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -186,12 +188,12 @@ export class EnhancedRAGService {
         validatedBy: item.validated_by,
         validationNotes: item.validation_notes,
         createdAt: item.created_at,
-        updatedAt: item.updated_at
+        updatedAt: item.updated_at,
       }));
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Material knowledge fetch failed',
-        { materialId, originalError: (error as Error).message }
+        { materialId, originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -224,8 +226,8 @@ export class EnhancedRAGService {
         body: {
           title: entry.title,
           content: entry.content,
-          contentType: entry.contentType
-        }
+          contentType: entry.contentType,
+        },
       });
 
       if (analysisError) {
@@ -253,7 +255,7 @@ export class EnhancedRAGService {
           search_keywords: analysisData?.search_keywords,
           created_by: user.id,
           last_modified_by: user.id,
-          status: 'draft'
+          status: 'draft',
         })
         .select()
         .single();
@@ -266,7 +268,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Knowledge entry addition failed',
-        { entryTitle: entry.title, originalError: (error as Error).message }
+        { entryTitle: entry.title, originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -301,12 +303,12 @@ export class EnhancedRAGService {
         validationStatus: item.validation_status,
         validatedBy: item.validated_by,
         createdAt: item.created_at,
-        updatedAt: item.updated_at
+        updatedAt: item.updated_at,
       }));
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Knowledge relationships fetch failed',
-        { entryId, originalError: (error as Error).message }
+        { entryId, originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -347,12 +349,12 @@ export class EnhancedRAGService {
         resultsReturned: item.results_returned,
         userSatisfaction: item.user_satisfaction,
         clickedResults: item.clicked_results || [],
-        createdAt: item.created_at
+        createdAt: item.created_at,
       }));
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Query history fetch failed',
-        { originalError: (error as Error).message }
+        { originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -377,7 +379,7 @@ export class EnhancedRAGService {
         .from('query_intelligence')
         .update({
           user_satisfaction: feedback.satisfaction,
-          clicked_results: feedback.clickedResults
+          clicked_results: feedback.clickedResults,
         })
         .eq('id', searchId)
         .eq('user_id', user.id);
@@ -402,7 +404,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Feedback submission failed',
-        { satisfaction: feedback.satisfaction, originalError: (error as Error).message }
+        { satisfaction: feedback.satisfaction, originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -436,9 +438,9 @@ export class EnhancedRAGService {
       const totalSearches = data.length;
       const avgSatisfaction = data
         .filter(s => s.satisfaction_rating)
-        .reduce((sum, s) => sum + s.satisfaction_rating, 0) / 
+        .reduce((sum, s) => sum + s.satisfaction_rating, 0) /
         data.filter(s => s.satisfaction_rating).length || 0;
-      
+
       const avgResponseTime = data
         .reduce((sum, s) => sum + (s.response_time_ms || 0), 0) / data.length || 0;
 
@@ -456,12 +458,12 @@ export class EnhancedRAGService {
           .sort(([,a], [,b]) => (b as number) - (a as number))
           .slice(0, 10)
           .map(([query, count]) => ({ query, count })),
-        searchHistory: data.slice(0, 50) // Recent searches
+        searchHistory: data.slice(0, 50), // Recent searches
       };
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Search analytics fetch failed',
-        { originalError: (error as Error).message }
+        { originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -497,8 +499,8 @@ export class EnhancedRAGService {
         body: {
           materialId,
           userId: user.id,
-          forceReextraction
-        }
+          forceReextraction,
+        },
       });
 
       if (error) {
@@ -509,7 +511,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Material knowledge extraction failed',
-        { materialId, originalError: (error as Error).message }
+        { materialId, originalError: (error as Error).message },
       );
       throw ragError;
     }
@@ -530,7 +532,7 @@ export class EnhancedRAGService {
         .update({
           validation_status: isValid ? 'approved' : 'rejected',
           validated_by: user.id,
-          validation_notes: notes
+          validation_notes: notes,
         })
         .eq('id', extractionId);
 
@@ -542,7 +544,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.createValidationError(
         'Knowledge validation failed',
-        { originalError: (error as Error).message }
+        { originalError: (error as Error).message },
       );
       throw ragError;
     }

@@ -3,7 +3,8 @@
  * Connects to the material-properties-analysis edge function
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 export interface MaterialPropertiesServiceConfig extends ServiceConfig {
@@ -74,7 +75,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
     // Test edge function availability
     try {
       const { error } = await supabase.functions.invoke('material-properties-analysis', {
-        body: { action: 'ping' }
+        body: { action: 'ping' },
       });
       if (error && !error.message.includes('ping')) {
         console.warn('MaterialPropertiesService: Edge function may not be available:', error);
@@ -131,14 +132,14 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
       enableBatchProcessing: false,
       maxBatchSize: 5,
       enableAdvancedAnalysis: true,
-      confidenceThreshold: 0.7
+      confidenceThreshold: 0.7,
     };
 
     const finalConfig = { ...defaultConfig, ...config };
     const instance = new MaterialPropertiesService(finalConfig);
     return instance;
   }
-  
+
   /**
    * Analyze material properties from image or existing material
    */
@@ -149,8 +150,8 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
       const { data, error } = await supabase.functions.invoke('material-properties-analysis', {
         body: {
           user_id: (await supabase.auth.getUser()).data.user?.id,
-          ...request
-        }
+          ...request,
+        },
       });
 
       if (error) {
@@ -206,7 +207,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   async comprehensiveAnalysis(imageData: string): Promise<MaterialPropertiesResult> {
     return this.analyzeProperties({
       image_data: imageData,
-      analysis_type: 'comprehensive'
+      analysis_type: 'comprehensive',
     });
   }
 
@@ -216,7 +217,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   async thermalAnalysis(imageData: string): Promise<MaterialPropertiesResult> {
     return this.analyzeProperties({
       image_data: imageData,
-      analysis_type: 'thermal'
+      analysis_type: 'thermal',
     });
   }
 
@@ -226,7 +227,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   async mechanicalAnalysis(imageData: string): Promise<MaterialPropertiesResult> {
     return this.analyzeProperties({
       image_data: imageData,
-      analysis_type: 'mechanical'
+      analysis_type: 'mechanical',
     });
   }
 }

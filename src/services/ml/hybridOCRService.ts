@@ -1,9 +1,10 @@
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { OCRService, OCRResult, OCROptions } from './ocrService';
 import { ServerMLService } from './serverMLService';
 import { MLResult } from './types';
 import { DeviceDetector } from './deviceDetector';
 import { HuggingFaceService } from './huggingFaceService';
-import { BaseService, ServiceConfig } from '../base/BaseService';
 
 export interface HybridOCRServiceConfig extends ServiceConfig {
   maxClientFileSize: number; // MB
@@ -103,7 +104,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       enableHybridProcessing: true,
       enableFallback: true,
       confidenceThreshold: 0.7,
-      enableStructuredExtraction: true
+      enableStructuredExtraction: true,
     };
 
     const finalConfig = { ...defaultConfig, ...config };
@@ -113,15 +114,15 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
 
   async processOCR(
     imageFile: File,
-    options: HybridOCROptions = {}
+    options: HybridOCROptions = {},
   ): Promise<MLResult> {
     const startTime = performance.now();
-    
+
     try {
       console.log('HybridOCR: Starting OCR processing', {
         fileName: imageFile.name,
         fileSize: `${(imageFile.size / 1024 / 1024).toFixed(2)}MB`,
-        options
+        options,
       });
 
       // Determine processing strategy
@@ -129,7 +130,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       console.log('HybridOCR: Processing strategy:', strategy);
 
       let result: MLResult;
-      
+
       switch (strategy.method) {
         case 'client':
           result = await HybridOCRService.processOnClient(imageFile, options);
@@ -151,10 +152,10 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
 
       const totalTime = performance.now() - startTime;
       console.log(`HybridOCR: Completed in ${totalTime.toFixed(2)}ms using ${strategy.method}`);
-      
+
       return {
         ...result,
-        processingTime: totalTime
+        processingTime: totalTime,
       };
 
     } catch (error) {
@@ -162,7 +163,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'OCR processing failed',
-        processingTime: performance.now() - startTime
+        processingTime: performance.now() - startTime,
       };
     }
   }
@@ -170,52 +171,52 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
   private static async determineProcessingStrategy(
     file: File,
     options: HybridOCROptions,
-    config: HybridOCRServiceConfig
+    config: HybridOCRServiceConfig,
   ): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string }> {
     const fileSizeMB = file.size / 1024 / 1024;
     const deviceInfo = await DeviceDetector.getDeviceInfo();
-    
+
     // Force flags override everything
     if (options.forceServerProcessing) {
       return { method: 'server', reason: 'Server processing forced by user' };
     }
-    
+
     if (options.forceClientProcessing) {
       return { method: 'client', reason: 'Client processing forced by user' };
     }
 
     // Document type considerations
-    const isComplexDocument = options.documentType && 
+    const isComplexDocument = options.documentType &&
       ['certificate', 'specification'].includes(options.documentType);
-    
+
     // File size considerations
     if (fileSizeMB > config.maxClientFileSize) {
       return {
         method: 'server',
-        reason: `Large file (${fileSizeMB.toFixed(1)}MB) best processed server-side`
+        reason: `Large file (${fileSizeMB.toFixed(1)}MB) best processed server-side`,
       };
     }
 
     if (fileSizeMB < config.minServerFileSize && !isComplexDocument) {
       return {
         method: 'client',
-        reason: `Small file (${fileSizeMB.toFixed(1)}MB) efficient for client processing`
+        reason: `Small file (${fileSizeMB.toFixed(1)}MB) efficient for client processing`,
       };
     }
 
     // Device capability considerations
     if (!deviceInfo.supportsWebGPU || deviceInfo.optimalDevice === 'cpu') {
-      return { 
-        method: 'server', 
-        reason: 'Limited device capabilities, using server processing' 
+      return {
+        method: 'server',
+        reason: 'Limited device capabilities, using server processing',
       };
     }
 
     // Complex document types benefit from AI processing
     if (isComplexDocument || options.extractStructuredData) {
-      return { 
-        method: 'server', 
-        reason: 'Complex document requires AI-powered extraction' 
+      return {
+        method: 'server',
+        reason: 'Complex document requires AI-powered extraction',
       };
     }
 
@@ -223,41 +224,41 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
     if (fileSizeMB <= config.maxClientFileSize && deviceInfo.supportsWebGPU) {
       return {
         method: 'hybrid',
-        reason: 'Optimal conditions for hybrid processing'
+        reason: 'Optimal conditions for hybrid processing',
       };
     }
 
     // Default to server for reliability
-    return { 
-      method: 'server', 
-      reason: 'Server processing for optimal accuracy' 
+    return {
+      method: 'server',
+      reason: 'Server processing for optimal accuracy',
     };
   }
 
   private static async processOnClient(
     file: File,
-    options: HybridOCROptions
+    options: HybridOCROptions,
   ): Promise<MLResult> {
     console.log('HybridOCR: Processing on client...');
-    
+
     try {
       // Try client-side OCR first using OCRService instance
       const ocrService = OCRService.createInstance();
       await ocrService.initialize();
       const result = await ocrService.extractText(file, options);
-      
+
       if (result.success && result.data?.text && (result.data.confidence || 0) > 0.7) {
         return result;
       }
-      
+
       console.log('HybridOCR: Client confidence low, trying HuggingFace...');
-      
+
       // Try HuggingFace OCR as fallback
       try {
         const huggingFaceService = HuggingFaceService.createInstance();
         await huggingFaceService.initialize();
         const text = await huggingFaceService.processOCR(file);
-        
+
         if (text && text.length > 0) {
           return {
             success: true,
@@ -267,14 +268,14 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
               language: 'auto',
               boundingBoxes: [],
               processingMethod: 'huggingface',
-              fallbackUsed: true
-            }
+              fallbackUsed: true,
+            },
           };
         }
       } catch (hfError) {
         console.log('HybridOCR: HuggingFace failed, falling back to server:', hfError);
       }
-      
+
       // Final fallback to server - create a temporary instance for server processing
       console.log('HybridOCR: All client methods failed, falling back to server');
       const tempInstance = HybridOCRService.createInstance();
@@ -284,7 +285,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
         (serverResult.data as HybridOCRResult).fallbackUsed = true;
       }
       return serverResult;
-      
+
     } catch (error) {
       console.log('HybridOCR: Client processing error, falling back to server:', error);
       const tempInstance = HybridOCRService.createInstance();
@@ -299,10 +300,10 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
 
   private async processOnServer(
     file: File,
-    options: HybridOCROptions
+    options: HybridOCROptions,
   ): Promise<MLResult> {
     console.log('HybridOCR: Processing on server...');
-    
+
     // Use a simple server processing approach
     return {
       success: true,
@@ -312,18 +313,18 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
         language: options.language || 'en',
         processingMethod: 'server' as const,
         documentType: options.documentType,
-        extractedStructuredData: options.extractStructuredData
+        extractedStructuredData: options.extractStructuredData,
       },
-      processingTime: Date.now()
+      processingTime: Date.now(),
     };
   }
 
   private async processHybrid(
     file: File,
-    options: HybridOCROptions
+    options: HybridOCROptions,
   ): Promise<MLResult> {
     console.log('HybridOCR: Starting hybrid processing...');
-    
+
     // Start both client and server processing in parallel
     const clientPromise = HybridOCRService.processOnClient(file, options);
     const serverPromise = this.processOnServer(file, options);
@@ -332,7 +333,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       // Wait for the first one to complete
       const race = await Promise.race([
         clientPromise.then(result => ({ source: 'client', result })),
-        serverPromise.then(result => ({ source: 'server', result }))
+        serverPromise.then(result => ({ source: 'server', result })),
       ]);
 
       console.log(`HybridOCR: ${race.source} processing completed first`);
@@ -363,7 +364,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       return {
         success: false,
         error: 'Both client and server OCR processing failed',
-        processingTime: 0
+        processingTime: 0,
       };
     }
   }
@@ -389,12 +390,12 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       enableHybridProcessing: true,
       enableFallback: true,
       confidenceThreshold: 0.7,
-      enableStructuredExtraction: true
+      enableStructuredExtraction: true,
     };
 
     const strategy = await this.determineProcessingStrategy(file, options, defaultConfig);
     const fileSizeMB = file.size / 1024 / 1024;
-    
+
     let estimatedTime: string;
     let accuracy: string;
 
@@ -417,7 +418,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       method: strategy.method,
       reason: strategy.reason,
       estimatedTime,
-      accuracy
+      accuracy,
     };
   }
 
@@ -433,7 +434,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       // Try to create instances to check if services are available
       const ocrInstance = OCRService.createInstance();
       const serverInstance = ServerMLService.createInstance();
-      
+
       return {
         clientSupported: true, // OCR service is available
         serverAvailable: true, // Server ML service is available
@@ -444,15 +445,15 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
           'Server: AI-Powered OCR',
           'Server: Structured Data Extraction',
           'Hybrid: Automatic Method Selection',
-          'Hybrid: Fallback Processing'
-        ]
+          'Hybrid: Fallback Processing',
+        ],
       };
     } catch (error) {
       return {
         clientSupported: false,
         serverAvailable: false,
         hybridReady: false,
-        features: []
+        features: [],
       };
     }
   }
@@ -465,22 +466,22 @@ export const hybridOCRService = HybridOCRService.createInstance();
 export interface HybridOCRStatic {
   processOCR(imageFile: File, options?: HybridOCROptions): Promise<MLResult>;
   determineProcessingStrategy(
-    file: File, 
+    file: File,
     options?: HybridOCROptions
   ): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string; estimatedTime: string; accuracy: string; }>;
 }
 
 // Add static methods to HybridOCRService class
 (HybridOCRService as any).processOCR = async function(
-  imageFile: File, 
-  options: HybridOCROptions = {}
+  imageFile: File,
+  options: HybridOCROptions = {},
 ): Promise<MLResult> {
   return hybridOCRService.processOCR(imageFile, options);
 };
 
 (HybridOCRService as any).determineProcessingStrategy = async function(
   file: File,
-  options: HybridOCROptions = {}
+  options: HybridOCROptions = {},
 ): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string; estimatedTime: string; accuracy: string; }> {
   return HybridOCRService.getProcessingRecommendation(file, options);
 };

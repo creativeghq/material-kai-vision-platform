@@ -12,7 +12,7 @@ interface ServiceRegistryEntry<T extends BaseService = BaseService> {
 
 /**
  * Service Factory
- * 
+ *
  * Centralized factory for creating and managing service instances
  * Provides dependency injection, lifecycle management, and service discovery
  */
@@ -38,7 +38,7 @@ export class ServiceFactory {
     name: string,
     config: ServiceConfig,
     factory: () => Promise<T>,
-    dependencies: string[] = []
+    dependencies: string[] = [],
   ): void {
     if (this.registry.has(name)) {
       throw new Error(`Service ${name} is already registered`);
@@ -48,7 +48,7 @@ export class ServiceFactory {
       instance: null,
       config,
       factory,
-      dependencies
+      dependencies,
     });
 
     console.log(`Service ${name} registered with factory`);
@@ -75,7 +75,7 @@ export class ServiceFactory {
       console.log(`Initializing service: ${name}`);
       entry.instance = await entry.factory();
       await entry.instance.initialize();
-      
+
       this.initializationOrder.push(name);
     }
 
@@ -114,7 +114,7 @@ export class ServiceFactory {
     }
 
     entry.config = { ...entry.config, ...updates };
-    
+
     // If service is already initialized, update its config
     if (entry.instance) {
       entry.instance.updateConfig(entry.config);
@@ -134,13 +134,13 @@ export class ServiceFactory {
         } catch (error) {
           health[name] = {
             status: 'unhealthy',
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Unknown error',
           };
         }
       } else {
         health[name] = {
           status: 'not_initialized',
-          error: 'Service not yet initialized'
+          error: 'Service not yet initialized',
         };
       }
     }
@@ -160,7 +160,7 @@ export class ServiceFactory {
       } else {
         metrics[name] = {
           serviceName: name,
-          status: 'not_initialized'
+          status: 'not_initialized',
         };
       }
     }
@@ -173,12 +173,12 @@ export class ServiceFactory {
    */
   public async initializeAllServices(): Promise<void> {
     console.log('Initializing all services...');
-    
+
     const serviceNames = Array.from(this.registry.keys());
-    
+
     // Sort services by dependencies
     const sortedServices = this.topologicalSort(serviceNames);
-    
+
     for (const serviceName of sortedServices) {
       try {
         await this.getService(serviceName);
@@ -234,13 +234,13 @@ export class ServiceFactory {
       if (visiting.has(serviceName)) {
         throw new Error(`Circular dependency detected involving service: ${serviceName}`);
       }
-      
+
       if (visited.has(serviceName)) {
         return;
       }
 
       visiting.add(serviceName);
-      
+
       const entry = this.registry.get(serviceName);
       if (entry?.dependencies) {
         for (const dependency of entry.dependencies) {

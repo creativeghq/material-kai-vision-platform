@@ -3,9 +3,11 @@
  * Handles environment detection, configuration loading, validation, and hot reload
  */
 
-import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import { z } from 'zod';
+
 import { AppConfig, Environment, ConfigValidationResult, ConfigFactory } from './types';
 import { AppConfigSchema, EnvVarsSchema } from './schemas/configSchemas';
 import { developmentConfig } from './environments/development';
@@ -30,7 +32,7 @@ class ConfigurationFactory implements ConfigFactory {
    */
   private detectEnvironment(): Environment {
     const nodeEnv = process.env.NODE_ENV?.toLowerCase();
-    
+
     switch (nodeEnv) {
       case 'production':
         return 'production';
@@ -52,7 +54,7 @@ class ConfigurationFactory implements ConfigFactory {
       if (fs.existsSync(envPath)) {
         const envContent = fs.readFileSync(envPath, 'utf-8');
         const envLines = envContent.split('\n');
-        
+
         envLines.forEach(line => {
           const trimmedLine = line.trim();
           if (trimmedLine && !trimmedLine.startsWith('#')) {
@@ -168,8 +170,8 @@ class ConfigurationFactory implements ConfigFactory {
       };
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.errors.map(err => 
-          `${err.path.join('.')}: ${err.message}`
+        const errors = error.issues.map(err =>
+          `${err.path.join('.')}: ${err.message}`,
         );
         return {
           isValid: false,
@@ -177,7 +179,7 @@ class ConfigurationFactory implements ConfigFactory {
           warnings: [],
         };
       }
-      
+
       return {
         isValid: false,
         errors: [error instanceof Error ? error.message : 'Unknown validation error'],
@@ -193,38 +195,38 @@ class ConfigurationFactory implements ConfigFactory {
     try {
       // Detect environment if not provided
       const targetEnvironment = environment || this.detectEnvironment();
-      
+
       // Load environment variables
       const envVars = this.loadEnvironmentVariables();
-      
+
       // Load base configuration
       let config = this.loadBaseConfiguration(targetEnvironment);
-      
+
       // Apply environment variable overrides
       config = this.applyEnvironmentOverrides(config, envVars);
-      
+
       // Validate the final configuration
       const validation = this.validate(config);
       if (!validation.isValid) {
         throw new Error(`Configuration validation failed: ${validation.errors.join(', ')}`);
       }
-      
+
       // Log warnings if any
       if (validation.warnings.length > 0) {
         console.warn('Configuration warnings:', validation.warnings);
       }
-      
+
       // Store current configuration
       this.currentConfig = config;
-      
+
       // Setup hot reload if enabled
       if (config.hotReload.enabled) {
         this.setupHotReload(config);
       }
-      
+
       console.log(`Configuration loaded successfully for environment: ${targetEnvironment}`);
       return config;
-      
+
     } catch (error) {
       console.error('Failed to create configuration:', error);
       throw error;
@@ -249,7 +251,7 @@ class ConfigurationFactory implements ConfigFactory {
       if (reloadTimeout) {
         clearTimeout(reloadTimeout);
       }
-      
+
       reloadTimeout = setTimeout(async () => {
         try {
           console.log('Configuration files changed, reloading...');
@@ -266,13 +268,13 @@ class ConfigurationFactory implements ConfigFactory {
       try {
         const fullPath = path.resolve(watchPath);
         if (fs.existsSync(fullPath)) {
-          const watcher = fs.watch(fullPath, { recursive: true }, (eventType, filename) => {
+          const watcher = fs.watch(fullPath, { recursive: true }, (_, filename) => {
             if (filename && (filename.endsWith('.ts') || filename.endsWith('.json') || filename.endsWith('.env'))) {
               console.log(`Configuration file changed: ${filename}`);
               scheduleReload();
             }
           });
-          
+
           this.watchers.push(watcher);
           console.log(`Watching for configuration changes: ${watchPath}`);
         }
@@ -289,7 +291,7 @@ class ConfigurationFactory implements ConfigFactory {
     if (!this.currentConfig) {
       throw new Error('No configuration to reload');
     }
-    
+
     const environment = this.currentConfig.environment;
     await this.create(environment);
   }

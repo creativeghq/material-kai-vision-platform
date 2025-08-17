@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import styles from './Dashboard.module.css';
 import { featuresConfig, type FeatureCard } from './dashboardData';
 

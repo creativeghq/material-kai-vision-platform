@@ -1,17 +1,17 @@
 /**
  * Dependency Injection Container System
- * 
+ *
  * This module provides a comprehensive dependency injection container for the microservice PDF2MD system.
  * It includes service registration, resolution, lifecycle management, and integration with the existing
  * configuration system.
- * 
+ *
  * @example
  * ```typescript
  * import { getDefaultContainer, ServiceLifetime } from './di';
- * 
+ *
  * // Get the default container with pre-configured services
  * const container = getDefaultContainer();
- * 
+ *
  * // Register a service
  * container.register({
  *   identifier: 'MyService',
@@ -19,7 +19,7 @@
  *   lifetime: ServiceLifetime.Singleton,
  *   dependencies: ['Logger', 'DocumentChunkingConfig']
  * });
- * 
+ *
  * // Resolve a service
  * const myService = container.resolve<MyServiceClass>('MyService');
  * ```
@@ -37,7 +37,7 @@ export type {
   IServiceHealth,
   IContainerOptions,
   IServiceRegistrationBuilder,
-  IServiceContainer
+  IServiceContainer,
 } from './types.js';
 
 // Service interface contracts
@@ -47,14 +47,14 @@ export {
   ServiceLifetime,
   CircularDependencyError,
   ServiceNotFoundError,
-  ServiceResolutionError
+  ServiceResolutionError,
 } from './types.js';
 
 // Core container implementation
 export {
   ServiceContainer,
   ServiceRegistrationBuilder,
-  ServiceScope
+  ServiceScope,
 } from './container.js';
 
 // Container factory and convenience functions
@@ -62,7 +62,7 @@ export {
   ContainerFactory,
   getDefaultContainer,
   createContainer,
-  createTestContainer
+  createTestContainer,
 } from './containerFactory.js';
 
 /**
@@ -77,7 +77,7 @@ export type {
   BatchProcessingConfig,
   ValidationIntegrationConfig,
   PerformanceConfig,
-  ExternalDependenciesConfig
+  ExternalDependenciesConfig,
 } from '../config/types.js';
 
 
@@ -94,5 +94,5 @@ export const FEATURES = {
   HEALTH_CHECKS: true,
   SCOPED_SERVICES: true,
   CONFIG_INTEGRATION: true,
-  ASYNC_RESOLUTION: true
+  ASYNC_RESOLUTION: true,
 } as const;

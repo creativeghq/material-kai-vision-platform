@@ -1,4 +1,14 @@
 import React, { useState, useCallback } from 'react';
+import {
+  Sparkles,
+  Settings,
+  Brain,
+  FileText,
+  Loader2,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,15 +17,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Sparkles,
-  Settings,
-  Brain,
-  FileText,
-  Loader2,
-  CheckCircle,
-  XCircle
-} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
@@ -44,9 +45,9 @@ export const MaterialSuggestionsPanel: React.FC = () => {
     prompt: '',
     includeProperties: true,
     maxSuggestions: 8,
-    confidenceThreshold: 0.7
+    confidenceThreshold: 0.7,
   });
-  
+
   const [suggestions, setSuggestions] = useState<MaterialSuggestion[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [testResults, setTestResults] = useState<any[]>([]);
@@ -55,9 +56,9 @@ export const MaterialSuggestionsPanel: React.FC = () => {
   const generateSuggestions = useCallback(async () => {
     if (!config.prompt.trim()) {
       toast({
-        title: "Prompt Required",
-        description: "Please enter a prompt for material suggestions",
-        variant: "destructive"
+        title: 'Prompt Required',
+        description: 'Please enter a prompt for material suggestions',
+        variant: 'destructive',
       });
       return;
     }
@@ -74,8 +75,8 @@ export const MaterialSuggestionsPanel: React.FC = () => {
         context: {
           roomType: config.roomType,
           style: config.style,
-          purpose: '3d_generation'
-        }
+          purpose: '3d_generation',
+        },
       });
 
       if (!result.success) {
@@ -86,7 +87,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
 
       // Process and format suggestions
       const formattedSuggestions: MaterialSuggestion[] = [];
-      
+
       // From PDF knowledge base
       if (data.results?.knowledgeBase) {
         data.results.knowledgeBase.forEach((item: any) => {
@@ -97,7 +98,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
                 category: item.metadata.content_type || 'pdf_content',
                 confidence: item.confidence || 0.8,
                 source: 'pdf_knowledge',
-                properties: item.metadata
+                properties: item.metadata,
               });
             });
           }
@@ -112,7 +113,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
             category: item.category || 'material',
             confidence: item.confidence || 0.7,
             source: 'catalog',
-            properties: item.properties
+            properties: item.properties,
           });
         });
       }
@@ -120,24 +121,24 @@ export const MaterialSuggestionsPanel: React.FC = () => {
       // Filter by confidence and deduplicate
       const uniqueSuggestions = formattedSuggestions
         .filter(s => s.confidence >= config.confidenceThreshold)
-        .filter((suggestion, index, self) => 
-          index === self.findIndex(s => s.name.toLowerCase() === suggestion.name.toLowerCase())
+        .filter((suggestion, index, self) =>
+          index === self.findIndex(s => s.name.toLowerCase() === suggestion.name.toLowerCase()),
         )
         .slice(0, config.maxSuggestions);
 
       setSuggestions(uniqueSuggestions);
 
       toast({
-        title: "Suggestions Generated",
-        description: `Found ${uniqueSuggestions.length} material suggestions from PDF knowledge base`
+        title: 'Suggestions Generated',
+        description: `Found ${uniqueSuggestions.length} material suggestions from PDF knowledge base`,
       });
 
     } catch (error) {
       console.error('Error generating suggestions:', error);
       toast({
-        title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Generation Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
@@ -149,7 +150,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
     try {
       // Test the 3D generation with current suggestions
       const materialList = suggestions.map(s => s.name).join(', ');
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
@@ -162,7 +163,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
         room_type: config.roomType,
         style: config.style,
         materials_used: materialList,
-        model: 'test_mode'
+        model: 'test_mode',
       });
 
       if (!result.success) {
@@ -176,12 +177,12 @@ export const MaterialSuggestionsPanel: React.FC = () => {
         success: true,
         materials_suggested: suggestions.length,
         processing_time: data?.processing_time_ms || 0,
-        result: data
+        result: data,
       }]);
 
       toast({
-        title: "3D Integration Test Complete",
-        description: `Successfully tested with ${suggestions.length} material suggestions`
+        title: '3D Integration Test Complete',
+        description: `Successfully tested with ${suggestions.length} material suggestions`,
       });
 
     } catch (error) {
@@ -189,14 +190,14 @@ export const MaterialSuggestionsPanel: React.FC = () => {
       setTestResults(prev => [...prev, {
         timestamp: new Date().toISOString(),
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-        materials_suggested: suggestions.length
+        error: error instanceof Error ? error.message : 'Unknown error',
+        materials_suggested: suggestions.length,
       }]);
 
       toast({
-        title: "3D Integration Test Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: '3D Integration Test Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
@@ -309,7 +310,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
               Generate Suggestions
             </Button>
-            
+
             {suggestions.length > 0 && (
               <Button className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground" onClick={test3DIntegration} disabled={isGenerating}>
                 {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -377,8 +378,8 @@ export const MaterialSuggestionsPanel: React.FC = () => {
                   {testResults.map((result, index) => (
                     <div key={index} className="flex items-center justify-between p-3 border rounded">
                       <div className="flex items-center gap-3">
-                        {result.success ? 
-                          <CheckCircle className="h-5 w-5 text-green-500" /> : 
+                        {result.success ?
+                          <CheckCircle className="h-5 w-5 text-green-500" /> :
                           <XCircle className="h-5 w-5 text-red-500" />
                         }
                         <div>
@@ -386,7 +387,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
                             Test {index + 1} - {result.success ? 'Success' : 'Failed'}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {new Date(result.timestamp).toLocaleString()} • 
+                            {new Date(result.timestamp).toLocaleString()} •
                             {result.materials_suggested} materials suggested
                           </div>
                         </div>

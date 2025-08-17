@@ -6,7 +6,9 @@
  */
 
 import { z } from 'zod';
+
 import { Singleton } from '../core/patterns/Singleton';
+
 import type { HuggingFaceApiConfig } from './apis/huggingfaceConfig';
 import { replicateConfig } from './apis/replicateConfig';
 import { supabaseConfig } from './apis/supabaseConfig';
@@ -83,10 +85,10 @@ export interface OpenAIApiConfig extends BaseApiConfig {
 
 
 // Union type for all API configurations
-export type ApiConfig = 
-  | ReplicateApiConfig 
-  | SupabaseApiConfig 
-  | OpenAIApiConfig 
+export type ApiConfig =
+  | ReplicateApiConfig
+  | SupabaseApiConfig
+  | OpenAIApiConfig
   | HuggingFaceApiConfig;
 
 // API Registry - centralized store for all API configurations
@@ -137,30 +139,30 @@ export class ApiRegistry extends Singleton {
    * Get a specific API configuration by type
    */
   public getApiConfigByType<T extends ApiConfig>(type: string): T | null {
-    
-    
-    for (const config of this.configs.values()) {
+
+
+    for (const config of Array.from(this.configs.values())) {
       // Normalize both strings for comparison to handle case sensitivity and whitespace
       const configType = config.type?.toLowerCase().trim();
       const searchType = type?.toLowerCase().trim();
-      
+
       if (configType === searchType) {
         return config as T;
       }
     }
-    
+
     console.log(`❌ DEBUG: No config found for type "${type}"`);
-    console.log(`❌ DEBUG: Available types:`, Array.from(this.configs.values()).map(c => `"${c.type}"`));
-    
+    console.log('❌ DEBUG: Available types:', Array.from(this.configs.values()).map(c => `"${c.type}"`));
+
     // Additional error handling: suggest similar types
     const availableTypes = Array.from(this.configs.values()).map(c => c.type?.toLowerCase().trim());
     const searchTypeLower = type?.toLowerCase().trim();
     const similarTypes = availableTypes.filter(t => t && t.includes(searchTypeLower));
-    
+
     if (similarTypes.length > 0) {
-      console.log(`💡 DEBUG: Did you mean one of these types?`, similarTypes);
+      console.log('💡 DEBUG: Did you mean one of these types?', similarTypes);
     }
-    
+
     return null;
   }
 
@@ -201,15 +203,15 @@ export class ApiRegistry extends Singleton {
 export class ApiConfigUtils {
   public static createReplicateModelSchema(requiredParams: string[], optionalParams: string[] = []): z.ZodSchema {
     const schemaObject: Record<string, z.ZodTypeAny> = {};
-    
+
     requiredParams.forEach(param => {
       schemaObject[param] = z.any(); // Will be refined per model
     });
-    
+
     optionalParams.forEach(param => {
       schemaObject[param] = z.any().optional();
     });
-    
+
     return z.object(schemaObject);
   }
 
@@ -223,8 +225,8 @@ export class ApiConfigUtils {
       ...override,
       rateLimit: {
         ...base.rateLimit,
-        ...override.rateLimit
-      }
+        ...override.rateLimit,
+      },
     };
   }
 }

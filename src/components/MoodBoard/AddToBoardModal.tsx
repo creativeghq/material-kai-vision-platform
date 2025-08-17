@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Check } from 'lucide-react';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@ interface AddToBoardModalProps {
 export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
   open,
   onOpenChange,
-  material
+  material,
 }) => {
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
@@ -44,9 +45,9 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
     } catch (error) {
       console.error('Error loading moodboards:', error);
       toast({
-        title: "Error",
-        description: "Failed to load your moodboards",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load your moodboards',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -60,26 +61,26 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
     try {
       await moodboardAPI.addMoodBoardItem({
         moodboard_id: selectedBoardId,
-        material_id: material.id
+        material_id: material.id,
       });
 
       const selectedBoard = moodboards.find(b => b.id === selectedBoardId);
       toast({
-        title: "Success",
-        description: `Added "${material.name}" to "${selectedBoard?.title}"`
+        title: 'Success',
+        description: `Added "${material.name}" to "${selectedBoard?.title}"`,
       });
       onOpenChange(false);
       resetState();
     } catch (error: any) {
       console.error('Error adding to board:', error);
-      const errorMessage = error.message?.includes('duplicate') 
+      const errorMessage = error.message?.includes('duplicate')
         ? 'This material is already in the selected moodboard'
         : 'Failed to add material to moodboard';
-      
+
       toast({
-        title: "Error",
+        title: 'Error',
         description: errorMessage,
-        variant: "destructive"
+        variant: 'destructive',
       });
     } finally {
       setAdding(false);
@@ -89,9 +90,9 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
   const handleCreateNewBoard = async () => {
     if (!material || !newBoardTitle.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a title for the new moodboard",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Please enter a title for the new moodboard',
+        variant: 'destructive',
       });
       return;
     }
@@ -101,27 +102,27 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
       // Create new board
       const newBoard = await moodboardAPI.createMoodBoard({
         title: newBoardTitle.trim(),
-        is_public: false
+        is_public: false,
       });
 
       // Add material to the new board
       await moodboardAPI.addMoodBoardItem({
         moodboard_id: newBoard.id,
-        material_id: material.id
+        material_id: material.id,
       });
 
       toast({
-        title: "Success",
-        description: `Created "${newBoard.title}" and added "${material.name}"`
+        title: 'Success',
+        description: `Created "${newBoard.title}" and added "${material.name}"`,
       });
       onOpenChange(false);
       resetState();
     } catch (error) {
       console.error('Error creating board and adding material:', error);
       toast({
-        title: "Error",
-        description: "Failed to create new moodboard",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to create new moodboard',
+        variant: 'destructive',
       });
     } finally {
       setCreating(false);
@@ -193,7 +194,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                     </SelectContent>
                   </Select>
 
-                  <Button 
+                  <Button
                     onClick={handleAddToExistingBoard}
                     disabled={!selectedBoardId || adding}
                     className="w-full"
@@ -249,7 +250,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                 >
                   Back
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreateNewBoard}
                   disabled={!newBoardTitle.trim() || creating}
                   className="flex-1"

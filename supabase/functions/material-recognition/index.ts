@@ -1,9 +1,9 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface MaterialRecognitionRequest {
@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
-      }
+      },
     );
   }
 
@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
           },
-        }
+        },
       );
     }
 
@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
         analysis_type: analysisType,
         confidence_threshold: confidenceThreshold,
         status: 'processing',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
 
     // Perform actual material recognition using AI/ML services
     let recognizedMaterials = [];
-    
+
     try {
       // Use OpenAI Vision API for material recognition
       const openaiKey = Deno.env.get('OPENAI_API_KEY');
@@ -162,34 +162,34 @@ Deno.serve(async (req: Request) => {
             messages: [
               {
                 role: 'system',
-                content: `You are an expert materials scientist. Analyze the image to identify materials and their properties. Return a JSON array of materials with: name, confidence (0-1), properties (category, subcategory, color, texture, finish, durability, sustainability), and bounding_box (x, y, width, height). Be precise and only identify materials you can see clearly.`
+                content: 'You are an expert materials scientist. Analyze the image to identify materials and their properties. Return a JSON array of materials with: name, confidence (0-1), properties (category, subcategory, color, texture, finish, durability, sustainability), and bounding_box (x, y, width, height). Be precise and only identify materials you can see clearly.',
               },
               {
                 role: 'user',
                 content: [
                   {
                     type: 'text',
-                    text: `Analyze this image for materials. Analysis type: ${analysisType}. Minimum confidence: ${confidenceThreshold}`
+                    text: `Analyze this image for materials. Analysis type: ${analysisType}. Minimum confidence: ${confidenceThreshold}`,
                   },
                   {
                     type: 'image_url',
                     image_url: {
                       url: body.image_url,
-                      detail: analysisType === 'comprehensive' ? 'high' : 'auto'
-                    }
-                  }
-                ]
-              }
+                      detail: analysisType === 'comprehensive' ? 'high' : 'auto',
+                    },
+                  },
+                ],
+              },
             ],
             max_tokens: 1500,
-            temperature: 0.1
+            temperature: 0.1,
           }),
         });
 
         if (visionResponse.ok) {
           const visionData = await visionResponse.json();
           const analysisText = visionData.choices[0].message.content;
-          
+
           try {
             const parsedMaterials = JSON.parse(analysisText);
             if (Array.isArray(parsedMaterials)) {
@@ -233,7 +233,7 @@ Deno.serve(async (req: Request) => {
 
       // Filter materials based on confidence threshold
       const filteredMaterials = recognizedMaterials.filter(
-        (material: RecognizedMaterial) => material.confidence >= confidenceThreshold
+        (material: RecognizedMaterial) => material.confidence >= confidenceThreshold,
       );
 
       // Store results in database
@@ -247,8 +247,8 @@ Deno.serve(async (req: Request) => {
               confidence: material.confidence,
               properties: material.properties,
               bounding_box: material.bounding_box,
-              created_at: new Date().toISOString()
-            }))
+              created_at: new Date().toISOString(),
+            })),
           );
 
         if (resultsError) {
@@ -261,14 +261,14 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'completed',
             materials_found: filteredMaterials.length,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', recognitionRecord.id);
       }
 
     } catch (error) {
       console.error('Material recognition processing error:', error);
-      
+
       // Update request status to failed
       if (recognitionRecord) {
         await supabase
@@ -276,17 +276,17 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'failed',
             error_message: error.message,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', recognitionRecord.id);
       }
-      
+
       // Return empty results but don't fail the request
       recognizedMaterials = [];
     }
 
     const filteredMaterials = recognizedMaterials.filter(
-      (material: RecognizedMaterial) => material.confidence >= confidenceThreshold
+      (material: RecognizedMaterial) => material.confidence >= confidenceThreshold,
     );
 
 
@@ -300,7 +300,7 @@ Deno.serve(async (req: Request) => {
         analysis_type: analysisType,
         image_dimensions: {
           width: 800,
-          height: 600
+          height: 600,
         },
       },
     };
@@ -315,7 +315,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Material recognition error:', error);
-    
+
     const response: MaterialRecognitionResponse = {
       success: false,
       materials: [],

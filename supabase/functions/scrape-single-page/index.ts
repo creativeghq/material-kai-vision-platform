@@ -38,9 +38,9 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Method not allowed. Use POST.' 
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Method not allowed. Use POST.',
     }), {
       status: 405,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -49,9 +49,9 @@ Deno.serve(async (req) => {
 
   try {
     const { pageUrl, sessionId, pageId, options = {} }: ScrapePageRequest = await req.json();
-    
+
     console.log(`Processing page: ${pageUrl} for session: ${sessionId}, page: ${pageId}`);
-    
+
     // Validate inputs
     if (!pageUrl || !sessionId || !pageId) {
       throw new Error('Missing required parameters: pageUrl, sessionId, pageId');
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
     // Get auth info
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
       .update({
         status: 'processing',
         started_at: startTime.toISOString(),
-        retry_count: options.retryAttempt || 0
+        retry_count: options.retryAttempt || 0,
       })
       .eq('id', pageId);
 
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     try {
       // Use the specified service or default to firecrawl
       const service = options.service || 'firecrawl';
-      
+
       if (service === 'firecrawl') {
         materials = await scrapeWithFirecrawl(pageUrl, options);
       } else {
@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
         completed_at: endTime.toISOString(),
         materials_found: materials.length,
         error_message: errorMessage,
-        processing_time_ms: processingTime
+        processing_time_ms: processingTime,
       })
       .eq('id', pageId);
 
@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
         material_data: material,
         reviewed: false,
         approved: null,
-        scraped_at: new Date().toISOString()
+        scraped_at: new Date().toISOString(),
       }));
 
       const { error: materialsError } = await supabase
@@ -152,18 +152,18 @@ Deno.serve(async (req) => {
       pageId,
       materialsFound: materials.length,
       processingTimeMs: processingTime,
-      error: errorMessage
+      error: errorMessage,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Error in scrape-single-page:', error);
-    
+
     return new Response(JSON.stringify({
       success: false,
       error: error.message || 'Unknown error occurred',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -190,12 +190,12 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<MaterialD
 - Images
 - Properties like dimensions, color, finish
 - Category (tiles, stone, wood, etc.)
-Return a list of materials found on the page.`
-    }
+Return a list of materials found on the page.`,
+    },
   };
 
   console.log('Making Firecrawl API request to:', url);
-  
+
   const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
@@ -211,20 +211,20 @@ Return a list of materials found on the page.`
   }
 
   const result = await response.json();
-  
+
   if (!result.success) {
     throw new Error(result.error || 'Firecrawl extraction failed');
   }
 
   // Parse extracted data into our material format
   const materials: MaterialData[] = [];
-  
+
   if (result.data?.extract) {
     const extracted = result.data.extract;
-    
+
     // Handle if extracted data is an array or single object
     const items = Array.isArray(extracted) ? extracted : [extracted];
-    
+
     for (const item of items) {
       if (item && typeof item === 'object') {
         materials.push({
@@ -236,7 +236,7 @@ Return a list of materials found on the page.`
           properties: item.properties || {},
           sourceUrl: url,
           supplier: item.supplier || '',
-          confidence: 0.8
+          confidence: 0.8,
         });
       }
     }
@@ -255,8 +255,8 @@ async function scrapeWithJina(url: string, options: any): Promise<MaterialData[]
   const readerResponse = await fetch(`https://r.jina.ai/${url}`, {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
-      'X-Return-Format': 'markdown'
-    }
+      'X-Return-Format': 'markdown',
+    },
   });
 
   if (!readerResponse.ok) {
@@ -264,10 +264,10 @@ async function scrapeWithJina(url: string, options: any): Promise<MaterialData[]
   }
 
   const content = await readerResponse.text();
-  
+
   // Use simple pattern matching to extract material information
   const materials: MaterialData[] = [];
-  
+
   // Basic material extraction patterns (can be enhanced)
   const materialPatterns = [
     /(?:tile|stone|wood|metal|fabric|glass|plastic|concrete)[^.]*?(?:\$[\d,]+\.?\d*|\d+[\s]*(?:USD|EUR|GBP))/gi,
@@ -285,7 +285,7 @@ async function scrapeWithJina(url: string, options: any): Promise<MaterialData[]
           images: [],
           properties: {},
           sourceUrl: url,
-          confidence: 0.6
+          confidence: 0.6,
         });
       }
     }

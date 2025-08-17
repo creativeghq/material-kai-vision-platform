@@ -1,16 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BarChart3,
   Users,
@@ -20,11 +8,25 @@ import {
   Activity,
   Home,
   ArrowLeft,
-  Clock
+  Clock,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+
 
 interface UsageAnalytics {
   total_searches: number;
@@ -45,12 +47,17 @@ interface SearchAnalytic {
 
 interface ApiUsageLog {
   id: string;
-  request_path: string;
-  request_method: string;
-  response_status: number;
-  response_time_ms: number;
-  created_at: string;
-  user_id: string;
+  api_key_id: string;
+  endpoint: string;
+  method: string;
+  status_code: number;
+  response_time_ms: number | null;
+  request_size_bytes: number | null;
+  response_size_bytes: number | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  error_message: string | null;
+  created_at: string | null;
 }
 
 export const AnalyticsDashboard: React.FC = () => {
@@ -59,7 +66,7 @@ export const AnalyticsDashboard: React.FC = () => {
     total_searches: 0,
     total_api_calls: 0,
     active_users: 0,
-    avg_response_time: 0
+    avg_response_time: 0,
   });
   const [searchAnalytics, setSearchAnalytics] = useState<SearchAnalytic[]>([]);
   const [apiUsage, setApiUsage] = useState<ApiUsageLog[]>([]);
@@ -73,7 +80,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch search analytics
       const { data: searchData, error: searchError } = await supabase
         .from('analytics_events')
@@ -96,7 +103,7 @@ export const AnalyticsDashboard: React.FC = () => {
       const filteredSearchData = (searchData || []).filter(item =>
         item.created_at &&
         item.event_type &&
-        item.id
+        item.id,
       ).map(item => ({
         id: item.id,
         query_text: (item.event_data as any)?.query || 'Unknown query',
@@ -106,20 +113,20 @@ export const AnalyticsDashboard: React.FC = () => {
         response_time_ms: (item.event_data as any)?.response_time || 0,
         created_at: item.created_at || new Date().toISOString(),
         user_id: item.user_id,
-        session_id: item.session_id
+        session_id: item.session_id,
       }));
 
       const filteredApiData = (apiData || []).filter(item =>
         item.created_at &&
         item.id &&
-        item.response_status !== null
+        item.status_code !== null,
       ).map(item => ({
         ...item,
-        response_status: item.response_status || 0,
+        response_status: item.status_code || 0,
         response_time_ms: item.response_time_ms || 0,
-        user_id: item.user_id || 'anonymous',
-        endpoint_id: item.endpoint_id || 'unknown',
-        user_agent: item.user_agent || 'unknown'
+        user_id: item.api_key_id || 'anonymous',
+        endpoint_id: item.endpoint || 'unknown',
+        user_agent: item.user_agent || 'unknown',
       }));
 
       setSearchAnalytics(filteredSearchData);
@@ -130,7 +137,7 @@ export const AnalyticsDashboard: React.FC = () => {
       const totalApiCalls = apiData?.length || 0;
       const uniqueUsers = new Set([
         ...searchData?.map(s => s.user_id).filter(Boolean) || [],
-        ...apiData?.map(a => a.user_id).filter(Boolean) || []
+        ...apiData?.map(a => a.api_key_id).filter(Boolean) || [],
       ]).size;
       const avgResponseTime = apiData?.reduce((sum, log) => sum + (log.response_time_ms || 0), 0) / Math.max(apiData?.length || 1, 1);
 
@@ -138,7 +145,7 @@ export const AnalyticsDashboard: React.FC = () => {
         total_searches: totalSearches,
         total_api_calls: totalApiCalls,
         active_users: uniqueUsers,
-        avg_response_time: Math.round(avgResponseTime)
+        avg_response_time: Math.round(avgResponseTime),
       });
 
     } catch (error) {
@@ -146,7 +153,7 @@ export const AnalyticsDashboard: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to fetch analytics data',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -352,24 +359,24 @@ export const AnalyticsDashboard: React.FC = () => {
                     {apiUsage.slice(0, 15).map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="font-mono text-sm max-w-xs truncate">
-                          {log.request_path}
+                          {log.endpoint}
                         </TableCell>
                         <TableCell>
-                          <Badge className="border border-gray-300 bg-white text-gray-700">{log.request_method}</Badge>
+                          <Badge className="border border-gray-300 bg-white text-gray-700">{log.method}</Badge>
                         </TableCell>
                         <TableCell>
-                          <span className={getStatusColor(log.response_status)}>
-                            {log.response_status}
+                          <span className={getStatusColor(log.status_code)}>
+                            {log.status_code}
                           </span>
                         </TableCell>
                         <TableCell>{log.response_time_ms || 0}ms</TableCell>
                         <TableCell>
                           <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
-                            {log.user_id ? log.user_id.slice(0, 8) + '...' : 'Anonymous'}
+                            {log.api_key_id ? log.api_key_id.slice(0, 8) + '...' : 'Anonymous'}
                           </code>
                         </TableCell>
                         <TableCell>
-                          {new Date(log.created_at).toLocaleString()}
+                          {log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A'}
                         </TableCell>
                       </TableRow>
                     ))}

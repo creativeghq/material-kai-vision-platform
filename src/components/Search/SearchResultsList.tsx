@@ -1,9 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import {
   Grid3X3,
   List,
@@ -20,9 +15,16 @@ import {
   FileText,
   Image,
   Database,
-  BarChart3
+  BarChart3,
 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+
 import { SearchResultCard, SearchResult } from './SearchResultCard';
 
 // Types for sorting and filtering
@@ -107,7 +109,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
         result.title.toLowerCase().includes(term) ||
         result.description.toLowerCase().includes(term) ||
         result.tags.some(tag => tag.toLowerCase().includes(term)) ||
-        result.author?.toLowerCase().includes(term)
+        result.author?.toLowerCase().includes(term),
       );
     }
 
@@ -160,8 +162,8 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
   };
 
   const handleBulkDownload = () => {
-    const selectedResultObjects = filteredAndSortedResults.filter(r => 
-      selectedResults.has(r.id)
+    const selectedResultObjects = filteredAndSortedResults.filter(r =>
+      selectedResults.has(r.id),
     );
     onBulkDownload?.(selectedResultObjects);
   };
@@ -203,13 +205,11 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
               </span>
             )}
           </h2>
-          
+
           {hasActiveFilters && (
             <Button
-              variant="ghost"
-              size="sm"
               onClick={clearFilters}
-              className="text-gray-500 hover:text-gray-700"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3 text-gray-500 hover:text-gray-700"
             >
               <X className="h-4 w-4 mr-1" />
               Clear filters
@@ -221,14 +221,12 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           {/* Bulk actions */}
           {selectedResults.size > 0 && (
             <>
-              <Badge variant="secondary" className="mr-2">
+              <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 mr-2">
                 {selectedResults.size} selected
               </Badge>
               <Button
-                variant="outline"
-                size="sm"
                 onClick={handleBulkDownload}
-                className="mr-2"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 mr-2"
               >
                 <Download className="h-4 w-4 mr-1" />
                 Download Selected
@@ -244,10 +242,12 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
               return (
                 <Button
                   key={option.value}
-                  variant={viewMode === option.value ? 'default' : 'ghost'}
-                  size="sm"
                   onClick={() => setViewMode(option.value as ViewMode)}
-                  className="rounded-none first:rounded-l-lg last:rounded-r-lg"
+                  className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 rounded-none first:rounded-l-lg last:rounded-r-lg ${
+                    viewMode === option.value
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'hover:bg-accent hover:text-accent-foreground'
+                  }`}
                 >
                   <Icon className="h-4 w-4" />
                 </Button>
@@ -272,7 +272,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           </div>
 
           {/* Type filter */}
-          <Select value={filterType} onValueChange={(value) => setFilterType(value as FilterType)}>
+          <Select value={filterType} onValueChange={(value: string) => setFilterType(value as FilterType)}>
             <SelectTrigger className="w-40">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
@@ -295,7 +295,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
 
         <div className="flex items-center gap-2">
           {/* Sort controls */}
-          <Select value={sortField} onValueChange={(value) => setSortField(value as SortField)}>
+          <Select value={sortField} onValueChange={(value: string) => setSortField(value as SortField)}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -315,9 +315,8 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           </Select>
 
           <Button
-            variant="outline"
-            size="sm"
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
           >
             {sortOrder === 'asc' ? (
               <SortAsc className="h-4 w-4" />
@@ -366,7 +365,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           <div className={cn(
             'space-y-4',
             viewMode === 'card' && 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 space-y-0',
-            viewMode === 'compact' && 'space-y-2'
+            viewMode === 'compact' && 'space-y-2',
           )}>
             {paginatedResults.map((result) => (
               <div key={result.id} className="relative">
@@ -430,10 +429,9 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
 
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => onPageChange?.(currentPage - 1)}
                   disabled={currentPage === 1}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
                 >
                   Previous
                 </Button>
@@ -444,24 +442,28 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     return (
                       <Button
                         key={page}
-                        variant={currentPage === page ? 'default' : 'outline'}
-                        size="sm"
                         onClick={() => onPageChange?.(page)}
-                        className="w-8 h-8 p-0"
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 w-8 h-8 p-0 ${
+                          currentPage === page
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                            : 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                        }`}
                       >
                         {page}
                       </Button>
                     );
                   })}
-                  
+
                   {totalPages > 5 && (
                     <>
                       <span className="text-gray-400">...</span>
                       <Button
-                        variant={currentPage === totalPages ? 'default' : 'outline'}
-                        size="sm"
                         onClick={() => onPageChange?.(totalPages)}
-                        className="w-8 h-8 p-0"
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 w-8 h-8 p-0 ${
+                          currentPage === totalPages
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                            : 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                        }`}
                       >
                         {totalPages}
                       </Button>
@@ -470,10 +472,9 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                 </div>
 
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => onPageChange?.(currentPage + 1)}
                   disabled={currentPage === totalPages}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
                 >
                   Next
                 </Button>

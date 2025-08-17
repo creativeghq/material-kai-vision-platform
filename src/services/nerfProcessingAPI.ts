@@ -47,8 +47,8 @@ export class NeRFProcessingAPI {
       const { data, error } = await supabase.functions.invoke('nerf-processor', {
         body: {
           ...request,
-          user_id: user.id
-        }
+          user_id: user.id,
+        },
       });
 
       if (error) {
@@ -133,7 +133,7 @@ export class NeRFProcessingAPI {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileName = `${user.id}/${timestamp}/image_${i + 1}.${file.name.split('.').pop()}`;
-        
+
         const { data, error } = await supabase.storage
           .from('material-images')
           .upload(fileName, file);
@@ -152,7 +152,7 @@ export class NeRFProcessingAPI {
       // Start NeRF reconstruction
       return await this.startReconstruction({
         user_id: user.id,
-        source_image_urls: uploadedUrls
+        source_image_urls: uploadedUrls,
       });
 
     } catch (error) {

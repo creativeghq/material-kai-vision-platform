@@ -1,6 +1,6 @@
 /**
  * Service Interface Contracts for Dependency Injection
- * 
+ *
  * This module defines the interface contracts for all services that will be registered
  * with the DI container. These interfaces enable loose coupling and testability by
  * allowing services to depend on abstractions rather than concrete implementations.

@@ -105,11 +105,11 @@ export interface ChunkingResult {
 
 /**
  * DocumentChunkingService
- * 
+ *
  * Intelligent text chunking service with configurable strategies for optimal
  * document segmentation. Supports fixed-size, semantic, and hybrid chunking
  * approaches with overlap handling and boundary detection.
- * 
+ *
  * Features:
  * - Multiple chunking strategies (fixed-size, semantic, hybrid)
  * - Configurable overlap and boundary preservation
@@ -125,7 +125,7 @@ export class DocumentChunkingService {
     overlapSize: 100,
     preserveStructure: true,
     sentenceBoundary: true,
-    paragraphBoundary: true
+    paragraphBoundary: true,
   };
 
   private readonly SENTENCE_ENDINGS = /[.!?]+\s+/g;
@@ -137,23 +137,23 @@ export class DocumentChunkingService {
    */
   async chunkDocument(
     document: DocumentInput,
-    strategy: Partial<ChunkingStrategy> = {}
+    strategy: Partial<ChunkingStrategy> = {},
   ): Promise<ChunkingResult> {
     const startTime = performance.now();
     const memoryBefore = process.memoryUsage().heapUsed;
 
     try {
       console.log(`Starting document chunking for: ${document.metadata.source}`);
-      
+
       // Merge strategy with defaults
       const finalStrategy: ChunkingStrategy = { ...this.DEFAULT_STRATEGY, ...strategy };
-      
+
       // Validate inputs
       this.validateInputs(document, finalStrategy);
-      
+
       // Preprocess document content
       const preprocessedContent = this.preprocessContent(document.content);
-      
+
       // Generate chunks based on strategy
       let chunks: DocumentChunk[];
       switch (finalStrategy.type) {
@@ -172,22 +172,22 @@ export class DocumentChunkingService {
 
       // Post-process chunks
       chunks = await this.postProcessChunks(chunks, document, finalStrategy);
-      
+
       // Calculate metrics
       const endTime = performance.now();
       const memoryAfter = process.memoryUsage().heapUsed;
       const metrics = this.calculateMetrics(chunks, startTime, endTime, memoryBefore, memoryAfter);
-      
+
       // Generate warnings
       const warnings = this.generateWarnings(chunks, finalStrategy, metrics);
 
       console.log(`Document chunking completed: ${chunks.length} chunks generated in ${metrics.totalProcessingTime}ms`);
-      
+
       return {
         chunks,
         metrics,
         strategy: finalStrategy,
-        warnings
+        warnings,
       };
 
     } catch (error) {
@@ -223,14 +223,14 @@ export class DocumentChunkingService {
   private preprocessContent(content: string): string {
     // Normalize whitespace
     let processed = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    
+
     // Remove excessive whitespace while preserving structure
     processed = processed.replace(/[ \t]+/g, ' ');
     processed = processed.replace(/\n{3,}/g, '\n\n');
-    
+
     // Trim leading/trailing whitespace
     processed = processed.trim();
-    
+
     return processed;
   }
 
@@ -240,7 +240,7 @@ export class DocumentChunkingService {
   private async chunkFixedSize(
     document: DocumentInput,
     content: string,
-    strategy: ChunkingStrategy
+    strategy: ChunkingStrategy,
   ): Promise<DocumentChunk[]> {
     const chunks: DocumentChunk[] = [];
     let currentIndex = 0;
@@ -262,7 +262,7 @@ export class DocumentChunkingService {
         document,
         chunkIndex,
         currentIndex,
-        currentIndex + chunkContent.length
+        currentIndex + chunkContent.length,
       );
 
       chunks.push(chunk);
@@ -281,20 +281,20 @@ export class DocumentChunkingService {
   private async chunkSemantic(
     document: DocumentInput,
     content: string,
-    strategy: ChunkingStrategy
+    strategy: ChunkingStrategy,
   ): Promise<DocumentChunk[]> {
     const chunks: DocumentChunk[] = [];
-    
+
     // Split by paragraphs first
     const paragraphs = content.split(this.PARAGRAPH_BREAKS).filter(p => p.trim().length > 0);
-    
+
     let currentChunk = '';
     let currentIndex = 0;
     let chunkIndex = 0;
 
     for (const paragraph of paragraphs) {
       const paragraphWithBreak = paragraph + '\n\n';
-      
+
       // If adding this paragraph would exceed max size, finalize current chunk
       if (currentChunk.length + paragraphWithBreak.length > strategy.maxChunkSize && currentChunk.length > 0) {
         const chunk = this.createChunk(
@@ -302,10 +302,10 @@ export class DocumentChunkingService {
           document,
           chunkIndex,
           currentIndex - currentChunk.length,
-          currentIndex
+          currentIndex,
         );
         chunks.push(chunk);
-        
+
         // Start new chunk with overlap
         const overlapContent = this.getOverlapContent(currentChunk, strategy.overlapSize);
         currentChunk = overlapContent + paragraphWithBreak;
@@ -313,7 +313,7 @@ export class DocumentChunkingService {
       } else {
         currentChunk += paragraphWithBreak;
       }
-      
+
       currentIndex += paragraphWithBreak.length;
     }
 
@@ -324,7 +324,7 @@ export class DocumentChunkingService {
         document,
         chunkIndex,
         currentIndex - currentChunk.length,
-        currentIndex
+        currentIndex,
       );
       chunks.push(chunk);
     }
@@ -338,7 +338,7 @@ export class DocumentChunkingService {
   private async chunkHybrid(
     document: DocumentInput,
     content: string,
-    strategy: ChunkingStrategy
+    strategy: ChunkingStrategy,
   ): Promise<DocumentChunk[]> {
     // Start with semantic chunking, then apply size constraints
     const semanticChunks = await this.chunkSemantic(document, content, strategy);
@@ -352,12 +352,12 @@ export class DocumentChunkingService {
         const subChunks = await this.chunkFixedSize(
           {
             content: chunk.content,
-            metadata: document.metadata
+            metadata: document.metadata,
           },
           chunk.content,
-          strategy
+          strategy,
         );
-        
+
         // Update chunk indices and positions
         subChunks.forEach((subChunk, index) => {
           subChunk.id = `${chunk.id}_${index}`;
@@ -385,14 +385,14 @@ export class DocumentChunkingService {
     document: DocumentInput,
     chunkIndex: number,
     startIndex: number,
-    endIndex: number
+    endIndex: number,
   ): DocumentChunk {
     const chunkId = `chunk_${document.metadata.workspaceId}_${Date.now()}_${chunkIndex}`;
     const hash = this.generateContentHash(content);
 
     // Detect content type
     const contentType = this.detectContentType(content);
-    
+
     // Calculate quality metrics
     const quality = this.calculateChunkQuality(content);
 
@@ -408,15 +408,15 @@ export class DocumentChunkingService {
         extractedAt: new Date(),
         language: document.metadata.language || 'en',
         contentType,
-        quality
+        quality,
       },
       position: {
         startIndex,
         endIndex,
         pageNumber: this.estimatePageNumber(startIndex, document.content.length),
-        sectionId: this.findSectionId(content, document.metadata.structure)
+        sectionId: this.findSectionId(content, document.metadata.structure),
       },
-      hash
+      hash,
     };
 
     return chunk;
@@ -428,7 +428,7 @@ export class DocumentChunkingService {
   private async postProcessChunks(
     chunks: DocumentChunk[],
     document: DocumentInput,
-    strategy: ChunkingStrategy
+    strategy: ChunkingStrategy,
   ): Promise<DocumentChunk[]> {
     // Update total chunks count
     chunks.forEach(chunk => {
@@ -436,8 +436,8 @@ export class DocumentChunkingService {
     });
 
     // Remove empty or very small chunks
-    const filteredChunks = chunks.filter(chunk => 
-      chunk.content.trim().length >= 10 // Minimum viable chunk size
+    const filteredChunks = chunks.filter(chunk =>
+      chunk.content.trim().length >= 10, // Minimum viable chunk size
     );
 
     // Enhance metadata with headers if structure is available
@@ -445,7 +445,7 @@ export class DocumentChunkingService {
       filteredChunks.forEach(chunk => {
         chunk.metadata.headers = this.extractRelevantHeaders(
           chunk.content,
-          document.metadata.structure!.headers
+          document.metadata.structure!.headers,
         );
       });
     }
@@ -460,12 +460,12 @@ export class DocumentChunkingService {
   private findSentenceBoundary(content: string, start: number, end: number): number {
     const searchText = content.substring(start, end + 50); // Look ahead a bit
     const sentences = searchText.split(this.SENTENCE_ENDINGS);
-    
+
     if (sentences.length > 1) {
       const lastCompleteSentence = sentences.slice(0, -1).join('. ') + '.';
       return start + lastCompleteSentence.length;
     }
-    
+
     return end;
   }
 
@@ -473,15 +473,15 @@ export class DocumentChunkingService {
     if (overlapSize <= 0 || content.length <= overlapSize) {
       return '';
     }
-    
+
     const overlapText = content.substring(content.length - overlapSize);
-    
+
     // Try to start overlap at a sentence boundary
     const sentenceStart = overlapText.search(/[.!?]\s+/);
     if (sentenceStart !== -1) {
       return overlapText.substring(sentenceStart + 2);
     }
-    
+
     return overlapText;
   }
 
@@ -490,15 +490,15 @@ export class DocumentChunkingService {
     if (content.includes('|') && content.includes('\n') && content.split('|').length > 4) {
       return 'table';
     }
-    
+
     if (content.includes('![') || content.includes('<img')) {
       return 'image';
     }
-    
+
     if (content.includes('|') || content.includes('<img') || content.includes('![')) {
       return 'mixed';
     }
-    
+
     return 'text';
   }
 
@@ -506,21 +506,21 @@ export class DocumentChunkingService {
     const length = content.length;
     const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const words = content.split(/\s+/).filter(w => w.length > 0);
-    
+
     // Completeness: based on sentence structure
     const completeness = sentences.length > 0 && content.trim().endsWith('.') ? 1.0 : 0.8;
-    
+
     // Coherence: based on average sentence length
     const avgSentenceLength = sentences.length > 0 ? words.length / sentences.length : 0;
     const coherence = Math.min(1.0, avgSentenceLength / 15); // Optimal around 15 words per sentence
-    
+
     // Readability: simple metric based on word and sentence count
     const readability = Math.min(1.0, (words.length * sentences.length) / (length * 0.1));
-    
+
     return {
       completeness: Math.round(completeness * 100) / 100,
       coherence: Math.round(coherence * 100) / 100,
-      readability: Math.round(readability * 100) / 100
+      readability: Math.round(readability * 100) / 100,
     };
   }
 
@@ -531,20 +531,20 @@ export class DocumentChunkingService {
 
   private findSectionId(content: string, structure?: DocumentInput['metadata']['structure']): string | undefined {
     if (!structure?.sections) return undefined;
-    
+
     // Find the section that would contain this content based on headers
     const firstLine = content.split('\n')[0];
-    const matchingSection = structure.sections.find(section => 
-      firstLine.includes(section.title) || section.title.includes(firstLine.substring(0, 50))
+    const matchingSection = structure.sections.find(section =>
+      firstLine.includes(section.title) || section.title.includes(firstLine.substring(0, 50)),
     );
-    
+
     return matchingSection?.id;
   }
 
   private extractRelevantHeaders(content: string, headers: string[]): string[] {
-    return headers.filter(header => 
+    return headers.filter(header =>
       content.toLowerCase().includes(header.toLowerCase()) ||
-      header.toLowerCase().includes(content.substring(0, 50).toLowerCase())
+      header.toLowerCase().includes(content.substring(0, 50).toLowerCase()),
     );
   }
 
@@ -564,21 +564,21 @@ export class DocumentChunkingService {
     startTime: number,
     endTime: number,
     memoryBefore: number,
-    memoryAfter: number
+    memoryAfter: number,
   ): ChunkingMetrics {
     const totalProcessingTime = endTime - startTime;
     const chunksGenerated = chunks.length;
     const averageChunkSize = chunks.reduce((sum, chunk) => sum + chunk.content.length, 0) / chunksGenerated;
-    
+
     // Calculate overlap efficiency (how much content is actually overlapped)
     const totalContent = chunks.reduce((sum, chunk) => sum + chunk.content.length, 0);
     const uniqueContent = new Set(chunks.map(chunk => chunk.hash)).size;
     const overlapEfficiency = uniqueContent / chunksGenerated;
-    
+
     // Calculate overall quality score
     const qualityScore = chunks.reduce((sum, chunk) => {
-      const chunkQuality = (chunk.metadata.quality.completeness + 
-                           chunk.metadata.quality.coherence + 
+      const chunkQuality = (chunk.metadata.quality.completeness +
+                           chunk.metadata.quality.coherence +
                            chunk.metadata.quality.readability) / 3;
       return sum + chunkQuality;
     }, 0) / chunksGenerated;
@@ -589,14 +589,14 @@ export class DocumentChunkingService {
       averageChunkSize: Math.round(averageChunkSize * 100) / 100,
       overlapEfficiency: Math.round(overlapEfficiency * 100) / 100,
       qualityScore: Math.round(qualityScore * 100) / 100,
-      memoryUsage: memoryAfter - memoryBefore
+      memoryUsage: memoryAfter - memoryBefore,
     };
   }
 
   private generateWarnings(
     chunks: DocumentChunk[],
     strategy: ChunkingStrategy,
-    metrics: ChunkingMetrics
+    metrics: ChunkingMetrics,
   ): string[] {
     const warnings: string[] = [];
 

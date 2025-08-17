@@ -1,10 +1,11 @@
 /**
  * Hugging Face API Configuration
- * 
+ *
  * Manages Hugging Face Inference API models and their specific requirements.
  */
 
 import { z } from 'zod';
+
 import type { BaseApiConfig } from '../apiConfig';
 
 // Common schemas for Hugging Face models
@@ -40,12 +41,12 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
     burstLimit: 10,
   },
   environment: 'production',
-  
+
   models: {
     // Stable Diffusion XL Base
     'stabilityai/stable-diffusion-xl-base-1.0': {
       inputSchema: z.object({
-        inputs: z.string().min(1, "Prompt is required"),
+        inputs: z.string().min(1, 'Prompt is required'),
         parameters: z.object({
           negative_prompt: z.string().optional(),
           num_inference_steps: z.number().int().min(1).max(50).default(20),
@@ -72,7 +73,7 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
     // FLUX.1 Schnell
     'black-forest-labs/FLUX.1-schnell': {
       inputSchema: z.object({
-        inputs: z.string().min(1, "Prompt is required"),
+        inputs: z.string().min(1, 'Prompt is required'),
         parameters: z.object({
           num_inference_steps: z.number().int().min(1).max(4).default(4),
           guidance_scale: z.number().min(0).max(10).default(0),
@@ -98,7 +99,7 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
     // Stable Diffusion 2.1
     'stabilityai/stable-diffusion-2-1': {
       inputSchema: z.object({
-        inputs: z.string().min(1, "Prompt is required"),
+        inputs: z.string().min(1, 'Prompt is required'),
         parameters: z.object({
           negative_prompt: z.string().optional(),
           num_inference_steps: z.number().int().min(1).max(50).default(50),

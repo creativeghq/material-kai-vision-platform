@@ -12,13 +12,13 @@ import { errorLogger } from './ErrorLogger';
 export function createErrorContext(
   service: string,
   operation: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
 ): ErrorContext {
   return {
     operation,
     service,
-    metadata,
-    timestamp: new Date().toISOString()
+    metadata: metadata || {},
+    timestamp: new Date().toISOString(),
   };
 }
 
@@ -27,13 +27,13 @@ export function createErrorContext(
  */
 export async function withErrorHandling<T>(
   operation: () => Promise<T>,
-  context: ErrorContext
+  context: ErrorContext,
 ): Promise<T> {
   try {
     errorLogger.logDebug(`Starting operation: ${context.operation}`, {
       service: context.service,
       operation: context.operation,
-      metadata: context.metadata
+      metadata: context.metadata,
     });
 
     const result = await operation();
@@ -41,20 +41,20 @@ export async function withErrorHandling<T>(
     errorLogger.logDebug(`Completed operation: ${context.operation}`, {
       service: context.service,
       operation: context.operation,
-      metadata: { ...context.metadata, success: true }
+      metadata: { ...context.metadata, success: true },
     });
 
     return result;
   } catch (error) {
-    const appError = error instanceof AppError 
-      ? error 
+    const appError = error instanceof AppError
+      ? error
       : new AppError({
           code: 'OPERATION_ERROR',
           message: `Operation failed: ${context.operation}`,
           category: ErrorCategory.PROCESSING,
           severity: ErrorSeverity.HIGH,
           context,
-          originalError: error instanceof Error ? error : new Error(String(error))
+          originalError: error instanceof Error ? error : new Error(String(error)),
         });
 
     errorLogger.logError(appError);
@@ -68,7 +68,7 @@ export async function withErrorHandling<T>(
 export function handleAPIError(
   error: any,
   context: ErrorContext,
-  endpoint?: string
+  endpoint?: string,
 ): never {
   let apiError: APIError;
 
@@ -76,7 +76,7 @@ export function handleAPIError(
     // HTTP error response
     const status = error.response.status;
     const statusText = error.response.statusText || 'Unknown Error';
-    
+
     let code = 'API_ERROR';
     let severity = ErrorSeverity.HIGH;
 
@@ -106,11 +106,12 @@ export function handleAPIError(
           endpoint,
           status,
           statusText,
-          responseData: error.response.data
-        }
+          severity,
+          responseData: error.response.data,
+        },
       },
       error,
-      code
+      code,
     );
   } else if (error.request) {
     // Network error
@@ -121,11 +122,11 @@ export function handleAPIError(
         metadata: {
           ...context.metadata,
           endpoint,
-          networkError: true
-        }
+          networkError: true,
+        },
       },
       error,
-      'API_NETWORK_ERROR'
+      'API_NETWORK_ERROR',
     );
   } else {
     // Request setup error
@@ -136,11 +137,11 @@ export function handleAPIError(
         metadata: {
           ...context.metadata,
           endpoint,
-          setupError: true
-        }
+          setupError: true,
+        },
       },
       error,
-      'API_REQUEST_ERROR'
+      'API_REQUEST_ERROR',
     );
   }
 
@@ -154,7 +155,7 @@ export function handleAPIError(
 export function handleNetworkError(
   error: any,
   context: ErrorContext,
-  retryAttempt?: number
+  retryAttempt?: number,
 ): never {
   const networkError = new NetworkError(
     `Network operation failed: ${error.message}`,
@@ -165,10 +166,10 @@ export function handleNetworkError(
         retryAttempt,
         networkError: true,
         errorCode: error.code,
-        errorType: error.type
-      }
+        errorType: error.type,
+      },
     },
-    error instanceof Error ? error : new Error(String(error))
+    error instanceof Error ? error : new Error(String(error)),
   );
 
   errorLogger.logError(networkError);
@@ -182,7 +183,7 @@ export function handleValidationError(
   message: string,
   context: ErrorContext,
   field?: string,
-  value?: any
+  value?: any,
 ): never {
   const validationError = new ValidationError(
     message,
@@ -192,9 +193,9 @@ export function handleValidationError(
         ...context.metadata,
         field,
         value: typeof value === 'object' ? JSON.stringify(value) : value,
-        validationError: true
-      }
-    }
+        validationError: true,
+      },
+    },
   );
 
   errorLogger.logError(validationError);
@@ -208,7 +209,7 @@ export function handleDatabaseError(
   error: any,
   context: ErrorContext,
   query?: string,
-  params?: any[]
+  params?: any[],
 ): never {
   const dbError = new DatabaseError(
     `Database operation failed: ${error.message}`,
@@ -220,10 +221,10 @@ export function handleDatabaseError(
         params,
         databaseError: true,
         errorCode: error.code,
-        errorDetail: error.detail
-      }
+        errorDetail: error.detail,
+      },
     },
-    error instanceof Error ? error : new Error(String(error))
+    error instanceof Error ? error : new Error(String(error)),
   );
 
   errorLogger.logError(dbError);
@@ -237,7 +238,7 @@ export function handleExternalServiceError(
   error: any,
   context: ErrorContext,
   serviceName: string,
-  endpoint?: string
+  endpoint?: string,
 ): never {
   const serviceError = new ExternalServiceError(
     `External service error (${serviceName}): ${error.message}`,
@@ -248,10 +249,10 @@ export function handleExternalServiceError(
         serviceName,
         endpoint,
         externalServiceError: true,
-        serviceResponse: error.response?.data
-      }
+        serviceResponse: error.response?.data,
+      },
     },
-    error instanceof Error ? error : new Error(String(error))
+    error instanceof Error ? error : new Error(String(error)),
   );
 
   errorLogger.logError(serviceError);
@@ -280,7 +281,7 @@ export function getErrorMessage(error: unknown): string {
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof AppError) {
     // Don't retry validation errors or authentication errors
-    if (error.category === ErrorCategory.VALIDATION || 
+    if (error.category === ErrorCategory.VALIDATION ||
         error.category === ErrorCategory.AUTHENTICATION ||
         error.category === ErrorCategory.AUTHORIZATION) {
       return false;
@@ -293,7 +294,7 @@ export function isRetryableError(error: unknown): boolean {
 
     if (error instanceof APIError) {
       // Retry rate limits and server errors, but not client errors
-      return error.code === 'API_RATE_LIMIT' || 
+      return error.code === 'API_RATE_LIMIT' ||
              error.code === 'API_SERVER_ERROR' ||
              error.code === 'API_NETWORK_ERROR';
     }
@@ -317,8 +318,8 @@ export function createErrorResponse(error: unknown) {
         code: error.code,
         message: error.getUserFriendlyMessage(),
         correlationId: error.correlationId,
-        timestamp: error.timestamp
-      }
+        timestamp: error.timestamp,
+      },
     };
   }
 
@@ -328,7 +329,7 @@ export function createErrorResponse(error: unknown) {
       code: 'INTERNAL_ERROR',
       message: 'An unexpected error occurred. Please try again or contact support.',
       correlationId: `fallback_${Date.now()}`,
-      timestamp: new Date().toISOString()
-    }
+      timestamp: new Date().toISOString(),
+    },
   };
 }

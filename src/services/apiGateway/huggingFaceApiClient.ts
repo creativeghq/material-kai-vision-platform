@@ -1,12 +1,13 @@
 /**
  * Hugging Face API Client
- * 
+ *
  * Standardized client for Hugging Face Inference API that preserves all
  * Hugging Face-specific functionality while providing consistent interface.
  */
 
-import { BaseApiClient, StandardizedApiResponse, withRetry } from './standardizedApiClient';
 import { huggingfaceConfig, type HuggingFaceApiConfig } from '../../config/apis/huggingfaceConfig';
+
+import { BaseApiClient, StandardizedApiResponse, withRetry } from './standardizedApiClient';
 
 // Hugging Face specific types
 export interface HuggingFaceParams {
@@ -65,7 +66,7 @@ export class HuggingFaceApiClient extends BaseApiClient<HuggingFaceParams, Huggi
   }
 
   protected async makeApiCall(
-    validatedParams: HuggingFaceParams
+    validatedParams: HuggingFaceParams,
   ): Promise<StandardizedApiResponse<HuggingFaceResponse>> {
     if (!this.currentModelId) {
       throw new Error('Model ID is required for Hugging Face API calls');
@@ -104,7 +105,7 @@ export class HuggingFaceApiClient extends BaseApiClient<HuggingFaceParams, Huggi
         if (!fetchResponse.ok) {
           // Hugging Face specific error handling
           let errorMessage = `HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`;
-          
+
           try {
             const errorData = await fetchResponse.json();
             if (errorData.error) {
@@ -129,7 +130,7 @@ export class HuggingFaceApiClient extends BaseApiClient<HuggingFaceParams, Huggi
 
         // Handle different response types
         const contentType = fetchResponse.headers.get('content-type');
-        
+
         if (contentType?.includes('application/json')) {
           // JSON response (error or structured data)
           const jsonData = await fetchResponse.json();
@@ -153,7 +154,7 @@ export class HuggingFaceApiClient extends BaseApiClient<HuggingFaceParams, Huggi
         maxAttempts: this.huggingFaceConfig.retryAttempts || 2,
         baseDelay: 1000,
         maxDelay: 5000,
-      }
+      },
     );
 
     // Validate response using exact schema from configuration

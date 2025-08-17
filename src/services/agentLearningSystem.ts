@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+
 import { agentMLCoordinator, AgentMLTask } from './agentMLCoordinator';
 
 export interface AgentLearningData {
@@ -39,18 +40,18 @@ export class AgentLearningSystem {
   async updateAgentLearning(
     agentId: string,
     mlTask: AgentMLTask,
-    userFeedback?: { rating: number; comments: string }
+    userFeedback?: { rating: number; comments: string },
   ): Promise<void> {
     try {
       // Analyze ML task performance
       const learningData = this.extractLearningInsights(mlTask, userFeedback);
-      
+
       // Update agent memory and learning progress
       await this.updateAgentMemory(agentId, learningData);
-      
+
       // Update performance metrics
       await this.updatePerformanceMetrics(agentId, mlTask);
-      
+
       console.log('AgentLearning: Updated learning for agent', agentId);
     } catch (error) {
       console.error('AgentLearning: Failed to update learning:', error);
@@ -62,13 +63,13 @@ export class AgentLearningSystem {
    */
   private extractLearningInsights(
     mlTask: AgentMLTask,
-    userFeedback?: { rating: number; comments: string }
+    userFeedback?: { rating: number; comments: string },
   ): AgentLearningData {
     const baseInsights: any = {
       taskType: mlTask.mlOperationType,
       processingTime: mlTask.processingTimeMs,
       confidence: mlTask.confidenceScores,
-      success: mlTask.mlResults && !mlTask.mlResults.error
+      success: mlTask.mlResults && !mlTask.mlResults.error,
     };
 
     let learningType: AgentLearningData['learningType'] = 'ml_performance';
@@ -98,18 +99,18 @@ export class AgentLearningSystem {
     if (userFeedback) {
       baseInsights.userRating = userFeedback.rating;
       baseInsights.userComments = userFeedback.comments;
-      baseInsights.userSatisfaction = userFeedback.rating >= 4 ? 'high' : 
+      baseInsights.userSatisfaction = userFeedback.rating >= 4 ? 'high' :
                                       userFeedback.rating >= 3 ? 'medium' : 'low';
     }
 
     // Calculate performance impact
     const performanceImpact = {
       accuracyImprovement: userFeedback?.rating ? (userFeedback.rating - 3) * 0.1 : 0,
-      speedImprovement: mlTask.processingTimeMs ? 
+      speedImprovement: mlTask.processingTimeMs ?
         Math.max(-0.1, Math.min(0.1, (5000 - mlTask.processingTimeMs) / 50000)) : 0,
-      consistencyImprovement: mlTask.confidenceScores ? 
-        Object.values(mlTask.confidenceScores).reduce((avg, val) => avg + val, 0) / 
-        Object.keys(mlTask.confidenceScores).length * 0.1 : 0
+      consistencyImprovement: mlTask.confidenceScores ?
+        Object.values(mlTask.confidenceScores).reduce((avg, val) => avg + val, 0) /
+        Object.keys(mlTask.confidenceScores).length * 0.1 : 0,
     };
 
     return {
@@ -120,9 +121,9 @@ export class AgentLearningSystem {
         insights: baseInsights,
         confidence: this.calculateInsightConfidence(mlTask, userFeedback),
         evidenceSource: `ml_task_${mlTask.id}`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       },
-      performanceImpact
+      performanceImpact,
     };
   }
 
@@ -131,7 +132,7 @@ export class AgentLearningSystem {
    */
   private calculateInsightConfidence(
     mlTask: AgentMLTask,
-    userFeedback?: { rating: number; comments: string }
+    userFeedback?: { rating: number; comments: string },
   ): number {
     let confidence = 0.5; // Base confidence
 
@@ -181,25 +182,25 @@ export class AgentLearningSystem {
         ...currentMemory,
         recent_insights: [
           ...(currentMemory.recent_insights || []).slice(-9), // Keep last 9
-          learningData.knowledgeUpdate
+          learningData.knowledgeUpdate,
         ],
         expertise_areas: this.updateExpertiseAreas(
           currentMemory.expertise_areas || {},
-          learningData
-        )
+          learningData,
+        ),
       };
 
       // Update learning progress
       const updatedLearning = {
         ...currentLearning,
         total_tasks: (currentLearning.total_tasks || 0) + 1,
-        successful_tasks: (currentLearning.successful_tasks || 0) + 
+        successful_tasks: (currentLearning.successful_tasks || 0) +
           (learningData.knowledgeUpdate.insights.success ? 1 : 0),
         skill_improvements: this.updateSkillImprovements(
           currentLearning.skill_improvements || {},
-          learningData
+          learningData,
         ),
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
       };
 
       // Save updated data
@@ -207,7 +208,7 @@ export class AgentLearningSystem {
         .from('crewai_agents')
         .update({
           memory_data: updatedMemory,
-          learning_progress: updatedLearning
+          learning_progress: updatedLearning,
         })
         .eq('id', agentId);
 
@@ -221,7 +222,7 @@ export class AgentLearningSystem {
    */
   private updateExpertiseAreas(
     currentExpertise: Record<string, any>,
-    learningData: AgentLearningData
+    learningData: AgentLearningData,
   ): Record<string, any> {
     const category = learningData.knowledgeUpdate.category;
     const currentLevel = currentExpertise[category] || { level: 0, confidence: 0.5, tasks_completed: 0 };
@@ -232,8 +233,8 @@ export class AgentLearningSystem {
         level: Math.min(1, currentLevel.level + learningData.performanceImpact.accuracyImprovement),
         confidence: Math.min(1, currentLevel.confidence + learningData.knowledgeUpdate.confidence * 0.1),
         tasks_completed: (currentLevel.tasks_completed || 0) + 1,
-        last_improvement: new Date().toISOString()
-      }
+        last_improvement: new Date().toISOString(),
+      },
     };
   }
 
@@ -242,7 +243,7 @@ export class AgentLearningSystem {
    */
   private updateSkillImprovements(
     currentSkills: Record<string, any>,
-    learningData: AgentLearningData
+    learningData: AgentLearningData,
   ): Record<string, any> {
     return {
       ...currentSkills,
@@ -250,8 +251,8 @@ export class AgentLearningSystem {
         improvement_rate: learningData.performanceImpact.accuracyImprovement,
         consistency: learningData.performanceImpact.consistencyImprovement,
         efficiency: learningData.performanceImpact.speedImprovement,
-        last_updated: new Date().toISOString()
-      }
+        last_updated: new Date().toISOString(),
+      },
     };
   }
 
@@ -281,17 +282,17 @@ export class AgentLearningSystem {
         average_processing_time: this.updateAverageProcessingTime(
           currentMetrics.average_processing_time || 0,
           mlTask.processingTimeMs || 0,
-          totalTasks
+          totalTasks,
         ),
         ml_task_accuracy: this.calculateMLAccuracy(mlTask),
         last_task_timestamp: new Date().toISOString(),
-        total_ml_tasks: (currentMetrics.total_ml_tasks || 0) + 1
+        total_ml_tasks: (currentMetrics.total_ml_tasks || 0) + 1,
       };
 
       await supabase
         .from('crewai_agents')
         .update({
-          performance_metrics: updatedMetrics
+          performance_metrics: updatedMetrics,
         })
         .eq('id', agentId);
 
@@ -306,7 +307,7 @@ export class AgentLearningSystem {
   private updateAverageProcessingTime(
     currentAverage: number,
     newTime: number,
-    totalTasks: number
+    totalTasks: number,
   ): number {
     if (totalTasks <= 1) return newTime;
     return ((currentAverage * (totalTasks - 1)) + newTime) / totalTasks;
@@ -348,8 +349,8 @@ export class AgentLearningSystem {
           skillLevel: this.calculateOverallSkillLevel(learning),
           knowledgeGaps: this.identifyKnowledgeGaps(learning),
           strongAreas: this.identifyStrongAreas(learning),
-          recentImprovements: this.getRecentImprovements(learning)
-        }
+          recentImprovements: this.getRecentImprovements(learning),
+        },
       };
     } catch (error) {
       console.error('Failed to get agent performance metrics:', error);
@@ -362,11 +363,11 @@ export class AgentLearningSystem {
    */
   private calculateOverallSkillLevel(learning: any): number {
     const skills = learning.skill_improvements || {};
-    const skillLevels = Object.values(skills).map((skill: any) => 
-      (skill.improvement_rate + skill.consistency + skill.efficiency) / 3
+    const skillLevels = Object.values(skills).map((skill: any) =>
+      (skill.improvement_rate + skill.consistency + skill.efficiency) / 3,
     );
-    
-    return skillLevels.length > 0 
+
+    return skillLevels.length > 0
       ? skillLevels.reduce((sum: number, level: number) => sum + level, 0) / skillLevels.length
       : 0.5;
   }

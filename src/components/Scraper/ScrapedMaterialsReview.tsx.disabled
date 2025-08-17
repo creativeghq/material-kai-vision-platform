@@ -47,13 +47,21 @@ interface ScrapedMaterial {
 
 interface ScrapedMaterialTemp {
   id: string;
-  material_data: any; // Use any since it comes from database as Json type
-  source_url: string;
+  session_id: string;
+  url: string;
+  title: string | null;
+  description: string | null;
+  image_url: string | null;
+  price: string | null;
+  availability: string | null;
+  material_type: string | null;
+  brand: string | null;
+  specifications: any | null; // Json type from database
   scraped_at: string;
-  reviewed: boolean;
-  approved: boolean | null;
-  notes: string | null;
-  scraping_session_id: string;
+  processing_status: string | null;
+  confidence_score: number | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface ScrapedMaterialsReviewProps {
@@ -113,7 +121,7 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
           const newMaterial = payload.new as ScrapedMaterialTemp;
           
           // Add new material to the list if it matches our current session or if we're viewing all
-          if (!sessionId || newMaterial.scraping_session_id === sessionId) {
+          if (!sessionId || newMaterial.session_id === sessionId) {
             setMaterials(prev => [newMaterial, ...prev]);
             setScrapingStatus('active');
             
@@ -130,7 +138,7 @@ export const ScrapedMaterialsReview: React.FC<ScrapedMaterialsReviewProps> = ({
                 totalProcessed: 1,
                 totalExpected: 1,
                 isActive: true,
-                currentUrl: newMaterial.source_url,
+                currentUrl: newMaterial.url,
                 startedAt: new Date().toISOString(),
                 estimatedTimeRemaining: 0
               };

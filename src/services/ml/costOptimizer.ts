@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 interface CostOptimizerServiceConfig extends ServiceConfig {
@@ -76,7 +77,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         huggingface: 0.001,
         replicate: 0.05,
         client: 0.0,
-        anthropic: 0.003
+        anthropic: 0.003,
       },
       analysisInterval: 3600000, // 1 hour
       enableCaching: true,
@@ -86,8 +87,8 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       healthCheck: {
         enabled: true,
         interval: 30000,
-        timeout: 5000
-      }
+        timeout: 5000,
+      },
     };
 
     super({ ...defaultConfig, ...config });
@@ -99,7 +100,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       monthlyBudget: this.getConfig().monthlyBudget,
       warningThreshold: this.getConfig().warningThreshold,
       emergencyThreshold: this.getConfig().emergencyThreshold,
-      costPerProvider: this.getConfig().costPerProvider
+      costPerProvider: this.getConfig().costPerProvider,
     };
   }
 
@@ -144,7 +145,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     fileSize: number,
     complexity: number,
     qualityRequirement: 'basic' | 'standard' | 'premium',
-    userBudgetPreference?: 'cost' | 'balanced' | 'performance'
+    userBudgetPreference?: 'cost' | 'balanced' | 'performance',
   ): Promise<OptimizedStrategy> {
     const currentUsage = await this.getCurrentMonthUsage();
     const remainingBudget = this.config.monthlyBudget - currentUsage.totalCost;
@@ -157,7 +158,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         confidence: 0.6,
         estimatedCost: 0,
         estimatedTime: 5000,
-        reasoning: 'Budget nearly exhausted - using client-side processing only'
+        reasoning: 'Budget nearly exhausted - using client-side processing only',
       };
     }
 
@@ -172,23 +173,23 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     // Select based on user preference
     switch (preference) {
       case 'cost':
-        return budgetConstrainedStrategies.reduce((min, current) => 
-          current.estimatedCost < min.estimatedCost ? current : min
+        return budgetConstrainedStrategies.reduce((min, current) =>
+          current.estimatedCost < min.estimatedCost ? current : min,
         );
-      
+
       case 'performance':
-        return budgetConstrainedStrategies.reduce((fastest, current) => 
-          current.estimatedTime < fastest.estimatedTime ? current : fastest
+        return budgetConstrainedStrategies.reduce((fastest, current) =>
+          current.estimatedTime < fastest.estimatedTime ? current : fastest,
         );
-      
+
       case 'balanced':
       default:
         return budgetConstrainedStrategies.reduce((best, current) => {
-          const currentScore = (current.confidence * 0.4) + 
-                              ((1 - current.estimatedCost / remainingBudget) * 0.3) + 
+          const currentScore = (current.confidence * 0.4) +
+                              ((1 - current.estimatedCost / remainingBudget) * 0.3) +
                               ((1 - current.estimatedTime / 60000) * 0.3);
-          const bestScore = (best.confidence * 0.4) + 
-                           ((1 - best.estimatedCost / remainingBudget) * 0.3) + 
+          const bestScore = (best.confidence * 0.4) +
+                           ((1 - best.estimatedCost / remainingBudget) * 0.3) +
                            ((1 - best.estimatedTime / 60000) * 0.3);
           return currentScore > bestScore ? current : best;
         });
@@ -203,7 +204,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     endpoint: string,
     cost: number,
     latency: number,
-    success: boolean
+    success: boolean,
   ): Promise<void> {
     const usage: UsageMetrics = {
       provider,
@@ -212,7 +213,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       cost,
       averageLatency: latency,
       errorRate: success ? 0 : 1,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     // Store in local cache
@@ -232,8 +233,8 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
           cost,
           latency,
           success,
-          timestamp: usage.timestamp
-        }
+          timestamp: usage.timestamp,
+        },
       }]);
     } catch (error) {
       console.error('Failed to track usage in database:', error);
@@ -284,7 +285,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         totalCost: 0,
         requestCount: 0,
         byProvider: {} as Record<string, { cost: number; requests: number }>,
-        dailySpend: [] as { date: string; cost: number }[]
+        dailySpend: [] as { date: string; cost: number }[],
       });
 
       // Calculate daily spend
@@ -313,7 +314,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   async checkBudgetAlerts(): Promise<BudgetAlert[]> {
     const usage = await this.getCurrentMonthUsage();
     const alerts: BudgetAlert[] = [];
-    
+
     const budgetUsedPercentage = (usage.totalCost / this.config.monthlyBudget) * 100;
     const remainingBudget = this.config.monthlyBudget - usage.totalCost;
 
@@ -329,7 +330,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         message: 'Emergency: Monthly budget almost exhausted!',
         currentSpend: usage.totalCost,
         budgetRemaining: remainingBudget,
-        projectedSpend
+        projectedSpend,
       });
     } else if (budgetUsedPercentage >= this.config.warningThreshold) {
       alerts.push({
@@ -337,7 +338,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         message: 'Warning: Approaching monthly budget limit',
         currentSpend: usage.totalCost,
         budgetRemaining: remainingBudget,
-        projectedSpend
+        projectedSpend,
       });
     }
 
@@ -347,7 +348,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         message: 'Projected to exceed monthly budget',
         currentSpend: usage.totalCost,
         budgetRemaining: remainingBudget,
-        projectedSpend
+        projectedSpend,
       });
     }
 
@@ -368,7 +369,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
           key: `${provider}-common-requests`,
           ttl: 3600, // 1 hour
           cost_savings: stats.cost * 0.3, // Estimate 30% savings
-          hit_rate: 0.6 // Estimate 60% cache hit rate
+          hit_rate: 0.6, // Estimate 60% cache hit rate
         });
       }
     }
@@ -385,7 +386,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       monthlyBudget: config.monthlyBudget,
       warningThreshold: config.warningThreshold,
       emergencyThreshold: config.emergencyThreshold,
-      costPerProvider: config.costPerProvider
+      costPerProvider: config.costPerProvider,
     });
   }
 
@@ -400,7 +401,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   }> {
     const usage = await this.getCurrentMonthUsage();
     const alerts = await this.checkBudgetAlerts();
-    
+
     const recommendations: string[] = [];
     const inefficiencies: string[] = [];
     let potentialSavings = 0;
@@ -408,12 +409,12 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     // Analyze provider efficiency
     for (const [provider, stats] of Object.entries(usage.byProvider)) {
       const costPerRequest = stats.cost / stats.requests;
-      
+
       if (provider === 'replicate' && costPerRequest > 0.1) {
         recommendations.push('Consider using HuggingFace for simpler tasks instead of Replicate');
         potentialSavings += stats.cost * 0.4;
       }
-      
+
       if (provider === 'openai' && stats.requests > 100) {
         recommendations.push('Implement caching for OpenAI requests to reduce costs');
         potentialSavings += stats.cost * 0.25;
@@ -433,7 +434,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       recommendations,
       potentialSavings,
       inefficiencies,
-      budgetHealth
+      budgetHealth,
     };
   }
 
@@ -442,7 +443,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   private async analyzeStrategies(
     fileSize: number,
     complexity: number,
-    quality: 'basic' | 'standard' | 'premium'
+    quality: 'basic' | 'standard' | 'premium',
   ): Promise<OptimizedStrategy[]> {
     const strategies: OptimizedStrategy[] = [];
 
@@ -452,7 +453,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       confidence: Math.max(0.4, 0.8 - complexity),
       estimatedCost: 0,
       estimatedTime: Math.min(10000, fileSize / 1000 + complexity * 5000),
-      reasoning: 'Free client-side processing, good for basic tasks'
+      reasoning: 'Free client-side processing, good for basic tasks',
     });
 
     // HuggingFace strategy
@@ -461,7 +462,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       confidence: Math.min(0.9, 0.6 + complexity * 0.3),
       estimatedCost: this.config.costPerProvider.huggingface,
       estimatedTime: 8000 + complexity * 2000,
-      reasoning: 'Cost-effective cloud processing with good accuracy'
+      reasoning: 'Cost-effective cloud processing with good accuracy',
     });
 
     // Replicate strategy (for premium quality)
@@ -471,7 +472,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         confidence: 0.95,
         estimatedCost: this.config.costPerProvider.replicate,
         estimatedTime: 15000 + complexity * 5000,
-        reasoning: 'Premium quality with specialized models'
+        reasoning: 'Premium quality with specialized models',
       });
     }
 

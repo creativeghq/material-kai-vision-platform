@@ -1,6 +1,6 @@
 /**
  * TextureGaborFilters - Learnable Gabor filter banks for directional texture pattern detection
- * 
+ *
  * Gabor filters are particularly effective for texture analysis as they capture both
  * spatial and frequency information. This implementation provides learnable parameters
  * for orientation, frequency, and spatial extent.
@@ -51,13 +51,13 @@ export class TextureGaborFilters {
    */
   private initializeFilterBank(): void {
     const { filterCount, kernelSize, orientations, frequencies, phases } = this.config;
-    
+
     this.filterBank = {
       filters: [],
       orientations: new Float32Array(orientations),
       frequencies: new Float32Array(frequencies),
       responses: [],
-      energyMaps: []
+      energyMaps: [],
     };
 
     // Generate Gabor filters for each orientation-frequency combination
@@ -69,7 +69,7 @@ export class TextureGaborFilters {
             kernelSize,
             orientations[i],
             frequencies[j],
-            phases[k]
+            phases[k],
           );
           this.filterBank.filters.push(filter);
           filterIndex++;
@@ -87,7 +87,7 @@ export class TextureGaborFilters {
     kernelSize: number,
     orientation: number,
     frequency: number,
-    phase: number
+    phase: number,
   ): Float32Array {
     const filter = new Float32Array(kernelSize * kernelSize);
     const center = Math.floor(kernelSize / 2);
@@ -149,7 +149,7 @@ export class TextureGaborFilters {
     for (let i = 0; i < filter.length; i++) {
       energy += filter[i] * filter[i];
     }
-    
+
     if (energy > 0) {
       const scale = 1.0 / Math.sqrt(energy);
       for (let i = 0; i < filter.length; i++) {
@@ -165,7 +165,7 @@ export class TextureGaborFilters {
     image: Float32Array,
     width: number,
     height: number,
-    channels: number = 1
+    channels: number = 1,
   ): Promise<TextureResponse> {
     try {
       // Convert to grayscale if multi-channel
@@ -195,7 +195,7 @@ export class TextureGaborFilters {
         energyMap,
         dominantOrientation,
         dominantFrequency,
-        textureEnergy
+        textureEnergy,
       };
 
     } catch (error) {
@@ -211,7 +211,7 @@ export class TextureGaborFilters {
     image: Float32Array,
     width: number,
     height: number,
-    channels: number
+    channels: number,
   ): Float32Array {
     const grayImage = new Float32Array(width * height);
 
@@ -222,13 +222,13 @@ export class TextureGaborFilters {
 
         if (channels === 3) {
           // RGB to grayscale using luminance weights
-          grayImage[pixelIndex] = 
+          grayImage[pixelIndex] =
             0.299 * image[colorIndex] +
             0.587 * image[colorIndex + 1] +
             0.114 * image[colorIndex + 2];
         } else if (channels === 4) {
           // RGBA to grayscale
-          grayImage[pixelIndex] = 
+          grayImage[pixelIndex] =
             0.299 * image[colorIndex] +
             0.587 * image[colorIndex + 1] +
             0.114 * image[colorIndex + 2];
@@ -249,7 +249,7 @@ export class TextureGaborFilters {
     image: Float32Array,
     width: number,
     height: number,
-    filter: Float32Array
+    filter: Float32Array,
   ): Promise<Float32Array> {
     const kernelSize = Math.sqrt(filter.length);
     const padding = Math.floor(kernelSize / 2);
@@ -301,7 +301,7 @@ export class TextureGaborFilters {
   private computeOrientationMap(
     responses: Float32Array[],
     width: number,
-    height: number
+    height: number,
   ): Float32Array {
     const orientationMap = new Float32Array(width * height);
     const { orientations } = this.config;
@@ -334,7 +334,7 @@ export class TextureGaborFilters {
   private computeFrequencyMap(
     responses: Float32Array[],
     width: number,
-    height: number
+    height: number,
   ): Float32Array {
     const frequencyMap = new Float32Array(width * height);
     const { frequencies } = this.config;
@@ -367,7 +367,7 @@ export class TextureGaborFilters {
   private computeEnergyMap(
     responses: Float32Array[],
     width: number,
-    height: number
+    height: number,
   ): Float32Array {
     const energyMap = new Float32Array(width * height);
 
@@ -495,8 +495,8 @@ export class TextureGaborFilters {
       config: this.config,
       filterBank: {
         orientations: Array.from(this.filterBank.orientations),
-        frequencies: Array.from(this.filterBank.frequencies)
-      }
+        frequencies: Array.from(this.filterBank.frequencies),
+      },
     };
   }
 

@@ -1,6 +1,6 @@
 /**
  * API Integration Service
- * 
+ *
  * High-level service that provides convenient methods for common API operations
  * using the centralized API client factory. This service abstracts the complexity
  * of the factory and provides domain-specific methods for the application.
@@ -44,7 +44,7 @@ export interface TextGenerationParams {
 
 /**
  * API Integration Service Class
- * 
+ *
  * Provides high-level methods for common API operations across all providers
  */
 export class ApiIntegrationService {
@@ -64,11 +64,11 @@ export class ApiIntegrationService {
    */
   public async generateImage(
     modelId: string,
-    params: TextToImageParams
+    params: TextToImageParams,
   ): Promise<StandardizedApiResponse<any>> {
     // Determine API type from model ID or use a mapping
     const apiType = this.getApiTypeFromModelId(modelId);
-    
+
     return await apiClientFactory.executeApiCall(apiType, modelId, params);
   }
 
@@ -77,10 +77,10 @@ export class ApiIntegrationService {
    */
   public async transformImage(
     modelId: string,
-    params: ImageToImageParams
+    params: ImageToImageParams,
   ): Promise<StandardizedApiResponse<any>> {
     const apiType = this.getApiTypeFromModelId(modelId);
-    
+
     return await apiClientFactory.executeApiCall(apiType, modelId, params);
   }
 
@@ -89,10 +89,10 @@ export class ApiIntegrationService {
    */
   public async generateText(
     modelId: string,
-    params: TextGenerationParams
+    params: TextGenerationParams,
   ): Promise<StandardizedApiResponse<any>> {
     const apiType = this.getApiTypeFromModelId(modelId);
-    
+
     return await apiClientFactory.executeApiCall(apiType, modelId, params);
   }
 
@@ -101,14 +101,14 @@ export class ApiIntegrationService {
    */
   public async executeSupabaseFunction(
     functionName: string,
-    params: any
+    params: any,
   ): Promise<StandardizedApiResponse<any>> {
     // Format parameters correctly for SupabaseApiClient
     const supabaseParams = {
       functionName: functionName,
-      data: params
+      data: params,
     };
-    
+
     return await apiClientFactory.executeApiCall('supabase', functionName, supabaseParams);
   }
 
@@ -126,7 +126,7 @@ export class ApiIntegrationService {
     return {
       replicate: this.getAvailableModels('replicate'),
       huggingface: this.getAvailableModels('huggingface'),
-      supabase: this.getAvailableModels('supabase')
+      supabase: this.getAvailableModels('supabase'),
     };
   }
 
@@ -165,13 +165,13 @@ export class ApiIntegrationService {
   private getApiTypeFromModelId(modelId: string): string {
     // Check if model exists in each API type
     const allModels = this.getAllAvailableModels();
-    
+
     for (const [apiType, models] of Object.entries(allModels)) {
       if (models.includes(modelId)) {
         return apiType;
       }
     }
-    
+
     // Fallback: try to infer from model ID patterns
     if (modelId.includes('/')) {
       // Replicate models typically have owner/model format

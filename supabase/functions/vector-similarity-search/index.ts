@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface VectorSearchRequest {
@@ -87,7 +87,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
         input: text.substring(0, 8000), // Limit input length
-        dimensions: EMBEDDING_DIMENSIONS
+        dimensions: EMBEDDING_DIMENSIONS,
       }),
     });
 
@@ -108,10 +108,10 @@ async function performSemanticSearch(
   queryVector: number[],
   collections: string[],
   filters: any,
-  limit: number
+  limit: number,
 ): Promise<VectorSearchResult[]> {
   const results: VectorSearchResult[] = [];
-  
+
   // Search in each specified collection
   for (const collection of collections) {
     let query = supabase
@@ -150,7 +150,7 @@ async function performSemanticSearch(
       // Calculate similarity scores
       const collectionResults = data.map((item: any, index: number) => {
         const similarity = calculateCosineSimilarity(queryVector, item.embedding || []);
-        
+
         return {
           id: item.id,
           content: item.content || '',
@@ -161,14 +161,14 @@ async function performSemanticSearch(
             title: item.metadata?.title,
             tags: item.metadata?.tags || [],
             author: item.metadata?.author,
-            ...item.metadata
+            ...item.metadata,
           },
           similarity_score: similarity,
           vector_distance: 1 - similarity,
-          search_rank: index + 1
+          search_rank: index + 1,
         };
-      }).filter(result => 
-        result.similarity_score >= (filters.similarity_threshold || 0.5)
+      }).filter(result =>
+        result.similarity_score >= (filters.similarity_threshold || 0.5),
       );
 
       results.push(...collectionResults);
@@ -186,7 +186,7 @@ async function performHybridSearch(
   queryVector: number[],
   collections: string[],
   filters: any,
-  limit: number
+  limit: number,
 ): Promise<VectorSearchResult[]> {
   // Combine semantic and keyword search
   const semanticResults = await performSemanticSearch(queryVector, collections, filters, limit * 2);
@@ -201,14 +201,14 @@ async function performHybridSearch(
     combinedResults.set(result.id, {
       ...result,
       similarity_score: hybridScore,
-      search_rank: index + 1
+      search_rank: index + 1,
     });
   });
 
   // Add keyword results with weight, combining scores if already present
   keywordResults.forEach((result, index) => {
     const keywordScore = (1 - index / keywordResults.length) * 0.5;
-    
+
     if (combinedResults.has(result.id)) {
       const existing = combinedResults.get(result.id)!;
       existing.similarity_score = existing.similarity_score * 0.8 + keywordScore * 0.2;
@@ -216,7 +216,7 @@ async function performHybridSearch(
       combinedResults.set(result.id, {
         ...result,
         similarity_score: keywordScore,
-        search_rank: index + 1
+        search_rank: index + 1,
       });
     }
   });
@@ -231,13 +231,13 @@ async function performKeywordSearch(
   queryText: string,
   collections: string[],
   filters: any,
-  limit: number
+  limit: number,
 ): Promise<VectorSearchResult[]> {
   const results: VectorSearchResult[] = [];
-  
+
   // Simple keyword search implementation
   const keywords = queryText.toLowerCase().split(/\s+/).filter(word => word.length > 2);
-  
+
   for (const collection of collections) {
     let query = supabase
       .from(collection)
@@ -276,9 +276,9 @@ async function performKeywordSearch(
         const matchCount = keywords.reduce((count, keyword) => {
           return count + (content.includes(keyword) ? 1 : 0);
         }, 0);
-        
+
         const relevanceScore = matchCount / keywords.length;
-        
+
         return {
           id: item.id,
           content: item.content || '',
@@ -289,11 +289,11 @@ async function performKeywordSearch(
             title: item.metadata?.title,
             tags: item.metadata?.tags || [],
             author: item.metadata?.author,
-            ...item.metadata
+            ...item.metadata,
           },
           similarity_score: relevanceScore,
           vector_distance: 1 - relevanceScore,
-          search_rank: index + 1
+          search_rank: index + 1,
         };
       }).filter(result => result.similarity_score > 0);
 
@@ -355,16 +355,16 @@ function generateAggregations(results: VectorSearchResult[]): any {
     content_types: contentTypes,
     sources: sources,
     date_distribution: dateDistribution,
-    avg_similarity: results.length > 0 ? totalSimilarity / results.length : 0
+    avg_similarity: results.length > 0 ? totalSimilarity / results.length : 0,
   };
 }
 
 async function processVectorSearch(request: VectorSearchRequest): Promise<SearchResponse> {
   const startTime = Date.now();
-  
+
   try {
     console.log(`Processing ${request.search_type} search`);
-    
+
     // Set default values
     const limit = Math.min(request.limit || 20, 100);
     const collections = request.collections || ['documents', 'knowledge_base', 'materials_catalog'];
@@ -372,7 +372,7 @@ async function processVectorSearch(request: VectorSearchRequest): Promise<Search
     const similarityThreshold = filters.similarity_threshold || 0.5;
 
     let queryVector: number[] = [];
-    
+
     // Generate embedding if query text is provided
     if (request.query_text && !request.query_vector) {
       queryVector = await generateEmbedding(request.query_text);
@@ -390,21 +390,21 @@ async function processVectorSearch(request: VectorSearchRequest): Promise<Search
       case 'similarity':
         results = await performSemanticSearch(queryVector, collections, filters, limit);
         break;
-        
+
       case 'hybrid':
         if (!request.query_text) {
           throw new Error('query_text is required for hybrid search');
         }
         results = await performHybridSearch(request.query_text, queryVector, collections, filters, limit);
         break;
-        
+
       case 'keyword':
         if (!request.query_text) {
           throw new Error('query_text is required for keyword search');
         }
         results = await performKeywordSearch(request.query_text, collections, filters, limit);
         break;
-        
+
       default:
         throw new Error(`Unsupported search type: ${request.search_type}`);
     }
@@ -413,7 +413,7 @@ async function processVectorSearch(request: VectorSearchRequest): Promise<Search
     if (!request.include_content) {
       results = results.map(result => ({
         ...result,
-        content: result.content.substring(0, 200) + '...' // Truncate content
+        content: result.content.substring(0, 200) + '...', // Truncate content
       }));
     }
 
@@ -423,8 +423,8 @@ async function processVectorSearch(request: VectorSearchRequest): Promise<Search
         metadata: {
           content_type: result.metadata.content_type,
           source: result.metadata.source,
-          created_at: result.metadata.created_at
-        }
+          created_at: result.metadata.created_at,
+        },
       }));
     }
 
@@ -441,9 +441,9 @@ async function processVectorSearch(request: VectorSearchRequest): Promise<Search
         search_time_ms: searchTime,
         collections_searched: collections,
         embedding_model: EMBEDDING_MODEL,
-        similarity_threshold: similarityThreshold
+        similarity_threshold: similarityThreshold,
       },
-      aggregations
+      aggregations,
     };
 
     // Log search analytics
@@ -459,8 +459,8 @@ async function processVectorSearch(request: VectorSearchRequest): Promise<Search
             results_count: results.length,
             search_time_ms: searchTime,
             avg_similarity: aggregations.avg_similarity,
-            query_length: request.query_text?.length || 0
-          }
+            query_length: request.query_text?.length || 0,
+          },
         });
     }
 
@@ -479,32 +479,32 @@ serve(async (req) => {
 
   try {
     const request: VectorSearchRequest = await req.json();
-    
+
     console.log('Processing vector search request:', {
       search_type: request.search_type,
       has_query_text: !!request.query_text,
       has_query_vector: !!request.query_vector,
       collections: request.collections,
-      limit: request.limit
+      limit: request.limit,
     });
 
     if (!request.query_text && !request.query_vector) {
       return new Response(
         JSON.stringify({ error: 'Either query_text or query_vector is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
     if (!['semantic', 'hybrid', 'similarity', 'keyword'].includes(request.search_type)) {
       return new Response(
         JSON.stringify({ error: 'Invalid search_type. Must be one of: semantic, hybrid, similarity, keyword' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -512,23 +512,23 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(response),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Vector similarity search error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Vector search failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Vector search failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

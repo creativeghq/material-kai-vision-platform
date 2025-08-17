@@ -1,6 +1,6 @@
 /**
  * Abstract Singleton Base Class
- * 
+ *
  * Provides a standardized implementation of the Singleton pattern
  * as defined in ADR-002: Singleton Pattern Standardization
  */
@@ -21,13 +21,13 @@ export abstract class Singleton {
    */
   public static getInstance<T extends Singleton>(this: new (...args: any[]) => T): T {
     const className = this.name;
-    
+
     if (!Singleton.instances.has(className)) {
       // Use Reflect.construct to bypass constructor visibility restrictions
       const instance = Reflect.construct(this, []);
       Singleton.instances.set(className, instance);
     }
-    
+
     return Singleton.instances.get(className) as T;
   }
 

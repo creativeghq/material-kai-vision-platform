@@ -6,16 +6,17 @@ import {
   Box,
   ScanText,
   Search,
-  Globe
+  Globe,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Link, useLocation } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
 
 const navigationItems = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'search', label: 'Search Hub', path: '/search-hub', icon: Search },
   { id: 'pdf', label: 'PDF Upload', path: '/pdf-processing', icon: ScanText },
-  
+
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: '3d', label: '3D Designer', path: '/3d', icon: Box },
   { id: 'scraper', label: 'Web Scraper', path: '/scraper', icon: Globe },
@@ -24,7 +25,7 @@ const navigationItems = [
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
-  
+
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);

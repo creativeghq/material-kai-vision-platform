@@ -1,14 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
-import { EnhancedRAGService } from '@/services/enhancedRAGService';
-import { HybridAIService } from '@/services/hybridAIService';
-import { CrewAI3DGenerationAPI } from '@/services/crewai3DGenerationAPI';
 import {
   Bot,
   Send,
@@ -25,8 +15,19 @@ import {
   FileImage,
   FileText,
   Settings,
-  Cpu
+  Cpu,
 } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { EnhancedRAGService } from '@/services/enhancedRAGService';
+import { HybridAIService } from '@/services/hybridAIService';
+import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 
 interface AttachedFile {
   id: string;
@@ -99,16 +100,16 @@ interface EnhancedContext {
   ragResults?: RAGResults;
 }
 
-interface CrewAISearchInterfaceProps {
+interface MaterialAgentSearchInterfaceProps {
   onMaterialSelect?: (materialId: string) => void;
   onNavigateToMoodboard?: () => void;
   onNavigateTo3D?: () => void;
 }
 
-export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
+export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterfaceProps> = ({
   onMaterialSelect,
   onNavigateToMoodboard,
-  onNavigateTo3D
+  onNavigateTo3D,
 }) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -125,7 +126,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
     useRAG: true,
     use3DGeneration: true,
     enableRAG: true,
-    enable3DGeneration: true
+    enable3DGeneration: true,
   });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -135,14 +136,14 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
     setMessages([{
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: "👋 Hello! I'm your AI material research assistant powered by CrewAI. I can help you:\n\n• Search and analyze materials from our PDF knowledge base\n• Find materials based on specific properties or applications\n• Generate design suggestions and 3D concepts\n• Cross-reference materials with projects and mood boards\n\nWhat would you like to explore today?",
+      content: "👋 Hello! I'm your AI material research assistant powered by Material Agent Orchestrator. I can help you:\n\n• Search and analyze materials from our PDF knowledge base\n• Find materials based on specific properties or applications\n• Generate design suggestions and 3D concepts\n• Cross-reference materials with projects and mood boards\n\nWhat would you like to explore today?",
       timestamp: new Date(),
       suggestions: [
-        "Find sustainable materials for modern interiors",
-        "Search for acoustic materials with high performance",
-        "Show me trending colors and textures for 2024",
-        "Find materials suitable for outdoor applications"
-      ]
+        'Find sustainable materials for modern interiors',
+        'Search for acoustic materials with high performance',
+        'Show me trending colors and textures for 2024',
+        'Find materials suitable for outdoor applications',
+      ],
     }]);
   }, []);
 
@@ -159,21 +160,21 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       // Validate file type and size
       const maxSize = 10 * 1024 * 1024; // 10MB
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv'];
-      
+
       if (file.size > maxSize) {
         toast({
-          title: "File too large",
+          title: 'File too large',
           description: `${file.name} is larger than 10MB`,
-          variant: "destructive",
+          variant: 'destructive',
         });
         return;
       }
 
       if (!allowedTypes.includes(file.type)) {
         toast({
-          title: "Unsupported file type",
+          title: 'Unsupported file type',
           description: `${file.name} is not a supported file type`,
-          variant: "destructive",
+          variant: 'destructive',
         });
         return;
       }
@@ -183,7 +184,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         name: file.name,
         type: file.type,
         size: file.size,
-        url: URL.createObjectURL(file)
+        url: URL.createObjectURL(file),
       };
 
       // Generate preview for images
@@ -223,7 +224,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       role: 'user',
       content: input,
       timestamp: new Date(),
-      attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined
+      attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -238,7 +239,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       }
 
       // Enhanced diagnostic logging
-      console.log('=== Enhanced CrewAI Integration ===');
+      console.log('=== Enhanced Material Agent Integration ===');
       console.log('1. File attachments:', attachedFiles.length > 0 ? `${attachedFiles.length} files attached` : 'No files');
       console.log('2. Hybrid model config:', hybridConfig);
       console.log('3. RAG enabled:', hybridConfig.useRAG);
@@ -255,7 +256,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           includeMaterialProperties: true,
           includeApplicationExamples: true,
           use3DGeneration: hybridConfig.use3DGeneration,
-          useRAG: hybridConfig.useRAG
+          useRAG: hybridConfig.useRAG,
         },
         hybridModelConfig: hybridConfig,
         attachments: attachedFiles.map(file => ({
@@ -263,8 +264,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           name: file.name,
           type: file.type,
           size: file.size,
-          url: file.url
-        }))
+          url: file.url,
+        })),
       };
 
       // If RAG is enabled, perform knowledge base search first
@@ -277,11 +278,11 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
             context: {
               projectType: 'interior_design',
               roomType: 'general',
-              materialCategories: ['all']
+              materialCategories: ['all'],
             },
             searchType: 'hybrid',
             maxResults: 5,
-            includeRealTime: false
+            includeRealTime: false,
           });
 
           if (ragResponse.success && ragResponse.results) {
@@ -291,17 +292,17 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                 title: kb.title,
                 content: kb.content.substring(0, 500) + '...', // Truncate for context
                 relevanceScore: kb.relevanceScore,
-                source: kb.source
+                source: kb.source,
               })),
               materialResults: (ragResponse.results.materialKnowledge || []).map(mk => ({
                 id: mk.materialId,
                 title: mk.materialName,
                 content: mk.extractedKnowledge,
                 relevanceScore: mk.relevanceScore,
-                source: 'material_knowledge'
+                source: 'material_knowledge',
               })),
               totalResults: (ragResponse.results.knowledgeBase || []).length + (ragResponse.results.materialKnowledge || []).length,
-              searchTime: ragResponse.performance?.totalTime || 0
+              searchTime: ragResponse.performance?.totalTime || 0,
             };
             console.log('✅ RAG search completed:', ragResults);
             enhancedContext.ragResults = ragResults;
@@ -314,7 +315,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
 
       // Determine which AI service to use based on hybrid configuration
       let data: any, error: any;
-      
+
       if (hybridConfig.enableRAG && hybridConfig.primary && hybridConfig.fallback) {
         console.log('🔄 Using Hybrid AI Service...');
         try {
@@ -324,7 +325,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
             model: hybridConfig.primary,
             type: 'general',
             maxRetries: 2,
-            minimumScore: 0.7
+            minimumScore: 0.7,
           });
 
           if (hybridResponse.success) {
@@ -342,18 +343,18 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                 ragEnabled: !!ragResults,
                 attachmentCount: attachedFiles.length,
                 hybridAI: true,
-                attempts: hybridResponse.attempts.length
-              }
+                attempts: hybridResponse.attempts.length,
+              },
             };
             error = null;
           } else {
-            throw new Error(`Hybrid AI failed: No successful response`);
+            throw new Error('Hybrid AI failed: No successful response');
           }
         } catch (hybridError) {
-          console.warn('⚠️ Hybrid AI failed, falling back to standard CrewAI:', hybridError);
-          // Fallback to standard CrewAI
+          console.warn('⚠️ Hybrid AI failed, falling back to standard Material Agent:', hybridError);
+          // Fallback to standard Material Agent
           const apiService = ApiIntegrationService.getInstance();
-          const response = await apiService.executeSupabaseFunction('enhanced-crewai', {
+          const response = await apiService.executeSupabaseFunction('material-agent-orchestrator', {
             user_id: session.user.id,
             task_type: 'comprehensive_design',
             input_data: {
@@ -361,17 +362,17 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
               sessionId: sessionId,
               context: enhancedContext,
               hybridConfig: hybridConfig,
-              attachments: attachedFiles.length > 0 ? attachedFiles : undefined
-            }
+              attachments: attachedFiles.length > 0 ? attachedFiles : undefined,
+            },
           });
           data = response.data;
           error = response.error;
         }
       } else {
-        console.log('🤖 Using standard CrewAI...');
-        // Use standard CrewAI endpoint
+        console.log('🤖 Using standard Material Agent...');
+        // Use standard Material Agent endpoint
         const apiService = ApiIntegrationService.getInstance();
-        const response = await apiService.executeSupabaseFunction('enhanced-crewai', {
+        const response = await apiService.executeSupabaseFunction('material-agent-orchestrator', {
           user_id: session.user.id,
           task_type: 'comprehensive_design',
           input_data: {
@@ -379,15 +380,15 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
             sessionId: sessionId,
             context: enhancedContext,
             hybridConfig: hybridConfig,
-            attachments: attachedFiles.length > 0 ? attachedFiles : undefined
-          }
+            attachments: attachedFiles.length > 0 ? attachedFiles : undefined,
+          },
         });
         data = response.data;
         error = response.error;
       }
 
       if (error) {
-        console.error('CrewAI function error:', error);
+        console.error('Material Agent function error:', error);
         throw new Error(error.message || 'Failed to get AI response');
       }
 
@@ -395,11 +396,11 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         throw new Error(data?.error_message || data?.error || 'AI processing failed');
       }
 
-      // Transform CrewAI response to expected format
+      // Transform Material Agent response to expected format
       const transformedData = {
         success: true,
         response: data.coordinated_result?.content || data.coordinated_result?.analysis || data.coordinated_result || 'Analysis completed successfully',
-        thinking: data.coordination_summary || 'Task processed through CrewAI agent coordination',
+        thinking: data.coordination_summary || 'Task processed through Material Agent coordination',
         suggestions: data.coordinated_result?.recommendations || [],
         materials: data.coordinated_result?.materials || [],
         metadata: {
@@ -407,11 +408,11 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           processingTime: data.total_processing_time_ms,
           overallConfidence: data.overall_confidence,
           agentCount: data.agent_executions?.length || 0,
-          crewAI: true
-        }
+          crewAI: true,
+        },
       };
 
-      console.log('CrewAI response:', transformedData);
+      console.log('Material Agent response:', transformedData);
 
       // Check if 3D generation is enabled and should be triggered
       let enhanced3DContent = null;
@@ -421,15 +422,15 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           // Check if the response contains design-related keywords that would benefit from 3D generation
           const designKeywords = ['interior', 'room', 'space', 'design', 'layout', 'furniture', 'decor'];
           const containsDesignContent = designKeywords.some(keyword =>
-            data.response.toLowerCase().includes(keyword)
+            data.response.toLowerCase().includes(keyword),
           );
 
           if (containsDesignContent) {
-            const generationResult = await CrewAI3DGenerationAPI.generate3D({
+            const generationResult = await MaterialAgent3DGenerationAPI.generate3D({
               prompt: input,
               room_type: 'general', // Could be extracted from context
               style: 'modern', // Could be made configurable
-              specific_materials: [] // Could be extracted from attachments or context
+              specific_materials: [], // Could be extracted from attachments or context
             });
 
             if (generationResult.success) {
@@ -439,7 +440,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                 parsedRequest: generationResult.parsed_request,
                 matchedMaterials: generationResult.matched_materials,
                 qualityAssessment: generationResult.quality_assessment,
-                processingTime: generationResult.processing_time_ms
+                processingTime: generationResult.processing_time_ms,
               };
               console.log('✅ 3D generation completed:', enhanced3DContent);
             }
@@ -462,9 +463,9 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           ...transformedData.metadata,
           ...(enhanced3DContent && {
             has3DContent: true,
-            designGeneration: enhanced3DContent
-          })
-        }
+            designGeneration: enhanced3DContent,
+          }),
+        },
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -474,27 +475,27 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
 
       // Show success notification with additional info
       toast({
-        title: "AI Response Generated",
+        title: 'AI Response Generated',
         description: `Found ${data.materials?.length || 0} relevant materials`,
         duration: 3000,
       });
 
     } catch (error) {
       console.error('Error sending message:', error);
-      
+
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         role: 'system',
         content: `❌ Error: ${error instanceof Error ? error.message : 'Failed to process request'}`,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, errorMessage]);
 
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get AI response",
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to get AI response',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -525,7 +526,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-6 w-6 text-primary" />
-            CrewAI Material Research Assistant
+            Material Agent Research Assistant
             <Badge className="ml-auto border border-border bg-background text-foreground">
               <Sparkles className="h-3 w-3 mr-1" />
               AI-Powered
@@ -565,7 +566,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div
                       className={`p-3 rounded-lg ${
@@ -577,7 +578,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{message.content}</p>
-                      
+
                       {message.thinking && (
                         <details className="mt-2">
                           <summary className="cursor-pointer text-sm opacity-70 flex items-center gap-1">
@@ -636,8 +637,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                           {message.suggestions.map((suggestion, idx) => (
                             <Button
                               key={idx}
-                              
-                              
+
+
                               onClick={() => handleSuggestionClick(suggestion)}
                               className="text-xs h-7"
                             >
@@ -655,7 +656,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                 </div>
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="flex gap-3 justify-start">
                 <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
@@ -669,7 +670,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
         </CardContent>
@@ -716,7 +717,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <label className="block text-muted-foreground mb-1">Primary Model</label>
@@ -730,7 +731,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                       <option value="vertex">Vertex AI</option>
                     </select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-muted-foreground mb-1">Fallback Model</label>
                     <select
@@ -743,7 +744,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                       <option value="vertex">Vertex AI</option>
                     </select>
                   </div>
-                  
+
                   <div className="col-span-2">
                     <label className="block text-muted-foreground mb-1">
                       Temperature: {hybridConfig.temperature}
@@ -758,7 +759,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                       className="w-full"
                     />
                   </div>
-                  
+
                   <div className="col-span-2 flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -771,7 +772,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                       Enable Knowledge Base Search
                     </label>
                   </div>
-                  
+
                   <div className="col-span-2 flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -798,24 +799,24 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
                 disabled={isLoading}
                 className="flex-1"
               />
-              
+
               {/* File Attachment Button */}
               <Button
                 type="button"
-                
-                
+
+
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
                 title="Attach files"
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
-              
+
               {/* Settings Button */}
               <Button
                 type="button"
-                
-                
+
+
                 onClick={() => setShowSettings(!showSettings)}
                 disabled={isLoading}
                 title="AI Settings"
@@ -847,7 +848,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
               className="hidden"
             />
           </div>
-          
+
           <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
             <span>Press Enter to send, Shift+Enter for new line</span>
             <span>Session: {sessionId.substring(0, 8)}...</span>
@@ -858,7 +859,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Button
-          
+
           onClick={onNavigateToMoodboard}
           className="justify-start gap-2"
         >
@@ -866,7 +867,7 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           Browse Mood Boards
         </Button>
         <Button
-          
+
           onClick={onNavigateTo3D}
           className="justify-start gap-2"
         >
@@ -874,8 +875,8 @@ export const CrewAISearchInterface: React.FC<CrewAISearchInterfaceProps> = ({
           3D Generation
         </Button>
         <Button
-          
-          onClick={() => handleSuggestionClick("Show me the latest material trends")}
+
+          onClick={() => handleSuggestionClick('Show me the latest material trends')}
           className="justify-start gap-2"
         >
           <Lightbulb className="h-4 w-4" />

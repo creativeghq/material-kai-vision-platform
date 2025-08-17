@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
+
 import { DocumentChunkingService, ChunkingStrategy } from '../services/documentChunkingService';
 import { MivaaToRagTransformer, MivaaDocument, RagDocument, TransformationConfig } from '../services/mivaaToRagTransformer';
 import { EnhancedRAGService } from '../services/enhancedRAGService';
@@ -39,17 +40,17 @@ interface Job {
 class SimpleQueue extends EventEmitter implements Queue {
   private jobs: Map<string, Job> = new Map();
   private processors: Map<string, (job: Job) => Promise<any>> = new Map();
-  
+
   async add(name: string, data: any, options?: any): Promise<Job> {
     const job: Job = {
       data: { ...data, jobType: name },
       remove: async () => {
         this.jobs.delete(job.data.jobId);
-      }
+      },
     };
-    
+
     this.jobs.set(data.jobId, job);
-    
+
     // Process immediately for simplicity
     setTimeout(async () => {
       const processor = this.processors.get(name);
@@ -62,18 +63,18 @@ class SimpleQueue extends EventEmitter implements Queue {
         }
       }
     }, 0);
-    
+
     return job;
   }
-  
+
   process(name: string, processor: (job: Job) => Promise<any>): void {
     this.processors.set(name, processor);
   }
-  
+
   async getJobs(types: string[]): Promise<Job[]> {
     return Array.from(this.jobs.values());
   }
-  
+
   async close(): Promise<void> {
     this.jobs.clear();
     this.processors.clear();
@@ -207,11 +208,11 @@ export interface WorkflowState {
 
 /**
  * DocumentWorkflowOrchestrator
- * 
+ *
  * Orchestrates the complete document processing workflow from Mivaa PDF extraction
  * to RAG-ready document format. Manages asynchronous processing, state persistence,
  * error recovery, and rollback mechanisms.
- * 
+ *
  * Features:
  * - Asynchronous job queue processing with Bull/Redis
  * - Multi-stage workflow with checkpointing
@@ -230,10 +231,10 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
   private readonly processingQueue: Queue;
   private readonly stateStore: Map<string, WorkflowState>;
   private readonly activeJobs: Map<string, WorkflowJob>;
-  
+
   // MIVAA Integration Service (consolidated)
   private readonly mivaaIntegrationService: MivaaIntegrationService;
-  
+
   private readonly defaultConfig: WorkflowConfig = {
     transformation: {
       chunking: {
@@ -242,50 +243,50 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
         overlapSize: 100,
         preserveStructure: true,
         sentenceBoundary: true,
-        paragraphBoundary: true
+        paragraphBoundary: true,
       },
       embeddings: {
         enabled: true,
         generateDocumentEmbedding: true,
-        generateChunkEmbeddings: true
+        generateChunkEmbeddings: true,
       },
       tables: {
         includeInChunks: true,
         generateSummaries: true,
-        extractSearchableText: true
+        extractSearchableText: true,
       },
       images: {
         includeInChunks: false,
         extractText: true,
-        generateDescriptions: true
+        generateDescriptions: true,
       },
       structure: {
         preserveHeaders: true,
         generateTableOfContents: true,
-        detectSections: true
+        detectSections: true,
       },
       quality: {
         minimumChunkSize: 50,
         maximumChunkSize: 2000,
-        minimumConfidence: 0.7
-      }
+        minimumConfidence: 0.7,
+      },
     },
     processing: {
       enableParallelProcessing: true,
       maxConcurrentJobs: 5,
       retryAttempts: 3,
       retryDelay: 5000,
-      timeout: 300000 // 5 minutes
+      timeout: 300000, // 5 minutes
     },
     persistence: {
       saveIntermediateResults: true,
       enableRollback: true,
-      stateCheckpointInterval: 30000 // 30 seconds
+      stateCheckpointInterval: 30000, // 30 seconds
     },
     notifications: {
       enableProgressUpdates: true,
-      enableCompletionNotification: true
-    }
+      enableCompletionNotification: true,
+    },
   };
 
   constructor(
@@ -294,10 +295,10 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     transformerService: MivaaToRagTransformer,
     ragService: EnhancedRAGService,
     logger: Logger,
-    redisConfig?: any
+    redisConfig?: any,
   ) {
     super();
-    
+
     this.logger = logger;
     this.chunkingService = chunkingService;
     this.embeddingService = mivaaIntegrationService;
@@ -306,10 +307,10 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     this.mivaaIntegrationService = mivaaIntegrationService;
     this.stateStore = new Map();
     this.activeJobs = new Map();
-    
+
     // Initialize queue for job processing (using simple implementation for development)
     this.processingQueue = new SimpleQueue();
-    
+
     this.setupQueueProcessors();
     this.setupEventHandlers();
   }
@@ -321,12 +322,12 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     const startTime = performance.now();
     const jobId = this.generateJobId();
     const config = { ...this.defaultConfig, ...request.config };
-    
-    this.logger.info(`Starting document workflow processing`, {
+
+    this.logger.info('Starting document workflow processing', {
       jobId,
       requestId: request.id,
       workspaceId: request.workspaceId,
-      filename: request.mivaaDocument.filename
+      filename: request.mivaaDocument.filename,
     });
 
     // Create workflow job
@@ -338,7 +339,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       stages: this.initializeStages(),
       createdAt: new Date(),
       updatedAt: new Date(),
-      metrics: this.initializeMetrics()
+      metrics: this.initializeMetrics(),
     };
 
     // Store job state
@@ -350,32 +351,32 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       const queueJob = await this.processingQueue.add('process-document', {
         jobId,
         request,
-        config
+        config,
       }, {
         priority: this.getPriority(request.priority),
-        delay: 0
+        delay: 0,
       });
 
       // Update job with queue information
       job.status = 'processing';
       job.updatedAt = new Date();
-      
+
       this.emit('jobStarted', job);
-      
+
       return job;
-      
+
     } catch (error) {
       const errorMessage = `Failed to start document processing: ${error instanceof Error ? error.message : String(error)}`;
-      
+
       this.logger.error('Failed to start document processing', {
         jobId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
-      
+
       job.status = 'failed';
       job.error = errorMessage;
       job.updatedAt = new Date();
-      
+
       this.emit('jobFailed', job, new Error(errorMessage));
       throw new Error(errorMessage);
     }
@@ -389,7 +390,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     if (!job) {
       throw new Error(`Workflow job not found: ${jobId}`);
     }
-    
+
     return job.status;
   }
 
@@ -402,13 +403,13 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       throw new Error(`Workflow job not found: ${jobId}`);
     }
 
-    this.logger.info(`Cancelling workflow`, { jobId });
+    this.logger.info('Cancelling workflow', { jobId });
 
     try {
       // Find and remove job from queue
       const queueJobs = await this.processingQueue.getJobs(['waiting', 'active', 'delayed']);
       const queueJob = queueJobs.find(j => j.data.jobId === jobId);
-      
+
       if (queueJob) {
         await queueJob.remove();
       }
@@ -419,11 +420,11 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       job.completedAt = new Date();
 
       this.emit('jobCancelled', job);
-      
+
     } catch (error) {
-      this.logger.error(`Failed to cancel workflow`, {
+      this.logger.error('Failed to cancel workflow', {
         jobId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -447,7 +448,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       throw new Error(`Stage is not in failed state: ${stage}`);
     }
 
-    this.logger.info(`Retrying failed stage`, { jobId, stage });
+    this.logger.info('Retrying failed stage', { jobId, stage });
 
     try {
       // Reset stage status
@@ -460,21 +461,21 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       await this.processingQueue.add('retry-stage', {
         jobId,
         stage,
-        fromStage: stage
+        fromStage: stage,
       }, {
-        priority: 1 // High priority for retries
+        priority: 1, // High priority for retries
       });
 
       job.status = 'processing';
       job.updatedAt = new Date();
 
       this.emit('stageRetried', job, stage);
-      
+
     } catch (error) {
-      this.logger.error(`Failed to retry stage`, {
+      this.logger.error('Failed to retry stage', {
         jobId,
         stage,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -494,12 +495,12 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       throw new Error(`No rollback points available for job: ${jobId}`);
     }
 
-    this.logger.info(`Rolling back workflow`, { jobId });
+    this.logger.info('Rolling back workflow', { jobId });
 
     try {
       // Get the latest rollback point
       const rollbackPoint = state.rollbackPoints[state.rollbackPoints.length - 1];
-      
+
       // Restore state
       state.currentStage = rollbackPoint.stage;
       state.stageData = rollbackPoint.state;
@@ -521,11 +522,11 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       job.updatedAt = new Date();
 
       this.emit('workflowRolledBack', job, rollbackPoint.stage);
-      
+
     } catch (error) {
-      this.logger.error(`Failed to rollback workflow`, {
+      this.logger.error('Failed to rollback workflow', {
         jobId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -549,18 +550,18 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
    */
   private setupEventHandlers(): void {
     this.processingQueue.on('completed', (job: Job, result: any) => {
-      this.logger.info(`Queue job completed`, { jobId: job.data.jobId });
+      this.logger.info('Queue job completed', { jobId: job.data.jobId });
     });
 
     this.processingQueue.on('failed', (job: Job, error: Error) => {
-      this.logger.error(`Queue job failed`, { 
-        jobId: job.data.jobId, 
-        error: error.message 
+      this.logger.error('Queue job failed', {
+        jobId: job.data.jobId,
+        error: error.message,
       });
     });
 
     this.processingQueue.on('stalled', (job: Job) => {
-      this.logger.warn(`Queue job stalled`, { jobId: job.data.jobId });
+      this.logger.warn('Queue job stalled', { jobId: job.data.jobId });
     });
   }
 
@@ -568,9 +569,9 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
    * Execute the complete workflow
    */
   private async executeWorkflow(
-    jobId: string, 
-    request: ProcessingRequest, 
-    config: WorkflowConfig
+    jobId: string,
+    request: ProcessingRequest,
+    config: WorkflowConfig,
   ): Promise<RagDocument> {
     const job = this.activeJobs.get(jobId);
     if (!job) {
@@ -578,9 +579,9 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     }
 
     const startTime = performance.now();
-    
+
     try {
-      this.logger.info(`Executing workflow`, { jobId });
+      this.logger.info('Executing workflow', { jobId });
 
       // Stage 1: Document Validation
       await this.executeStage(job, 'validation', async () => {
@@ -592,7 +593,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       const chunkingResult = await this.executeStage(job, 'chunking', async () => {
         job.status = 'chunking';
         this.emit('jobProgress', job);
-        
+
         return await this.chunkingService.chunkDocument({
           content: request.mivaaDocument.markdown,
           metadata: {
@@ -604,10 +605,10 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
             extractedImages: request.mivaaDocument.images || [],
             structure: {
               headers: [],
-              sections: []
+              sections: [],
             },
-            ...request.mivaaDocument.metadata
-          }
+            ...request.mivaaDocument.metadata,
+          },
         }, config.transformation.chunking);
       });
 
@@ -623,29 +624,29 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
         const embeddingInputs: EmbeddingInput[] = chunkingResult.chunks.map(chunk => ({
           id: chunk.id,
           text: chunk.content,
-          metadata: chunk.metadata
+          metadata: chunk.metadata,
         }));
 
         // Check MIVAA service health first
         try {
           const healthStatus = await this.mivaaIntegrationService.healthCheck();
-          
+
           if (healthStatus.isHealthy) {
             this.logger.info('MIVAA service is healthy, but embedding generation not implemented in consolidated service', {
               jobId: job.id,
               chunkCount: embeddingInputs.length,
-              mivaaHealth: healthStatus
+              mivaaHealth: healthStatus,
             });
           } else {
             this.logger.warn('MIVAA service unhealthy', {
               jobId: job.id,
-              healthStatus
+              healthStatus,
             });
           }
         } catch (error) {
           this.logger.error('MIVAA service health check failed', {
             jobId: job.id,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
 
@@ -654,7 +655,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
         this.logger.info('Embedding generation not available in consolidated MIVAA service', {
           jobId: job.id,
           chunkCount: embeddingInputs.length,
-          note: 'Consider implementing embedding service or using alternative approach'
+          note: 'Consider implementing embedding service or using alternative approach',
         });
 
         // For now, return a mock result to maintain workflow compatibility
@@ -663,13 +664,13 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
           embeddings: embeddingInputs.map((input, index) => ({
             id: input.id,
             embedding: new Array(1536).fill(0), // Mock embedding vector
-            metadata: input.metadata || {}
+            metadata: input.metadata || {},
           })),
           metrics: {
             totalProcessed: embeddingInputs.length,
             processingTime: 0,
-            averageEmbeddingTime: 0
-          }
+            averageEmbeddingTime: 0,
+          },
         };
       });
 
@@ -681,7 +682,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
         return await this.transformerService.transformDocument(
           request.mivaaDocument,
           request.workspaceId,
-          config.transformation
+          config.transformation,
         );
       });
 
@@ -702,28 +703,28 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
             ...chunk.metadata,
             sourceDocument: request.mivaaDocument.filename,
             processingJobId: job.id,
-            transformationTimestamp: new Date().toISOString()
+            transformationTimestamp: new Date().toISOString(),
           },
-          embedding: null // Will be generated by DocumentVectorStoreService
+          embedding: null, // Will be generated by DocumentVectorStoreService
         })) || [];
 
         // Store document chunks in vector store using DocumentVectorStoreService
         const vectorStoreRequest: BatchStoreRequest = {
           workspaceId: request.workspaceId,
           documentId: transformationResult.ragDocument.id,
-          chunks: documentChunks
+          chunks: documentChunks,
         };
 
         // Use DocumentVectorStoreService factory to create instance and store document
         const vectorStoreService = createDocumentVectorStoreService(this.mivaaIntegrationService);
         const vectorStoreResponse = await vectorStoreService.storeBatch(vectorStoreRequest);
-        
+
         return {
           ragDocumentId: transformationResult.ragDocument.id,
           vectorStoreMetrics: vectorStoreResponse.metrics,
           successfulChunks: vectorStoreResponse.successful.length,
           failedChunks: vectorStoreResponse.failed.length,
-          searchIndexUpdated: vectorStoreResponse.successful.length > 0
+          searchIndexUpdated: vectorStoreResponse.successful.length > 0,
         };
       });
 
@@ -734,22 +735,22 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       job.updatedAt = new Date();
       job.result = {
         ...transformationResult.ragDocument,
-        ...transformationResult.ragDocument
+        ...transformationResult.ragDocument,
       };
       job.metrics.totalProcessingTime = endTime - startTime;
 
       this.emit('jobCompleted', job);
-      
+
       // Cleanup
       this.stateStore.delete(jobId);
-      
+
       return transformationResult.ragDocument;
-      
+
     } catch (error) {
       const appError = new Error(
         'Workflow execution failed',
         error instanceof Error ? error.message : 'Unknown workflow error',
-        { jobId, workspaceId: job.workspaceId }
+        { jobId, workspaceId: job.workspaceId },
       );
 
       job.status = 'failed';
@@ -771,7 +772,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     const appError = new Error(
       'Stage resumption not implemented',
       'Workflow stage resumption functionality is not yet available',
-      { jobId, fromStage }
+      { jobId, fromStage },
     );
     throw appError;
   }
@@ -782,7 +783,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
   private async executeStage<T>(
     job: WorkflowJob,
     stageName: string,
-    executor: () => Promise<T>
+    executor: () => Promise<T>,
   ): Promise<T> {
     const stage = job.stages.find(s => s.name === stageName);
     if (!stage) {
@@ -793,38 +794,38 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     stage.status = 'processing';
     stage.startTime = new Date();
 
-    this.logger.info(`Executing stage`, { 
-      jobId: job.id, 
-      stage: stageName 
+    this.logger.info('Executing stage', {
+      jobId: job.id,
+      stage: stageName,
     });
 
     try {
       const result = await executor();
-      
+
       const endTime = performance.now();
       stage.status = 'completed';
       stage.endTime = new Date();
       stage.result = result;
-      
+
       // Update metrics
       job.metrics.stageMetrics[stageName] = {
         duration: endTime - startTime,
         memoryUsage: process.memoryUsage().heapUsed,
-        cpuUsage: process.cpuUsage().user
+        cpuUsage: process.cpuUsage().user,
       };
 
       this.emit('stageCompleted', job, stageName, result);
-      
+
       // Create checkpoint
       this.createCheckpoint(job.id, stageName, result);
-      
+
       return result;
-      
+
     } catch (error) {
       const appError = new Error(
         `Stage execution failed: ${stageName}`,
         error instanceof Error ? error.message : 'Unknown stage execution error',
-        { jobId: job.id, stageName, workspaceId: job.workspaceId }
+        { jobId: job.id, stageName, workspaceId: job.workspaceId },
       );
 
       stage.status = 'failed';
@@ -844,7 +845,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       { name: 'validation', status: 'pending' },
       { name: 'chunking', status: 'pending' },
       { name: 'embedding', status: 'pending' },
-      { name: 'transformation', status: 'pending' }
+      { name: 'transformation', status: 'pending' },
     ];
   }
 
@@ -858,13 +859,13 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       throughput: {
         documentsPerSecond: 0,
         chunksPerSecond: 0,
-        embeddingsPerSecond: 0
+        embeddingsPerSecond: 0,
       },
       qualityMetrics: {
         transformationQuality: 0,
         chunkingQuality: 0,
-        embeddingQuality: 0
-      }
+        embeddingQuality: 0,
+      },
     };
   }
 
@@ -872,9 +873,9 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
    * Create workflow state for persistence
    */
   private createWorkflowState(
-    job: WorkflowJob, 
-    request: ProcessingRequest, 
-    config: WorkflowConfig
+    job: WorkflowJob,
+    request: ProcessingRequest,
+    config: WorkflowConfig,
   ): void {
     const state: WorkflowState = {
       jobId: job.id,
@@ -883,7 +884,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       currentStage: 'validation',
       stageData: {},
       checkpoints: [],
-      rollbackPoints: []
+      rollbackPoints: [],
     };
 
     this.stateStore.set(job.id, state);
@@ -899,7 +900,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     state.checkpoints.push({
       stage,
       timestamp: new Date(),
-      data
+      data,
     });
 
     // Create rollback point every few stages
@@ -907,7 +908,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       state.rollbackPoints.push({
         stage,
         timestamp: new Date(),
-        state: { ...state.stageData }
+        state: { ...state.stageData },
       });
     }
   }
@@ -919,11 +920,11 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     if (!document.filename) {
       throw new Error('Document filename is required');
     }
-    
+
     if (!document.markdown || document.markdown.trim().length === 0) {
       throw new Error('Document markdown content is required');
     }
-    
+
     if (!document.metadata) {
       throw new Error('Document metadata is required');
     }
@@ -953,7 +954,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
    */
   async shutdown(): Promise<void> {
     this.logger.info('Shutting down DocumentWorkflowOrchestrator');
-    
+
     await this.processingQueue.close();
     this.stateStore.clear();
     this.activeJobs.clear();

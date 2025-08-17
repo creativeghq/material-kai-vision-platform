@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, Clock, TrendingUp, Loader2, Sparkles } from 'lucide-react';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -66,7 +67,6 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
 
     if (processingData) {
       processingData.forEach((item: any) => {
-        const metadata = item.metadata || {};
         suggestions.push({
           id: `processing_${item.id}`,
           text: `${item.extraction_type} analysis`,
@@ -75,8 +75,8 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
           category: 'analysis',
           metadata: {
             relatedTerms: [item.extraction_type, 'processing', 'analysis'],
-            source: 'processing_results'
-          }
+            source: 'processing_results',
+          },
         });
       });
     }
@@ -97,8 +97,8 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
           category: item.category || 'materials',
           metadata: {
             popularity: 'high',
-            source: 'materials_catalog'
-          }
+            source: 'materials_catalog',
+          },
         });
       });
     }
@@ -111,15 +111,15 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
           text: `${query} analysis`,
           type: 'completion',
           category: 'analysis',
-          metadata: { source: 'completion' }
+          metadata: { source: 'completion' },
         },
         {
           id: `completion-${query}-processing`,
           text: `${query} processing`,
           type: 'completion',
           category: 'processing',
-          metadata: { source: 'completion' }
-        }
+          metadata: { source: 'completion' },
+        },
       ];
       suggestions.push(...completions);
     }
@@ -138,37 +138,11 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
   }
 };
 
-const fetchSearchHistory = async (maxHistory: number = 5): Promise<SearchHistory[]> => {
-  try {
-    // In a real implementation, this would come from a user_search_history table
-    // For now, we'll simulate it by getting recent processing results as search history
-    const { data: recentData } = await supabase
-      .from('processing_results')
-      .select('id, extraction_type, created_at, metadata')
-      .order('created_at', { ascending: false })
-      .limit(maxHistory);
-
-    if (!recentData) return [];
-
-    return recentData.map((item: any, index: number) => ({
-      id: `history_${item.id}`,
-      query: `${item.extraction_type} results`,
-      timestamp: new Date(item.created_at),
-      resultCount: Math.floor(Math.random() * 50) + 5, // Simulated result count
-      category: 'analysis'
-    }));
-
-  } catch (error) {
-    console.error('Error fetching search history:', error);
-    return [];
-  }
-};
-
 export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   value,
   onChange,
   onSearch,
-  placeholder = "Search with AI-powered semantic understanding...",
+  placeholder = 'Search with AI-powered semantic understanding...',
   disabled = false,
   showHistory = true,
   maxSuggestions = 8,
@@ -179,14 +153,14 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   categories = [],
   onSuggestionSelect,
   onHistorySelect,
-  onClearHistory
+  onClearHistory,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [history, setHistory] = useState<SearchHistory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  
+
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -199,11 +173,11 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       }
 
       setIsLoading(true);
-      
+
       try {
         // Simulate API call for semantic suggestions
         await new Promise(resolve => setTimeout(resolve, 300));
-        
+
         const suggestions = await fetchSearchSuggestions(query, categories, semanticThreshold);
         setSuggestions(suggestions.slice(0, maxSuggestions));
       } catch (error) {
@@ -213,7 +187,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
         setIsLoading(false);
       }
     },
-    [enableSemanticSuggestions, categories, semanticThreshold, maxSuggestions]
+    [enableSemanticSuggestions, categories, semanticThreshold, maxSuggestions],
   );
 
   // Debounce suggestion fetching
@@ -232,7 +206,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
     const newValue = e.target.value;
     onChange(newValue);
     setSelectedIndex(-1);
-    
+
     if (newValue.trim()) {
       setIsOpen(true);
     }
@@ -248,16 +222,16 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       query: query.trim(),
       timestamp: new Date(),
       resultCount: 0, // Will be updated after search
-      ...(options?.category && { category: options.category })
+      ...(options?.category && { category: options.category }),
     };
 
     setHistory(prev => [historyItem, ...prev.slice(0, maxHistory - 1)]);
     setIsOpen(false);
-    
+
     // Execute search
     onSearch(query.trim(), {
       semantic: enableSemanticSuggestions,
-      ...options
+      ...options,
     });
   };
 
@@ -266,11 +240,11 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
     onChange(suggestion.text);
     setIsOpen(false);
     onSuggestionSelect?.(suggestion);
-    
+
     // Auto-search on suggestion select
     handleSearch(suggestion.text, {
       ...(suggestion.category && { category: suggestion.category }),
-      semantic: suggestion.type === 'semantic'
+      semantic: suggestion.type === 'semantic',
     });
   };
 
@@ -279,10 +253,10 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
     onChange(historyItem.query);
     setIsOpen(false);
     onHistorySelect?.(historyItem);
-    
+
     // Auto-search on history select
     handleSearch(historyItem.query, {
-      ...(historyItem.category && { category: historyItem.category })
+      ...(historyItem.category && { category: historyItem.category }),
     });
   };
 
@@ -386,7 +360,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   const showDropdown = isOpen && (suggestions.length > 0 || (showHistory && history.length > 0));
 
   return (
-    <div className={cn("relative w-full", className)}>
+    <div className={cn('relative w-full', className)}>
       {/* Search Input */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -405,12 +379,12 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
           aria-haspopup="listbox"
           role="combobox"
         />
-        
+
         {/* Loading indicator */}
         {isLoading && (
           <Loader2 className="absolute right-12 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
         )}
-        
+
         {/* Clear button */}
         {value && (
           <Button
@@ -426,7 +400,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
             <X className="h-3 w-3" />
           </Button>
         )}
-        
+
         {/* Search button */}
         <Button
           type="button"
@@ -458,8 +432,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                       key={suggestion.id}
                       onClick={() => handleSuggestionSelect(suggestion)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-accent transition-colors",
-                        selectedIndex === index && "bg-accent"
+                        'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-accent transition-colors',
+                        selectedIndex === index && 'bg-accent',
                       )}
                       role="option"
                       aria-selected={selectedIndex === index}
@@ -513,8 +487,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                         key={item.id}
                         onClick={() => handleHistorySelect(item)}
                         className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-accent transition-colors",
-                          selectedIndex === adjustedIndex && "bg-accent"
+                          'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-accent transition-colors',
+                          selectedIndex === adjustedIndex && 'bg-accent',
                         )}
                         role="option"
                         aria-selected={selectedIndex === adjustedIndex}

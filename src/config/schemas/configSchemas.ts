@@ -147,24 +147,24 @@ export const EnvVarsSchema = z.object({
   NODE_ENV: z.string().default('development'),
   LOG_LEVEL: z.string().default('info'),
   DEBUG: z.string().default('false'),
-  
+
   // API Configuration
   OPENAI_API_KEY: z.string().optional(),
   HUGGINGFACE_API_KEY: z.string().optional(),
-  
+
   // Database Configuration
   DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().optional(),
-  
+
   // Storage Configuration
   STORAGE_PROVIDER: z.string().default('local'),
   AWS_REGION: z.string().optional(),
   AWS_S3_BUCKET: z.string().optional(),
-  
+
   // Performance Configuration
   CACHE_TTL: z.string().default('3600000'), // 1 hour
   RATE_LIMIT_RPM: z.string().default('1000'),
-  
+
   // Service Configuration
   CHUNK_SIZE: z.string().default('1000'),
   EMBEDDING_BATCH_SIZE: z.string().default('10'),

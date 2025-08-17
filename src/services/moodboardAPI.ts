@@ -47,7 +47,7 @@ class MoodBoardAPI {
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
-    
+
     return data.map(board => ({
       id: board.id,
       userId: board.user_id,
@@ -56,7 +56,7 @@ class MoodBoardAPI {
       isPublic: board.is_public,
       items: [], // Will be loaded separately when needed
       createdAt: new Date(board.created_at),
-      updatedAt: new Date(board.updated_at)
+      updatedAt: new Date(board.updated_at),
     }));
   }
 
@@ -79,7 +79,7 @@ class MoodBoardAPI {
       isPublic: data.is_public,
       items: [], // Will be loaded separately
       createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
+      updatedAt: new Date(data.updated_at),
     };
   }
 
@@ -95,7 +95,7 @@ class MoodBoardAPI {
         title: data.title,
         description: data.description,
         is_public: data.is_public ?? false,
-        view_preference: data.view_preference ?? 'grid'
+        view_preference: data.view_preference ?? 'grid',
       })
       .select()
       .single();
@@ -110,7 +110,7 @@ class MoodBoardAPI {
       isPublic: result.is_public,
       items: [],
       createdAt: new Date(result.created_at),
-      updatedAt: new Date(result.updated_at)
+      updatedAt: new Date(result.updated_at),
     };
   }
 
@@ -133,7 +133,7 @@ class MoodBoardAPI {
       isPublic: result.is_public,
       items: [],
       createdAt: new Date(result.created_at),
-      updatedAt: new Date(result.updated_at)
+      updatedAt: new Date(result.updated_at),
     };
   }
 
@@ -186,7 +186,7 @@ class MoodBoardAPI {
         moodboard_id: data.moodboard_id,
         material_id: data.material_id,
         notes: data.notes,
-        position: nextPosition
+        position: nextPosition,
       })
       .select(`
         *,
@@ -206,8 +206,8 @@ class MoodBoardAPI {
 
   // Update moodboard item
   async updateMoodBoardItem(
-    id: string, 
-    data: { notes?: string; position?: number }
+    id: string,
+    data: { notes?: string; position?: number },
   ): Promise<MoodBoardItem> {
     const { data: result, error } = await supabase
       .from('moodboard_items')
@@ -262,7 +262,7 @@ class MoodBoardAPI {
       isPublic: board.is_public,
       items: [],
       createdAt: new Date(board.created_at),
-      updatedAt: new Date(board.updated_at)
+      updatedAt: new Date(board.updated_at),
     }));
   }
 }

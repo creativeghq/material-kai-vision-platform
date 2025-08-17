@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface ExtractionRequest {
@@ -80,7 +80,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
     - Relevant standards
     
     Respond with structured JSON matching the MaterialKnowledge interface.`,
-    
+
     properties: `Extract material properties from this text. Focus on:
     - Physical properties (density, strength, thermal, electrical)
     - Mechanical properties (elasticity, hardness, toughness)
@@ -88,7 +88,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
     - Property values with units where available
     
     Respond with structured JSON.`,
-    
+
     processes: `Extract manufacturing and processing information from this text. Focus on:
     - Process names and types
     - Process parameters and conditions
@@ -96,7 +96,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
     - Quality standards and specifications
     
     Respond with structured JSON.`,
-    
+
     standards: `Extract standards and specifications from this text. Focus on:
     - Standard identifiers (ASTM, ISO, ANSI, etc.)
     - Standard titles and descriptions
@@ -104,7 +104,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
     - Application contexts
     
     Respond with structured JSON.`,
-    
+
     comprehensive: `Perform comprehensive material knowledge extraction from this text. Extract:
     1. All materials mentioned with their categories and properties
     2. Manufacturing processes and their parameters
@@ -112,7 +112,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
     4. Relevant standards and specifications
     5. Relationships between materials, processes, and standards
     
-    Provide detailed structured JSON response matching the MaterialKnowledge interface.`
+    Provide detailed structured JSON response matching the MaterialKnowledge interface.`,
   };
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -126,15 +126,15 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
       messages: [
         {
           role: 'system',
-          content: `You are an expert materials engineer and knowledge extraction specialist. Extract structured material knowledge from technical content. Always respond with valid JSON matching the MaterialKnowledge interface. Include confidence scores (0-1) for all extracted information.`
+          content: 'You are an expert materials engineer and knowledge extraction specialist. Extract structured material knowledge from technical content. Always respond with valid JSON matching the MaterialKnowledge interface. Include confidence scores (0-1) for all extracted information.',
         },
         {
           role: 'user',
-          content: `${prompts[focus] || prompts.comprehensive}\n\nText to analyze:\n${text}`
-        }
+          content: `${prompts[focus] || prompts.comprehensive}\n\nText to analyze:\n${text}`,
+        },
       ],
       max_tokens: 3000,
-      temperature: 0.1
+      temperature: 0.1,
     }),
   });
 
@@ -145,7 +145,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
 
   const data = await response.json();
   const extractionText = data.choices[0].message.content;
-  
+
   try {
     return JSON.parse(extractionText);
   } catch (error) {
@@ -168,7 +168,7 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
     - Any visible labels or markings
     
     Extract material knowledge in JSON format.`,
-    
+
     properties: `Analyze this image to identify material properties. Look for:
     - Visual indicators of material properties
     - Surface finish and texture characteristics
@@ -176,7 +176,7 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
     - Any measurement data or property indicators
     
     Extract property information in JSON format.`,
-    
+
     comprehensive: `Perform comprehensive material analysis of this image. Extract:
     1. All visible materials and their characteristics
     2. Observable material properties
@@ -184,7 +184,7 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
     4. Any visible standards, labels, or specifications
     5. Relationships between different materials shown
     
-    Provide detailed JSON response.`
+    Provide detailed JSON response.`,
   };
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -198,27 +198,27 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
       messages: [
         {
           role: 'system',
-          content: `You are an expert materials scientist specializing in visual material analysis. Extract material knowledge from images with high accuracy. Always respond with valid JSON matching the MaterialKnowledge interface.`
+          content: 'You are an expert materials scientist specializing in visual material analysis. Extract material knowledge from images with high accuracy. Always respond with valid JSON matching the MaterialKnowledge interface.',
         },
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: prompts[focus] || prompts.comprehensive
+              text: prompts[focus] || prompts.comprehensive,
             },
             {
               type: 'image_url',
               image_url: {
                 url: imageUrl,
-                detail: 'high'
-              }
-            }
-          ]
-        }
+                detail: 'high',
+              },
+            },
+          ],
+        },
       ],
       max_tokens: 2000,
-      temperature: 0.1
+      temperature: 0.1,
     }),
   });
 
@@ -229,7 +229,7 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
 
   const data = await response.json();
   const extractionText = data.choices[0].message.content;
-  
+
   try {
     return JSON.parse(extractionText);
   } catch (error) {
@@ -261,12 +261,12 @@ async function extractFromUrl(url: string, focus: string): Promise<MaterialKnowl
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.statusText}`);
     }
-    
+
     const content = await response.text();
-    
+
     // Simple text extraction (in production, you might want to use a proper HTML parser)
     const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    
+
     return await extractFromText(textContent, focus);
   } catch (error) {
     throw new Error(`URL extraction failed: ${error.message}`);
@@ -287,7 +287,7 @@ async function storeExtractedKnowledge(knowledge: MaterialKnowledge, request: Ex
       relationships: knowledge.relationships,
       metadata: knowledge.metadata,
       user_id: request.user_id,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     })
     .select()
     .single();
@@ -302,29 +302,29 @@ async function storeExtractedKnowledge(knowledge: MaterialKnowledge, request: Ex
 
 async function processKnowledgeExtraction(request: ExtractionRequest): Promise<any> {
   const startTime = Date.now();
-  
+
   try {
     console.log(`Extracting ${request.extraction_focus} knowledge from ${request.source_type}`);
-    
+
     let knowledge: MaterialKnowledge;
-    
+
     switch (request.source_type) {
       case 'text':
         knowledge = await extractFromText(request.source_data, request.extraction_focus);
         break;
-        
+
       case 'document':
         knowledge = await extractFromDocument(request.source_data, request.extraction_focus);
         break;
-        
+
       case 'image':
         knowledge = await extractFromImage(request.source_data, request.extraction_focus);
         break;
-        
+
       case 'url':
         knowledge = await extractFromUrl(request.source_data, request.extraction_focus);
         break;
-        
+
       default:
         throw new Error(`Unsupported source type: ${request.source_type}`);
     }
@@ -334,7 +334,7 @@ async function processKnowledgeExtraction(request: ExtractionRequest): Promise<a
       extraction_method: 'gpt-4o-vision',
       processing_time_ms: Date.now() - startTime,
       source_type: request.source_type,
-      confidence_score: calculateOverallConfidence(knowledge)
+      confidence_score: calculateOverallConfidence(knowledge),
     };
 
     // Filter by confidence threshold if specified
@@ -361,8 +361,8 @@ async function processKnowledgeExtraction(request: ExtractionRequest): Promise<a
             properties_count: knowledge.properties.length,
             standards_count: knowledge.standards.length,
             overall_confidence: knowledge.metadata.confidence_score,
-            processing_time_ms: knowledge.metadata.processing_time_ms
-          }
+            processing_time_ms: knowledge.metadata.processing_time_ms,
+          },
         });
     }
 
@@ -370,7 +370,7 @@ async function processKnowledgeExtraction(request: ExtractionRequest): Promise<a
       success: true,
       extraction_id: storedExtraction.id,
       knowledge,
-      processing_time_ms: knowledge.metadata.processing_time_ms
+      processing_time_ms: knowledge.metadata.processing_time_ms,
     };
 
   } catch (error) {
@@ -385,10 +385,10 @@ function calculateOverallConfidence(knowledge: MaterialKnowledge): number {
     ...knowledge.processes.map(p => p.confidence),
     ...knowledge.properties.map(p => p.confidence),
     ...knowledge.standards.map(s => s.confidence),
-    ...knowledge.relationships.map(r => r.confidence)
+    ...knowledge.relationships.map(r => r.confidence),
   ];
 
-  return allConfidences.length > 0 ? 
+  return allConfidences.length > 0 ?
     allConfidences.reduce((sum, conf) => sum + conf, 0) / allConfidences.length : 0;
 }
 
@@ -399,7 +399,7 @@ function filterByConfidence(knowledge: MaterialKnowledge, threshold: number): Ma
     processes: knowledge.processes.filter(p => p.confidence >= threshold),
     properties: knowledge.properties.filter(p => p.confidence >= threshold),
     standards: knowledge.standards.filter(s => s.confidence >= threshold),
-    relationships: knowledge.relationships.filter(r => r.confidence >= threshold)
+    relationships: knowledge.relationships.filter(r => r.confidence >= threshold),
   };
 }
 
@@ -410,30 +410,30 @@ serve(async (req) => {
 
   try {
     const request: ExtractionRequest = await req.json();
-    
+
     console.log('Processing material knowledge extraction request:', {
       source_type: request.source_type,
       extraction_focus: request.extraction_focus,
-      include_relationships: request.include_relationships
+      include_relationships: request.include_relationships,
     });
 
     if (!request.source_data || request.source_data.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: 'source_data is required and cannot be empty' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
     if (!['document', 'image', 'url', 'text'].includes(request.source_type)) {
       return new Response(
         JSON.stringify({ error: 'source_type must be one of: document, image, url, text' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -441,23 +441,23 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Material knowledge extraction error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Knowledge extraction failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Knowledge extraction failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

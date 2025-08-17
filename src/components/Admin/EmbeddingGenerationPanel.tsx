@@ -1,8 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
   Brain,
   Activity,
@@ -11,8 +7,13 @@ import {
   Zap,
   TrendingUp,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,19 +42,20 @@ const EmbeddingGenerationPanel: React.FC = () => {
   const fetchEmbeddingStats = async () => {
     try {
       setLoading(true);
-      
+
       // Get material embeddings stats from materials_catalog
       const { data: materialData, error: materialError } = await supabase
-        .from('material_knowledge')
+        .from('materials_catalog')
         .select('id, embedding')
         .not('embedding', 'is', null);
 
+      // Since enhanced_knowledge_base doesn't exist, we'll use materials_catalog for knowledge data
       const { data: knowledgeData, error: knowledgeError } = await supabase
-        .from('enhanced_knowledge_base')
-        .select('id, openai_embedding, huggingface_embedding, custom_embedding');
+        .from('materials_catalog')
+        .select('id, embedding');
 
       const { data: materialsTotal } = await supabase
-        .from('material_knowledge')
+        .from('materials_catalog')
         .select('id', { count: 'exact' });
 
       if (materialError) throw materialError;
@@ -66,7 +68,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
         if (!embeddingTypeCounts[embeddingType]) {
           embeddingTypeCounts[embeddingType] = {
             count: 0,
-            dimension: 1536 // Standard OpenAI embedding dimension
+            dimension: 1536, // Standard OpenAI embedding dimension
           };
         }
         embeddingTypeCounts[embeddingType].count++;
@@ -75,12 +77,12 @@ const EmbeddingGenerationPanel: React.FC = () => {
       const embeddingTypes = Object.entries(embeddingTypeCounts).map(([type, data]) => ({
         type,
         count: data.count,
-        dimension: data.dimension
+        dimension: data.dimension,
       }));
 
       // Count knowledge entries with embeddings
-      const entriesWithEmbeddings = knowledgeData?.filter(entry => 
-        entry.openai_embedding || entry.huggingface_embedding || entry.custom_embedding
+      const entriesWithEmbeddings = knowledgeData?.filter(entry =>
+        entry.embedding,
       ).length || 0;
 
       setStats({
@@ -88,15 +90,15 @@ const EmbeddingGenerationPanel: React.FC = () => {
         materialsWithEmbeddings: materialData?.length || 0,
         totalKnowledgeEntries: knowledgeData?.length || 0,
         entriesWithEmbeddings,
-        embeddingTypes
+        embeddingTypes,
       });
 
     } catch (error) {
       console.error('Error fetching embedding stats:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch embedding statistics",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to fetch embedding statistics',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -108,22 +110,22 @@ const EmbeddingGenerationPanel: React.FC = () => {
     try {
       // This would trigger embedding regeneration
       toast({
-        title: "Started",
-        description: "Embedding regeneration process initiated",
+        title: 'Started',
+        description: 'Embedding regeneration process initiated',
       });
-      
+
       // Refresh stats after a delay
       setTimeout(() => {
         fetchEmbeddingStats();
         setRegenerating(false);
       }, 2000);
-      
+
     } catch (error) {
       console.error('Error regenerating embeddings:', error);
       toast({
-        title: "Error",
-        description: "Failed to start embedding regeneration",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to start embedding regeneration',
+        variant: 'destructive',
       });
       setRegenerating(false);
     }
@@ -157,8 +159,8 @@ const EmbeddingGenerationPanel: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button 
-            onClick={handleRegenerateEmbeddings} 
+          <Button
+            onClick={handleRegenerateEmbeddings}
             className="bg-blue-600 text-white text-sm px-3 py-1"
             disabled={regenerating}
           >
@@ -247,7 +249,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
                 </CardContent>
               </Card>
             ))}
-            
+
             {/* Add placeholders for expected models */}
             <Card className="border-dashed border-2">
               <CardContent className="p-4">
@@ -289,7 +291,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
               </div>
               <Badge className="bg-green-500/20 text-green-600">Online</Badge>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 border rounded-lg">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -297,7 +299,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
               </div>
               <Badge className="bg-green-500/20 text-green-600">Active</Badge>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 border rounded-lg">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-yellow-500" />
@@ -306,7 +308,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
               <Badge className="bg-yellow-500/20 text-yellow-600">Idle</Badge>
             </div>
           </div>
-          
+
           <div className="mt-4 p-3 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">
               Embedding generation is handled automatically during material processing.

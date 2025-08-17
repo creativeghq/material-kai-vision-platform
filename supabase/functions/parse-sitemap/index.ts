@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -15,10 +15,10 @@ serve(async (req) => {
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
-        { 
-          status: 405, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        {
+          status: 405,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -27,10 +27,10 @@ serve(async (req) => {
     if (!sitemapUrl) {
       return new Response(
         JSON.stringify({ error: 'Sitemap URL is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -39,22 +39,22 @@ serve(async (req) => {
     // Fetch the sitemap directly from the server
     const response = await fetch(sitemapUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Material-Scraper/1.0)'
-      }
+        'User-Agent': 'Mozilla/5.0 (compatible; Material-Scraper/1.0)',
+      },
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch sitemap: ${response.status} ${response.statusText}`);
     }
-    
+
     const sitemapContent = await response.text();
-    
+
     // Simple XML parsing without DOMParser (which isn't available in Deno)
     let urls: string[] = [];
-    
+
     // Extract URLs using regex patterns
     const locMatches = sitemapContent.match(/<loc[^>]*>(.*?)<\/loc>/gi);
-    
+
     if (locMatches) {
       for (const locMatch of locMatches) {
         // Extract the URL from between the tags
@@ -68,14 +68,14 @@ serve(async (req) => {
             .replace(/&gt;/g, '>')
             .replace(/&quot;/g, '"')
             .replace(/&#39;/g, "'");
-          
+
           if (decodedUrl.length > 0) {
             urls.push(decodedUrl);
           }
         }
       }
     }
-    
+
     // If no URLs found with standard format, try to find sitemap references
     if (urls.length === 0) {
       const sitemapMatches = sitemapContent.match(/<sitemap[^>]*>.*?<\/sitemap>/gis);
@@ -90,7 +90,7 @@ serve(async (req) => {
               .replace(/&gt;/g, '>')
               .replace(/&quot;/g, '"')
               .replace(/&#39;/g, "'");
-            
+
             if (decodedUrl.length > 0) {
               urls.push(decodedUrl);
             }
@@ -98,46 +98,46 @@ serve(async (req) => {
         }
       }
     }
-    
+
     // Apply limit
     urls = urls.slice(0, maxPages);
-    
+
     console.log(`Found ${urls.length} URLs in sitemap`);
-    
+
     if (urls.length === 0) {
       return new Response(
         JSON.stringify({ error: 'No URLs found in sitemap' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
-    
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         urls,
         count: urls.length,
-        success: true 
+        success: true,
       }),
-      { 
+      {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Error parsing sitemap:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message || 'Failed to parse sitemap',
-        success: false 
+        success: false,
       }),
-      { 
+      {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

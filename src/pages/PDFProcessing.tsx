@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Upload, Activity } from 'lucide-react';
 
 import { PDFWorkflowViewer, WorkflowJob } from '@/components/PDF/PDFWorkflowViewer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
 import { Badge } from '@/components/ui/badge';
-import { useDropzone } from 'react-dropzone';
-import { Upload, Activity } from 'lucide-react';
 import { consolidatedPDFWorkflowService } from '@/services/consolidatedPDFWorkflowService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,14 +35,14 @@ const PDFProcessing = () => {
       try {
         void await consolidatedPDFWorkflowService.startPDFProcessing(file);
         toast({
-          title: "Processing Started",
+          title: 'Processing Started',
           description: `Started processing ${file.name}. You can monitor the progress in the workflow below.`,
         });
       } catch (error) {
         toast({
-          title: "Failed to Start Processing",
+          title: 'Failed to Start Processing',
           description: error instanceof Error ? error.message : 'Unknown error',
-          variant: "destructive",
+          variant: 'destructive',
         });
       }
     }
@@ -52,17 +51,17 @@ const PDFProcessing = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf']
+      'application/pdf': ['.pdf'],
     },
     maxFiles: 5,
-    maxSize: 50 * 1024 * 1024 // 50MB
+    maxSize: 50 * 1024 * 1024, // 50MB
   });
 
   const handleRetryJob = (jobId: string) => {
     consolidatedPDFWorkflowService.retryJob(jobId);
     toast({
-      title: "Job Retried",
-      description: "The processing job has been restarted.",
+      title: 'Job Retried',
+      description: 'The processing job has been restarted.',
     });
   };
 
@@ -78,7 +77,7 @@ const PDFProcessing = () => {
           Upload and process PDF documents with advanced workflow monitoring and step-by-step tracking.
         </p>
       </div>
-      
+
       <Tabs defaultValue="workflow" className="w-full">
         <TabsList className="grid w-full grid-cols-1">
           <TabsTrigger value="workflow" className="flex items-center gap-2">
@@ -163,8 +162,8 @@ const PDFProcessing = () => {
           </Card>
 
           {/* Workflow Viewer */}
-          <PDFWorkflowViewer 
-            jobs={workflowJobs} 
+          <PDFWorkflowViewer
+            jobs={workflowJobs}
             onRetryJob={handleRetryJob}
           />
         </TabsContent>

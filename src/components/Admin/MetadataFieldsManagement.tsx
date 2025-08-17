@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, Settings, ArrowLeft, Home } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Settings, ArrowLeft, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,8 +32,8 @@ interface MetadataField {
 }
 
 const materialCategories = [
-  'metals', 'plastics', 'ceramics', 'composites', 'textiles', 
-  'wood', 'glass', 'rubber', 'concrete', 'other'
+  'metals', 'plastics', 'ceramics', 'composites', 'textiles',
+  'wood', 'glass', 'rubber', 'concrete', 'other',
 ];
 
 const fieldTypes = [
@@ -40,7 +41,7 @@ const fieldTypes = [
   { value: 'number', label: 'Number' },
   { value: 'dropdown', label: 'Dropdown' },
   { value: 'boolean', label: 'Boolean' },
-  { value: 'date', label: 'Date' }
+  { value: 'date', label: 'Date' },
 ];
 
 export const MetadataFieldsManagement: React.FC = () => {
@@ -70,7 +71,7 @@ export const MetadataFieldsManagement: React.FC = () => {
     dropdown_options: [],
     applies_to_categories: [],
     is_global: false,
-    sort_order: 0
+    sort_order: 0,
   });
   const [dropdownOptionInput, setDropdownOptionInput] = useState('');
   const { toast } = useToast();
@@ -90,7 +91,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to load metadata fields',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -108,7 +109,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       dropdown_options: [],
       applies_to_categories: [],
       is_global: false,
-      sort_order: Math.max(...fields.map(f => f.sort_order), 0) + 1
+      sort_order: Math.max(...fields.map(f => f.sort_order), 0) + 1,
     });
     setDropdownOptionInput('');
     setEditingField(null);
@@ -126,7 +127,7 @@ export const MetadataFieldsManagement: React.FC = () => {
         dropdown_options: field.dropdown_options || [],
         applies_to_categories: field.applies_to_categories || [],
         is_global: field.is_global,
-        sort_order: field.sort_order
+        sort_order: field.sort_order,
       });
       setEditingField(field);
     } else {
@@ -140,29 +141,29 @@ export const MetadataFieldsManagement: React.FC = () => {
       const fieldData: any = {
         ...formData,
         dropdown_options: formData.field_type === 'dropdown' ? formData.dropdown_options : null,
-        applies_to_categories: formData.is_global ? null : formData.applies_to_categories
+        applies_to_categories: formData.is_global ? null : formData.applies_to_categories,
       };
 
       if (editingField) {
         const { error } = await supabase
-          .from('material_knowledge')
+          .from('materials_catalog')
           .update(fieldData)
           .eq('id', editingField.id);
 
         if (error) throw error;
         toast({
           title: 'Success',
-          description: 'Metadata field updated successfully'
+          description: 'Metadata field updated successfully',
         });
       } else {
         const { error } = await supabase
-          .from('material_knowledge')
+          .from('materials_catalog')
           .insert([fieldData]);
 
         if (error) throw error;
         toast({
           title: 'Success',
-          description: 'Metadata field created successfully'
+          description: 'Metadata field created successfully',
         });
       }
 
@@ -174,7 +175,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to save metadata field',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
@@ -186,7 +187,7 @@ export const MetadataFieldsManagement: React.FC = () => {
 
     try {
       const { error } = await supabase
-        .from('material_knowledge')
+        .from('materials_catalog')
         .delete()
         .eq('id', field.id);
 
@@ -194,7 +195,7 @@ export const MetadataFieldsManagement: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: 'Metadata field deleted successfully'
+        description: 'Metadata field deleted successfully',
       });
       loadMetadataFields();
     } catch (error) {
@@ -202,7 +203,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to delete metadata field',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
@@ -211,7 +212,7 @@ export const MetadataFieldsManagement: React.FC = () => {
     if (dropdownOptionInput.trim()) {
       setFormData(prev => ({
         ...prev,
-        dropdown_options: [...prev.dropdown_options, dropdownOptionInput.trim()]
+        dropdown_options: [...prev.dropdown_options, dropdownOptionInput.trim()],
       }));
       setDropdownOptionInput('');
     }
@@ -220,7 +221,7 @@ export const MetadataFieldsManagement: React.FC = () => {
   const removeDropdownOption = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      dropdown_options: prev.dropdown_options.filter((_, i) => i !== index)
+      dropdown_options: prev.dropdown_options.filter((_, i) => i !== index),
     }));
   };
 
@@ -267,7 +268,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                 {editingField ? 'Edit Metadata Field' : 'Create Metadata Field'}
               </DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -293,8 +294,8 @@ export const MetadataFieldsManagement: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="field_type">Field Type</Label>
-                  <Select 
-                    value={formData.field_type} 
+                  <Select
+                    value={formData.field_type}
                     onValueChange={(value: string) => setFormData(prev => ({ ...prev, field_type: value }))}
                   >
                     <SelectTrigger>
@@ -396,12 +397,12 @@ export const MetadataFieldsManagement: React.FC = () => {
                             if (checked) {
                               setFormData(prev => ({
                                 ...prev,
-                                applies_to_categories: [...prev.applies_to_categories, category]
+                                applies_to_categories: [...prev.applies_to_categories, category],
                               }));
                             } else {
                               setFormData(prev => ({
                                 ...prev,
-                                applies_to_categories: prev.applies_to_categories.filter(c => c !== category)
+                                applies_to_categories: prev.applies_to_categories.filter(c => c !== category),
                               }));
                             }
                           }}

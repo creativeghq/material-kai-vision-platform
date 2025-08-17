@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
+import {
+  FileText,
+  Database,
+  Search,
+  ExternalLink,
+  CheckCircle,
+  Info,
+} from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  FileText, 
-  Database, 
-  Search, 
-  ExternalLink,
-  CheckCircle,
-  Info
-} from 'lucide-react';
 import { AddKnowledgeEntry } from '@/components/RAG/AddKnowledgeEntry';
 import { EnhancedRAGInterface } from '@/components/RAG/EnhancedRAGInterface';
 import { useToast } from '@/hooks/use-toast';
@@ -28,42 +29,42 @@ export const PDFKnowledgeDemo: React.FC = () => {
       // This would normally be done through the AddKnowledgeEntry component
       // but we're showing how it would work with a sample PDF
       const sampleEntry = {
-        title: "Advanced Material Properties Guide",
-        content: "This comprehensive guide covers the fundamental properties of construction materials including ceramics, metals, composites, and polymers. It includes detailed specifications, performance characteristics, and application guidelines for various building and design projects.",
-        contentType: "material_guide",
+        title: 'Advanced Material Properties Guide',
+        content: 'This comprehensive guide covers the fundamental properties of construction materials including ceramics, metals, composites, and polymers. It includes detailed specifications, performance characteristics, and application guidelines for various building and design projects.',
+        contentType: 'material_guide',
         pdfUrl: samplePdfUrl,
-        materialCategories: ["ceramics", "metals", "composites"],
-        semanticTags: ["material-properties", "construction", "specifications"],
-        language: "en",
+        materialCategories: ['ceramics', 'metals', 'composites'],
+        semanticTags: ['material-properties', 'construction', 'specifications'],
+        language: 'en',
         readingLevel: 4,
-        technicalComplexity: 4
+        technicalComplexity: 4,
       };
 
       toast({
-        title: "Sample Entry Added",
-        description: "Added sample knowledge entry with PDF link for demonstration",
+        title: 'Sample Entry Added',
+        description: 'Added sample knowledge entry with PDF link for demonstration',
       });
 
       // Simulate the entry being added to results
       setDemoResults([{
-        id: "demo-1",
+        id: 'demo-1',
         title: sampleEntry.title,
         content: sampleEntry.content,
         relevanceScore: 0.95,
-        source: "PDF Knowledge Base",
+        source: 'PDF Knowledge Base',
         pdfUrl: sampleEntry.pdfUrl,
         metadata: {
           tags: sampleEntry.semanticTags,
           contentType: sampleEntry.contentType,
-          materialCategories: sampleEntry.materialCategories
-        }
+          materialCategories: sampleEntry.materialCategories,
+        },
       }]);
     } catch (error) {
       console.error('Error adding sample entry:', error);
       toast({
-        title: "Error",
-        description: "Failed to add sample entry",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to add sample entry',
+        variant: 'destructive',
       });
     }
   };
@@ -99,7 +100,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-start gap-3">
               <Database className="h-5 w-5 text-green-500 mt-1" />
               <div>
@@ -109,7 +110,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-start gap-3">
               <Search className="h-5 w-5 text-purple-500 mt-1" />
               <div>
@@ -124,8 +125,8 @@ export const PDFKnowledgeDemo: React.FC = () => {
           <Alert>
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>How it works:</strong> Add content to the knowledge base with a PDF URL. 
-              When users search and find relevant content, they can click "View PDF Details" 
+              <strong>How it works:</strong> Add content to the knowledge base with a PDF URL.
+              When users search and find relevant content, they can click "View PDF Details"
               to access the original document for comprehensive information.
             </AlertDescription>
           </Alert>
@@ -171,10 +172,10 @@ export const PDFKnowledgeDemo: React.FC = () => {
                             </span>
                           </div>
                         </div>
-                        
+
                         <p className="text-sm text-muted-foreground mb-3">
-                          {result.content.length > 300 
-                            ? `${result.content.substring(0, 300)}...` 
+                          {result.content.length > 300
+                            ? `${result.content.substring(0, 300)}...`
                             : result.content
                           }
                         </p>
@@ -188,7 +189,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
                               ))
                             )}
                           </div>
-                          
+
                           {/* PDF Link for additional details */}
                           {result.pdfUrl && (
                             <Button
@@ -213,11 +214,11 @@ export const PDFKnowledgeDemo: React.FC = () => {
 
         {/* Add Knowledge Tab */}
         <TabsContent value="add">
-          <AddKnowledgeEntry 
+          <AddKnowledgeEntry
             onEntryAdded={(entry) => {
               toast({
-                title: "Knowledge Entry Added",
-                description: "Successfully added to the knowledge base with PDF link support",
+                title: 'Knowledge Entry Added',
+                description: 'Successfully added to the knowledge base with PDF link support',
               });
             }}
           />
@@ -225,7 +226,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
 
         {/* Search Interface Tab */}
         <TabsContent value="search">
-          <EnhancedRAGInterface 
+          <EnhancedRAGInterface
             onResultsFound={(results) => {
               console.log('Search results with PDF links:', results);
             }}
@@ -249,7 +250,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-start gap-3">
               <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">2</div>
               <div>
@@ -259,7 +260,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-start gap-3">
               <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">3</div>
               <div>

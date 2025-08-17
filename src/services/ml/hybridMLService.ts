@@ -1,9 +1,12 @@
+import { supabase } from '@/integrations/supabase/client';
+
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { clientMLService, MLResult } from './clientMLService';
 import { serverMLService, ServerMLResult } from './serverMLService';
 import { DeviceDetector } from './deviceDetector';
-import { supabase } from '@/integrations/supabase/client';
 import { HuggingFaceService } from './huggingFaceService';
-import { BaseService, ServiceConfig } from '../base/BaseService';
+
 
 export interface HybridMLServiceConfig extends ServiceConfig {
   preferServerSide: boolean;
@@ -42,7 +45,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     confidenceThreshold: 0.6,
     useAIVision: true,
     maxFileSize: 5, // 5MB
-    maxFiles: 10
+    maxFiles: 10,
   };
 
   protected async doInitialize(): Promise<void> {
@@ -115,7 +118,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       maxFiles: 10,
       enableHybridProcessing: true,
       enableDeviceDetection: true,
-      enablePerformanceOptimization: true
+      enablePerformanceOptimization: true,
     };
 
     const finalConfig = { ...defaultConfig, ...config };
@@ -127,9 +130,9 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    * Analyze materials using the optimal processing method
    */
   async analyzeMaterials(
-    files: File[], 
+    files: File[],
     descriptions?: string[],
-    options: HybridMLOptions = {}
+    options: HybridMLOptions = {},
   ): Promise<HybridMLResult> {
     const opts = { ...this.DEFAULT_OPTIONS, ...options };
     const processingDecision = await this.determineProcessingMethod(files, opts);
@@ -140,24 +143,24 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       switch (processingDecision.method) {
         case 'server':
           return await this.processOnServer(files, descriptions, opts);
-        
+
         case 'client':
           return await this.processOnClient(files, descriptions, opts);
-        
+
         case 'hybrid':
           return await this.processHybrid(files, descriptions, opts);
-        
+
         default:
           throw new Error('Invalid processing method');
       }
     } catch (error) {
       console.error('Primary processing failed:', error);
-      
+
       if (opts.fallbackToClient && processingDecision.method !== 'client') {
         console.log('Falling back to client-side processing');
         return await this.processOnClient(files, descriptions, opts);
       }
-      
+
       throw error;
     }
   }
@@ -167,72 +170,72 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    */
   private async determineProcessingMethod(
     files: File[],
-    options: Required<HybridMLOptions>
+    options: Required<HybridMLOptions>,
   ): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string }> {
     // Check file constraints
     const totalSize = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024); // MB
     const oversizedFiles = files.filter(file => file.size > options.maxFileSize * 1024 * 1024);
-    
+
     if (files.length > options.maxFiles) {
-      return { 
-        method: 'server', 
-        reason: `Too many files (${files.length} > ${options.maxFiles})` 
+      return {
+        method: 'server',
+        reason: `Too many files (${files.length} > ${options.maxFiles})`,
       };
     }
 
     if (oversizedFiles.length > 0) {
-      return { 
-        method: 'server', 
-        reason: `Large files detected (${oversizedFiles.length} files > ${options.maxFileSize}MB)` 
+      return {
+        method: 'server',
+        reason: `Large files detected (${oversizedFiles.length} files > ${options.maxFileSize}MB)`,
       };
     }
 
     // Check for AI vision requirement
     if (options.useAIVision && options.preferServerSide) {
-      return { 
-        method: 'server', 
-        reason: 'AI vision requested with server preference' 
+      return {
+        method: 'server',
+        reason: 'AI vision requested with server preference',
       };
     }
 
     // Check device capabilities
     const deviceInfo = await DeviceDetector.getDeviceInfo();
-    
+
     if (!deviceInfo.supportsWebGPU && totalSize > 2) {
       return {
         method: 'server',
-        reason: 'No WebGPU support and large total file size'
+        reason: 'No WebGPU support and large total file size',
       };
     }
 
     // User preference
     if (options.preferServerSide) {
-      return { 
-        method: 'server', 
-        reason: 'User preference for server-side processing' 
+      return {
+        method: 'server',
+        reason: 'User preference for server-side processing',
       };
     }
 
     // Small files, good device capabilities - use client
     if (files.length <= 3 && totalSize <= 1 && deviceInfo.supportsWebGPU) {
-      return { 
-        method: 'client', 
-        reason: 'Small files with good device capabilities' 
+      return {
+        method: 'client',
+        reason: 'Small files with good device capabilities',
       };
     }
 
     // Medium complexity - hybrid approach
     if (files.length <= 5 && totalSize <= 3) {
-      return { 
-        method: 'hybrid', 
-        reason: 'Medium complexity - using hybrid approach' 
+      return {
+        method: 'hybrid',
+        reason: 'Medium complexity - using hybrid approach',
       };
     }
 
     // Default to server for everything else
-    return { 
-      method: 'server', 
-      reason: 'Default choice for optimal performance' 
+    return {
+      method: 'server',
+      reason: 'Default choice for optimal performance',
     };
   }
 
@@ -240,9 +243,9 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    * Process using server-side ML
    */
   private async processOnServer(
-    files: File[], 
+    files: File[],
     descriptions?: string[],
-    options?: HybridMLOptions
+    options?: HybridMLOptions,
   ): Promise<HybridMLResult> {
     const startTime = performance.now();
 
@@ -251,7 +254,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       use_ai_vision: options?.useAIVision,
       extract_properties: true,
       include_similar_materials: true,
-      detection_methods: ['visual']
+      detection_methods: ['visual'],
     });
 
     const processingTime = performance.now() - startTime;
@@ -266,7 +269,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       confidence: this.calculateAverageConfidence(serverResult.results),
       processingTime: Math.round(processingTime),
       processingMethod: 'server',
-      serverJobId: serverResult.job_id
+      serverJobId: serverResult.job_id,
     };
   }
 
@@ -274,9 +277,9 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    * Process using client-side ML
    */
   private async processOnClient(
-    files: File[], 
+    files: File[],
     descriptions?: string[],
-    options?: HybridMLOptions
+    options?: HybridMLOptions,
   ): Promise<HybridMLResult> {
     const startTime = performance.now();
     const results = [];
@@ -284,26 +287,26 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const description = descriptions?.[i];
-      
+
       try {
         // Try client-side first
         const result = await clientMLService.analyzeMaterial(file, description);
-        
+
         if (result.success && (result.confidence || 0) > 0.7) {
           results.push(result);
           continue;
         }
-        
+
         // Fallback to HuggingFace if client confidence is low
         console.log('Client confidence low, trying HuggingFace...');
         const huggingFaceService = HuggingFaceService.getInstance<HuggingFaceService>();
         await huggingFaceService.initialize();
-        
+
         const [materialResults, styleResults] = await Promise.all([
           huggingFaceService.classifyMaterial(file),
-          huggingFaceService.analyzeImageStyle(file)
+          huggingFaceService.analyzeImageStyle(file),
         ]);
-        
+
         if (materialResults.length > 0) {
           const topResult = materialResults[0];
           results.push({
@@ -313,20 +316,20 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
               confidence: topResult.score,
               properties: {
                 style: styleResults[0]?.label || 'unknown',
-                processing_method: 'huggingface'
-              }
+                processing_method: 'huggingface',
+              },
             },
-            confidence: topResult.score
+            confidence: topResult.score,
           });
         } else {
           results.push(result); // Use client result even if low confidence
         }
-        
+
       } catch (error) {
         console.error('Processing failed for file:', file.name, error);
         results.push({
           success: false,
-          error: error instanceof Error ? error.message : 'Processing failed'
+          error: error instanceof Error ? error.message : 'Processing failed',
         });
       }
     }
@@ -340,7 +343,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       confidence: this.calculateAverageConfidence(successfulResults),
       processingTime: Math.round(processingTime),
       processingMethod: 'client',
-      error: successfulResults.length === 0 ? 'All processing methods failed' : undefined
+      error: successfulResults.length === 0 ? 'All processing methods failed' : undefined,
     };
   }
 
@@ -348,39 +351,39 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    * Process using hybrid approach (client + server validation)
    */
   private async processHybrid(
-    files: File[], 
+    files: File[],
     descriptions?: string[],
-    options?: HybridMLOptions
+    options?: HybridMLOptions,
   ): Promise<HybridMLResult> {
     const startTime = performance.now();
 
     // Start with client-side processing for speed
     const clientPromise = this.processOnClient(files, descriptions, options);
-    
+
     // Simultaneously start server processing for accuracy
     const serverPromise = this.processOnServer(files, descriptions, options);
 
     try {
       // Wait for client results first
       const clientResult = await clientPromise;
-      
+
       // Check if client results meet confidence threshold
       const avgConfidence = clientResult.confidence || 0;
-      
+
       if (avgConfidence >= (options?.confidenceThreshold || 0.6)) {
         console.log('Client results meet confidence threshold, using client results');
-        
+
         // Cancel server processing if possible (edge function will still complete)
         return {
           ...clientResult,
-          processingMethod: 'hybrid'
+          processingMethod: 'hybrid',
         };
       }
 
       // Wait for server results for better accuracy
       console.log('Client confidence low, waiting for server results');
       const serverResult = await serverPromise;
-      
+
       // Combine the best aspects of both
       return {
         success: serverResult.success || clientResult.success,
@@ -388,7 +391,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
         confidence: Math.max(serverResult.confidence || 0, clientResult.confidence || 0),
         processingTime: Math.round(performance.now() - startTime),
         processingMethod: 'hybrid',
-        serverJobId: serverResult.serverJobId
+        serverJobId: serverResult.serverJobId,
       };
 
     } catch (error) {
@@ -397,7 +400,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       return {
         ...clientResult,
         processingMethod: 'hybrid',
-        error: `Hybrid processing: ${error instanceof Error ? error.message : 'Server processing failed'}`
+        error: `Hybrid processing: ${error instanceof Error ? error.message : 'Server processing failed'}`,
       };
     }
   }
@@ -407,13 +410,13 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    */
   private calculateAverageConfidence(results?: any[]): number {
     if (!results || results.length === 0) return 0;
-    
+
     const confidences = results
       .map(r => r.confidence_score || r.confidence || 0)
       .filter(c => typeof c === 'number');
-      
-    return confidences.length > 0 
-      ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length 
+
+    return confidences.length > 0
+      ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
       : 0;
   }
 
@@ -431,7 +434,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     const deviceInfo = await DeviceDetector.getDeviceInfo();
 
     const reasons = [decision.reason];
-    
+
     let estimatedTime = '';
     let costImplications = '';
 
@@ -441,13 +444,13 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
         costImplications = 'No server costs, uses local device resources';
         reasons.push('Fastest processing', 'Works offline', 'Privacy-focused');
         break;
-        
+
       case 'server':
         estimatedTime = '10-30 seconds';
         costImplications = 'Uses AI API credits for enhanced accuracy';
         reasons.push('Highest accuracy', 'Advanced AI models', 'Handles large files');
         break;
-        
+
       case 'hybrid':
         estimatedTime = '5-20 seconds';
         costImplications = 'Balanced approach - minimal API usage';
@@ -463,7 +466,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       recommendedMethod: decision.method,
       reasons,
       estimatedTime,
-      costImplications
+      costImplications,
     };
   }
 
@@ -474,7 +477,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     try {
       // Try a simple ping to the edge function
       const { error } = await supabase.functions.invoke('material-recognition', {
-        body: { action: 'ping' }
+        body: { action: 'ping' },
       });
       return !error;
     } catch {
@@ -502,7 +505,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Image analysis failed',
-        processingMethod: processingDecision.method
+        processingMethod: processingDecision.method,
       };
     }
   }
@@ -533,17 +536,17 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   }> {
     const clientStatus = clientMLService.getStatus();
     const deviceInfo = await DeviceDetector.getDeviceInfo();
-    
+
     const recommendations = [];
-    
+
     if (!deviceInfo.supportsWebGPU) {
       recommendations.push('Consider using server-side processing for better performance');
     }
-    
+
     if (!clientStatus.initialized) {
       recommendations.push('Client-side models are still loading');
     }
-    
+
     if (clientStatus.initialized && deviceInfo.supportsWebGPU) {
       recommendations.push('All systems ready for optimal processing');
     }
@@ -551,7 +554,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     return {
       client: clientStatus,
       device: deviceInfo,
-      recommendations
+      recommendations,
     };
   }
 }

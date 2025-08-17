@@ -35,7 +35,7 @@ interface Route {
 
 /**
  * API Routes Configuration
- * 
+ *
  * Centralizes all API route definitions for the application.
  * Implements the gateway pattern for MIVAA requests and standard document processing.
  */
@@ -45,7 +45,7 @@ export class ApiRoutes {
 
   constructor() {
     this.mivaaGateway = new MivaaGatewayController();
-    
+
     // Initialize document controller with orchestrator
     // Note: DocumentIntegrationController requires proper dependency injection
     // For routing purposes, we'll skip this initialization and handle it at runtime
@@ -62,13 +62,13 @@ export class ApiRoutes {
         method: 'POST',
         path: '/api/mivaa/gateway',
         handler: this.mivaaGateway.processRequest,
-        middleware: []
+        middleware: [],
       },
       {
         method: 'GET',
         path: '/api/mivaa/health',
         handler: this.mivaaGateway.healthCheck,
-        middleware: []
+        middleware: [],
       },
 
       // Document Integration Routes (existing)
@@ -81,7 +81,7 @@ export class ApiRoutes {
           }
           return this.documentController.processDocument(req, res);
         },
-        middleware: []
+        middleware: [],
       },
       {
         method: 'GET',
@@ -92,7 +92,7 @@ export class ApiRoutes {
           }
           return this.documentController.getJobStatus(req, res);
         },
-        middleware: []
+        middleware: [],
       },
       {
         method: 'GET',
@@ -103,7 +103,7 @@ export class ApiRoutes {
           }
           return this.documentController.getJobProgress(req, res);
         },
-        middleware: []
+        middleware: [],
       },
 
       // Legacy MIVAA Routes (to be deprecated - redirect to gateway)
@@ -111,20 +111,20 @@ export class ApiRoutes {
         method: 'POST',
         path: '/api/mivaa/extract',
         handler: this.redirectToGateway,
-        middleware: []
+        middleware: [],
       },
       {
         method: 'POST',
         path: '/api/mivaa/process',
         handler: this.redirectToGateway,
-        middleware: []
+        middleware: [],
       },
       {
         method: 'GET',
         path: '/api/mivaa/status/:id',
         handler: this.redirectToGateway,
-        middleware: []
-      }
+        middleware: [],
+      },
     ];
   }
 
@@ -135,7 +135,7 @@ export class ApiRoutes {
     try {
       // Extract the original endpoint path
       const originalPath = req.url.replace('/api/mivaa', '');
-      
+
       // Create gateway request
       const gatewayRequest = {
         endpoint: originalPath,
@@ -143,7 +143,7 @@ export class ApiRoutes {
         headers: req.headers as Record<string, string>,
         body: req.body,
         params: req.params,
-        query: req.query
+        query: req.query,
       };
 
       // Update request body for gateway
@@ -157,13 +157,13 @@ export class ApiRoutes {
         error: {
           code: 'REDIRECT_ERROR',
           message: 'Failed to redirect to MIVAA gateway',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
         },
         metadata: {
           timestamp: new Date().toISOString(),
           processingTime: 0,
-          version: '1.0.0'
-        }
+          version: '1.0.0',
+        },
       });
     }
   };
@@ -172,9 +172,9 @@ export class ApiRoutes {
    * Get route by method and path
    */
   public getRoute(method: string, path: string): Route | undefined {
-    return this.getRoutes().find(route => 
-      route.method === method.toUpperCase() && 
-      this.matchPath(route.path, path)
+    return this.getRoutes().find(route =>
+      route.method === method.toUpperCase() &&
+      this.matchPath(route.path, path),
     );
   }
 

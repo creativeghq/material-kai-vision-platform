@@ -54,7 +54,7 @@ export class EnhancedNeRFProcessor {
   async processNeRFReconstruction(
     imageUrls: string[],
     userId: string,
-    options: NeRFProcessingOptions
+    options: NeRFProcessingOptions,
   ): Promise<string> {
     try {
       // Create NeRF reconstruction job
@@ -67,8 +67,8 @@ export class EnhancedNeRFProcessor {
           metadata: {
             options: options as any,
             imageCount: imageUrls.length,
-            startTime: new Date().toISOString()
-          } as any
+            startTime: new Date().toISOString(),
+          } as any,
         })
         .select()
         .single();
@@ -88,7 +88,7 @@ export class EnhancedNeRFProcessor {
   private async processNeRFAsync(
     jobId: string,
     imageUrls: string[],
-    options: NeRFProcessingOptions
+    options: NeRFProcessingOptions,
   ): Promise<void> {
     try {
       // Update status to processing
@@ -96,33 +96,33 @@ export class EnhancedNeRFProcessor {
         .from('nerf_reconstructions')
         .update({
           reconstruction_status: 'processing',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', jobId);
 
       // Step 1: Validate and preprocess images
       const preprocessedImages = await this.preprocessImages(imageUrls);
-      
+
       // Step 2: Extract camera poses and intrinsics
       const cameraParams = await this.estimateCameraPoses(preprocessedImages);
-      
+
       // Step 3: Train NeRF model
       const nerfModel = await this.trainNeRFModel(preprocessedImages, cameraParams, options);
-      
+
       // Step 4: Generate outputs
       const outputs = await this.generateOutputs(nerfModel, options);
-      
+
       // Step 5: Quality assessment
       const qualityMetrics = await this.assessQuality(nerfModel, preprocessedImages);
-      
+
       // Step 6: Extract materials and lighting (if requested)
       let materialInfo: NeRFMaterialInfo[] = [];
       let lightingInfo: NeRFLightingInfo | null = null;
-      
+
       if (options.materialExtraction) {
         materialInfo = await this.extractMaterials(nerfModel, outputs.mesh);
       }
-      
+
       if (options.lightingAnalysis) {
         lightingInfo = await this.analyzeLighting(nerfModel);
       }
@@ -143,9 +143,9 @@ export class EnhancedNeRFProcessor {
             materialInfo: materialInfo as any,
             lightingInfo: lightingInfo as any,
             cameraParams: cameraParams as any,
-            completedAt: new Date().toISOString()
+            completedAt: new Date().toISOString(),
           } as any,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', jobId);
 
@@ -153,13 +153,13 @@ export class EnhancedNeRFProcessor {
 
     } catch (error) {
       console.error('Error processing NeRF:', error);
-      
+
       await supabase
         .from('nerf_reconstructions')
         .update({
           reconstruction_status: 'failed',
           error_message: `Processing failed: ${error}`,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', jobId);
     }
@@ -193,8 +193,8 @@ export class EnhancedNeRFProcessor {
             focalLength: 24, // mm
             aperture: 2.8,
             iso: 100,
-            exposureTime: '1/60'
-          }
+            exposureTime: '1/60',
+          },
         };
 
         preprocessed.push(imageInfo);
@@ -222,31 +222,31 @@ export class EnhancedNeRFProcessor {
   }> {
     // In a real implementation, this would use SfM (Structure from Motion) algorithms
     // like COLMAP, OpenMVG, or similar to estimate camera poses
-    
+
     return {
       intrinsics: {
         fx: 1000, // Focal length in pixels
         fy: 1000,
         cx: 960, // Principal point
-        cy: 540
+        cy: 540,
       },
       poses: images.map((_, index) => ({
         position: [
           Math.cos(index * 0.5) * 3, // Circular motion
           0,
-          Math.sin(index * 0.5) * 3
+          Math.sin(index * 0.5) * 3,
         ] as [number, number, number],
         rotation: [0, 0, 0, 1] as [number, number, number, number], // Identity quaternion
-        imageIndex: index
+        imageIndex: index,
       })),
-      confidence: 0.85
+      confidence: 0.85,
     };
   }
 
   private async trainNeRFModel(
     images: any[],
     cameraParams: any,
-    options: NeRFProcessingOptions
+    options: NeRFProcessingOptions,
   ): Promise<{
     modelPath: string;
     trainingMetrics: {
@@ -259,10 +259,10 @@ export class EnhancedNeRFProcessor {
     // 1. Set up the NeRF network architecture
     // 2. Train the model using the images and camera poses
     // 3. Save the trained model
-    
-    const trainingTime = options.quality === 'fast' ? 5000 : 
+
+    const trainingTime = options.quality === 'fast' ? 5000 :
                         options.quality === 'balanced' ? 15000 : 30000;
-    
+
     // Simulate training progress
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -271,8 +271,8 @@ export class EnhancedNeRFProcessor {
       trainingMetrics: {
         iterations: trainingTime,
         finalLoss: 0.001,
-        trainingTime: trainingTime
-      }
+        trainingTime: trainingTime,
+      },
     };
   }
 
@@ -284,7 +284,7 @@ export class EnhancedNeRFProcessor {
     model: string;
   }> {
     const outputs: any = {
-      model: nerfModel.modelPath
+      model: nerfModel.modelPath,
     };
 
     if (options.outputFormats.includes('mesh')) {
@@ -311,14 +311,14 @@ export class EnhancedNeRFProcessor {
     // 1. Use marching cubes or similar to extract mesh from NeRF
     // 2. Optionally optimize the mesh (decimation, smoothing)
     // 3. Save as PLY, OBJ, or GLTF format
-    
+
     const meshPath = `/3d_models/mesh_${Date.now()}.ply`;
-    
+
     if (optimize) {
       // Mesh optimization steps would go here
       console.log('Optimizing mesh...');
     }
-    
+
     return meshPath;
   }
 
@@ -348,14 +348,14 @@ export class EnhancedNeRFProcessor {
     // 1. Render images from original camera poses
     // 2. Compare with original images using PSNR, SSIM, LPIPS
     // 3. Measure rendering performance
-    
+
     return {
       psnr: 28.5, // dB
       ssim: 0.92, // 0-1
       lpips: 0.08, // 0-1 (lower is better)
       renderTime: 15, // ms per frame
       triangleCount: 50000,
-      vertexCount: 25000
+      vertexCount: 25000,
     };
   }
 
@@ -367,22 +367,22 @@ export class EnhancedNeRFProcessor {
     // 2. Segment regions with similar material properties
     // 3. Extract PBR material parameters
     // 4. Match with material database
-    
+
     return [
       {
         materialId: 'material_1',
         region: {
           vertices: [0, 1, 2, 3, 4, 5], // Vertex indices
-          textureCoords: [0, 0, 1, 0, 1, 1, 0, 1] // UV coordinates
+          textureCoords: [0, 0, 1, 0, 1, 1, 0, 1], // UV coordinates
         },
         properties: {
           albedo: [0.8, 0.8, 0.8],
           roughness: 0.3,
           metallic: 0.1,
-          normal: [0, 0, 1]
+          normal: [0, 0, 1],
         },
-        confidence: 0.85
-      }
+        confidence: 0.85,
+      },
     ];
   }
 
@@ -391,27 +391,27 @@ export class EnhancedNeRFProcessor {
     // 1. Analyze the NeRF's learned radiance field
     // 2. Decompose lighting into components
     // 3. Estimate light source positions and properties
-    
+
     return {
       ambientLight: {
         intensity: 0.3,
-        color: [1, 1, 1]
+        color: [1, 1, 1],
       },
       directionalLights: [
         {
           direction: [-0.5, -0.8, -0.3],
           intensity: 0.8,
-          color: [1, 0.95, 0.8]
-        }
+          color: [1, 0.95, 0.8],
+        },
       ],
       pointLights: [
         {
           position: [2, 3, 1],
           intensity: 0.5,
           color: [1, 1, 0.9],
-          radius: 2
-        }
-      ]
+          radius: 2,
+        },
+      ],
     };
   }
 
@@ -420,7 +420,7 @@ export class EnhancedNeRFProcessor {
     const psnrNorm = Math.min(metrics.psnr / 35, 1); // Normalize PSNR
     const ssimWeight = metrics.ssim;
     const lpipsWeight = 1 - metrics.lpips; // Invert LPIPS (lower is better)
-    
+
     return (psnrNorm * 0.3 + ssimWeight * 0.4 + lpipsWeight * 0.3);
   }
 

@@ -1,4 +1,12 @@
 import React, { useState } from 'react';
+import {
+  Plus,
+  FileText,
+  ExternalLink,
+  Database,
+  Loader2,
+} from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,13 +14,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Plus,
-  FileText,
-  ExternalLink,
-  Database,
-  Loader2
-} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedRAGService } from '@/services/enhancedRAGService';
 
@@ -33,7 +34,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
     semanticTags: [] as string[],
     language: 'en',
     readingLevel: 3,
-    technicalComplexity: 3
+    technicalComplexity: 3,
   });
 
   const handleInputChange = (field: string, value: any) => {
@@ -44,7 +45,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
     if (value.trim() && !formData[field].includes(value.trim())) {
       setFormData(prev => ({
         ...prev,
-        [field]: [...prev[field], value.trim()]
+        [field]: [...prev[field], value.trim()],
       }));
     }
   };
@@ -52,18 +53,18 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
   const removeTag = (field: 'materialCategories' | 'semanticTags', index: number) => {
     setFormData(prev => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
+      [field]: prev[field].filter((_, i) => i !== index),
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.title.trim() || !formData.content.trim()) {
       toast({
-        title: "Required Fields Missing",
-        description: "Please provide both title and content",
-        variant: "destructive"
+        title: 'Required Fields Missing',
+        description: 'Please provide both title and content',
+        variant: 'destructive',
       });
       return;
     }
@@ -80,12 +81,12 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
         semanticTags: formData.semanticTags,
         language: formData.language,
         readingLevel: formData.readingLevel,
-        technicalComplexity: formData.technicalComplexity
+        technicalComplexity: formData.technicalComplexity,
       });
 
       toast({
-        title: "Knowledge Entry Added",
-        description: "Successfully added to the knowledge base with embeddings",
+        title: 'Knowledge Entry Added',
+        description: 'Successfully added to the knowledge base with embeddings',
       });
 
       // Reset form
@@ -99,16 +100,16 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
         semanticTags: [],
         language: 'en',
         readingLevel: 3,
-        technicalComplexity: 3
+        technicalComplexity: 3,
       });
 
       onEntryAdded?.(entry);
     } catch (error) {
       console.error('Error adding knowledge entry:', error);
       toast({
-        title: "Failed to Add Entry",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Failed to Add Entry',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -283,8 +284,8 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
 
             <div className="space-y-2">
               <Label htmlFor="readingLevel">Reading Level (1-5)</Label>
-              <Select 
-                value={formData.readingLevel.toString()} 
+              <Select
+                value={formData.readingLevel.toString()}
                 onValueChange={(value: string) => handleInputChange('readingLevel', parseInt(value))}
               >
                 <SelectTrigger>
@@ -302,8 +303,8 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
 
             <div className="space-y-2">
               <Label htmlFor="technicalComplexity">Technical Complexity (1-5)</Label>
-              <Select 
-                value={formData.technicalComplexity.toString()} 
+              <Select
+                value={formData.technicalComplexity.toString()}
                 onValueChange={(value: string) => handleInputChange('technicalComplexity', parseInt(value))}
               >
                 <SelectTrigger>

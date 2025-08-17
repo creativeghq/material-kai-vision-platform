@@ -63,7 +63,7 @@ class RAGService {
    */
   async searchKnowledge(request: RAGSearchRequest): Promise<RAGResponse> {
     const { data, error } = await supabase.functions.invoke('rag-knowledge-search', {
-      body: request
+      body: request,
     });
 
     if (error) {
@@ -82,7 +82,7 @@ class RAGService {
       search_type: 'hybrid',
       match_count: 5,
       include_context: includeContext,
-      match_threshold: 0.6
+      match_threshold: 0.6,
     });
   }
 
@@ -95,15 +95,15 @@ class RAGService {
       search_type: 'material',
       match_count: 10,
       include_context: false,
-      match_threshold: 0.5
+      match_threshold: 0.5,
     };
 
     // If category specified, we'll filter in the results
     const response = await this.searchKnowledge(request);
-    
+
     if (category) {
       response.results = response.results.filter(
-        result => result.metadata?.category === category
+        result => result.metadata?.category === category,
       );
     }
 
@@ -119,12 +119,12 @@ class RAGService {
       search_type: 'knowledge',
       match_count: 8,
       include_context: true,
-      match_threshold: 0.6
+      match_threshold: 0.6,
     });
 
     if (contentType) {
       response.results = response.results.filter(
-        result => result.metadata?.content_type === contentType
+        result => result.metadata?.content_type === contentType,
       );
     }
 
@@ -136,7 +136,7 @@ class RAGService {
    */
   async startTraining(request: TrainingRequest): Promise<TrainingResponse> {
     const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-      body: request
+      body: request,
     });
 
     if (error) {
@@ -152,7 +152,7 @@ class RAGService {
   async startCLIPFineTuning(
     outputModelName: string,
     includeCategories?: string[],
-    epochs: number = 3
+    epochs: number = 3,
   ): Promise<TrainingResponse> {
     return this.startTraining({
       training_type: 'clip_finetuning',
@@ -160,14 +160,14 @@ class RAGService {
       dataset_export_options: {
         include_materials: true,
         include_knowledge_base: true,
-        category_filter: includeCategories
+        category_filter: includeCategories,
       },
       training_config: {
         output_model_name: outputModelName,
         epochs,
         batch_size: 8,
-        learning_rate: 5e-5
-      }
+        learning_rate: 5e-5,
+      },
     });
   }
 
@@ -177,7 +177,7 @@ class RAGService {
   async startMaterialClassification(
     outputModelName: string,
     categories?: string[],
-    epochs: number = 5
+    epochs: number = 5,
   ): Promise<TrainingResponse> {
     return this.startTraining({
       training_type: 'material_classification',
@@ -185,14 +185,14 @@ class RAGService {
       dataset_export_options: {
         include_materials: true,
         include_knowledge_base: false,
-        category_filter: categories
+        category_filter: categories,
       },
       training_config: {
         output_model_name: outputModelName,
         epochs,
         batch_size: 16,
-        learning_rate: 3e-4
-      }
+        learning_rate: 3e-4,
+      },
     });
   }
 
@@ -238,8 +238,8 @@ class RAGService {
    * Generate embeddings for a material
    */
   async generateMaterialEmbedding(
-    materialId: string, 
-    embeddingType: 'clip' | 'efficientnet' | 'materialnet' = 'clip'
+    materialId: string,
+    embeddingType: 'clip' | 'efficientnet' | 'materialnet' = 'clip',
   ): Promise<void> {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
@@ -256,9 +256,9 @@ class RAGService {
         job_type: 'generate_embedding',
         input_data: {
           material_id: materialId,
-          embedding_type: embeddingType
+          embedding_type: embeddingType,
         },
-        status: 'pending'
+        status: 'pending',
       });
 
     if (error) {

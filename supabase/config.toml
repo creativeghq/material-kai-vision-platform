@@ -16,7 +16,7 @@ verify_jwt = false
 [functions.crewai-3d-generation]
 verify_jwt = false
 
-[functions.enhanced-crewai]
+[functions.material-agent-orchestrator]
 verify_jwt = false
 
 [functions.enhanced-rag-search]

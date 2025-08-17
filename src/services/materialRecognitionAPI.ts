@@ -1,11 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { 
-  Material, 
-  RecognitionResult, 
-  RecognitionRequest, 
+import type {
+  Material,
+  RecognitionResult,
+  RecognitionRequest,
   RecognitionResponse,
   UploadedFile,
-  ProcessingJob
+  ProcessingJob,
 } from '@/types/materials';
 
 // Helper function to map database response to our types
@@ -16,10 +16,10 @@ function mapToMaterial(dbMaterial: any): Material {
       color: '',
       finish: '',
       brand: '',
-      properties: dbMaterial.properties || {}
+      properties: dbMaterial.properties || {},
     },
     createdAt: new Date(dbMaterial.created_at),
-    updatedAt: new Date(dbMaterial.updated_at)
+    updatedAt: new Date(dbMaterial.updated_at),
   };
 }
 
@@ -35,7 +35,7 @@ function mapToRecognitionResult(dbResult: any): RecognitionResult {
       color: '',
       finish: '',
       brand: '',
-      properties: dbResult.properties_detected || {}
+      properties: dbResult.properties_detected || {},
     },
     processingTime: dbResult.processing_time_ms || 0,
   };
@@ -44,14 +44,14 @@ function mapToRecognitionResult(dbResult: any): RecognitionResult {
 function mapToUploadedFile(dbFile: any): UploadedFile {
   return {
     ...dbFile,
-    file_type: dbFile.file_type as 'image' | 'document' | '3d_model'
+    file_type: dbFile.file_type as 'image' | 'document' | '3d_model',
   };
 }
 
 function mapToProcessingJob(dbJob: any): ProcessingJob {
   return {
     ...dbJob,
-    job_type: dbJob.job_type as 'recognition' | '3d_reconstruction' | 'batch_analysis'
+    job_type: dbJob.job_type as 'recognition' | '3d_reconstruction' | 'batch_analysis',
   };
 }
 
@@ -59,11 +59,11 @@ export class MaterialRecognitionAPI {
   // Upload files to storage
   static async uploadFiles(files: File[], userId: string): Promise<UploadedFile[]> {
     const uploadedFiles: UploadedFile[] = [];
-    
+
     for (const file of files) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('material-images')
         .upload(fileName, file);
@@ -84,8 +84,8 @@ export class MaterialRecognitionAPI {
           metadata: {
             original_name: file.name,
             mime_type: file.type,
-            uploaded_at: new Date().toISOString()
-          }
+            uploaded_at: new Date().toISOString(),
+          },
         })
         .select()
         .single();
@@ -105,7 +105,7 @@ export class MaterialRecognitionAPI {
     const { data } = supabase.storage
       .from('material-images')
       .getPublicUrl(storagePath);
-    
+
     return data.publicUrl;
   }
 
@@ -114,7 +114,7 @@ export class MaterialRecognitionAPI {
     try {
       // First upload the files
       const uploadedFiles = await this.uploadFiles(request.files, userId);
-      
+
       // Create processing job
       const { data: job, error } = await supabase
         .from('processing_queue')
@@ -123,10 +123,10 @@ export class MaterialRecognitionAPI {
           job_type: 'recognition',
           input_data: {
             file_ids: uploadedFiles.map(f => f.id),
-            options: request.options
+            options: request.options,
           },
           status: 'pending',
-          priority: 5
+          priority: 5,
         })
         .select()
         .single();
@@ -143,8 +143,8 @@ export class MaterialRecognitionAPI {
             analysis_type: request.options?.extract_properties ? 'properties_only' : 'comprehensive',
             include_similar: request.options?.include_similar_materials || false,
             minimum_score: 0.7,
-            max_retries: 2
-          }
+            max_retries: 2,
+          },
         });
 
       if (processError) {
@@ -152,13 +152,13 @@ export class MaterialRecognitionAPI {
         // Update job status to failed
         await supabase
           .from('processing_queue')
-          .update({ 
-            status: 'failed', 
+          .update({
+            status: 'failed',
             error_message: processError.message,
-            completed_at: new Date().toISOString()
+            completed_at: new Date().toISOString(),
           })
           .eq('id', job.id);
-        
+
         throw new Error(`Hybrid recognition failed: ${processError.message}`);
       }
 
@@ -183,7 +183,7 @@ export class MaterialRecognitionAPI {
     }
 
     const fileIds = (job.input_data as any)?.file_ids || [];
-    
+
     if (!Array.isArray(fileIds) || fileIds.length === 0) {
       return [];
     }
@@ -261,7 +261,7 @@ export class MaterialRecognitionAPI {
       .update({
         user_verified: isCorrect,
         verified_at: new Date().toISOString(),
-        verified_by: userId
+        verified_by: userId,
       })
       .eq('id', resultId);
 
@@ -277,8 +277,8 @@ export class MaterialRecognitionAPI {
         event_type: 'user_feedback',
         event_data: {
           result_id: resultId,
-          feedback: isCorrect ? 'correct' : 'incorrect'
-        }
+          feedback: isCorrect ? 'correct' : 'incorrect',
+        },
       });
   }
 

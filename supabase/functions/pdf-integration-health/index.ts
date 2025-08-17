@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -38,7 +38,7 @@ interface HealthCheckResponse {
 
 serve(async (req) => {
   const startTime = Date.now();
-  
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -56,7 +56,7 @@ serve(async (req) => {
         {
           status: 405,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        },
       );
     }
 
@@ -69,13 +69,13 @@ serve(async (req) => {
 
     // Check Supabase connectivity
     const supabaseHealth = await checkSupabaseHealth(supabase);
-    
+
     // Check Mivaa service connectivity
     const mivaaHealth = await checkMivaaHealth();
-    
+
     // Check integration service configuration
     const integrationHealth = await checkIntegrationHealth();
-    
+
     // Get metrics from database
     const metrics = await getHealthMetrics(supabase);
 
@@ -83,7 +83,7 @@ serve(async (req) => {
     const overallStatus = determineOverallHealth([
       supabaseHealth.status,
       mivaaHealth.status,
-      integrationHealth.status
+      integrationHealth.status,
     ]);
 
     const healthResponse: HealthCheckResponse = {
@@ -113,12 +113,12 @@ serve(async (req) => {
       {
         status: overallStatus === 'unhealthy' ? 503 : 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
 
   } catch (error) {
     console.error('Health check error:', error);
-    
+
     const errorResponse = {
       status: 'unhealthy' as const,
       timestamp: new Date().toISOString(),
@@ -146,7 +146,7 @@ serve(async (req) => {
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
   }
 });
@@ -157,7 +157,7 @@ async function checkSupabaseHealth(supabase: any): Promise<{
   error?: string;
 }> {
   const startTime = Date.now();
-  
+
   try {
     // Test database connectivity with a simple query
     const { data, error } = await supabase
@@ -178,7 +178,7 @@ async function checkSupabaseHealth(supabase: any): Promise<{
 
     // Check response time for degraded performance
     const status = responseTime > 2000 ? 'degraded' : 'healthy';
-    
+
     return {
       status,
       responseTime,
@@ -186,7 +186,7 @@ async function checkSupabaseHealth(supabase: any): Promise<{
   } catch (error) {
     const responseTime = Date.now() - startTime;
     console.error('Supabase health check exception:', error);
-    
+
     return {
       status: 'unhealthy',
       responseTime,
@@ -201,11 +201,11 @@ async function checkMivaaHealth(): Promise<{
   error?: string;
 }> {
   const startTime = Date.now();
-  
+
   try {
     const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'http://localhost:8000';
     const healthUrl = `${mivaaBaseUrl}/health`;
-    
+
     const response = await fetch(healthUrl, {
       method: 'GET',
       headers: {
@@ -226,7 +226,7 @@ async function checkMivaaHealth(): Promise<{
 
     // Check response time for degraded performance
     const status = responseTime > 3000 ? 'degraded' : 'healthy';
-    
+
     return {
       status,
       responseTime,
@@ -234,7 +234,7 @@ async function checkMivaaHealth(): Promise<{
   } catch (error) {
     const responseTime = Date.now() - startTime;
     console.error('Mivaa health check error:', error);
-    
+
     return {
       status: 'unhealthy',
       responseTime,
@@ -257,7 +257,7 @@ async function checkIntegrationHealth(): Promise<{
     ];
 
     const missingVars = requiredEnvVars.filter(varName => !Deno.env.get(varName));
-    
+
     if (missingVars.length > 0) {
       return {
         status: 'unhealthy',
@@ -274,7 +274,7 @@ async function checkIntegrationHealth(): Promise<{
     ];
 
     const missingOptionalVars = optionalVars.filter(varName => !Deno.env.get(varName));
-    
+
     if (missingOptionalVars.length > 0) {
       console.warn(`Optional environment variables not set: ${missingOptionalVars.join(', ')}`);
       return {
@@ -290,7 +290,7 @@ async function checkIntegrationHealth(): Promise<{
     };
   } catch (error) {
     console.error('Integration health check error:', error);
-    
+
     return {
       status: 'unhealthy',
       configLoaded: false,
@@ -308,7 +308,7 @@ async function getHealthMetrics(supabase: any): Promise<{
   try {
     // Get metrics from the last 24 hours
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    
+
     const { data, error } = await supabase
       .from('api_usage_logs')
       .select('response_status, response_time_ms')
@@ -328,7 +328,7 @@ async function getHealthMetrics(supabase: any): Promise<{
     const totalRequests = data.length;
     const successfulRequests = data.filter(log => log.response_status >= 200 && log.response_status < 400).length;
     const failedRequests = totalRequests - successfulRequests;
-    
+
     const totalResponseTime = data.reduce((sum, log) => sum + (log.response_time_ms || 0), 0);
     const averageResponseTime = totalRequests > 0 ? Math.round(totalResponseTime / totalRequests) : 0;
 
@@ -362,7 +362,7 @@ function determineOverallHealth(statuses: Array<'healthy' | 'degraded' | 'unheal
 async function logHealthCheck(
   supabase: any,
   healthResponse: HealthCheckResponse,
-  responseTime: number
+  responseTime: number,
 ): Promise<void> {
   try {
     const { error } = await supabase

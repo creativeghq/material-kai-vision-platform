@@ -41,14 +41,14 @@ export interface RateLimitInfo {
 
 /**
  * Material Kai API Key Authentication Middleware
- * 
+ *
  * This middleware validates Material Kai API keys for secure access to the platform.
  * It supports both hardcoded keys (for immediate deployment) and database lookup
  * (when the migration is applied).
  */
 export class MaterialKaiAuthMiddleware {
   private supabase: SupabaseClient<Database>;
-  
+
   // Hardcoded Material Kai API keys for immediate deployment
   private readonly HARDCODED_KEYS: Record<string, MaterialKaiKeyData> = {
     'mk_api_2024_Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s': {
@@ -67,9 +67,9 @@ export class MaterialKaiAuthMiddleware {
         'http://localhost:3000',
         'http://localhost:5173',
         'https://material-kai-vision.vercel.app',
-        'https://*.material-kai-vision.vercel.app'
-      ]
-    }
+        'https://*.material-kai-vision.vercel.app',
+      ],
+    },
   };
 
   constructor(supabase: SupabaseClient<Database>) {
@@ -88,8 +88,8 @@ export class MaterialKaiAuthMiddleware {
           error: {
             code: 'INVALID_MATERIAL_KAI_KEY_FORMAT',
             message: 'Invalid Material Kai API key format',
-            statusCode: 400
-          }
+            statusCode: 400,
+          },
         };
       }
 
@@ -103,8 +103,8 @@ export class MaterialKaiAuthMiddleware {
             error: {
               code: 'MATERIAL_KAI_KEY_INACTIVE',
               message: 'Material Kai API key is inactive',
-              statusCode: 401
-            }
+              statusCode: 401,
+            },
           };
         }
 
@@ -115,8 +115,8 @@ export class MaterialKaiAuthMiddleware {
             error: {
               code: 'MATERIAL_KAI_KEY_EXPIRED',
               message: 'Material Kai API key has expired',
-              statusCode: 401
-            }
+              statusCode: 401,
+            },
           };
         }
 
@@ -124,12 +124,12 @@ export class MaterialKaiAuthMiddleware {
         const keyData: MaterialKaiKeyData = {
           ...hardcodedKey,
           usage_count: hardcodedKey.usage_count + 1,
-          last_used_at: new Date().toISOString()
+          last_used_at: new Date().toISOString(),
         };
 
         return {
           success: true,
-          keyData
+          keyData,
         };
       }
 
@@ -139,8 +139,8 @@ export class MaterialKaiAuthMiddleware {
         error: {
           code: 'INVALID_MATERIAL_KAI_KEY',
           message: 'Invalid Material Kai API key',
-          statusCode: 401
-        }
+          statusCode: 401,
+        },
       };
     } catch (error) {
       console.error('Material Kai API key validation error:', error);
@@ -149,8 +149,8 @@ export class MaterialKaiAuthMiddleware {
         error: {
           code: 'MATERIAL_KAI_VALIDATION_ERROR',
           message: 'Internal error during API key validation',
-          statusCode: 500
-        }
+          statusCode: 500,
+        },
       };
     }
   }
@@ -171,16 +171,16 @@ export class MaterialKaiAuthMiddleware {
     try {
       // For hardcoded keys, we'll implement a simple in-memory rate limiting
       // In production with database, this would query usage logs
-      
+
       const now = new Date();
       const oneMinuteAgo = new Date(now.getTime() - 60000);
-      
+
       // For now, allow all requests (rate limiting will be implemented with database)
       return {
         isAllowed: true,
         currentUsage: 0,
         limit: keyData.rate_limit_per_minute,
-        resetTime: new Date(now.getTime() + 60000)
+        resetTime: new Date(now.getTime() + 60000),
       };
     } catch (error) {
       console.error('Rate limit check error:', error);
@@ -189,7 +189,7 @@ export class MaterialKaiAuthMiddleware {
         isAllowed: true,
         currentUsage: 0,
         limit: keyData.rate_limit_per_minute,
-        resetTime: new Date(Date.now() + 60000)
+        resetTime: new Date(Date.now() + 60000),
       };
     }
   }
@@ -255,26 +255,26 @@ export class MaterialKaiAuthMiddleware {
    */
   async authenticate(
     headers: Record<string, string | string[] | undefined>,
-    origin?: string | null
+    origin?: string | null,
   ): Promise<MaterialKaiValidationResult> {
     try {
       // Extract API key from headers
       const apiKey = this.extractApiKey(headers);
-      
+
       if (!apiKey) {
         return {
           success: false,
           error: {
             code: 'MISSING_MATERIAL_KAI_API_KEY',
             message: 'Material Kai API key is required',
-            statusCode: 401
-          }
+            statusCode: 401,
+          },
         };
       }
 
       // Validate the API key
       const validationResult = await this.validateApiKey(apiKey);
-      
+
       if (!validationResult.success || !validationResult.keyData) {
         return validationResult;
       }
@@ -286,22 +286,22 @@ export class MaterialKaiAuthMiddleware {
           error: {
             code: 'INVALID_ORIGIN',
             message: 'Origin not allowed for this API key',
-            statusCode: 403
-          }
+            statusCode: 403,
+          },
         };
       }
 
       // Check rate limiting
       const rateLimitInfo = await this.checkRateLimit(validationResult.keyData);
-      
+
       if (!rateLimitInfo.isAllowed) {
         return {
           success: false,
           error: {
             code: 'RATE_LIMIT_EXCEEDED',
             message: `Rate limit exceeded. Limit: ${rateLimitInfo.limit} requests per minute`,
-            statusCode: 429
-          }
+            statusCode: 429,
+          },
         };
       }
 
@@ -313,8 +313,8 @@ export class MaterialKaiAuthMiddleware {
         error: {
           code: 'MATERIAL_KAI_AUTH_ERROR',
           message: 'Internal authentication error',
-          statusCode: 500
-        }
+          statusCode: 500,
+        },
       };
     }
   }

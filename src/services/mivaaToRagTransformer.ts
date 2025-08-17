@@ -1,5 +1,6 @@
 import { performance } from 'perf_hooks';
 import { createHash } from 'crypto';
+
 import { DocumentChunk, DocumentChunkingService, ChunkingStrategy } from './documentChunkingService';
 import { MivaaEmbeddingIntegration, EmbeddingRequest, EmbeddingResponse } from './mivaaEmbeddingIntegration';
 
@@ -257,11 +258,11 @@ export interface TransformationResult {
 
 /**
  * MivaaToRagTransformer
- * 
+ *
  * Transforms Mivaa PDF extractor output into RAG-compatible document format.
  * Handles markdown content, tables, images, and metadata transformation with
  * intelligent chunking, embedding generation, and quality preservation.
- * 
+ *
  * Features:
  * - Markdown content transformation and chunking
  * - Table data processing and searchable text generation
@@ -281,38 +282,38 @@ export class MivaaToRagTransformer {
       overlapSize: 100,
       preserveStructure: true,
       sentenceBoundary: true,
-      paragraphBoundary: true
+      paragraphBoundary: true,
     },
     embeddings: {
       enabled: false,
       generateDocumentEmbedding: false,
-      generateChunkEmbeddings: false
+      generateChunkEmbeddings: false,
     },
     tables: {
       includeInChunks: true,
       generateSummaries: true,
-      extractSearchableText: true
+      extractSearchableText: true,
     },
     images: {
       includeInChunks: false,
       extractText: true,
-      generateDescriptions: true
+      generateDescriptions: true,
     },
     structure: {
       preserveHeaders: true,
       generateTableOfContents: true,
-      detectSections: true
+      detectSections: true,
     },
     quality: {
       minimumChunkSize: 50,
       maximumChunkSize: 2000,
-      minimumConfidence: 0.7
-    }
+      minimumConfidence: 0.7,
+    },
   };
 
   constructor(
     chunkingService: DocumentChunkingService,
-    embeddingService?: MivaaEmbeddingIntegration
+    embeddingService?: MivaaEmbeddingIntegration,
   ) {
     this.chunkingService = chunkingService;
     this.embeddingService = embeddingService || undefined;
@@ -324,7 +325,7 @@ export class MivaaToRagTransformer {
   async transformDocument(
     mivaaDocument: MivaaDocument,
     workspaceId: string,
-    config: Partial<TransformationConfig> = {}
+    config: Partial<TransformationConfig> = {},
   ): Promise<TransformationResult> {
     const startTime = performance.now();
     const finalConfig = { ...this.defaultConfig, ...config };
@@ -345,28 +346,28 @@ export class MivaaToRagTransformer {
         mivaaDocument,
         documentId,
         workspaceId,
-        finalConfig
+        finalConfig,
       );
 
       // Process tables
       const processedTables = await this.processTables(
         mivaaDocument.tables,
         chunks,
-        finalConfig
+        finalConfig,
       );
 
       // Process images
       const processedImages = await this.processImages(
         mivaaDocument.images,
         chunks,
-        finalConfig
+        finalConfig,
       );
 
       // Extract document structure
       const structure = this.extractDocumentStructure(
         processedContent,
         chunks,
-        finalConfig
+        finalConfig,
       );
 
       // Generate embeddings if enabled
@@ -375,7 +376,7 @@ export class MivaaToRagTransformer {
         embeddings = await this.generateEmbeddings(
           processedContent,
           chunks,
-          finalConfig
+          finalConfig,
         );
       }
 
@@ -385,7 +386,7 @@ export class MivaaToRagTransformer {
         chunks,
         processedTables,
         processedImages,
-        finalConfig
+        finalConfig,
       );
 
       // Create RAG metadata
@@ -396,7 +397,7 @@ export class MivaaToRagTransformer {
         chunks,
         processedTables,
         processedImages,
-        quality
+        quality,
       );
 
       // Construct RAG document
@@ -411,7 +412,7 @@ export class MivaaToRagTransformer {
         tables: processedTables,
         images: processedImages,
         structure,
-        quality
+        quality,
       };
 
       const processingTime = performance.now() - startTime;
@@ -426,10 +427,10 @@ export class MivaaToRagTransformer {
           chunksGenerated: chunks.length,
           tablesProcessed: processedTables.length,
           imagesProcessed: processedImages.length,
-          qualityScore: quality.overallQuality
+          qualityScore: quality.overallQuality,
         },
         warnings: [...warnings, ...quality.warnings],
-        errors
+        errors,
       };
 
       console.log(`Mivaa to RAG transformation completed in ${processingTime}ms`);
@@ -439,7 +440,7 @@ export class MivaaToRagTransformer {
 
     } catch (error) {
       console.error('Mivaa to RAG transformation failed:', error);
-      
+
       const processingTime = performance.now() - startTime;
       errors.push(error instanceof Error ? error.message : 'Unknown transformation error');
 
@@ -453,10 +454,10 @@ export class MivaaToRagTransformer {
           chunksGenerated: 0,
           tablesProcessed: 0,
           imagesProcessed: 0,
-          qualityScore: 0
+          qualityScore: 0,
         },
         warnings,
-        errors
+        errors,
       };
     }
   }
@@ -502,7 +503,7 @@ export class MivaaToRagTransformer {
     document: MivaaDocument,
     documentId: string,
     workspaceId: string,
-    config: TransformationConfig
+    config: TransformationConfig,
   ): Promise<{ chunks: DocumentChunk[]; processedContent: string }> {
     // Preprocess markdown content
     let processedContent = this.preprocessMarkdown(document.markdown);
@@ -522,19 +523,19 @@ export class MivaaToRagTransformer {
         language: document.metadata.language || 'en',
         extractedTables: document.tables,
         extractedImages: document.images,
-        structure: this.extractBasicStructure(processedContent)
-      }
+        structure: this.extractBasicStructure(processedContent),
+      },
     };
 
     // Generate chunks
     const chunkingResult = await this.chunkingService.chunkDocument(
       documentInput,
-      config.chunking
+      config.chunking,
     );
 
     return {
       chunks: chunkingResult.chunks,
-      processedContent
+      processedContent,
     };
   }
 
@@ -567,12 +568,12 @@ export class MivaaToRagTransformer {
     tables.forEach((table, index) => {
       const tableRef = `[Table ${index + 1}${table.caption ? `: ${table.caption}` : ''}]`;
       const tableMarkdown = this.convertTableToMarkdown(table);
-      
+
       // Try to find a good insertion point near the table's position
       const insertionPoint = this.findTableInsertionPoint(processedContent, table);
-      
+
       if (insertionPoint !== -1) {
-        processedContent = 
+        processedContent =
           processedContent.slice(0, insertionPoint) +
           `\n\n${tableRef}\n${tableMarkdown}\n\n` +
           processedContent.slice(insertionPoint);
@@ -607,7 +608,7 @@ export class MivaaToRagTransformer {
     // Simple heuristic: find paragraph breaks near the table's page position
     const lines = content.split('\n');
     const targetLine = Math.floor((table.position.page / 10) * lines.length);
-    
+
     // Look for paragraph break near target line
     for (let i = Math.max(0, targetLine - 5); i < Math.min(lines.length, targetLine + 5); i++) {
       if (lines[i].trim() === '' && i > 0 && lines[i - 1].trim() !== '') {
@@ -646,7 +647,7 @@ export class MivaaToRagTransformer {
           id: `section_${sections.length}`,
           title,
           startIndex: content.split('\n').slice(0, index).join('\n').length,
-          endIndex: content.length
+          endIndex: content.length,
         };
       }
     });
@@ -665,11 +666,11 @@ export class MivaaToRagTransformer {
   private async processTables(
     tables: TableData[],
     chunks: DocumentChunk[],
-    config: TransformationConfig
+    config: TransformationConfig,
   ): Promise<ProcessedTableData[]> {
     return Promise.all(tables.map(async (table, index) => {
       const title = table.caption || `Table ${index + 1}`;
-      const description = config.tables.generateSummaries ? 
+      const description = config.tables.generateSummaries ?
         this.generateTableSummary(table) : undefined;
 
       const searchableText = config.tables.extractSearchableText ?
@@ -684,12 +685,12 @@ export class MivaaToRagTransformer {
         structuredData: {
           headers: table.headers,
           rows: table.rows,
-          summary: description || ''
+          summary: description || '',
         },
         searchableText,
         position: table.position,
         confidence: table.confidence,
-        relatedChunks: relatedChunks.map(chunk => chunk.id)
+        relatedChunks: relatedChunks.map(chunk => chunk.id),
       };
     }));
   }
@@ -701,7 +702,7 @@ export class MivaaToRagTransformer {
     const rowCount = table.rows.length;
     const colCount = table.headers.length;
     const headers = table.headers.join(', ');
-    
+
     return `Table with ${rowCount} rows and ${colCount} columns. Headers: ${headers}. ${table.caption || ''}`.trim();
   }
 
@@ -712,7 +713,7 @@ export class MivaaToRagTransformer {
     const headerText = table.headers.join(' ');
     const rowText = table.rows.map(row => row.join(' ')).join(' ');
     const captionText = table.caption || '';
-    
+
     return `${captionText} ${headerText} ${rowText}`.trim();
   }
 
@@ -722,7 +723,7 @@ export class MivaaToRagTransformer {
   private async processImages(
     images: ImageMetadata[],
     chunks: DocumentChunk[],
-    config: TransformationConfig
+    config: TransformationConfig,
   ): Promise<ProcessedImageData[]> {
     return Promise.all(images.map(async (image, index) => {
       const title = image.caption || image.filename || `Image ${index + 1}`;
@@ -741,7 +742,7 @@ export class MivaaToRagTransformer {
         position: image.position,
         confidence: image.confidence,
         relatedChunks: relatedChunks.map(chunk => chunk.id),
-        url: image.url
+        url: image.url,
       };
     }));
   }
@@ -751,14 +752,14 @@ export class MivaaToRagTransformer {
    */
   private generateImageDescription(image: ImageMetadata): string {
     const parts = [];
-    
+
     if (image.caption) parts.push(image.caption);
     if (image.altText) parts.push(image.altText);
     if (image.extractedText) parts.push(`Contains text: ${image.extractedText}`);
-    
+
     parts.push(`Image file: ${image.filename}`);
     parts.push(`Format: ${image.format}`);
-    
+
     return parts.join('. ');
   }
 
@@ -767,10 +768,10 @@ export class MivaaToRagTransformer {
    */
   private extractImageSearchableText(image: ImageMetadata, description: string): string {
     const parts = [description];
-    
+
     if (image.extractedText) parts.push(image.extractedText);
     if (image.filename) parts.push(image.filename);
-    
+
     return parts.join(' ').trim();
   }
 
@@ -781,12 +782,12 @@ export class MivaaToRagTransformer {
     // Simple heuristic: find chunks that might be on the same page
     const pageSize = 1000; // Approximate characters per page
     const targetPosition = position.page * pageSize;
-    
+
     return chunks.filter(chunk => {
       const chunkStart = chunk.position.startIndex;
       const chunkEnd = chunk.position.endIndex;
       const chunkPage = Math.floor(chunkStart / pageSize);
-      
+
       return Math.abs(chunkPage - position.page) <= 1;
     });
   }
@@ -797,7 +798,7 @@ export class MivaaToRagTransformer {
   private extractDocumentStructure(
     content: string,
     chunks: DocumentChunk[],
-    config: TransformationConfig
+    config: TransformationConfig,
   ): DocumentStructure {
     const headers = this.extractHeaders(content, chunks);
     const sections = this.extractSections(content, chunks, headers);
@@ -807,7 +808,7 @@ export class MivaaToRagTransformer {
     return {
       headers,
       sections,
-      tableOfContents
+      tableOfContents,
     };
   }
 
@@ -827,14 +828,14 @@ export class MivaaToRagTransformer {
 
         // Find related chunks
         const relatedChunks = chunks.filter(chunk =>
-          position >= chunk.position.startIndex && position <= chunk.position.endIndex
+          position >= chunk.position.startIndex && position <= chunk.position.endIndex,
         );
 
         headers.push({
           level,
           text,
           position,
-          chunkIds: relatedChunks.map(chunk => chunk.id)
+          chunkIds: relatedChunks.map(chunk => chunk.id),
         });
       }
     });
@@ -848,7 +849,7 @@ export class MivaaToRagTransformer {
   private extractSections(
     content: string,
     chunks: DocumentChunk[],
-    headers: DocumentStructure['headers']
+    headers: DocumentStructure['headers'],
   ): DocumentStructure['sections'] {
     const sections: DocumentStructure['sections'] = [];
 
@@ -858,7 +859,7 @@ export class MivaaToRagTransformer {
       const endPosition = nextHeader ? nextHeader.position : content.length;
 
       const relatedChunks = chunks.filter(chunk =>
-        chunk.position.startIndex >= startPosition && chunk.position.endIndex <= endPosition
+        chunk.position.startIndex >= startPosition && chunk.position.endIndex <= endPosition,
       );
 
       sections.push({
@@ -866,7 +867,7 @@ export class MivaaToRagTransformer {
         title: header.text,
         startPosition,
         endPosition,
-        chunkIds: relatedChunks.map(chunk => chunk.id)
+        chunkIds: relatedChunks.map(chunk => chunk.id),
       });
     });
 
@@ -880,7 +881,7 @@ export class MivaaToRagTransformer {
     return headers.map(header => ({
       title: header.text,
       level: header.level,
-      chunkIds: header.chunkIds
+      chunkIds: header.chunkIds,
     }));
   }
 
@@ -890,13 +891,13 @@ export class MivaaToRagTransformer {
   private async generateEmbeddings(
     content: string,
     chunks: DocumentChunk[],
-    config: TransformationConfig
+    config: TransformationConfig,
   ) {
     if (!this.embeddingService) return undefined;
 
     const embeddings: RagDocument['embeddings'] = {
       document: [],
-      chunks: []
+      chunks: [],
     };
 
     // Generate document-level embedding
@@ -904,7 +905,7 @@ export class MivaaToRagTransformer {
       const documentInput: EmbeddingRequest = {
         id: 'document',
         text: content.substring(0, 8000), // Limit for embedding model
-        metadata: { type: 'document' }
+        metadata: { type: 'document' },
       };
 
       const documentEmbedding = await this.embeddingService.generateEmbedding(documentInput);
@@ -916,14 +917,14 @@ export class MivaaToRagTransformer {
       const chunkInputs: EmbeddingRequest[] = chunks.map(chunk => ({
         id: chunk.id,
         text: chunk.content,
-        metadata: { type: 'chunk', chunkIndex: chunk.metadata.chunkIndex }
+        metadata: { type: 'chunk', chunkIndex: chunk.metadata.chunkIndex },
       }));
 
       const chunkEmbeddings = await this.embeddingService.generateBatchEmbeddings(chunkInputs);
-      
+
       embeddings.chunks = chunkEmbeddings.embeddings.map((embedding: number[], index: number) => ({
         chunkId: chunks[index]?.id || `chunk-${index}`,
-        embedding: embedding
+        embedding: embedding,
       }));
     }
 
@@ -938,7 +939,7 @@ export class MivaaToRagTransformer {
     chunks: DocumentChunk[],
     tables: ProcessedTableData[],
     images: ProcessedImageData[],
-    config: TransformationConfig
+    config: TransformationConfig,
   ): QualityMetrics {
     const warnings: string[] = [];
     const recommendations: string[] = [];
@@ -989,7 +990,7 @@ export class MivaaToRagTransformer {
       chunkingQuality,
       overallQuality,
       warnings,
-      recommendations
+      recommendations,
     };
   }
 
@@ -1017,7 +1018,7 @@ export class MivaaToRagTransformer {
     // Check essential metadata fields
     const fields = [
       'title', 'author', 'subject', 'creator', 'producer',
-      'creationDate', 'modificationDate', 'language', 'keywords'
+      'creationDate', 'modificationDate', 'language', 'keywords',
     ];
 
     fields.forEach(field => {
@@ -1068,7 +1069,7 @@ export class MivaaToRagTransformer {
     // Size compliance
     const sizeCompliance = chunks.filter(chunk =>
       chunk.content.length >= config.quality.minimumChunkSize &&
-      chunk.content.length <= config.quality.maximumChunkSize
+      chunk.content.length <= config.quality.maximumChunkSize,
     ).length / chunks.length;
     qualityScore += sizeCompliance;
     factors++;
@@ -1086,7 +1087,7 @@ export class MivaaToRagTransformer {
     chunks: DocumentChunk[],
     tables: ProcessedTableData[],
     images: ProcessedImageData[],
-    quality: QualityMetrics
+    quality: QualityMetrics,
   ): RagMetadata {
     const avgChunkSize = chunks.length > 0 ?
       chunks.reduce((sum, chunk) => sum + chunk.content.length, 0) / chunks.length : 0;
@@ -1110,10 +1111,10 @@ export class MivaaToRagTransformer {
         totalImages: images.length,
         averageChunkSize: avgChunkSize,
         extractionQuality: mivaaDocument.metadata.confidence,
-        transformationQuality: quality.overallQuality
+        transformationQuality: quality.overallQuality,
       },
       tags: mivaaDocument.metadata.keywords || [],
-      categories: this.extractCategories(mivaaDocument)
+      categories: this.extractCategories(mivaaDocument),
     };
   }
 
@@ -1156,17 +1157,17 @@ export class MivaaToRagTransformer {
 
     // Extract from content analysis (simple heuristics)
     const content = mivaaDocument.markdown.toLowerCase();
-    
+
     // Technical document indicators
     if (content.includes('api') || content.includes('technical') || content.includes('specification')) {
       categories.push('technical');
     }
-    
+
     // Business document indicators
     if (content.includes('business') || content.includes('strategy') || content.includes('plan')) {
       categories.push('business');
     }
-    
+
     // Research document indicators
     if (content.includes('research') || content.includes('study') || content.includes('analysis')) {
       categories.push('research');

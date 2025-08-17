@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { Package } from 'lucide-react';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+
 import { DynamicMaterialForm } from './DynamicMaterialForm';
-import { Package } from 'lucide-react';
 
 interface MaterialFormModalProps {
   open: boolean;
@@ -21,13 +23,13 @@ const materialCategories = [
   { value: 'glass', label: 'Glass' },
   { value: 'rubber', label: 'Rubber' },
   { value: 'concrete', label: 'Concrete' },
-  { value: 'other', label: 'Other' }
+  { value: 'other', label: 'Other' },
 ];
 
 export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
   open,
   onOpenChange,
-  onSave
+  onSave,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('metals');
 
@@ -47,7 +49,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
             Add New Material
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div>
             <Label htmlFor="category-select">First, select a material category:</Label>

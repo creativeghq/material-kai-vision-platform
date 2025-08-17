@@ -116,7 +116,7 @@ class JinaAIService {
       'Authorization': `Bearer ${this.getApiKey()}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      ...additionalHeaders
+      ...additionalHeaders,
     };
   }
 
@@ -128,7 +128,7 @@ class JinaAIService {
       task?: 'retrieval.query' | 'retrieval.passage' | 'text-matching' | 'classification' | 'separation';
       dimensions?: number;
       normalized?: boolean;
-    } = {}
+    } = {},
   ): Promise<JinaEmbeddingResponse> {
     const response = await fetch(`${this.baseUrl}/embeddings`, {
       method: 'POST',
@@ -136,8 +136,8 @@ class JinaAIService {
       body: JSON.stringify({
         model,
         input,
-        ...options
-      })
+        ...options,
+      }),
     });
 
     if (!response.ok) {
@@ -151,7 +151,7 @@ class JinaAIService {
   async classifyText(
     input: string[],
     labels: string[],
-    model: string = 'jina-embeddings-v3'
+    model: string = 'jina-embeddings-v3',
   ): Promise<JinaClassificationResponse> {
     const response = await fetch(`${this.baseUrl}/classify`, {
       method: 'POST',
@@ -159,8 +159,8 @@ class JinaAIService {
       body: JSON.stringify({
         model,
         input,
-        labels
-      })
+        labels,
+      }),
     });
 
     if (!response.ok) {
@@ -174,18 +174,18 @@ class JinaAIService {
   async classifyImages(
     images: string[], // base64 encoded images
     labels: string[],
-    model: string = 'jina-clip-v2'
+    model: string = 'jina-clip-v2',
   ): Promise<JinaClassificationResponse> {
     const input = images.map(image => ({ image }));
-    
+
     const response = await fetch(`${this.baseUrl}/classify`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
         model,
         input,
-        labels
-      })
+        labels,
+      }),
     });
 
     if (!response.ok) {
@@ -206,10 +206,10 @@ class JinaAIService {
       targetSelector?: string;
       removeSelector?: string;
       timeout?: number;
-    } = {}
+    } = {},
   ): Promise<JinaReaderResponse> {
     const headers = this.getHeaders();
-    
+
     if (options.returnFormat) {
       headers['X-Return-Format'] = options.returnFormat;
     }
@@ -235,7 +235,7 @@ class JinaAIService {
     const response = await fetch(this.readerUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url }),
     });
 
     if (!response.ok) {
@@ -256,10 +256,10 @@ class JinaAIService {
       num?: number;
       location?: string;
       language?: string;
-    } = {}
+    } = {},
   ): Promise<JinaSearchResponse> {
     const headers = this.getHeaders();
-    
+
     if (options.site) {
       headers['X-Site'] = options.site;
     }
@@ -281,7 +281,7 @@ class JinaAIService {
     const response = await fetch(this.searchUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -299,10 +299,10 @@ class JinaAIService {
       model?: 'jina-reranker-v2-base-multilingual' | 'jina-colbert-v2' | 'jina-reranker-m0';
       topN?: number;
       returnDocuments?: boolean;
-    } = {}
+    } = {},
   ): Promise<JinaRerankResponse> {
     const model = options.model || 'jina-reranker-v2-base-multilingual';
-    
+
     const response = await fetch(`${this.baseUrl}/rerank`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -311,8 +311,8 @@ class JinaAIService {
         query,
         documents,
         top_n: options.topN,
-        return_documents: options.returnDocuments !== false
-      })
+        return_documents: options.returnDocuments !== false,
+      }),
     });
 
     if (!response.ok) {
@@ -332,7 +332,7 @@ class JinaAIService {
       maxChunkLength?: number;
       head?: number;
       tail?: number;
-    } = {}
+    } = {},
   ): Promise<JinaSegmentResponse> {
     const response = await fetch(this.segmentUrl, {
       method: 'POST',
@@ -344,8 +344,8 @@ class JinaAIService {
         return_chunks: options.returnChunks || false,
         max_chunk_length: options.maxChunkLength || 1000,
         head: options.head,
-        tail: options.tail
-      })
+        tail: options.tail,
+      }),
     });
 
     if (!response.ok) {
@@ -363,15 +363,15 @@ class JinaAIService {
       classificationLabels?: string[];
       useSearch?: boolean;
       searchQuery?: string;
-    } = {}
+    } = {},
   ): Promise<MaterialData[]> {
     try {
       console.log('Starting Jina AI material extraction for:', url);
-      
+
       let content = '';
       let pageTitle = '';
       let images: string[] = [];
-      
+
       if (options.useSearch && options.searchQuery) {
         // Use search API to find relevant pages
         console.log('Using Jina Search API with query:', options.searchQuery);
@@ -379,9 +379,9 @@ class JinaAIService {
           site: new URL(url).hostname,
           num: 5,
           withImages: true,
-          withLinks: true
+          withLinks: true,
         });
-        
+
         // Process search results
         const materials: MaterialData[] = [];
         for (const result of searchResults.data) {
@@ -389,11 +389,11 @@ class JinaAIService {
             result.content,
             result.url,
             result.title,
-            []
+            [],
           );
           materials.push(...extractedMaterials);
         }
-        
+
         console.log(`Extracted ${materials.length} materials from search results`);
         return materials;
       } else {
@@ -403,26 +403,26 @@ class JinaAIService {
           returnFormat: 'markdown',
           withImages: true,
           withLinks: true,
-          timeout: 30
+          timeout: 30,
         });
-        
+
         content = readerResult.data.content;
         pageTitle = readerResult.data.title;
         images = Object.values(readerResult.data.images || {});
-        
+
         console.log(`Retrieved content: ${content.length} characters`);
         console.log(`Found ${images.length} images`);
       }
-      
+
       // Extract materials from content
       const materials = this.extractMaterialsFromContent(content, url, pageTitle, images);
-      
+
       // Classify materials if labels provided
       if (options.classificationLabels && materials.length > 0) {
         console.log('Classifying materials with labels:', options.classificationLabels);
         const materialNames = materials.map(m => m.name);
         const classification = await this.classifyText(materialNames, options.classificationLabels);
-        
+
         // Update materials with classification results
         classification.data.forEach((result, index) => {
           if (materials[index]) {
@@ -431,10 +431,10 @@ class JinaAIService {
           }
         });
       }
-      
+
       console.log(`Successfully extracted ${materials.length} materials`);
       return materials;
-      
+
     } catch (error) {
       console.error('Jina AI material extraction error:', error);
       throw error;
@@ -445,10 +445,10 @@ class JinaAIService {
     content: string,
     sourceUrl: string,
     pageTitle: string,
-    images: string[]
+    images: string[],
   ): MaterialData[] {
     const materials: MaterialData[] = [];
-    
+
     // Material keywords for detection
     const materialKeywords = [
       'tile', 'tiles', 'ceramic', 'porcelain', 'stone', 'marble', 'granite',
@@ -456,65 +456,65 @@ class JinaAIService {
       'fabric', 'textile', 'cotton', 'linen', 'wool', 'silk',
       'metal', 'steel', 'aluminum', 'brass', 'copper', 'iron',
       'glass', 'acrylic', 'plastic', 'vinyl', 'leather',
-      'concrete', 'brick', 'laminate', 'veneer', 'composite'
+      'concrete', 'brick', 'laminate', 'veneer', 'composite',
     ];
-    
+
     // Price patterns
     const priceRegex = /[\$£€¥]\s*\d+(?:[.,]\d{2})?(?:\s*-\s*[\$£€¥]\s*\d+(?:[.,]\d{2})?)?/g;
     const dimensionRegex = /\d+\s*(?:x|×)\s*\d+(?:\s*(?:x|×)\s*\d+)?\s*(?:mm|cm|m|inch|in|ft)(?:es)?/gi;
-    
+
     // Split content into potential product sections
     const lines = content.split('\n');
     let currentMaterial: Partial<MaterialData> | null = null;
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       const lowerLine = line.toLowerCase();
-      
+
       if (!line) continue;
-      
+
       // Detect potential material names (headings or emphasized text)
       const hasKeyword = materialKeywords.some(keyword => lowerLine.includes(keyword));
       const isHeading = line.startsWith('#') || line.includes('**') || line.length < 100;
-      
+
       if (hasKeyword && isHeading) {
         // Save previous material if exists
         if (currentMaterial && currentMaterial.name) {
           materials.push(this.createMaterialFromPartial(currentMaterial, sourceUrl));
         }
-        
+
         // Start new material
         currentMaterial = {
           name: line.replace(/[#*]/g, '').trim(),
           properties: {},
-          images: []
+          images: [],
         };
-        
+
         console.log(`Found potential material: ${currentMaterial.name}`);
         continue;
       }
-      
+
       if (currentMaterial) {
         // Extract price
         const priceMatch = line.match(priceRegex);
         if (priceMatch && !currentMaterial.price) {
           currentMaterial.price = priceMatch[0];
         }
-        
+
         // Extract dimensions
         const dimMatch = line.match(dimensionRegex);
         if (dimMatch && currentMaterial.properties) {
           currentMaterial.properties.dimensions = dimMatch[0];
         }
-        
+
         // Extract description (first substantial text)
-        if (!currentMaterial.description && line.length > 20 && line.length < 300 && 
+        if (!currentMaterial.description && line.length > 20 && line.length < 300 &&
             !priceRegex.test(line) && !dimensionRegex.test(line)) {
           currentMaterial.description = line;
         }
-        
+
         // Look for image references
-        if (line.includes('http') && (line.includes('.jpg') || line.includes('.png') || 
+        if (line.includes('http') && (line.includes('.jpg') || line.includes('.png') ||
             line.includes('.jpeg') || line.includes('.webp'))) {
           const imageMatch = line.match(/https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp)/i);
           if (imageMatch && currentMaterial.images) {
@@ -523,12 +523,12 @@ class JinaAIService {
         }
       }
     }
-    
+
     // Save last material
     if (currentMaterial && currentMaterial.name) {
       materials.push(this.createMaterialFromPartial(currentMaterial, sourceUrl));
     }
-    
+
     // Add page images to materials that don't have images
     if (images.length > 0) {
       materials.forEach(material => {
@@ -537,10 +537,10 @@ class JinaAIService {
         }
       });
     }
-    
+
     return materials;
   }
-  
+
   private createMaterialFromPartial(partial: Partial<MaterialData>, sourceUrl: string): MaterialData {
     return {
       name: partial.name || 'Unknown Material',
@@ -552,14 +552,14 @@ class JinaAIService {
         ...partial.properties,
         sourceUrl,
         extractedAt: new Date().toISOString(),
-        extractedBy: 'jina-ai'
+        extractedBy: 'jina-ai',
       },
       sourceUrl,
       supplier: this.extractSupplierFromUrl(sourceUrl),
-      confidence: partial.confidence || 0.8
+      confidence: partial.confidence || 0.8,
     };
   }
-  
+
   private categorizeFromName(name: string): string {
     const categoryMap: Record<string, string> = {
       'wood': 'Wood',
@@ -582,18 +582,18 @@ class JinaAIService {
       'porcelain': 'Ceramics',
       'glass': 'Glass',
       'plastic': 'Plastics',
-      'vinyl': 'Plastics'
+      'vinyl': 'Plastics',
     };
-    
+
     for (const [key, value] of Object.entries(categoryMap)) {
       if (name.includes(key)) {
         return value;
       }
     }
-    
+
     return 'Other';
   }
-  
+
   private extractSupplierFromUrl(url: string): string {
     try {
       const domain = new URL(url).hostname;

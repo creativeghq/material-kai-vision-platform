@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Database,
+  PlayCircle,
+  RefreshCw,
+  ExternalLink,
+} from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
-  ChevronDown, 
-  ChevronRight,
-  Database,
-  PlayCircle,
-  RefreshCw,
-  ExternalLink
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
+
 import { HTMLDocumentViewer } from './HTMLDocumentViewer';
 
 export interface WorkflowStep {
@@ -52,7 +54,7 @@ interface PDFWorkflowViewerProps {
 export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
   jobs,
   onRetryJob,
-  className
+  className,
 }) => {
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
@@ -105,7 +107,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
       running: 'bg-blue-100 text-blue-700',
       completed: 'bg-green-100 text-green-700',
       failed: 'bg-red-100 text-red-700',
-      skipped: 'bg-gray-100 text-gray-500'
+      skipped: 'bg-gray-100 text-gray-500',
     };
 
     return (
@@ -146,7 +148,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
       {jobs.map((job) => {
         const isExpanded = expandedJobs.has(job.id);
         const progress = getJobProgress(job);
-        
+
         return (
           <Card key={job.id} className="overflow-hidden">
             <CardHeader className="pb-3">
@@ -156,29 +158,29 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                     onClick={() => toggleJobExpansion(job.id)}
                     className="p-1 h-auto text-sm bg-transparent hover:bg-gray-100"
                   >
-                    {isExpanded ? 
-                      <ChevronDown className="h-4 w-4" /> : 
+                    {isExpanded ?
+                      <ChevronDown className="h-4 w-4" /> :
                       <ChevronRight className="h-4 w-4" />
                     }
                   </Button>
-                  
+
                   {getStatusIcon(job.status)}
-                  
+
                   <div>
                     <CardTitle className="text-base">{job.name}</CardTitle>
                     <p className="text-sm text-muted-foreground">{job.filename}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   {job.status === 'running' && (
                     <div className="text-sm text-muted-foreground">
                       {progress}% complete
                     </div>
                   )}
-                  
+
                   {getStatusBadge(job.status)}
-                  
+
                   {job.status === 'failed' && onRetryJob && (
                     <Button
                       onClick={() => onRetryJob(job.id)}
@@ -190,13 +192,13 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                   )}
                 </div>
               </div>
-              
+
               {(job.status === 'running' || job.status === 'completed') && (
                 <div className="mt-3">
                   <Progress value={progress} className="h-2" />
                 </div>
               )}
-              
+
               <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
                 <span>Started: {job.startTime.toLocaleTimeString()}</span>
                 {job.endTime && (
@@ -205,28 +207,28 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                 <span>{job.steps.length} steps</span>
               </div>
             </CardHeader>
-            
+
             {isExpanded && (
               <CardContent className="pt-0">
                 <Separator className="mb-4" />
-                
+
                 <div className="space-y-3">
                   {job.steps.map((step, index) => {
                     const isStepExpanded = expandedSteps.has(step.id);
                     const Icon = step.icon;
-                    
+
                     return (
                       <div key={step.id} className="relative">
                         {/* Connector line */}
                         {index < job.steps.length - 1 && (
                           <div className="absolute left-6 top-8 bottom-0 w-px bg-border" />
                         )}
-                        
+
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0 mt-1">
                             {getStatusIcon(step.status)}
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -234,32 +236,32 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                 <span className="font-medium">{step.name}</span>
                                 {getStatusBadge(step.status)}
                               </div>
-                              
+
                               <div className="flex items-center gap-2">
                                 {step.duration && (
                                   <span className="text-xs text-muted-foreground">
                                     {formatDuration(step.duration)}
                                   </span>
                                 )}
-                                
+
                                 {(step.details || step.logs || step.error) && (
                                   <Button
                                     onClick={() => toggleStepExpansion(step.id)}
                                     className="p-1 h-auto text-sm bg-transparent hover:bg-gray-100"
                                   >
-                                    {isStepExpanded ? 
-                                      <ChevronDown className="h-3 w-3" /> : 
+                                    {isStepExpanded ?
+                                      <ChevronDown className="h-3 w-3" /> :
                                       <ChevronRight className="h-3 w-3" />
                                     }
                                   </Button>
                                 )}
                               </div>
                             </div>
-                            
+
                             <p className="text-sm text-muted-foreground mt-1">
                               {step.description}
                             </p>
-                            
+
                             {step.error && (
                               <Alert className="mt-2 border-red-200 bg-red-50">
                                 <AlertCircle className="h-4 w-4 text-red-600" />
@@ -268,7 +270,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                 </AlertDescription>
                               </Alert>
                             )}
-                            
+
                             {isStepExpanded && (
                               <div className="mt-3 space-y-3">
                                 {step.details && step.details.length > 0 && (
@@ -304,10 +306,10 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                           <ExternalLink className="h-3 w-3" />
                                           View HTML Document
                                         </button>
-                                       <button 
+                                       <button
                                          onClick={() => {
                                            // Navigate to knowledge base with search filter
-                                           window.open(`/admin/knowledge-base`, '_blank');
+                                           window.open('/admin/knowledge-base', '_blank');
                                          }}
                                          className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline"
                                        >
@@ -320,7 +322,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                     </div>
                                   </div>
                                 )}
-                                
+
                                 {step.metadata && Object.keys(step.metadata).length > 0 && (
                                   <div className="text-sm">
                                     <strong className="text-foreground">Metadata:</strong>
@@ -329,7 +331,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                     </div>
                                   </div>
                                 )}
-                                
+
                                 {step.logs && step.logs.length > 0 && (
                                   <div className="text-sm">
                                     <strong className="text-foreground">Logs:</strong>
@@ -353,7 +355,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
           </Card>
         );
       })}
-      
+
       <HTMLDocumentViewer
         isOpen={htmlViewerOpen}
         onClose={() => setHtmlViewerOpen(false)}

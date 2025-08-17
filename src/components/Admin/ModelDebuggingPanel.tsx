@@ -1,9 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Activity,
   AlertCircle,
@@ -15,8 +10,14 @@ import {
   Image,
   FileText,
   ExternalLink,
-  Copy
+  Copy,
 } from 'lucide-react';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
 interface ModelLog {
@@ -68,11 +69,11 @@ const ModelDebuggingPanel: React.FC = () => {
             status: 'success',
             duration: 5.55,
             imageUrl: 'https://replicate.delivery/xezq/BJkO9E29UeWrGiJaOfeus09teBJMoBo8GiieUwmQHAhnaxKoC/out.png',
-            predictionId: 've6q56x78hrmc0cr2e59vccny0'
-          }
+            predictionId: 've6q56x78hrmc0cr2e59vccny0',
+          },
         ],
         versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'AI-powered interior design generation from room images'
+        description: 'AI-powered interior design generation from room images',
       },
       {
         name: 'erayyavuz/interior-ai',
@@ -81,7 +82,7 @@ const ModelDebuggingPanel: React.FC = () => {
         status: 'untested',
         recentLogs: [],
         versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Interior design transformation using AI'
+        description: 'Interior design transformation using AI',
       },
       {
         name: 'jschoormans/comfyui-interior-remodel',
@@ -90,7 +91,7 @@ const ModelDebuggingPanel: React.FC = () => {
         status: 'untested',
         recentLogs: [],
         versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'ComfyUI-based interior remodeling system'
+        description: 'ComfyUI-based interior remodeling system',
       },
       {
         name: 'julian-at/interiorly-gen1-dev',
@@ -99,7 +100,7 @@ const ModelDebuggingPanel: React.FC = () => {
         status: 'untested',
         recentLogs: [],
         versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Advanced interior generation development model'
+        description: 'Advanced interior generation development model',
       },
       {
         name: 'jschoormans/interior-v2',
@@ -108,7 +109,7 @@ const ModelDebuggingPanel: React.FC = () => {
         status: 'untested',
         recentLogs: [],
         versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Second generation interior design model'
+        description: 'Second generation interior design model',
       },
       {
         name: 'rocketdigitalai/interior-design-sdxl',
@@ -117,7 +118,7 @@ const ModelDebuggingPanel: React.FC = () => {
         status: 'untested',
         recentLogs: [],
         versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'SDXL-based interior design generation'
+        description: 'SDXL-based interior design generation',
       },
       {
         name: 'davisbrown/designer-architecture',
@@ -126,8 +127,8 @@ const ModelDebuggingPanel: React.FC = () => {
         status: 'untested',
         recentLogs: [],
         versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Architectural design generation from text prompts'
-      }
+        description: 'Architectural design generation from text prompts',
+      },
     ];
     setModels(initialModels);
   }, []);
@@ -165,18 +166,18 @@ const ModelDebuggingPanel: React.FC = () => {
       // This would call the actual 3D generation API
       // For now, we'll simulate the test
       toast({
-        title: "Testing Model",
+        title: 'Testing Model',
         description: `Starting test for ${modelName}...`,
       });
-      
+
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Update model status (this would be based on actual API response)
-      setModels(prev => prev.map(model => 
-        model.name === modelName 
-          ? { 
-              ...model, 
+      setModels(prev => prev.map(model =>
+        model.name === modelName
+          ? {
+              ...model,
               status: 'working' as const,
               lastTested: new Date().toISOString(),
               recentLogs: [
@@ -187,21 +188,21 @@ const ModelDebuggingPanel: React.FC = () => {
                   status: 'success' as const,
                   duration: Math.random() * 10 + 3,
                 },
-                ...model.recentLogs.slice(0, 4)
-              ]
+                ...model.recentLogs.slice(0, 4),
+              ],
             }
-          : model
+          : model,
       ));
-      
+
       toast({
-        title: "Test Complete",
+        title: 'Test Complete',
         description: `${modelName} test completed successfully!`,
       });
     } catch (error) {
       toast({
-        title: "Test Failed",
+        title: 'Test Failed',
         description: `Failed to test ${modelName}`,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -211,24 +212,24 @@ const ModelDebuggingPanel: React.FC = () => {
   const testAllModels = async () => {
     setIsLoading(true);
     toast({
-      title: "Testing All Models",
-      description: "Running comprehensive test suite...",
+      title: 'Testing All Models',
+      description: 'Running comprehensive test suite...',
     });
-    
+
     // Simulate testing all models
     for (const model of models) {
       await testModel(model.name);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    
+
     setIsLoading(false);
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: "Copied",
-      description: "Content copied to clipboard",
+      title: 'Copied',
+      description: 'Content copied to clipboard',
     });
   };
 
@@ -248,8 +249,8 @@ const ModelDebuggingPanel: React.FC = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button 
-              onClick={testAllModels} 
+            <Button
+              onClick={testAllModels}
               disabled={isLoading}
               className="flex items-center gap-2"
             >
@@ -270,7 +271,7 @@ const ModelDebuggingPanel: React.FC = () => {
               <p className="text-xs text-muted-foreground">Configured models</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -283,7 +284,7 @@ const ModelDebuggingPanel: React.FC = () => {
               <p className="text-xs text-muted-foreground">Operational models</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -296,7 +297,7 @@ const ModelDebuggingPanel: React.FC = () => {
               <p className="text-xs text-muted-foreground">Models with issues</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -396,7 +397,7 @@ const ModelDebuggingPanel: React.FC = () => {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="flex gap-2">
                             <Button
                               className="h-8 px-3 text-sm flex items-center gap-1"
@@ -505,7 +506,7 @@ const ModelDebuggingPanel: React.FC = () => {
                   Error classification and retry logic enabled
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="text-sm font-medium">TypeScript Compilation</div>
                 <Badge className="bg-green-500/20 text-green-600">
@@ -516,7 +517,7 @@ const ModelDebuggingPanel: React.FC = () => {
                   No compilation errors detected
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="text-sm font-medium">API Integration</div>
                 <Badge className="bg-yellow-500/20 text-yellow-600">

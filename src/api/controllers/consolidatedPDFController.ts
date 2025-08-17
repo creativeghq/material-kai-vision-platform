@@ -1,7 +1,8 @@
+import { z } from 'zod';
+
 import { MivaaIntegrationService, PdfExtractionRequest, defaultMivaaConfig } from '../../services/pdf/mivaaIntegrationService';
 import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
-import { supabase } from '../../integrations/supabase/client';
-import { z } from 'zod';
+import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAuthMiddleware';
 
 /**
  * Request/Response types for unified PDF API
@@ -133,18 +134,18 @@ const UnifiedPdfProcessingRequestSchema = z.object({
     enableRAGIntegration: z.boolean().optional(),
     pageRange: z.object({
       start: z.number().int().positive().optional(),
-      end: z.number().int().positive().optional()
+      end: z.number().int().positive().optional(),
     }).optional(),
     chunkingOptions: z.object({
       maxChunkSize: z.number().int().positive().max(8000).optional(),
-      overlapSize: z.number().int().min(0).max(500).optional()
+      overlapSize: z.number().int().min(0).max(500).optional(),
     }).optional(),
     embeddingOptions: z.object({
       model: z.string().optional(),
-      dimensions: z.number().int().positive().optional()
+      dimensions: z.number().int().positive().optional(),
     }).optional(),
     outputFormat: z.enum(['json', 'zip']).optional(),
-    workspaceAware: z.boolean().optional()
+    workspaceAware: z.boolean().optional(),
   }),
   metadata: z.object({
     filename: z.string().optional(),
@@ -154,9 +155,9 @@ const UnifiedPdfProcessingRequestSchema = z.object({
     workspace: z.object({
       projectId: z.string().optional(),
       userId: z.string().optional(),
-      tags: z.array(z.string()).optional()
-    }).optional()
-  }).optional()
+      tags: z.array(z.string()).optional(),
+    }).optional(),
+  }).optional(),
 });
 
 const DocumentSearchRequestSchema = z.object({
@@ -166,8 +167,8 @@ const DocumentSearchRequestSchema = z.object({
     limit: z.number().int().positive().max(100).optional(),
     threshold: z.number().min(0).max(1).optional(),
     includeMetadata: z.boolean().optional(),
-    filterByTags: z.array(z.string()).optional()
-  }).optional()
+    filterByTags: z.array(z.string()).optional(),
+  }).optional(),
 });
 
 
@@ -176,20 +177,21 @@ const DocumentSearchRequestSchema = z.object({
  */
 export class AuthenticationHelper {
   /**
-   * Get current user authentication context
+   * Authenticate request using JWT middleware
+   * Supports both JWT tokens and API keys
    */
-  static async getCurrentUser(): Promise<AuthContext> {
+  static async authenticateRequest(request: AuthenticatedRequest): Promise<AuthContext> {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error || !user) {
+      const authResult = await JWTAuthMiddleware.authenticate(request, {
+        allowApiKey: true,
+        allowInternalToken: false,
+      });
+
+      if (!authResult.success) {
         return { isAuthenticated: false };
       }
 
-      return {
-        user: { id: user.id },
-        isAuthenticated: true
-      };
+      return authResult.authContext;
     } catch (error) {
       console.error('Authentication error:', error);
       return { isAuthenticated: false };
@@ -197,65 +199,19 @@ export class AuthenticationHelper {
   }
 
   /**
-   * Validate API key authentication
+   * Check endpoint access for authenticated request
+   * Uses JWT middleware for API key endpoint validation
    */
-  static async validateApiKey(apiKey: string): Promise<AuthContext> {
+  static async checkEndpointAccess(request: AuthenticatedRequest, endpoint: string): Promise<boolean> {
     try {
-      const { data: apiKeyData, error } = await supabase
-        .from('api_keys')
-        .select('user_id, is_active, allowed_endpoints, expires_at')
-        .eq('api_key', apiKey)
-        .single();
-
-      if (error || !apiKeyData || !apiKeyData.is_active) {
-        return { isAuthenticated: false };
+      // If using API key, check endpoint access
+      const apiKey = request.headers['x-api-key'] || request.headers['X-API-Key'];
+      if (apiKey) {
+        return await JWTAuthMiddleware.checkEndpointAccess(apiKey as string, endpoint);
       }
 
-      // Check if API key has expired
-      if (apiKeyData.expires_at && new Date(apiKeyData.expires_at) < new Date()) {
-        return { isAuthenticated: false };
-      }
-
-      // Update last_used_at for API key
-      await supabase
-        .from('api_keys')
-        .update({ last_used_at: new Date().toISOString() })
-        .eq('api_key', apiKey);
-
-      return {
-        user: { id: apiKeyData.user_id || '' },
-        isAuthenticated: true
-      };
-    } catch (error) {
-      console.error('API key validation error:', error);
-      return { isAuthenticated: false };
-    }
-  }
-
-  /**
-   * Check endpoint access for API key
-   */
-  static async checkEndpointAccess(apiKey: string, endpoint: string): Promise<boolean> {
-    try {
-      const { data: apiKeyData, error } = await supabase
-        .from('api_keys')
-        .select('allowed_endpoints')
-        .eq('api_key', apiKey)
-        .single();
-
-      if (error || !apiKeyData) {
-        return false;
-      }
-
-      // If no restrictions, allow all endpoints
-      if (!apiKeyData.allowed_endpoints || apiKeyData.allowed_endpoints.length === 0) {
-        return true;
-      }
-
-      // Check if endpoint is in allowed list
-      return apiKeyData.allowed_endpoints.some((allowedEndpoint: string) =>
-        endpoint.startsWith(allowedEndpoint)
-      );
+      // JWT tokens have full access by default
+      return true;
     } catch (error) {
       console.error('Endpoint access check error:', error);
       return false;
@@ -279,17 +235,22 @@ export class RateLimitHelper {
     try {
       // Get rate limit for this endpoint
       const rateLimit = await apiGatewayService.getRateLimit(endpoint, clientIP, userId);
-      
-      // Check current usage (simplified - in production, use Redis or similar)
-      const currentTime = new Date();
-      const oneMinuteAgo = new Date(currentTime.getTime() - 60000);
-      
+
+      // TODO: Create api_usage_logs table migration before enabling this functionality
+      console.warn('Rate limiting is disabled - api_usage_logs table not found. Create database migration to enable this feature.');
+
+      // Temporary fallback: allow all requests (no rate limiting)
+      const recentRequests: any[] = [];
+      const error = null;
+
+      /* COMMENTED OUT UNTIL DATABASE MIGRATION IS CREATED:
       const { data: recentRequests, error } = await supabase
         .from('api_usage_logs')
         .select('id')
         .eq('request_path', endpoint)
         .gte('created_at', oneMinuteAgo.toISOString())
         .or(`ip_address.eq.${clientIP}${userId ? `,user_id.eq.${userId}` : ''}`);
+      */
 
       if (error) {
         console.error('Rate limit check error:', error);
@@ -298,18 +259,18 @@ export class RateLimitHelper {
           allowed: true,
           limit: rateLimit,
           remaining: rateLimit,
-          resetTime: new Date(currentTime.getTime() + 60000)
+          resetTime: new Date(Date.now() + 60000),
         };
       }
 
       const requestCount = recentRequests?.length || 0;
       const remaining = Math.max(0, rateLimit - requestCount);
-      
+
       return {
         allowed: requestCount < rateLimit,
         limit: rateLimit,
         remaining,
-        resetTime: new Date(currentTime.getTime() + 60000)
+        resetTime: new Date(Date.now() + 60000),
       };
     } catch (error) {
       console.error('Rate limiting error:', error);
@@ -318,7 +279,7 @@ export class RateLimitHelper {
         allowed: true,
         limit: 60,
         remaining: 60,
-        resetTime: new Date(Date.now() + 60000)
+        resetTime: new Date(Date.now() + 60000),
       };
     }
   }
@@ -327,15 +288,22 @@ export class RateLimitHelper {
    * Log API usage
    */
   static async logUsage(
-    endpoint: string,
-    method: string,
-    clientIP: string,
-    userId?: string,
-    responseStatus?: number,
-    responseTime?: number,
-    rateLimitExceeded: boolean = false
+    _endpoint: string,
+    _method: string,
+    _clientIP: string,
+    _userId?: string,
+    _responseStatus?: number,
+    _responseTime?: number,
+    _rateLimitExceeded: boolean = false,
   ): Promise<void> {
     try {
+      // TODO: Create api_usage_logs table migration before enabling this functionality
+      console.warn('API usage logging is disabled - api_usage_logs table not found. Create database migration to enable this feature.');
+
+      // No-op until database migration is created
+      return;
+
+      /* COMMENTED OUT UNTIL DATABASE MIGRATION IS CREATED:
       await supabase
         .from('api_usage_logs')
         .insert({
@@ -350,6 +318,7 @@ export class RateLimitHelper {
           is_internal_request: await apiGatewayService.isInternalIP(clientIP),
           rate_limit_exceeded: rateLimitExceeded
         });
+      */
     } catch (error) {
       console.error('Failed to log API usage:', error);
     }
@@ -358,7 +327,7 @@ export class RateLimitHelper {
 
 /**
  * Consolidated PDF Controller Class
- * 
+ *
  * Unified controller combining PDF integration and document workflow operations.
  * Provides a single interface for all PDF-related API operations including:
  * - PDF content extraction (markdown, tables, images)
@@ -390,7 +359,7 @@ export class ConsolidatedPDFController {
   async healthCheck(): Promise<ApiResponse> {
     try {
       const health = await this.mivaaService.getHealth();
-      
+
       return {
         success: health.status === 'healthy',
         data: {
@@ -401,15 +370,15 @@ export class ConsolidatedPDFController {
             mivaaService: health.status === 'healthy',
             controller: { status: 'healthy' },
             database: { status: 'healthy' },
-            authentication: { status: 'healthy' }
+            authentication: { status: 'healthy' },
           },
           details: {
             uptime: health.uptime,
             version: defaultMivaaConfig.version,
-            activeJobs: this.activeJobs.size
-          }
+            activeJobs: this.activeJobs.size,
+          },
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       return {
@@ -420,9 +389,9 @@ export class ConsolidatedPDFController {
           status: 'unhealthy',
           service: 'consolidated-pdf',
           timestamp: new Date().toISOString(),
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -432,12 +401,12 @@ export class ConsolidatedPDFController {
    * Handles both extraction and workflow processing
    */
   async processDocument(
-    file: File, 
-    request: UnifiedPdfProcessingRequest, 
-    authContext: AuthContext
+    file: File,
+    request: UnifiedPdfProcessingRequest,
+    authContext: AuthContext,
   ): Promise<ApiResponse> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -445,7 +414,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -457,7 +426,7 @@ export class ConsolidatedPDFController {
           error: 'Invalid request data',
           code: 'VALIDATION_ERROR',
           data: { details: validationResult.error.issues },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -469,7 +438,7 @@ export class ConsolidatedPDFController {
             success: false,
             error: 'Access denied to workspace',
             code: 'FORBIDDEN',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
       }
@@ -482,11 +451,11 @@ export class ConsolidatedPDFController {
           ...(validationResult.data.options.pageRange && {
             pageRange: {
               ...(validationResult.data.options.pageRange.start !== undefined && { start: validationResult.data.options.pageRange.start }),
-              ...(validationResult.data.options.pageRange.end !== undefined && { end: validationResult.data.options.pageRange.end })
-            }
+              ...(validationResult.data.options.pageRange.end !== undefined && { end: validationResult.data.options.pageRange.end }),
+            },
           }),
           ...(validationResult.data.options.outputFormat && { outputFormat: validationResult.data.options.outputFormat }),
-          ...(validationResult.data.options.workspaceAware !== undefined && { workspaceAware: validationResult.data.options.workspaceAware })
+          ...(validationResult.data.options.workspaceAware !== undefined && { workspaceAware: validationResult.data.options.workspaceAware }),
         },
         file: await this.fileToBuffer(file),
         metadata: {
@@ -499,16 +468,16 @@ export class ConsolidatedPDFController {
             workspace: {
               ...(validationResult.data.metadata.workspace.projectId && { projectId: validationResult.data.metadata.workspace.projectId }),
               ...(validationResult.data.metadata.workspace.userId && { userId: validationResult.data.metadata.workspace.userId }),
-              ...(validationResult.data.metadata.workspace.tags && { tags: validationResult.data.metadata.workspace.tags })
-            }
+              ...(validationResult.data.metadata.workspace.tags && { tags: validationResult.data.metadata.workspace.tags }),
+            },
           }),
           ...(validationResult.data.metadata?.tags && {
-            tags: validationResult.data.metadata.tags
+            tags: validationResult.data.metadata.tags,
           }),
           ...(validationResult.data.metadata?.priority && {
-            priority: validationResult.data.metadata.priority
-          })
-        }
+            priority: validationResult.data.metadata.priority,
+          }),
+        },
       };
 
       // Add workspace context if user is authenticated
@@ -517,8 +486,8 @@ export class ConsolidatedPDFController {
           ...extractionRequest.metadata,
           workspace: {
             userId: authContext.user.id,
-            ...extractionRequest.metadata?.workspace
-          }
+            ...extractionRequest.metadata?.workspace,
+          },
         };
       }
 
@@ -527,7 +496,7 @@ export class ConsolidatedPDFController {
       if (request.options.enableRAGIntegration) {
         // Process for RAG integration
         result = await this.mivaaService.processForRag(extractionRequest);
-        
+
         // If this is a workflow request, create job tracking
         if (request.workspaceId) {
           const jobId = this.generateJobId();
@@ -544,9 +513,9 @@ export class ConsolidatedPDFController {
             results: result,
             createdAt: new Date(),
             updatedAt: new Date(),
-            completedAt: new Date()
+            completedAt: new Date(),
           };
-          
+
           this.activeJobs.set(jobId, job);
           result = { ...result, jobId };
         }
@@ -562,17 +531,17 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user?.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: true,
         data: result,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('PDF processing error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/pdf/process',
@@ -580,7 +549,7 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
@@ -588,7 +557,7 @@ export class ConsolidatedPDFController {
         error: 'PDF processing failed',
         code: 'PROCESSING_ERROR',
         data: { message: error instanceof Error ? error.message : 'Unknown error' },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -597,11 +566,11 @@ export class ConsolidatedPDFController {
    * Get workflow status and progress
    */
   async getWorkflowStatus(
-    jobId: string, 
-    authContext: AuthContext
+    jobId: string,
+    authContext: AuthContext,
   ): Promise<ApiResponse<WorkflowStatusResponse>> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -609,7 +578,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -620,7 +589,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Job not found',
           code: 'NOT_FOUND',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -632,7 +601,7 @@ export class ConsolidatedPDFController {
             success: false,
             error: 'Access denied to workspace',
             code: 'FORBIDDEN',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
         }
       }
@@ -641,8 +610,8 @@ export class ConsolidatedPDFController {
       const allStages = ['pending', 'processing', 'extracting', 'transforming', 'rag-integrating', 'completed'];
       const currentStageIndex = allStages.indexOf(job.status);
       const completedStages = allStages.slice(0, Math.max(0, currentStageIndex));
-      const percentage = job.status === 'completed' ? 100 : 
-                        job.status === 'failed' ? 0 : 
+      const percentage = job.status === 'completed' ? 100 :
+                        job.status === 'failed' ? 0 :
                         Math.round((currentStageIndex / (allStages.length - 1)) * 100);
 
       const statusResponse: WorkflowStatusResponse = {
@@ -652,15 +621,15 @@ export class ConsolidatedPDFController {
           currentStage: job.status,
           completedStages,
           totalStages: allStages.length,
-          percentage
+          percentage,
         },
         results: job.results,
         error: job.error,
         timestamps: {
           created: job.createdAt.toISOString(),
           started: job.startedAt?.toISOString(),
-          completed: job.completedAt?.toISOString()
-        }
+          completed: job.completedAt?.toISOString(),
+        },
       };
 
       // Log usage
@@ -670,17 +639,17 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: true,
         data: statusResponse,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Get workflow status error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/pdf/status',
@@ -688,14 +657,14 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: false,
         error: 'Failed to get workflow status',
         code: 'STATUS_RETRIEVAL_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -704,11 +673,11 @@ export class ConsolidatedPDFController {
    * Search documents in workspace using vector similarity
    */
   async searchDocuments(
-    request: DocumentSearchRequest, 
-    authContext: AuthContext
+    request: DocumentSearchRequest,
+    authContext: AuthContext,
   ): Promise<ApiResponse<DocumentSearchResponse>> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -716,7 +685,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -727,7 +696,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Invalid request data',
           code: 'VALIDATION_ERROR',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -738,7 +707,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Access denied to workspace',
           code: 'FORBIDDEN',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -754,12 +723,12 @@ export class ConsolidatedPDFController {
               filename: 'sample.pdf',
               pageNumber: 1,
               chunkIndex: 0,
-              tags: ['sample', 'document']
-            }
-          }
+              tags: ['sample', 'document'],
+            },
+          },
         ],
         totalResults: 1,
-        searchTime: Date.now() - startTime
+        searchTime: Date.now() - startTime,
       };
 
       // Log usage
@@ -769,17 +738,17 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: true,
         data: mockResults,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Document search error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/pdf/search',
@@ -787,14 +756,14 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: false,
         error: 'Document search failed',
         code: 'SEARCH_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -803,12 +772,12 @@ export class ConsolidatedPDFController {
    * Batch process multiple PDFs
    */
   async batchProcess(
-    files: File[], 
-    options: any, 
-    authContext: AuthContext
+    files: File[],
+    options: any,
+    authContext: AuthContext,
   ): Promise<ApiResponse> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -816,14 +785,14 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
       // Process files in batches
       const batchSize = options.batchOptions?.maxConcurrency || 3;
       const results = [];
-      
+
       for (let i = 0; i < files.length; i += batchSize) {
         const batch = files.slice(i, i + batchSize);
         const batchPromises = batch.map(async (file, index) => ({
@@ -834,10 +803,10 @@ export class ConsolidatedPDFController {
             {
               documentId: `batch_${Date.now()}_${i + index}`,
               options: options.options || { extractionType: 'all' },
-              metadata: { filename: file.name, source: 'upload' }
+              metadata: { filename: file.name, source: 'upload' },
             },
-            authContext
-          )
+            authContext,
+          ),
         }));
 
         const batchResults = await Promise.all(batchPromises);
@@ -856,7 +825,7 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
@@ -864,13 +833,13 @@ export class ConsolidatedPDFController {
         data: {
           totalFiles: files.length,
           processedFiles: results.length,
-          results
+          results,
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Batch processing error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/pdf/batch',
@@ -878,14 +847,14 @@ export class ConsolidatedPDFController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: false,
         error: 'Batch processing failed',
         code: 'BATCH_PROCESSING_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -901,7 +870,7 @@ export class ConsolidatedPDFController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -910,20 +879,20 @@ export class ConsolidatedPDFController {
         totalProcessed: Array.from(this.activeJobs.values()).filter(job => job.status === 'completed').length,
         totalFailed: Array.from(this.activeJobs.values()).filter(job => job.status === 'failed').length,
         averageProcessingTime: 2500, // Mock data
-        systemHealth: 'healthy'
+        systemHealth: 'healthy',
       };
 
       return {
         success: true,
         data: metrics,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       return {
         success: false,
         error: 'Failed to get metrics',
         code: 'METRICS_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }

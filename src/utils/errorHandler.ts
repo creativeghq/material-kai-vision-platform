@@ -1,6 +1,6 @@
 /**
  * Error Handler Utility
- * 
+ *
  * Provides centralized error handling with context information,
  * logging, and standardized error responses.
  */
@@ -23,10 +23,10 @@ export class AppError extends Error {
     message: string,
     statusCode: number = 500,
     isOperational: boolean = true,
-    context?: ErrorContext
+    context?: ErrorContext,
   ) {
     super(message);
-    
+
     this.name = this.constructor.name;
     this.statusCode = statusCode;
     this.isOperational = isOperational;
@@ -72,7 +72,7 @@ export class ErrorHandler {
           error.message,
           error.statusCode,
           error.isOperational,
-          { ...error.context, ...context }
+          { ...error.context, ...context },
         );
       }
       return error;
@@ -82,11 +82,11 @@ export class ErrorHandler {
     if (error.response) {
       const statusCode = error.response.status;
       const message = error.response.data?.message || error.message || 'HTTP request failed';
-      
+
       return new AppError(message, statusCode, true, {
         ...context,
         httpStatus: statusCode,
-        responseData: error.response.data
+        responseData: error.response.data,
       });
     }
 
@@ -95,7 +95,7 @@ export class ErrorHandler {
       return new ServiceUnavailableError('Network error - service unavailable', {
         ...context,
         errorCode: error.code,
-        errorType: 'network'
+        errorType: 'network',
       });
     }
 
@@ -103,7 +103,7 @@ export class ErrorHandler {
     if (error.name === 'ZodError') {
       return new ValidationError('Validation failed', {
         ...context,
-        validationErrors: error.errors
+        validationErrors: error.errors,
       });
     }
 
@@ -112,7 +112,7 @@ export class ErrorHandler {
     return new AppError(message, 500, false, {
       ...context,
       originalError: error.name,
-      stack: error.stack
+      stack: error.stack,
     });
   }
 
@@ -125,7 +125,7 @@ export class ErrorHandler {
       statusCode: error.statusCode,
       context: error.context,
       stack: error.stack,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     if (error.statusCode >= 500) {
@@ -163,8 +163,8 @@ export class ErrorHandler {
         message: error.message,
         code: error.name,
         statusCode: error.statusCode,
-        ...(process.env.NODE_ENV === 'development' && { context: error.context })
-      }
+        ...(process.env.NODE_ENV === 'development' && { context: error.context }),
+      },
     };
   }
 
@@ -172,7 +172,7 @@ export class ErrorHandler {
    * Wrap async functions with error handling
    */
   static wrapAsync<T extends any[], R>(
-    fn: (...args: T) => Promise<R>
+    fn: (...args: T) => Promise<R>,
   ): (...args: T) => Promise<R> {
     return async (...args: T): Promise<R> => {
       try {

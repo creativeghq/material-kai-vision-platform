@@ -1,5 +1,7 @@
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+import { supabase } from '@/integrations/supabase/client';
+
 import { ConsolidatedPDFWorkflowService, ConsolidatedProcessingOptions } from './consolidatedPDFWorkflowService';
 
 export interface PDFUploadOptions {
@@ -54,7 +56,7 @@ export class PDFContentService {
    */
   static async uploadAndProcess(
     file: File,
-    options: PDFUploadOptions = {}
+    options: PDFUploadOptions = {},
   ): Promise<PDFProcessingResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -67,7 +69,7 @@ export class PDFContentService {
       // Upload file to storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('pdf-documents')
         .upload(fileName, file);
@@ -98,15 +100,15 @@ export class PDFContentService {
           generateEmbeddings: options.generateEmbeddings ?? true,
           enableSemanticAnalysis: options.enableSemanticAnalysis ?? true,
           useMivaaProcessing: true, // Always use MIVAA for processing
-          
-          
+
+
         };
 
         const workflowService = new ConsolidatedPDFWorkflowService();
         const jobId = await workflowService.startPDFProcessing(file, consolidatedOptions);
 
         toast.success('PDF processing started with MIVAA!');
-        
+
         return {
           success: true,
           processingId: jobId,
@@ -120,13 +122,13 @@ export class PDFContentService {
             categories: [],
             keyMaterials: [],
             applications: [],
-            standards: []
+            standards: [],
           },
           message: 'PDF processing started successfully with MIVAA workflow',
           workflowJobId: jobId,
           mivaaProcessingResult: null,
           embeddingsGenerated: 0,
-          chunksCreated: 0
+          chunksCreated: 0,
         };
       } else {
         // Fallback to basic processing for legacy support
@@ -136,8 +138,8 @@ export class PDFContentService {
             originalFilename: file.name,
             fileSize: file.size,
             userId: user.id,
-            options
-          }
+            options,
+          },
         });
 
         if (processingError) {
@@ -188,7 +190,7 @@ export class PDFContentService {
         materialCategories: (item.metadata as any)?.material_categories || [],
         materialsDetected: (item.metadata as any)?.materials_identified_count || 0,
         confidence: (item.metadata as any)?.confidence_score_avg || 0,
-        createdAt: item.created_at || new Date().toISOString()
+        createdAt: item.created_at || new Date().toISOString(),
       }));
 
     } catch (error) {
@@ -228,7 +230,7 @@ export class PDFContentService {
 
       return {
         processing: data,
-        knowledge: knowledgeData || null
+        knowledge: knowledgeData || null,
       };
 
     } catch (error) {
@@ -361,7 +363,7 @@ export class PDFContentService {
         successfulProcessing,
         averageConfidence: Math.round(averageConfidence * 100) / 100,
         totalMaterials,
-        recentActivity
+        recentActivity,
       };
 
     } catch (error) {

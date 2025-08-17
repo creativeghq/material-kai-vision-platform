@@ -55,8 +55,8 @@ export class SVBRDFExtractionAPI {
       const { data, error } = await supabase.functions.invoke('svbrdf-extractor', {
         body: {
           ...request,
-          user_id: user.id
-        }
+          user_id: user.id,
+        },
       });
 
       if (error) {
@@ -133,7 +133,7 @@ export class SVBRDFExtractionAPI {
       // Upload image to storage
       const timestamp = Date.now();
       const fileName = `${user.id}/${timestamp}/source_image.${file.name.split('.').pop()}`;
-      
+
       const { data, error } = await supabase.storage
         .from('material-images')
         .upload(fileName, file);
@@ -150,7 +150,7 @@ export class SVBRDFExtractionAPI {
       return await this.startExtraction({
         user_id: user.id,
         source_image_url: urlData.publicUrl,
-        material_id: materialId
+        material_id: materialId,
       });
 
     } catch (error) {
@@ -190,7 +190,7 @@ export class SVBRDFExtractionAPI {
           .filter(e => e.confidence_score)
           .reduce((acc, e) => acc + (e.confidence_score || 0), 0) / data.filter(e => e.confidence_score).length || 0,
         material_types: this.analyzeMaterialTypes(data),
-        surface_categories: this.analyzeSurfaceCategories(data)
+        surface_categories: this.analyzeSurfaceCategories(data),
       };
 
       return analytics;
@@ -246,10 +246,10 @@ export class SVBRDFExtractionAPI {
               normal: extraction.normal_map_url,
               roughness: extraction.roughness_map_url,
               metallic: extraction.metallic_map_url,
-              height: extraction.height_map_url
+              height: extraction.height_map_url,
             },
-            extraction_confidence: extraction.confidence_score
-          }
+            extraction_confidence: extraction.confidence_score,
+          },
         })
         .eq('id', extraction.material_id);
 

@@ -15,14 +15,14 @@ export {
   ErrorSeverity,
   ErrorCategory,
   type ErrorContext,
-  type ErrorDetails
+  type ErrorDetails,
 } from './AppError';
 
 // Error logging system
 export {
   ErrorLogger,
   errorLogger,
-  type LogEntry
+  type LogEntry,
 } from './ErrorLogger';
 
 // Utility functions for common error handling patterns

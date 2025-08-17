@@ -30,27 +30,27 @@ export {
   type TextEmbeddingResult,
   type MaterialAnalysisResult,
   type FeatureExtractionOptions,
-  type DeviceType
+  type DeviceType,
 } from './types';
 
 export {
   type HybridMLOptions,
-  type HybridMLResult
+  type HybridMLResult,
 } from './hybridMLService';
 
 export {
   type HybridStyleAnalysisOptions,
-  type HybridStyleResult
+  type HybridStyleResult,
 } from './hybridStyleAnalysisService';
 
 export {
   type StyleAnalysisResult,
-  type StyleAnalysisOptions
+  type StyleAnalysisOptions,
 } from './styleAnalysisService';
 
 export {
   type ServerMLRequest,
-  type ServerMLResult
+  type ServerMLResult,
 } from './serverMLService';
 
 // Import for utility functions

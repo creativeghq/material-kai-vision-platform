@@ -4,10 +4,13 @@
  * Integrates with EmbeddingGenerationService and Supabase vector operations
  */
 
-import { supabase } from "@/integrations/supabase/client";
-import { MivaaEmbeddingIntegration } from './mivaaEmbeddingIntegration';
 import { performance } from 'perf_hooks';
+
+import { supabase } from '@/integrations/supabase/client';
+
 import { AppError } from '../utils/errorHandler';
+
+import { MivaaEmbeddingIntegration } from './mivaaEmbeddingIntegration';
 
 /**
  * Document chunk interface for vector storage
@@ -156,12 +159,12 @@ export class DocumentVectorStoreService {
     averageStorageTime: 0,
     averageSearchTime: 0,
     cacheHits: 0,
-    errors: 0
+    errors: 0,
   };
 
   constructor(
     config: DocumentVectorStoreConfig,
-    embeddingService: MivaaEmbeddingIntegration
+    embeddingService: MivaaEmbeddingIntegration,
   ) {
     this.config = config;
     this.embeddingService = embeddingService;
@@ -169,7 +172,7 @@ export class DocumentVectorStoreService {
     console.log('DocumentVectorStoreService initialized', {
       embeddingModel: config.embedding.model,
       dimensions: config.embedding.dimensions,
-      tableName: config.storage.tableName
+      tableName: config.storage.tableName,
     });
   }
 
@@ -188,7 +191,7 @@ export class DocumentVectorStoreService {
       documentId: request.documentId,
       workspaceId: request.workspaceId,
       chunkCount: request.chunks.length,
-      batchSize: request.options?.batchSize || this.config.embedding.batchSize
+      batchSize: request.options?.batchSize || this.config.embedding.batchSize,
     });
 
     try {
@@ -197,7 +200,7 @@ export class DocumentVectorStoreService {
       if (request.options?.skipExisting) {
         existingChunks = await this.getExistingChunkIds(
           request.documentId,
-          request.workspaceId
+          request.workspaceId,
         );
       }
 
@@ -214,7 +217,7 @@ export class DocumentVectorStoreService {
         console.log('All chunks already exist, skipping processing', {
           documentId: request.documentId,
           totalChunks: request.chunks.length,
-          skipped
+          skipped,
         });
 
         return {
@@ -226,8 +229,8 @@ export class DocumentVectorStoreService {
             processingTime: performance.now() - startTime,
             embeddingTime: 0,
             storageTime: 0,
-            skipped
-          }
+            skipped,
+          },
         };
       }
 
@@ -244,8 +247,8 @@ export class DocumentVectorStoreService {
             this.embeddingService.generateEmbedding({
               text: chunk.content,
               model: 'text-embedding-3-large',
-              dimensions: 1536
-            })
+              dimensions: 1536,
+            }),
           );
 
           const embeddingResponses = await Promise.all(embeddingPromises);
@@ -272,10 +275,10 @@ export class DocumentVectorStoreService {
                 ...chunk.metadata,
                 chunkIndex: chunk.chunkIndex,
                 embeddingModel: embeddingResponse.model || 'text-embedding-3-large',
-                dimensions: embeddingResponse.dimensions || 1536
+                dimensions: embeddingResponse.dimensions || 1536,
               },
               created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             };
           });
 
@@ -290,9 +293,9 @@ export class DocumentVectorStoreService {
           if (insertError) {
             const error = new AppError(
               `Failed to insert vector batch: ${insertError.message}`,
-              500
+              500,
             );
-            
+
             console.error('DocumentVectorStoreService.storeBatch:', error.message);
 
             // Add all batch items to failed
@@ -300,7 +303,7 @@ export class DocumentVectorStoreService {
               failed.push({
                 chunkId: chunk.id,
                 error: error.message,
-                chunk
+                chunk,
               });
             });
           } else {
@@ -309,7 +312,7 @@ export class DocumentVectorStoreService {
               successful.push({
                 chunkId: (item as any).chunk_id,
                 vectorId: (item as any).id,
-                embedding: (item as any).embedding
+                embedding: (item as any).embedding,
               });
             });
 
@@ -321,7 +324,7 @@ export class DocumentVectorStoreService {
               // Log warning about empty embedding response
               console.warn('Empty embedding response received', {
                 batchSize: batch.length,
-                documentId: request.documentId
+                documentId: request.documentId,
               });
             }
           }
@@ -329,7 +332,7 @@ export class DocumentVectorStoreService {
         } catch (error) {
           console.error('Batch processing failed', {
             error: error instanceof Error ? error.message : String(error),
-            batchSize: batch.length
+            batchSize: batch.length,
           });
 
           // Add all batch items to failed
@@ -337,7 +340,7 @@ export class DocumentVectorStoreService {
             failed.push({
               chunkId: chunk.id,
               error: error instanceof Error ? error.message : String(error),
-              chunk
+              chunk,
             });
           });
         }
@@ -356,8 +359,8 @@ export class DocumentVectorStoreService {
           processingTime: performance.now() - startTime,
           embeddingTime,
           storageTime,
-          skipped
-        }
+          skipped,
+        },
       };
 
       console.log('Batch vector storage completed', {
@@ -367,7 +370,7 @@ export class DocumentVectorStoreService {
         failed: failed.length,
         skipped,
         processingTime: result.metrics.processingTime,
-        successRate: result.metrics.successRate
+        successRate: result.metrics.successRate,
       });
 
       return result;
@@ -377,7 +380,7 @@ export class DocumentVectorStoreService {
       console.error('Batch storage operation failed', {
         documentId: request.documentId,
         error: error instanceof Error ? error.message : String(error),
-        processingTime: performance.now() - startTime
+        processingTime: performance.now() - startTime,
       });
 
       throw error;
@@ -397,7 +400,7 @@ export class DocumentVectorStoreService {
         query: request.query.substring(0, 100),
         workspaceId: request.workspaceId,
         documentIds: request.documentIds?.length || 'all',
-        limit: request.limit || this.config.search.defaultLimit
+        limit: request.limit || this.config.search.defaultLimit,
       });
 
       // Generate query embedding
@@ -408,7 +411,7 @@ export class DocumentVectorStoreService {
         text: request.query,
         // cache_ttl: 300 // Not part of EmbeddingRequest interface
       });
-      
+
       const queryEmbedding = queryEmbeddingResponse.embedding;
       if (!queryEmbedding) {
         throw new AppError('Failed to generate query embedding', 500);
@@ -425,10 +428,10 @@ export class DocumentVectorStoreService {
           match_threshold: request.threshold || this.config.search.defaultThreshold,
           match_count: Math.min(
             request.limit || this.config.search.defaultLimit,
-            this.config.search.maxLimit
+            this.config.search.maxLimit,
           ),
-          metadata_filter: request.metadata
-        }
+          metadata_filter: request.metadata,
+        },
       });
       searchTime = performance.now() - searchStart;
 
@@ -444,7 +447,7 @@ export class DocumentVectorStoreService {
         content: match.content,
         similarity: match.similarity,
         metadata: match.metadata || {},
-        embedding: match.embedding
+        embedding: match.embedding,
       })) || [];
 
       // Update metrics
@@ -460,8 +463,8 @@ export class DocumentVectorStoreService {
           embeddingTime,
           searchTime,
           threshold: request.threshold || this.config.search.defaultThreshold,
-          workspaceId: request.workspaceId
-        }
+          workspaceId: request.workspaceId,
+        },
       };
 
       console.log('Document vector search completed', {
@@ -470,7 +473,7 @@ export class DocumentVectorStoreService {
         totalMatches: response.totalMatches,
         processingTime: response.processingTime,
         embeddingTime,
-        searchTime
+        searchTime,
       });
 
       return response;
@@ -481,7 +484,7 @@ export class DocumentVectorStoreService {
         query: request.query.substring(0, 100),
         workspaceId: request.workspaceId,
         error: error instanceof Error ? error.message : String(error),
-        processingTime: performance.now() - startTime
+        processingTime: performance.now() - startTime,
       });
 
       throw error;
@@ -511,7 +514,7 @@ export class DocumentVectorStoreService {
       console.error('Failed to delete document vectors', {
         documentId,
         workspaceId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -523,7 +526,7 @@ export class DocumentVectorStoreService {
   getMetrics() {
     return {
       ...this.metrics,
-      embeddingServiceMetrics: {} // getMetrics method not available on MivaaEmbeddingIntegration
+      embeddingServiceMetrics: {}, // getMetrics method not available on MivaaEmbeddingIntegration
     };
   }
 
@@ -542,7 +545,7 @@ export class DocumentVectorStoreService {
         console.warn('Failed to fetch existing chunk IDs', {
           documentId,
           workspaceId,
-          error: error.message
+          error: error.message,
         });
         return new Set();
       }
@@ -553,7 +556,7 @@ export class DocumentVectorStoreService {
       console.warn('Error fetching existing chunk IDs', {
         documentId,
         workspaceId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
       return new Set();
     }
@@ -563,7 +566,7 @@ export class DocumentVectorStoreService {
    * Update average storage time metric
    */
   private updateAverageStorageTime(time: number): void {
-    this.metrics.averageStorageTime = 
+    this.metrics.averageStorageTime =
       (this.metrics.averageStorageTime * (this.metrics.totalStored - 1) + time) / this.metrics.totalStored;
   }
 
@@ -571,7 +574,7 @@ export class DocumentVectorStoreService {
    * Update average search time metric
    */
   private updateAverageSearchTime(time: number): void {
-    this.metrics.averageSearchTime = 
+    this.metrics.averageSearchTime =
       (this.metrics.averageSearchTime * (this.metrics.totalSearches - 1) + time) / this.metrics.totalSearches;
   }
 
@@ -592,24 +595,24 @@ export const defaultDocumentVectorStoreConfig: DocumentVectorStoreConfig = {
   embedding: {
     model: 'text-embedding-3-small',
     dimensions: 1536,
-    batchSize: 10
+    batchSize: 10,
   },
   storage: {
     tableName: 'document_vectors',
     indexName: 'document_vectors_embedding_idx',
-    batchSize: 50
+    batchSize: 50,
   },
   search: {
     defaultLimit: 10,
     defaultThreshold: 0.7,
-    maxLimit: 100
-  }
+    maxLimit: 100,
+  },
 };
 
 // Export singleton instance factory
 export const createDocumentVectorStoreService = (
   embeddingService: MivaaEmbeddingIntegration,
-  config: Partial<DocumentVectorStoreConfig> = {}
+  config: Partial<DocumentVectorStoreConfig> = {},
 ): DocumentVectorStoreService => {
   const finalConfig = { ...defaultDocumentVectorStoreConfig, ...config };
   return new DocumentVectorStoreService(finalConfig, embeddingService);

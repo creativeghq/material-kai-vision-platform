@@ -1,10 +1,11 @@
 import { z } from 'zod';
+
 import { ValidationError } from '../middleware/validationMiddleware.js';
 import { sanitizeMarkdown } from '../utils/contentSanitizer.js';
 import { ErrorReporter } from '../utils/errorReporting.js';
 import {
   MivaaDocumentSchema,
-  PartialMivaaDocumentSchema
+  PartialMivaaDocumentSchema,
 } from '../schemas/mivaaValidation.js';
 import {
   TransformationConfigSchema,
@@ -12,7 +13,7 @@ import {
   PartialTransformationConfigSchema,
   validateTransformationConfig,
   validatePartialTransformationConfig,
-  validateTransformationJobRequest
+  validateTransformationJobRequest,
 } from '../schemas/transformationValidation.js';
 
 /**
@@ -41,52 +42,52 @@ export class ValidationIntegrationService {
       partial?: boolean;
       sanitize?: boolean;
       trackPerformance?: boolean;
-    } = {}
+    } = {},
   ): Promise<any> {
     const startTime = performance.now();
-    
+
     try {
       // Choose schema based on partial flag
       const schema = options.partial ? PartialMivaaDocumentSchema : MivaaDocumentSchema;
-      
+
       // Validate the document structure
       const validatedDocument = schema.parse(document);
-      
+
       // Sanitize content if requested
       if (options.sanitize && validatedDocument.markdown) {
         validatedDocument.markdown = sanitizeMarkdown(validatedDocument.markdown);
       }
-      
+
       // Track performance if requested
       if (options.trackPerformance) {
         const processingTime = performance.now() - startTime;
         this.recordPerformanceMetric('mivaa_document_validation', processingTime);
       }
-      
+
       return validatedDocument;
     } catch (error) {
       const processingTime = performance.now() - startTime;
-      
+
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('mivaa-document-validation');
         errorReporter.addZodErrors(error);
         const errorReport = errorReporter.generateReport();
-        
+
         // Convert ErrorDetails to ValidationError format
         const mappedErrors = errorReport.errors.map(error => ({
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value
+          value: error.value,
         }));
 
         throw new ValidationError(
           `MivaaDocument validation failed: ${errorReport.summary.totalErrors} errors found`,
           mappedErrors,
-          'MIVAA_DOCUMENT_VALIDATION'
+          'MIVAA_DOCUMENT_VALIDATION',
         );
       }
-      
+
       throw error;
     }
   }
@@ -98,42 +99,42 @@ export class ValidationIntegrationService {
     config: unknown,
     options: {
       trackPerformance?: boolean;
-    } = {}
+    } = {},
   ): Promise<any> {
     const startTime = performance.now();
-    
+
     try {
       const validatedConfig = TransformationConfigSchema.parse(config);
-      
+
       if (options.trackPerformance) {
         const processingTime = performance.now() - startTime;
         this.recordPerformanceMetric('transformation_config_validation', processingTime);
       }
-      
+
       return validatedConfig;
     } catch (error) {
       const processingTime = performance.now() - startTime;
-      
+
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('transformation-config-validation');
         errorReporter.addZodErrors(error);
         const errorReport = errorReporter.generateReport();
-        
+
         // Convert ErrorDetails to ValidationError format
         const mappedErrors = errorReport.errors.map(error => ({
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value
+          value: error.value,
         }));
 
         throw new ValidationError(
           `TransformationConfig validation failed: ${errorReport.summary.totalErrors} errors found`,
           mappedErrors,
-          'TRANSFORMATION_CONFIG_VALIDATION'
+          'TRANSFORMATION_CONFIG_VALIDATION',
         );
       }
-      
+
       throw error;
     }
   }
@@ -145,42 +146,42 @@ export class ValidationIntegrationService {
     request: unknown,
     options: {
       trackPerformance?: boolean;
-    } = {}
+    } = {},
   ): Promise<any> {
     const startTime = performance.now();
-    
+
     try {
       const validatedRequest = TransformationJobRequestSchema.parse(request);
-      
+
       if (options.trackPerformance) {
         const processingTime = performance.now() - startTime;
         this.recordPerformanceMetric('transformation_job_request_validation', processingTime);
       }
-      
+
       return validatedRequest;
     } catch (error) {
       const processingTime = performance.now() - startTime;
-      
+
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('transformation-job-request-validation');
         errorReporter.addZodErrors(error);
         const errorReport = errorReporter.generateReport();
-        
+
         // Convert ErrorDetails to ValidationError format
         const mappedErrors = errorReport.errors.map(error => ({
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value
+          value: error.value,
         }));
 
         throw new ValidationError(
           `TransformationJobRequest validation failed: ${errorReport.summary.totalErrors} errors found`,
           mappedErrors,
-          'TRANSFORMATION_JOB_VALIDATION'
+          'TRANSFORMATION_JOB_VALIDATION',
         );
       }
-      
+
       throw error;
     }
   }
@@ -192,13 +193,13 @@ export class ValidationIntegrationService {
     config: unknown,
     options: {
       trackPerformance?: boolean;
-    } = {}
+    } = {},
   ): Promise<any> {
     const startTime = performance.now();
-    
+
     try {
       const result = validatePartialTransformationConfig(config);
-      
+
       if (!result.success) {
         const errorReporter = new ErrorReporter('partial-transformation-config-validation');
         // Convert validation errors to ErrorDetails format
@@ -206,31 +207,31 @@ export class ValidationIntegrationService {
           errorReporter.addError({
             code: 'VAL_001',
             message: error.message,
-            field: error.path
+            field: error.path,
           });
         });
         const errorReport = errorReporter.generateReport();
-        
+
         // Convert ErrorDetails to ValidationError format
         const mappedErrors = errorReport.errors.map(error => ({
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value
+          value: error.value,
         }));
 
         throw new ValidationError(
           `PartialTransformationConfig validation failed: ${errorReport.summary.totalErrors} errors found`,
           mappedErrors,
-          'PARTIAL_TRANSFORMATION_CONFIG_VALIDATION'
+          'PARTIAL_TRANSFORMATION_CONFIG_VALIDATION',
         );
       }
-      
+
       if (options.trackPerformance) {
         const processingTime = performance.now() - startTime;
         this.recordPerformanceMetric('partial_transformation_config_validation', processingTime);
       }
-      
+
       return result.data;
     } catch (error) {
       if (error instanceof ValidationError) {
@@ -251,34 +252,34 @@ export class ValidationIntegrationService {
       errorHandler?: (error: any) => any;
       trackPerformance?: boolean;
       methodName?: string;
-    }
+    },
   ): T {
     const wrapper = async (...args: Parameters<T>): Promise<ReturnType<T>> => {
       const startTime = performance.now();
       const methodName = validationConfig.methodName || originalMethod.name;
-      
+
       try {
         // Validate input if validator provided
         let validatedArgs = args;
         if (validationConfig.inputValidator && args.length > 0) {
           validatedArgs[0] = await validationConfig.inputValidator(args[0]);
         }
-        
+
         // Call original method
         const result = await originalMethod.apply(this, validatedArgs);
-        
+
         // Validate output if validator provided
         let validatedResult = result;
         if (validationConfig.outputValidator) {
           validatedResult = await validationConfig.outputValidator(result);
         }
-        
+
         // Track performance if requested
         if (validationConfig.trackPerformance) {
           const processingTime = performance.now() - startTime;
           this.recordPerformanceMetric(`${methodName}_validation`, processingTime);
         }
-        
+
         return validatedResult;
       } catch (error) {
         // Handle validation errors
@@ -288,7 +289,7 @@ export class ValidationIntegrationService {
         throw error;
       }
     };
-    
+
     return wrapper as T;
   }
 
@@ -299,10 +300,10 @@ export class ValidationIntegrationService {
     if (!this.performanceMetrics.has(operation)) {
       this.performanceMetrics.set(operation, []);
     }
-    
+
     const metrics = this.performanceMetrics.get(operation)!;
     metrics.push(time);
-    
+
     // Keep only last 100 measurements to prevent memory leaks
     if (metrics.length > 100) {
       metrics.shift();
@@ -320,10 +321,10 @@ export class ValidationIntegrationService {
     p95: number;
   }> {
     const stats: Record<string, any> = {};
-    
+
     for (const [operation, times] of this.performanceMetrics.entries()) {
       if (times.length === 0) continue;
-      
+
       const sorted = [...times].sort((a, b) => a - b);
       const count = times.length;
       const sum = times.reduce((a, b) => a + b, 0);
@@ -332,16 +333,16 @@ export class ValidationIntegrationService {
       const max = sorted[sorted.length - 1] || 0;
       const p95Index = Math.floor(count * 0.95);
       const p95 = sorted[p95Index] || max;
-      
+
       stats[operation] = {
         count,
         average: Math.round(average * 100) / 100,
         min: Math.round(min * 100) / 100,
         max: Math.round(max * 100) / 100,
-        p95: Math.round(p95 * 100) / 100
+        p95: Math.round(p95 * 100) / 100,
       };
     }
-    
+
     return stats;
   }
 
@@ -356,25 +357,25 @@ export class ValidationIntegrationService {
     const stats = this.getPerformanceStats();
     const violations: string[] = [];
     const maxAllowedTime = 50; // 50ms requirement from MDTM task
-    
+
     for (const [operation, operationStats] of Object.entries(stats)) {
       if (operationStats.average > maxAllowedTime) {
         violations.push(
-          `${operation}: average ${operationStats.average}ms exceeds ${maxAllowedTime}ms limit`
+          `${operation}: average ${operationStats.average}ms exceeds ${maxAllowedTime}ms limit`,
         );
       }
-      
+
       if (operationStats.p95 > maxAllowedTime * 2) {
         violations.push(
-          `${operation}: p95 ${operationStats.p95}ms exceeds ${maxAllowedTime * 2}ms limit`
+          `${operation}: p95 ${operationStats.p95}ms exceeds ${maxAllowedTime * 2}ms limit`,
         );
       }
     }
-    
+
     return {
       meetsRequirements: violations.length === 0,
       violations,
-      stats
+      stats,
     };
   }
 

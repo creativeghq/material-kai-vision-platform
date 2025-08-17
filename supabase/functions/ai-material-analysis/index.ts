@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface AnalysisRequest {
@@ -33,12 +33,12 @@ async function analyzeWithHybridAI(imageUrl: string, analysisType: string): Prom
   try {
     const openaiResult = await analyzeWithOpenAI(imageUrl, analysisType);
     const validation = validateResult(openaiResult);
-    
+
     if (validation.score >= 0.7) {
       console.log(`OpenAI analysis successful with score: ${validation.score}`);
       return openaiResult;
     }
-    
+
     console.log(`OpenAI score ${validation.score} below threshold, trying Claude...`);
   } catch (error) {
     console.log(`OpenAI failed: ${error.message}, trying Claude...`);
@@ -48,7 +48,7 @@ async function analyzeWithHybridAI(imageUrl: string, analysisType: string): Prom
   try {
     const claudeResult = await analyzeWithClaude(imageUrl, analysisType);
     const validation = validateResult(claudeResult);
-    
+
     console.log(`Claude analysis completed with score: ${validation.score}`);
     return claudeResult;
   } catch (error) {
@@ -59,17 +59,17 @@ async function analyzeWithHybridAI(imageUrl: string, analysisType: string): Prom
 
 function validateResult(result: MaterialAnalysis): { score: number } {
   let score = 1.0;
-  
+
   if (!result.material_name || result.material_name.trim().length < 2) score -= 0.3;
   if (!result.category) score -= 0.2;
   if (result.confidence < 0.6) score -= 0.2;
   if (!result.properties || Object.keys(result.properties).length < 2) score -= 0.2;
-  
+
   const genericTerms = ['unknown', 'generic', 'standard', 'typical'];
   const responseText = JSON.stringify(result).toLowerCase();
   const genericCount = genericTerms.filter(term => responseText.includes(term)).length;
   if (genericCount > 2) score -= 0.1;
-  
+
   return { score: Math.max(0, Math.min(1, score)) };
 }
 
@@ -89,10 +89,10 @@ async function analyzeWithOpenAI(imageUrl: string, analysisType: string): Promis
     6. Relevant industry standards
     
     Respond in JSON format only.`,
-    
-    quick: `Quickly identify this material. Provide basic identification, category, and confidence score in JSON format.`,
-    
-    properties_only: `Focus on identifying the physical and mechanical properties of this material. Respond in JSON format.`
+
+    quick: 'Quickly identify this material. Provide basic identification, category, and confidence score in JSON format.',
+
+    properties_only: 'Focus on identifying the physical and mechanical properties of this material. Respond in JSON format.',
   };
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -106,27 +106,27 @@ async function analyzeWithOpenAI(imageUrl: string, analysisType: string): Promis
       messages: [
         {
           role: 'system',
-          content: 'You are an expert materials scientist with extensive knowledge of material identification, properties, and safety. Always respond with valid JSON.'
+          content: 'You are an expert materials scientist with extensive knowledge of material identification, properties, and safety. Always respond with valid JSON.',
         },
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: prompts[analysisType] || prompts.comprehensive
+              text: prompts[analysisType] || prompts.comprehensive,
             },
             {
               type: 'image_url',
               image_url: {
                 url: imageUrl,
-                detail: 'high'
-              }
-            }
-          ]
-        }
+                detail: 'high',
+              },
+            },
+          ],
+        },
       ],
       max_tokens: 1500,
-      temperature: 0.1
+      temperature: 0.1,
     }),
   });
 
@@ -137,10 +137,10 @@ async function analyzeWithOpenAI(imageUrl: string, analysisType: string): Promis
 
   const data = await response.json();
   const analysisText = data.choices[0].message.content;
-  
+
   try {
     const analysis = JSON.parse(analysisText);
-    
+
     // Generate embedding for the analysis
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
@@ -150,13 +150,13 @@ async function analyzeWithOpenAI(imageUrl: string, analysisType: string): Promis
       },
       body: JSON.stringify({
         model: 'text-embedding-3-large',
-        input: `${analysis.material_name} ${analysis.category} ${JSON.stringify(analysis.properties)}`
+        input: `${analysis.material_name} ${analysis.category} ${JSON.stringify(analysis.properties)}`,
       }),
     });
 
     const embeddingData = await embeddingResponse.json();
     analysis.embedding = embeddingData.data[0].embedding;
-    
+
     return analysis;
   } catch (error) {
     console.error('Failed to parse OpenAI response:', analysisText);
@@ -171,9 +171,9 @@ async function analyzeWithClaude(imageUrl: string, analysisType: string): Promis
   }
 
   const prompts = {
-    comprehensive: `Analyze this material image comprehensively. Provide detailed material identification, category, properties, chemical composition, safety considerations, and standards in JSON format.`,
-    quick: `Quickly identify this material with basic properties in JSON format.`,
-    properties_only: `Focus on material properties and characteristics in JSON format.`
+    comprehensive: 'Analyze this material image comprehensively. Provide detailed material identification, category, properties, chemical composition, safety considerations, and standards in JSON format.',
+    quick: 'Quickly identify this material with basic properties in JSON format.',
+    properties_only: 'Focus on material properties and characteristics in JSON format.',
   };
 
   // Download and convert image to base64 for Claude
@@ -186,7 +186,7 @@ async function analyzeWithClaude(imageUrl: string, analysisType: string): Promis
     headers: {
       'Authorization': `Bearer ${claudeKey}`,
       'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
@@ -195,19 +195,19 @@ async function analyzeWithClaude(imageUrl: string, analysisType: string): Promis
           role: 'user',
           content: [
             { type: 'text', text: prompts[analysisType] || prompts.comprehensive },
-            { 
-              type: 'image', 
+            {
+              type: 'image',
               source: {
                 type: 'base64',
                 media_type: 'image/jpeg',
-                data: base64Image
-              }
-            }
-          ]
-        }
+                data: base64Image,
+              },
+            },
+          ],
+        },
       ],
       max_tokens: 1500,
-      system: 'You are an expert materials scientist. Respond with valid JSON containing: material_name, category (metals/plastics/ceramics/composites/textiles/wood/glass/rubber/concrete/other), confidence (0-1), properties, chemical_composition, safety_considerations, standards.'
+      system: 'You are an expert materials scientist. Respond with valid JSON containing: material_name, category (metals/plastics/ceramics/composites/textiles/wood/glass/rubber/concrete/other), confidence (0-1), properties, chemical_composition, safety_considerations, standards.',
     }),
   });
 
@@ -218,7 +218,7 @@ async function analyzeWithClaude(imageUrl: string, analysisType: string): Promis
 
   const data = await response.json();
   const analysisText = data.content[0].text;
-  
+
   try {
     return JSON.parse(analysisText);
   } catch (error) {
@@ -231,7 +231,7 @@ async function findSimilarMaterials(embedding: number[], limit = 5) {
   const { data, error } = await supabase.rpc('vector_similarity_search', {
     query_embedding: `[${embedding.join(',')}]`,
     match_threshold: 0.7,
-    match_count: limit
+    match_count: limit,
   });
 
   if (error) {
@@ -244,7 +244,7 @@ async function findSimilarMaterials(embedding: number[], limit = 5) {
 
 async function processAnalysis(request: AnalysisRequest) {
   const startTime = Date.now();
-  
+
   try {
     // Get file information
     const { data: file, error: fileError } = await supabase
@@ -263,10 +263,10 @@ async function processAnalysis(request: AnalysisRequest) {
       .getPublicUrl(file.storage_path);
 
     console.log(`Analyzing image with OpenAI: ${urlData.publicUrl}`);
-    
+
     // Analyze with Hybrid AI (OpenAI + Claude with fallback)
     const analysis = await analyzeWithHybridAI(urlData.publicUrl, request.analysis_type);
-    
+
     // Find similar materials if requested
     let similarMaterials = [];
     if (request.include_similar && analysis.embedding) {
@@ -293,10 +293,10 @@ async function processAnalysis(request: AnalysisRequest) {
             chemical_composition: analysis.chemical_composition || {},
             safety_data: {
               considerations: analysis.safety_considerations || [],
-              handling_requirements: []
+              handling_requirements: [],
             },
             standards: analysis.standards || [],
-            embedding: `[${analysis.embedding.join(',')}]`
+            embedding: `[${analysis.embedding.join(',')}]`,
           })
           .select('id')
           .single();
@@ -321,7 +321,7 @@ async function processAnalysis(request: AnalysisRequest) {
         properties_detected: analysis.properties || {},
         processing_time_ms: Date.now() - startTime,
         user_verified: false,
-        embedding: analysis.embedding ? `[${analysis.embedding.join(',')}]` : null
+        embedding: analysis.embedding ? `[${analysis.embedding.join(',')}]` : null,
       })
       .select()
       .single();
@@ -343,8 +343,8 @@ async function processAnalysis(request: AnalysisRequest) {
           analysis_type: request.analysis_type,
           confidence: analysis.confidence,
           material_category: analysis.category,
-          processing_time_ms: Date.now() - startTime
-        }
+          processing_time_ms: Date.now() - startTime,
+        },
       });
 
     return {
@@ -352,7 +352,7 @@ async function processAnalysis(request: AnalysisRequest) {
       result,
       analysis,
       similar_materials: similarMaterials,
-      processing_time_ms: Date.now() - startTime
+      processing_time_ms: Date.now() - startTime,
     };
 
   } catch (error) {
@@ -368,16 +368,16 @@ Deno.serve(async (req) => {
 
   try {
     const request: AnalysisRequest = await req.json();
-    
+
     console.log('Processing AI analysis request:', request);
 
     if (!request.file_id) {
       return new Response(
         JSON.stringify({ error: 'file_id is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -385,23 +385,23 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('AI material analysis error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'AI analysis failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'AI analysis failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

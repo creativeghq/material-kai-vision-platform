@@ -45,6 +45,355 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_tasks: {
+        Row: {
+          id: string
+          user_id: string | null
+          workspace_id: string | null
+          task_name: string
+          task_type: string
+          task_status: string
+          priority: string
+          description: string | null
+          input_data: Json
+          output_data: Json
+          task_config: Json
+          progress_percentage: number
+          error_message: string | null
+          processing_time_ms: number | null
+          estimated_completion_time: string | null
+          dependencies: Json
+          parent_task_id: string | null
+          assigned_agent: string | null
+          tags: Json
+          metadata: Json
+          created_at: string | null
+          updated_at: string | null
+          started_at: string | null
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          workspace_id?: string | null
+          task_name: string
+          task_type: string
+          task_status?: string
+          priority?: string
+          description?: string | null
+          input_data?: Json
+          output_data?: Json
+          task_config?: Json
+          progress_percentage?: number
+          error_message?: string | null
+          processing_time_ms?: number | null
+          estimated_completion_time?: string | null
+          dependencies?: Json
+          parent_task_id?: string | null
+          assigned_agent?: string | null
+          tags?: Json
+          metadata?: Json
+          created_at?: string | null
+          updated_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          workspace_id?: string | null
+          task_name?: string
+          task_type?: string
+          task_status?: string
+          priority?: string
+          description?: string | null
+          input_data?: Json
+          output_data?: Json
+          task_config?: Json
+          progress_percentage?: number
+          error_message?: string | null
+          processing_time_ms?: number | null
+          estimated_completion_time?: string | null
+          dependencies?: Json
+          parent_task_id?: string | null
+          assigned_agent?: string | null
+          tags?: Json
+          metadata?: Json
+          created_at?: string | null
+          updated_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'agent_tasks_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'agent_tasks_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'agent_tasks_parent_task_id_fkey'
+            columns: ['parent_task_id']
+            isOneToOne: false
+            referencedRelation: 'agent_tasks'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      analytics_events: {
+        Row: {
+          id: string
+          user_id: string | null
+          event_type: string
+          event_data: Json
+          session_id: string | null
+          ip_address: string | null
+          user_agent: string | null
+          page_url: string | null
+          referrer: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          event_type: string
+          event_data?: Json
+          session_id?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          page_url?: string | null
+          referrer?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          event_type?: string
+          event_data?: Json
+          session_id?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          page_url?: string | null
+          referrer?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'analytics_events_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      api_keys: {
+        Row: {
+          id: string
+          api_key: string
+          user_id: string | null
+          name: string
+          is_active: boolean
+          allowed_endpoints: Json
+          expires_at: string | null
+          last_used_at: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          api_key: string
+          user_id?: string | null
+          name: string
+          is_active?: boolean
+          allowed_endpoints?: Json
+          expires_at?: string | null
+          last_used_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          api_key?: string
+          user_id?: string | null
+          name?: string
+          is_active?: boolean
+          allowed_endpoints?: Json
+          expires_at?: string | null
+          last_used_at?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'api_keys_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      api_usage_logs: {
+        Row: {
+          id: string
+          api_key_id: string
+          endpoint: string
+          method: string
+          status_code: number
+          response_time_ms: number | null
+          request_size_bytes: number | null
+          response_size_bytes: number | null
+          ip_address: string | null
+          user_agent: string | null
+          error_message: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          api_key_id: string
+          endpoint: string
+          method: string
+          status_code: number
+          response_time_ms?: number | null
+          request_size_bytes?: number | null
+          response_size_bytes?: number | null
+          ip_address?: string | null
+          user_agent?: string | null
+          error_message?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          api_key_id?: string
+          endpoint?: string
+          method?: string
+          status_code?: number
+          response_time_ms?: number | null
+          request_size_bytes?: number | null
+          response_size_bytes?: number | null
+          ip_address?: string | null
+          user_agent?: string | null
+          error_message?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'api_usage_logs_api_key_id_fkey'
+            columns: ['api_key_id']
+            isOneToOne: false
+            referencedRelation: 'api_keys'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      generation_3d: {
+        Row: {
+          id: string
+          user_id: string | null
+          workspace_id: string | null
+          generation_name: string
+          generation_type: string
+          generation_status: string
+          input_data: Json
+          output_data: Json
+          generation_config: Json
+          progress_percentage: number
+          error_message: string | null
+          processing_time_ms: number | null
+          estimated_completion_time: string | null
+          file_urls: Json
+          preview_url: string | null
+          download_url: string | null
+          file_size_bytes: number | null
+          quality_score: number | null
+          tags: Json
+          metadata: Json
+          created_at: string | null
+          updated_at: string | null
+          started_at: string | null
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          workspace_id?: string | null
+          generation_name: string
+          generation_type: string
+          generation_status?: string
+          input_data?: Json
+          output_data?: Json
+          generation_config?: Json
+          progress_percentage?: number
+          error_message?: string | null
+          processing_time_ms?: number | null
+          estimated_completion_time?: string | null
+          file_urls?: Json
+          preview_url?: string | null
+          download_url?: string | null
+          file_size_bytes?: number | null
+          quality_score?: number | null
+          tags?: Json
+          metadata?: Json
+          created_at?: string | null
+          updated_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          workspace_id?: string | null
+          generation_name?: string
+          generation_type?: string
+          generation_status?: string
+          input_data?: Json
+          output_data?: Json
+          generation_config?: Json
+          progress_percentage?: number
+          error_message?: string | null
+          processing_time_ms?: number | null
+          estimated_completion_time?: string | null
+          file_urls?: Json
+          preview_url?: string | null
+          download_url?: string | null
+          file_size_bytes?: number | null
+          quality_score?: number | null
+          tags?: Json
+          metadata?: Json
+          created_at?: string | null
+          updated_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'generation_3d_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'generation_3d_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       scraped_materials_temp: {
         Row: {
           id: string
@@ -102,11 +451,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "scraped_materials_temp_session_id_fkey"
-            columns: ["session_id"]
+            foreignKeyName: 'scraped_materials_temp_session_id_fkey'
+            columns: ['session_id']
             isOneToOne: false
-            referencedRelation: "scraping_sessions"
-            referencedColumns: ["id"]
+            referencedRelation: 'scraping_sessions'
+            referencedColumns: ['id']
           }
         ]
       }
@@ -203,11 +552,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "scraping_pages_session_id_fkey"
-            columns: ["session_id"]
+            foreignKeyName: 'scraping_pages_session_id_fkey'
+            columns: ['session_id']
             isOneToOne: false
-            referencedRelation: "scraping_sessions"
-            referencedColumns: ["id"]
+            referencedRelation: 'scraping_sessions'
+            referencedColumns: ['id']
           }
         ]
       }
@@ -370,23 +719,23 @@ export type Database = {
 
 export type Tables<
   PublicTableNameOrOptions extends
-    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
+    | keyof (Database['public']['Tables'] & Database['public']['Views'])
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    ? keyof (Database[PublicTableNameOrOptions['schema']]['Tables'] &
+        Database[PublicTableNameOrOptions['schema']]['Views'])
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? (Database[PublicTableNameOrOptions['schema']]['Tables'] &
+      Database[PublicTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] &
-        Database["public"]["Views"])
-    ? (Database["public"]["Tables"] &
-        Database["public"]["Views"])[PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof (Database['public']['Tables'] &
+        Database['public']['Views'])
+    ? (Database['public']['Tables'] &
+        Database['public']['Views'])[PublicTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -395,19 +744,19 @@ export type Tables<
 
 export type TablesInsert<
   PublicTableNameOrOptions extends
-    | keyof Database["public"]["Tables"]
+    | keyof Database['public']['Tables']
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
-    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof Database['public']['Tables']
+    ? Database['public']['Tables'][PublicTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -416,19 +765,19 @@ export type TablesInsert<
 
 export type TablesUpdate<
   PublicTableNameOrOptions extends
-    | keyof Database["public"]["Tables"]
+    | keyof Database['public']['Tables']
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
-    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof Database['public']['Tables']
+    ? Database['public']['Tables'][PublicTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -437,13 +786,13 @@ export type TablesUpdate<
 
 export type Enums<
   PublicEnumNameOrOptions extends
-    | keyof Database["public"]["Enums"]
+    | keyof Database['public']['Enums']
     | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof Database[PublicEnumNameOrOptions['schema']]['Enums']
     : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
-    ? Database["public"]["Enums"][PublicEnumNameOrOptions]
+  ? Database[PublicEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : PublicEnumNameOrOptions extends keyof Database['public']['Enums']
+    ? Database['public']['Enums'][PublicEnumNameOrOptions]
     : never

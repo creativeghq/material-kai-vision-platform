@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface SearchRequest {
@@ -59,7 +59,7 @@ async function generateQueryEmbedding(query: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: 'text-embedding-3-large',
-      input: query
+      input: query,
     }),
   });
 
@@ -73,17 +73,17 @@ async function generateQueryEmbedding(query: string): Promise<number[]> {
 }
 
 async function performSemanticSearch(
-  embedding: number[], 
-  documentTypes: string[], 
-  limit: number, 
-  threshold: number
+  embedding: number[],
+  documentTypes: string[],
+  limit: number,
+  threshold: number,
 ): Promise<SearchResult[]> {
-  
+
   let query = supabase
     .rpc('vector_similarity_search', {
       query_embedding: `[${embedding.join(',')}]`,
       match_threshold: threshold,
-      match_count: limit
+      match_count: limit,
     });
 
   const { data, error } = await query;
@@ -102,16 +102,16 @@ async function performSemanticSearch(
     metadata: item.metadata || {},
     file_path: item.file_path,
     page_number: item.page_number,
-    section: item.section
+    section: item.section,
   }));
 }
 
 async function performKeywordSearch(
-  query: string, 
-  documentTypes: string[], 
-  limit: number
+  query: string,
+  documentTypes: string[],
+  limit: number,
 ): Promise<SearchResult[]> {
-  
+
   let queryBuilder = supabase
     .from('documents')
     .select(`
@@ -126,7 +126,7 @@ async function performKeywordSearch(
     `)
     .textSearch('content', query, {
       type: 'websearch',
-      config: 'english'
+      config: 'english',
     })
     .limit(limit);
 
@@ -150,7 +150,7 @@ async function performKeywordSearch(
     metadata: item.metadata || {},
     file_path: item.file_path,
     page_number: item.page_number,
-    section: item.section
+    section: item.section,
   }));
 }
 
@@ -159,23 +159,23 @@ async function performHybridSearch(
   embedding: number[],
   documentTypes: string[],
   limit: number,
-  threshold: number
+  threshold: number,
 ): Promise<SearchResult[]> {
-  
+
   // Perform both searches in parallel
   const [semanticResults, keywordResults] = await Promise.all([
     performSemanticSearch(embedding, documentTypes, Math.ceil(limit * 0.7), threshold),
-    performKeywordSearch(query, documentTypes, Math.ceil(limit * 0.5))
+    performKeywordSearch(query, documentTypes, Math.ceil(limit * 0.5)),
   ]);
 
   // Combine and deduplicate results
   const combinedResults = new Map<string, SearchResult>();
-  
+
   // Add semantic results with higher weight
   semanticResults.forEach(result => {
     combinedResults.set(result.document_id, {
       ...result,
-      similarity_score: result.similarity_score * 1.1 // Boost semantic scores
+      similarity_score: result.similarity_score * 1.1, // Boost semantic scores
     });
   });
 
@@ -209,11 +209,11 @@ async function logSearchEvent(request: SearchRequest, results: SearchResult[], p
           query: request.query,
           search_type: request.search_type,
           results_count: results.length,
-          avg_similarity: results.length > 0 ? 
+          avg_similarity: results.length > 0 ?
             results.reduce((sum, r) => sum + r.similarity_score, 0) / results.length : 0,
           processing_time_ms: processingTime,
-          document_types_filter: request.document_types || []
-        }
+          document_types_filter: request.document_types || [],
+        },
       });
   } catch (error) {
     console.error('Failed to log search event:', error);
@@ -222,40 +222,40 @@ async function logSearchEvent(request: SearchRequest, results: SearchResult[], p
 
 async function processDocumentSearch(request: SearchRequest): Promise<VectorSearchResponse> {
   const startTime = Date.now();
-  
+
   try {
     console.log(`Processing ${request.search_type} search for: "${request.query}"`);
-    
+
     const limit = request.limit || 10;
     const threshold = request.threshold || 0.7;
     const documentTypes = request.document_types || [];
-    
+
     let results: SearchResult[] = [];
-    
+
     switch (request.search_type) {
       case 'semantic': {
         const embedding = await generateQueryEmbedding(request.query);
         results = await performSemanticSearch(embedding, documentTypes, limit, threshold);
         break;
       }
-      
+
       case 'keyword': {
         results = await performKeywordSearch(request.query, documentTypes, limit);
         break;
       }
-      
+
       case 'hybrid': {
         const embedding = await generateQueryEmbedding(request.query);
         results = await performHybridSearch(request.query, embedding, documentTypes, limit, threshold);
         break;
       }
-      
+
       default:
         throw new Error(`Unsupported search type: ${request.search_type}`);
     }
 
     const processingTime = Date.now() - startTime;
-    
+
     // Log the search event
     await logSearchEvent(request, results, processingTime);
 
@@ -266,8 +266,8 @@ async function processDocumentSearch(request: SearchRequest): Promise<VectorSear
         query: request.query,
         search_type: request.search_type,
         processing_time_ms: processingTime,
-        embedding_model: 'text-embedding-3-large'
-      }
+        embedding_model: 'text-embedding-3-large',
+      },
     };
 
   } catch (error) {
@@ -283,30 +283,30 @@ serve(async (req) => {
 
   try {
     const request: SearchRequest = await req.json();
-    
+
     console.log('Processing document search request:', {
       query: request.query,
       search_type: request.search_type,
-      limit: request.limit || 10
+      limit: request.limit || 10,
     });
 
     if (!request.query || request.query.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: 'query is required and cannot be empty' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
     if (!['semantic', 'keyword', 'hybrid'].includes(request.search_type)) {
       return new Response(
         JSON.stringify({ error: 'search_type must be one of: semantic, keyword, hybrid' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -314,23 +314,23 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Document vector search error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Document search failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Document search failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

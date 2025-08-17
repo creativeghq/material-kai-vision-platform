@@ -1,10 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
 import {
   BarChart3,
@@ -35,11 +29,17 @@ import {
   RefreshCw,
   Download,
   Filter,
-  MoreHorizontal
+  MoreHorizontal,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
 
 // Types for our data structures
 type SystemMetrics = {
@@ -74,27 +74,27 @@ type Config = {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState('overview');
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
     cpu: 45,
     memory: 68,
     disk: 32,
     network: 12,
-    uptime: "15 days, 4 hours",
+    uptime: '15 days, 4 hours',
     activeUsers: 23,
     totalRequests: 8432,
     errorRate: 0.2,
     processedDocuments: 0,
     knowledgeEntries: 0,
-    activeSessions: 0
+    activeSessions: 0,
   });
   const [users, setUsers] = useState<User[]>([]);
   const [configs, setConfigs] = useState<Config[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [userFilter, setUserFilter] = useState("");
-  const [configFilter, setConfigFilter] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [userFilter, setUserFilter] = useState('');
+  const [configFilter, setConfigFilter] = useState('');
+  const [, setLoading] = useState(true);
+  const [, setError] = useState<string | null>(null);
 
   // Load real data from Supabase
   useEffect(() => {
@@ -108,10 +108,10 @@ const AdminDashboard: React.FC = () => {
 
       // Load system metrics from database
       await loadSystemMetrics();
-      
+
       // Load users from workspaces (simplified user management)
       await loadUsers();
-      
+
       // Load configurations from workspace settings
       await loadConfigurations();
 
@@ -164,7 +164,7 @@ const AdminDashboard: React.FC = () => {
         knowledgeEntries: knowledgeEntries || 0,
         activeSessions: activeSessions || 0,
         totalRequests,
-        errorRate: Number(errorRate.toFixed(2))
+        errorRate: Number(errorRate.toFixed(2)),
       }));
     } catch (err) {
       console.error('Error loading system metrics:', err);
@@ -190,7 +190,7 @@ const AdminDashboard: React.FC = () => {
         status: 'Active',
         lastLogin: workspace.updated_at ?
           new Date(workspace.updated_at).toLocaleDateString() :
-          'Never'
+          'Never',
       })) || [];
 
       setUsers(userList);
@@ -211,10 +211,10 @@ const AdminDashboard: React.FC = () => {
 
       // Default configurations with some from workspace settings
       const defaultConfigs: Config[] = [
-        { key: "max_upload_size", value: "100MB", category: "File Processing", description: "Maximum file size for uploads" },
-        { key: "session_timeout", value: "30 minutes", category: "Security", description: "User session timeout duration" },
-        { key: "api_rate_limit", value: "1000/hour", category: "API", description: "API requests per hour limit" },
-        { key: "backup_frequency", value: "Daily", category: "System", description: "Automated backup frequency" }
+        { key: 'max_upload_size', value: '100MB', category: 'File Processing', description: 'Maximum file size for uploads' },
+        { key: 'session_timeout', value: '30 minutes', category: 'Security', description: 'User session timeout duration' },
+        { key: 'api_rate_limit', value: '1000/hour', category: 'API', description: 'API requests per hour limit' },
+        { key: 'backup_frequency', value: 'Daily', category: 'System', description: 'Automated backup frequency' },
       ];
 
       // Add workspace-specific settings if available
@@ -224,8 +224,8 @@ const AdminDashboard: React.FC = () => {
           defaultConfigs.push({
             key,
             value: String(value),
-            category: "Workspace",
-            description: `Workspace setting: ${key}`
+            category: 'Workspace',
+            description: `Workspace setting: ${key}`,
           });
         });
       }
@@ -235,10 +235,10 @@ const AdminDashboard: React.FC = () => {
       console.error('Error loading configurations:', err);
       // Set default configs on error
       setConfigs([
-        { key: "max_upload_size", value: "100MB", category: "File Processing", description: "Maximum file size for uploads" },
-        { key: "session_timeout", value: "30 minutes", category: "Security", description: "User session timeout duration" },
-        { key: "api_rate_limit", value: "1000/hour", category: "API", description: "API requests per hour limit" },
-        { key: "backup_frequency", value: "Daily", category: "System", description: "Automated backup frequency" }
+        { key: 'max_upload_size', value: '100MB', category: 'File Processing', description: 'Maximum file size for uploads' },
+        { key: 'session_timeout', value: '30 minutes', category: 'Security', description: 'User session timeout duration' },
+        { key: 'api_rate_limit', value: '1000/hour', category: 'API', description: 'API requests per hour limit' },
+        { key: 'backup_frequency', value: 'Daily', category: 'System', description: 'Automated backup frequency' },
       ]);
     }
   };
@@ -250,7 +250,7 @@ const AdminDashboard: React.FC = () => {
         ...prev,
         cpu: Math.max(10, Math.min(90, prev.cpu + (Math.random() - 0.5) * 10)),
         memory: Math.max(20, Math.min(95, prev.memory + (Math.random() - 0.5) * 8)),
-        network: Math.max(0, Math.min(100, prev.network + (Math.random() - 0.5) * 20))
+        network: Math.max(0, Math.min(100, prev.network + (Math.random() - 0.5) * 20)),
       }));
     }, 3000);
 
@@ -270,12 +270,12 @@ const AdminDashboard: React.FC = () => {
   const handleConfigUpdate = async (key: string, newValue: string) => {
     try {
       setConfigs(prev => prev.map(config =>
-        config.key === key ? { ...config, value: newValue } : config
+        config.key === key ? { ...config, value: newValue } : config,
       ));
 
       // Update workspace settings in database if it's a workspace setting
       const config = configs.find(c => c.key === key);
-      if (config?.category === "Workspace") {
+      if (config?.category === 'Workspace') {
         const { data: workspaces } = await supabase
           .from('workspaces')
           .select('id, settings')
@@ -301,97 +301,97 @@ const AdminDashboard: React.FC = () => {
   const filteredUsers = users.filter((user: User) =>
     user.name.toLowerCase().includes(userFilter.toLowerCase()) ||
     user.email.toLowerCase().includes(userFilter.toLowerCase()) ||
-    user.role.toLowerCase().includes(userFilter.toLowerCase())
+    user.role.toLowerCase().includes(userFilter.toLowerCase()),
   );
 
   const filteredConfigs = configs.filter((config: Config) =>
     config.key.toLowerCase().includes(configFilter.toLowerCase()) ||
     config.category.toLowerCase().includes(configFilter.toLowerCase()) ||
-    config.description.toLowerCase().includes(configFilter.toLowerCase())
+    config.description.toLowerCase().includes(configFilter.toLowerCase()),
   );
 
   const adminSections = [
     {
-      title: "PDF Knowledge Base",
-      description: "Upload and process PDF documents for material knowledge extraction",
+      title: 'PDF Knowledge Base',
+      description: 'Upload and process PDF documents for material knowledge extraction',
       icon: FileText,
-      path: "/admin/pdf-processing",
-      status: "active",
-      count: "Primary system",
-      priority: 1
+      path: '/admin/pdf-processing',
+      status: 'active',
+      count: 'Primary system',
+      priority: 1,
     },
     {
-      title: "Search Hub",
-      description: "Multi-modal search interface with text, image, and hybrid capabilities",
+      title: 'Search Hub',
+      description: 'Multi-modal search interface with text, image, and hybrid capabilities',
       icon: Search,
-      path: "/admin/search-hub",
-      status: "active",
-      count: "Enhanced search",
-      priority: 2
+      path: '/admin/search-hub',
+      status: 'active',
+      count: 'Enhanced search',
+      priority: 2,
     },
     {
-      title: "3D Material Suggestions",
-      description: "AI-powered material recommendations for 3D generation",
+      title: '3D Material Suggestions',
+      description: 'AI-powered material recommendations for 3D generation',
       icon: Brain,
-      path: "/admin/3d-suggestions",
-      status: "active",
-      count: "PDF-integrated",
-      priority: 3
+      path: '/admin/3d-suggestions',
+      status: 'active',
+      count: 'PDF-integrated',
+      priority: 3,
     },
     {
-      title: "3D Model Debugging",
-      description: "Monitor and debug AI model performance for 3D generation",
+      title: '3D Model Debugging',
+      description: 'Monitor and debug AI model performance for 3D generation',
       icon: Microscope,
-      path: "/admin/3d-model-debugging",
-      status: "active",
-      count: "7 models",
-      priority: 4
+      path: '/admin/3d-model-debugging',
+      status: 'active',
+      count: '7 models',
+      priority: 4,
     },
     {
-      title: "Material Scraper",
-      description: "Scrape material data from websites and external sources",
+      title: 'Material Scraper',
+      description: 'Scrape material data from websites and external sources',
       icon: Globe,
-      path: "/admin/material-scraper",
-      status: "active",
-      count: "Web scraping",
-      priority: 5
+      path: '/admin/material-scraper',
+      status: 'active',
+      count: 'Web scraping',
+      priority: 5,
     },
     {
-      title: "Knowledge Base Management",
-      description: "Manage enhanced knowledge base entries from PDF processing",
+      title: 'Knowledge Base Management',
+      description: 'Manage enhanced knowledge base entries from PDF processing',
       icon: DatabaseIcon,
-      path: "/admin/knowledge-base",
-      status: "active",
-      count: "1,247 entries",
-      priority: 6
+      path: '/admin/knowledge-base',
+      status: 'active',
+      count: '1,247 entries',
+      priority: 6,
     },
     {
-      title: "Analytics Dashboard",
-      description: "System performance metrics and usage analytics",
+      title: 'Analytics Dashboard',
+      description: 'System performance metrics and usage analytics',
       icon: BarChart3,
-      path: "/admin/analytics",
-      status: "active",
-      count: "Real-time",
-      priority: 7
+      path: '/admin/analytics',
+      status: 'active',
+      count: 'Real-time',
+      priority: 7,
     },
     {
-      title: "API Gateway",
-      description: "Manage API endpoints and access control",
+      title: 'API Gateway',
+      description: 'Manage API endpoints and access control',
       icon: Shield,
-      path: "/admin/api-gateway",
-      status: "active",
-      count: "12 endpoints",
-      priority: 8
+      path: '/admin/api-gateway',
+      status: 'active',
+      count: '12 endpoints',
+      priority: 8,
     },
     {
-      title: "System Performance",
-      description: "Monitor processing queues and system health",
+      title: 'System Performance',
+      description: 'Monitor processing queues and system health',
       icon: Activity,
-      path: "/admin/performance",
-      status: "active",
-      count: "99.8% uptime",
-      priority: 9
-    }
+      path: '/admin/performance',
+      status: 'active',
+      count: '99.8% uptime',
+      priority: 9,
+    },
   ];
 
   const getStatusColor = (status: string) => {
@@ -671,7 +671,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Error Rate</span>
-                    <Badge className={`px-2 py-1 border border-gray-300 bg-white ${systemMetrics.errorRate > 1 ? "text-red-600" : "text-green-600"}`}>
+                    <Badge className={`px-2 py-1 border border-gray-300 bg-white ${systemMetrics.errorRate > 1 ? 'text-red-600' : 'text-green-600'}`}>
                       {systemMetrics.errorRate > 1 ? <AlertTriangle className="h-3 w-3 mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
                       {systemMetrics.errorRate}%
                     </Badge>

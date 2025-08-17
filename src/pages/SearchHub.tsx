@@ -1,5 +1,6 @@
 import React from 'react';
-import { CrewAISearchInterface } from '@/components/AI/CrewAISearchInterface';
+
+import { MaterialAgentSearchInterface } from '@/components/AI/MaterialAgentSearchInterface';
 
 const SearchHubPage: React.FC = () => {
   return (
@@ -8,11 +9,11 @@ const SearchHubPage: React.FC = () => {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">AI Search Hub</h1>
           <p className="text-muted-foreground">
-            Intelligent material research powered by CrewAI agents
+            Intelligent material research powered by Material Agent Orchestrator
           </p>
         </div>
-        
-        <CrewAISearchInterface
+
+        <MaterialAgentSearchInterface
           onMaterialSelect={(materialId) => {
             console.log('Material selected:', materialId);
             window.location.href = `/catalog?material=${materialId}`;

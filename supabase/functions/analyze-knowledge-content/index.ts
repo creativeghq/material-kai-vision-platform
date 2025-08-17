@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface AnalysisRequest {
@@ -47,8 +47,8 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
   }
 
   const prompts = {
-    surface: `Analyze this content briefly. Identify main topics, key materials mentioned, and provide a summary. Focus on extracting actionable insights.`,
-    
+    surface: 'Analyze this content briefly. Identify main topics, key materials mentioned, and provide a summary. Focus on extracting actionable insights.',
+
     detailed: `Perform detailed analysis of this content. Extract:
     1. Comprehensive summary
     2. Key topics and themes
@@ -58,7 +58,7 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
     6. Actionable insights and recommendations
     
     Provide structured analysis in JSON format.`,
-    
+
     comprehensive: `Perform comprehensive knowledge analysis of this content. Extract:
     1. Detailed content summary
     2. All key topics and subtopics
@@ -70,7 +70,7 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
     8. Related concepts for further exploration
     9. Confidence assessment of the analysis
     
-    Respond with detailed JSON structure.`
+    Respond with detailed JSON structure.`,
   };
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -84,15 +84,15 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
       messages: [
         {
           role: 'system',
-          content: `You are an expert knowledge analyst specializing in technical content analysis, particularly in materials science, engineering, and related domains. Analyze content for key insights, entities, and actionable information. Always respond with valid JSON matching the KnowledgeAnalysis interface.`
+          content: 'You are an expert knowledge analyst specializing in technical content analysis, particularly in materials science, engineering, and related domains. Analyze content for key insights, entities, and actionable information. Always respond with valid JSON matching the KnowledgeAnalysis interface.',
         },
         {
           role: 'user',
-          content: `${prompts[analysisDepth] || prompts.comprehensive}\n\nContent to analyze:\n${content}`
-        }
+          content: `${prompts[analysisDepth] || prompts.comprehensive}\n\nContent to analyze:\n${content}`,
+        },
       ],
       max_tokens: 2000,
-      temperature: 0.1
+      temperature: 0.1,
     }),
   });
 
@@ -103,7 +103,7 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
 
   const data = await response.json();
   const analysisText = data.choices[0].message.content;
-  
+
   try {
     return JSON.parse(analysisText);
   } catch (error) {
@@ -126,7 +126,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: 'text-embedding-3-large',
-      input: text.substring(0, 8000) // Limit input length
+      input: text.substring(0, 8000), // Limit input length
     }),
   });
 
@@ -143,7 +143,7 @@ async function findSimilarContent(embedding: number[], limit = 5) {
   const { data, error } = await supabase.rpc('vector_similarity_search', {
     query_embedding: `[${embedding.join(',')}]`,
     match_threshold: 0.75,
-    match_count: limit
+    match_count: limit,
   });
 
   if (error) {
@@ -173,7 +173,7 @@ async function storeKnowledgeAnalysis(analysis: KnowledgeAnalysis, request: Anal
       confidence: analysis.confidence,
       embedding: `[${embedding.join(',')}]`,
       user_id: request.user_id,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     })
     .select()
     .single();
@@ -196,23 +196,23 @@ async function generateContentHash(content: string): Promise<string> {
 
 async function processKnowledgeAnalysis(request: AnalysisRequest) {
   const startTime = Date.now();
-  
+
   try {
     console.log(`Analyzing content with depth: ${request.analysis_depth}`);
-    
+
     // Analyze content with AI
     const analysis = await analyzeContentWithAI(request.content, request.analysis_depth);
-    
+
     // Generate embedding for similarity search
     const embeddingText = `${analysis.content_summary} ${analysis.key_topics.join(' ')} ${analysis.knowledge_domains.join(' ')}`;
     const embedding = await generateEmbedding(embeddingText);
-    
+
     // Find similar content
     const similarContent = await findSimilarContent(embedding);
-    
+
     // Store the analysis
     const storedAnalysis = await storeKnowledgeAnalysis(analysis, request, embedding);
-    
+
     // Log analytics
     if (request.user_id) {
       await supabase
@@ -226,8 +226,8 @@ async function processKnowledgeAnalysis(request: AnalysisRequest) {
             analysis_depth: request.analysis_depth,
             complexity_score: analysis.complexity_score,
             technical_level: analysis.technical_level,
-            processing_time_ms: Date.now() - startTime
-          }
+            processing_time_ms: Date.now() - startTime,
+          },
         });
     }
 
@@ -236,7 +236,7 @@ async function processKnowledgeAnalysis(request: AnalysisRequest) {
       analysis,
       analysis_id: storedAnalysis.id,
       similar_content: similarContent,
-      processing_time_ms: Date.now() - startTime
+      processing_time_ms: Date.now() - startTime,
     };
 
   } catch (error) {
@@ -252,30 +252,30 @@ serve(async (req) => {
 
   try {
     const request: AnalysisRequest = await req.json();
-    
+
     console.log('Processing knowledge analysis request:', {
       content_type: request.content_type,
       analysis_depth: request.analysis_depth,
-      content_length: request.content.length
+      content_length: request.content.length,
     });
 
     if (!request.content || request.content.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: 'content is required and cannot be empty' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
     if (request.content.length > 50000) {
       return new Response(
         JSON.stringify({ error: 'content too large, maximum 50,000 characters allowed' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -283,23 +283,23 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Knowledge content analysis error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Knowledge analysis failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Knowledge analysis failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

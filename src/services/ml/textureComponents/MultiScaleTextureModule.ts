@@ -1,6 +1,6 @@
 /**
  * MultiScaleTextureModule - Multi-resolution texture processing for comprehensive material analysis
- * 
+ *
  * This module processes textures at multiple scales to capture both fine details
  * and coarse patterns, enabling robust material classification and analysis.
  */
@@ -49,7 +49,7 @@ export class MultiScaleTextureModule {
    */
   private initializeWeights(): void {
     const numScales = this.config.scaleFactors.length;
-    
+
     // Initialize attention weights for each scale
     this.attentionWeights = [];
     for (let i = 0; i < numScales; i++) {
@@ -70,7 +70,7 @@ export class MultiScaleTextureModule {
     image: Float32Array,
     width: number,
     height: number,
-    channels: number = 1
+    channels: number = 1,
   ): Promise<MultiScaleFeatures> {
     try {
       const scaleFeatures: Float32Array[] = [];
@@ -84,7 +84,7 @@ export class MultiScaleTextureModule {
         console.log(`Processing scale ${i + 1}/${this.config.scaleFactors.length}: factor=${scaleFactor}`);
 
         const scaleResult = await this.processAtScale(
-          image, width, height, channels, scaleFactor, kernelSize
+          image, width, height, channels, scaleFactor, kernelSize,
         );
 
         scaleFeatures.push(scaleResult.features);
@@ -108,7 +108,7 @@ export class MultiScaleTextureModule {
         fusedFeatures,
         attentionWeights,
         scaleImportance,
-        textureComplexity
+        textureComplexity,
       };
 
     } catch (error) {
@@ -126,7 +126,7 @@ export class MultiScaleTextureModule {
     height: number,
     channels: number,
     scaleFactor: number,
-    kernelSize: number
+    kernelSize: number,
   ): Promise<TextureScale> {
     // Resize image to scale
     const scaledImage = await this.resizeImage(image, width, height, channels, scaleFactor);
@@ -135,7 +135,7 @@ export class MultiScaleTextureModule {
 
     // Extract texture features at this scale
     const features = await this.extractTextureFeatures(
-      scaledImage, scaledWidth, scaledHeight, channels, kernelSize
+      scaledImage, scaledWidth, scaledHeight, channels, kernelSize,
     );
 
     // Compute texture metrics
@@ -146,7 +146,7 @@ export class MultiScaleTextureModule {
       features,
       width: scaledWidth,
       height: scaledHeight,
-      textureMetrics
+      textureMetrics,
     };
   }
 
@@ -158,7 +158,7 @@ export class MultiScaleTextureModule {
     width: number,
     height: number,
     channels: number,
-    scaleFactor: number
+    scaleFactor: number,
   ): Promise<Float32Array> {
     const newWidth = Math.round(width * scaleFactor);
     const newHeight = Math.round(height * scaleFactor);
@@ -192,7 +192,7 @@ export class MultiScaleTextureModule {
           const pixel22 = image[idx22] || 0;
 
           // Interpolate
-          const interpolated = 
+          const interpolated =
             pixel11 * (1 - fx) * (1 - fy) +
             pixel12 * fx * (1 - fy) +
             pixel21 * (1 - fx) * fy +
@@ -215,7 +215,7 @@ export class MultiScaleTextureModule {
     width: number,
     height: number,
     channels: number,
-    kernelSize: number
+    kernelSize: number,
   ): Promise<Float32Array> {
     // Convert to grayscale for texture analysis
     const grayImage = channels > 1 ? this.convertToGrayscale(image, width, height, channels) : image;
@@ -227,7 +227,7 @@ export class MultiScaleTextureModule {
     const statisticalFeatures = this.extractStatisticalFeatures(grayImage, width, height);
 
     // Concatenate all features
-    const totalFeatures = glcmFeatures.length + lbpFeatures.length + 
+    const totalFeatures = glcmFeatures.length + lbpFeatures.length +
                          edgeFeatures.length + statisticalFeatures.length;
     const features = new Float32Array(totalFeatures);
 
@@ -250,7 +250,7 @@ export class MultiScaleTextureModule {
     image: Float32Array,
     width: number,
     height: number,
-    channels: number
+    channels: number,
   ): Float32Array {
     const grayImage = new Float32Array(width * height);
 
@@ -260,7 +260,7 @@ export class MultiScaleTextureModule {
         const colorIndex = pixelIndex * channels;
 
         if (channels === 3) {
-          grayImage[pixelIndex] = 
+          grayImage[pixelIndex] =
             0.299 * image[colorIndex] +
             0.587 * image[colorIndex + 1] +
             0.114 * image[colorIndex + 2];
@@ -288,7 +288,7 @@ export class MultiScaleTextureModule {
 
     for (const angle of angles) {
       const glcm = this.computeGLCM(quantized, width, height, levels, distance, angle);
-      
+
       // Compute Haralick features
       const contrast = this.computeContrast(glcm, levels);
       const energy = this.computeEnergy(glcm, levels);
@@ -306,7 +306,7 @@ export class MultiScaleTextureModule {
    */
   private quantizeImage(image: Float32Array, levels: number): Uint8Array {
     const quantized = new Uint8Array(image.length);
-    
+
     // Find min and max values
     let min = Infinity, max = -Infinity;
     for (let i = 0; i < image.length; i++) {
@@ -331,10 +331,10 @@ export class MultiScaleTextureModule {
     height: number,
     levels: number,
     distance: number,
-    angle: number
+    angle: number,
   ): Float32Array {
     const glcm = new Float32Array(levels * levels);
-    
+
     // Convert angle to direction offsets
     const angleRad = (angle * Math.PI) / 180;
     const dx = Math.round(distance * Math.cos(angleRad));
@@ -350,7 +350,7 @@ export class MultiScaleTextureModule {
         if (x2 >= 0 && x2 < width && y2 >= 0 && y2 < height) {
           const val1 = image[y * width + x];
           const val2 = image[y2 * width + x2];
-          
+
           glcm[val1 * levels + val2]++;
           totalPairs++;
         }
@@ -423,7 +423,7 @@ export class MultiScaleTextureModule {
    */
   private extractLBPFeatures(image: Float32Array, width: number, height: number): Float32Array {
     const histogram = new Float32Array(256); // LBP produces 8-bit patterns
-    
+
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
         const centerValue = image[y * width + x];
@@ -438,7 +438,7 @@ export class MultiScaleTextureModule {
           image[(y + 1) * width + (x + 1)], // Bottom-right
           image[(y + 1) * width + x],       // Bottom
           image[(y + 1) * width + (x - 1)], // Bottom-left
-          image[y * width + (x - 1)]        // Left
+          image[y * width + (x - 1)],        // Left
         ];
 
         for (let i = 0; i < 8; i++) {
@@ -469,7 +469,7 @@ export class MultiScaleTextureModule {
     image: Float32Array,
     width: number,
     height: number,
-    kernelSize: number
+    kernelSize: number,
   ): Float32Array {
     // Sobel operators
     const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
@@ -485,7 +485,7 @@ export class MultiScaleTextureModule {
     for (let i = 0; i < gradX.length; i++) {
       const magnitude = Math.sqrt(gradX[i] * gradX[i] + gradY[i] * gradY[i]);
       const direction = Math.atan2(gradY[i], gradX[i]);
-      
+
       totalMagnitude += magnitude;
 
       // Quantize direction to bins
@@ -518,7 +518,7 @@ export class MultiScaleTextureModule {
     width: number,
     height: number,
     kernel: number[],
-    kernelSize: number
+    kernelSize: number,
   ): Float32Array {
     const result = new Float32Array(width * height);
     const padding = Math.floor(kernelSize / 2);
@@ -599,7 +599,7 @@ export class MultiScaleTextureModule {
       contrast: this.computeContrast(glcm, levels),
       energy: this.computeEnergy(glcm, levels),
       homogeneity: this.computeHomogeneity(glcm, levels),
-      entropy: this.computeEntropy(glcm, levels)
+      entropy: this.computeEntropy(glcm, levels),
     };
   }
 
@@ -614,7 +614,7 @@ export class MultiScaleTextureModule {
     for (let i = 0; i < textureScales.length; i++) {
       const metrics = textureScales[i].textureMetrics;
       // Combine multiple metrics for complexity
-      const complexity = metrics.contrast * 0.3 + metrics.entropy * 0.4 + 
+      const complexity = metrics.contrast * 0.3 + metrics.entropy * 0.4 +
                         (1 - metrics.homogeneity) * 0.3;
       importance[i] = complexity;
       totalComplexity += complexity;
@@ -638,7 +638,7 @@ export class MultiScaleTextureModule {
    */
   private async fuseScaleFeatures(
     scaleFeatures: Float32Array[],
-    scaleImportance: Float32Array
+    scaleImportance: Float32Array,
   ): Promise<Float32Array> {
     if (scaleFeatures.length === 0) {
       throw new Error('No scale features to fuse');
@@ -647,13 +647,13 @@ export class MultiScaleTextureModule {
     switch (this.config.fusionStrategy) {
       case 'concatenation':
         return this.concatenateFeatures(scaleFeatures);
-      
+
       case 'weighted':
         return this.weightedFusion(scaleFeatures, scaleImportance);
-      
+
       case 'attention':
         return this.attentionBasedFusion(scaleFeatures, scaleImportance);
-      
+
       default:
         return this.concatenateFeatures(scaleFeatures);
     }
@@ -699,7 +699,7 @@ export class MultiScaleTextureModule {
   private attentionBasedFusion(scaleFeatures: Float32Array[], importance: Float32Array): Float32Array {
     // Compute attention weights based on feature similarity and importance
     const attentionWeights = new Float32Array(scaleFeatures.length);
-    
+
     for (let i = 0; i < scaleFeatures.length; i++) {
       attentionWeights[i] = importance[i] * this.fusionWeights[i];
     }
@@ -720,7 +720,7 @@ export class MultiScaleTextureModule {
    */
   private computeAttentionWeights(
     scaleFeatures: Float32Array[],
-    fusedFeatures: Float32Array
+    fusedFeatures: Float32Array,
   ): Float32Array {
     const weights = new Float32Array(scaleFeatures.length);
 
@@ -759,7 +759,7 @@ export class MultiScaleTextureModule {
 
     for (const scale of textureScales) {
       const metrics = scale.textureMetrics;
-      const complexity = metrics.contrast * 0.25 + metrics.entropy * 0.25 + 
+      const complexity = metrics.contrast * 0.25 + metrics.entropy * 0.25 +
                         (1 - metrics.energy) * 0.25 + (1 - metrics.homogeneity) * 0.25;
       totalComplexity += complexity * scale.scaleFactor; // Weight by scale
     }
@@ -798,7 +798,7 @@ export class MultiScaleTextureModule {
     return {
       config: this.config,
       fusionWeights: Array.from(this.fusionWeights),
-      attentionWeights: this.attentionWeights.map(w => Array.from(w))
+      attentionWeights: this.attentionWeights.map(w => Array.from(w)),
     };
   }
 

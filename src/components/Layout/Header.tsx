@@ -1,6 +1,7 @@
 import React from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { Search, Bell, Settings, User, Zap, LogOut } from 'lucide-react';
+
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,12 +42,12 @@ export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) =
           </div>
           <span className="text-xl font-bold">KAI Platform</span>
         </div>
-        
+
         <div className="ml-8 flex-1 max-w-md">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input 
-              placeholder="Search materials, projects, or settings..." 
+            <Input
+              placeholder="Search materials, projects, or settings..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}

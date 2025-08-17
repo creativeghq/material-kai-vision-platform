@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { Button } from '@/components/ui/button';
+
 import styles from './Dashboard.module.css';
 import { heroConfig, type HeroAction } from './dashboardData';
 
@@ -18,13 +20,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
             {heroConfig.badge.text}
           </div>
         </div>
-        
+
         <h1 className={styles.heroTitle}>
           {heroConfig.title}
           <br />
           <span className={styles.heroSubtitle}>{heroConfig.subtitle}</span>
         </h1>
-        
+
         <p className={styles.heroDescription}>
           {heroConfig.description}
         </p>

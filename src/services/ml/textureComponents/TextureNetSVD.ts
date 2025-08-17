@@ -38,7 +38,7 @@ export class TextureNetSVD {
       headCount: config.attentionHeads,
       keyDim: 256,
       dropoutRate: 0.1,
-      temperatureScaling: 1.0
+      temperatureScaling: 1.0,
     });
     this.gaborFilters = new TextureGaborFilters({
       filterCount: config.gaborKernels,
@@ -48,14 +48,14 @@ export class TextureNetSVD {
       orientations: [0, 45, 90, 135],
       frequencies: [0.1, 0.2, 0.3, 0.4],
       phases: [0, Math.PI/2],
-      learnable: false
+      learnable: false,
     });
     this.multiScaleModule = new MultiScaleTextureModule({
       scaleFactors: config.scaleFactors,
       kernelSizes: [3, 5, 7],
       poolingType: 'max',
       fusionStrategy: 'concatenation',
-      preserveAspectRatio: true
+      preserveAspectRatio: true,
     });
     this.svdCache = new Map();
   }
@@ -66,7 +66,7 @@ export class TextureNetSVD {
   private performSVD(textureMatrix: Float32Array, rows: number, cols: number): SVDTextureFeatures {
     // Simplified SVD implementation - in production, use optimized library
     const cacheKey = this.generateCacheKey(textureMatrix);
-    
+
     if (this.svdCache.has(cacheKey)) {
       return this.svdCache.get(cacheKey)!;
     }
@@ -77,7 +77,7 @@ export class TextureNetSVD {
 
     // Compute SVD (simplified - use proper SVD library in production)
     const svdResult = this.computeSVD(centeredMatrix, rows, cols);
-    
+
     // Apply rank reduction based on configuration
     const reducedSVD = this.reduceRank(svdResult, this.config.svdRank);
 
@@ -91,11 +91,11 @@ export class TextureNetSVD {
   private convertImageDataToFloat32Array(imageData: ImageData): Float32Array {
     const { data, width, height } = imageData;
     const floatArray = new Float32Array(width * height * 4);
-    
+
     for (let i = 0; i < data.length; i++) {
       floatArray[i] = data[i] / 255.0;
     }
-    
+
     return floatArray;
   }
 
@@ -104,16 +104,16 @@ export class TextureNetSVD {
    */
   async extractSVDFeatures(imageData: ImageData): Promise<SVDTextureFeatures> {
     const { width, height, data } = imageData;
-    
+
     // Convert to grayscale for SVD analysis
     const grayscaleMatrix = this.convertToGrayscale(data, width, height);
-    
+
     // Apply Gabor filtering first
     const gaborResponse = await this.gaborFilters.applyFilterBank(grayscaleMatrix, width, height, 1);
-    
+
     // Perform SVD on filtered texture
     const svdFeatures = this.performSVD(gaborResponse.energyMap, height, width);
-    
+
     return svdFeatures;
   }
 
@@ -129,39 +129,39 @@ export class TextureNetSVD {
   }> {
     // 1. Extract SVD-based texture features
     const svdFeatures = await this.extractSVDFeatures(imageData);
-    
+
     // 2. Apply attention mechanism
     const attentionResult = await this.attentionModule.processTexture({
       features: svdFeatures.leftSingularVectors,
       width: this.config.inputSize[1],
       height: this.config.inputSize[0],
-      channels: 1
+      channels: 1,
     });
-    
+
     // 3. Multi-scale feature extraction
     const multiScaleFeatures = await this.multiScaleModule.processMultiScale(
       this.convertImageDataToFloat32Array(imageData),
       imageData.width,
       imageData.height,
-      4
+      4,
     );
-    
+
     // 4. Feature fusion with SVD weights
     const textureDescriptor = this.fuseFeatures(
       svdFeatures,
       attentionResult.attentionWeights,
-      multiScaleFeatures.fusedFeatures
+      multiScaleFeatures.fusedFeatures,
     );
-    
+
     // 5. Calculate confidence based on reconstruction error
     const confidence = this.calculateConfidence(svdFeatures.reconstructionError);
-    
+
     return {
       svdFeatures,
       attentionWeights: attentionResult.attentionWeights,
       multiScaleFeatures: multiScaleFeatures.fusedFeatures,
       textureDescriptor,
-      confidence
+      confidence,
     };
   }
 
@@ -171,29 +171,29 @@ export class TextureNetSVD {
   private fuseFeatures(
     svdFeatures: SVDTextureFeatures,
     attentionWeights: Float32Array,
-    multiScaleFeatures: Float32Array
+    multiScaleFeatures: Float32Array,
   ): Float32Array {
     const descriptorSize = Math.min(
       svdFeatures.singularValues.length,
       attentionWeights.length,
-      multiScaleFeatures.length
+      multiScaleFeatures.length,
     );
-    
+
     const descriptor = new Float32Array(descriptorSize);
-    
+
     for (let i = 0; i < descriptorSize; i++) {
       // Weighted combination with SVD singular values as importance weights
       const svdWeight = svdFeatures.singularValues[i] || 0;
       const attentionWeight = attentionWeights[i] || 0;
       const multiScaleWeight = multiScaleFeatures[i] || 0;
-      
+
       descriptor[i] = (
         svdWeight * 0.5 +
         attentionWeight * 0.3 +
         multiScaleWeight * 0.2
       );
     }
-    
+
     return this.normalizeFeatures(descriptor);
   }
 
@@ -226,38 +226,38 @@ export class TextureNetSVD {
   private computeSVD(matrix: Float32Array, rows: number, cols: number): SVDTextureFeatures {
     // Simplified SVD - use proper library like ml-matrix in production
     const rank = Math.min(rows, cols, this.config.svdRank);
-    
+
     return {
       singularValues: new Float32Array(rank),
       leftSingularVectors: new Float32Array(rows * rank),
       rightSingularVectors: new Float32Array(cols * rank),
       reconstructionError: 0.1, // Placeholder
-      rank
+      rank,
     };
   }
 
   private reduceRank(svd: SVDTextureFeatures, targetRank: number): SVDTextureFeatures {
     const actualRank = Math.min(svd.rank, targetRank);
-    
+
     return {
       singularValues: svd.singularValues.slice(0, actualRank),
       leftSingularVectors: svd.leftSingularVectors.slice(0, actualRank * svd.leftSingularVectors.length / svd.rank),
       rightSingularVectors: svd.rightSingularVectors.slice(0, actualRank * svd.rightSingularVectors.length / svd.rank),
       reconstructionError: svd.reconstructionError,
-      rank: actualRank
+      rank: actualRank,
     };
   }
 
   private convertToGrayscale(imageData: Uint8ClampedArray, width: number, height: number): Float32Array {
     const grayscale = new Float32Array(width * height);
-    
+
     for (let i = 0; i < width * height; i++) {
       const r = imageData[i * 4];
       const g = imageData[i * 4 + 1];
       const b = imageData[i * 4 + 2];
       grayscale[i] = 0.299 * r + 0.587 * g + 0.114 * b;
     }
-    
+
     return grayscale;
   }
 
@@ -279,7 +279,7 @@ export class TextureNetSVD {
       accuracy: 0.914, // 91.4% as mentioned in requirements
       parameters: this.estimateParameters(),
       cacheSize: this.svdCache.size,
-      svdRank: this.config.svdRank
+      svdRank: this.config.svdRank,
     };
   }
 
@@ -288,7 +288,7 @@ export class TextureNetSVD {
     const baseParams = inputSize[0] * inputSize[1] * inputSize[2];
     const svdParams = svdRank * (inputSize[0] + inputSize[1]);
     const attentionParams = attentionHeads * 256 * 256;
-    
+
     return baseParams + svdParams + attentionParams;
   }
 

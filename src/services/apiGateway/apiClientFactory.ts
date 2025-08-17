@@ -1,12 +1,13 @@
+import { ApiRegistry, ReplicateApiConfig, HuggingFaceApiConfig, SupabaseApiConfig } from '../../config/apiConfig';
+
 import { StandardizedApiClient, StandardizedApiResponse } from './standardizedApiClient';
 import { ReplicateApiClient } from './replicateApiClient';
 import { HuggingFaceApiClient } from './huggingFaceApiClient';
 import { SupabaseApiClient } from './supabaseApiClient';
-import { ApiRegistry, ReplicateApiConfig, HuggingFaceApiConfig, SupabaseApiConfig } from '../../config/apiConfig';
 
 /**
  * Centralized API Client Factory Implementation
- * 
+ *
  * This factory provides a single point of access to all standardized API clients,
  * ensuring consistent configuration and error handling across the platform.
  */
@@ -38,7 +39,7 @@ class CentralizedApiClientFactory {
           this.registerClient(
             'replicate',
             modelId,
-            new ReplicateApiClient(modelId)
+            new ReplicateApiClient(modelId),
           );
         }
       });
@@ -54,7 +55,7 @@ class CentralizedApiClientFactory {
           this.registerClient(
             'huggingface',
             modelId,
-            new HuggingFaceApiClient(modelId)
+            new HuggingFaceApiClient(modelId),
           );
         }
       });
@@ -72,7 +73,7 @@ class CentralizedApiClientFactory {
           this.registerClient(
             'supabase',
             functionName,
-            new SupabaseApiClient(apiKey, functionName)
+            new SupabaseApiClient(apiKey, functionName),
           );
         }
       });
@@ -105,7 +106,7 @@ class CentralizedApiClientFactory {
    */
   public getAvailableModels(apiType: string): string[] {
     const apiRegistry = ApiRegistry.getInstance();
-    
+
     switch (apiType) {
       case 'replicate':
         const replicateConfig = apiRegistry.getApiConfigByType<ReplicateApiConfig>('replicate');
@@ -126,7 +127,7 @@ class CentralizedApiClientFactory {
    */
   public getModelConfig(apiType: string, modelId: string) {
     const apiRegistry = ApiRegistry.getInstance();
-    
+
     switch (apiType) {
       case 'replicate':
         const replicateConfig = apiRegistry.getApiConfigByType<ReplicateApiConfig>('replicate');
@@ -157,7 +158,7 @@ class CentralizedApiClientFactory {
         config.inputSchema.parse(params);
         return true;
       }
-      
+
       // Fallback to basic validation
       return params !== null && params !== undefined;
     } catch (error) {
@@ -172,7 +173,7 @@ class CentralizedApiClientFactory {
   public async executeApiCall<TParams, TResponse>(
     apiType: string,
     modelId: string,
-    params: TParams
+    params: TParams,
   ): Promise<StandardizedApiResponse<TResponse>> {
     const client = this.getClient(apiType, modelId);
     if (!client) {
@@ -182,21 +183,21 @@ class CentralizedApiClientFactory {
           code: 'CLIENT_NOT_FOUND',
           message: `No client registered for ${apiType}:${modelId}`,
           details: { apiType, modelId },
-          retryable: false
+          retryable: false,
         },
         metadata: {
           apiType,
           modelId,
           timestamp: new Date().toISOString(),
-          requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        }
+          requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        },
       };
     }
 
     try {
       // Validate parameters if validation is available
       const isValid = this.validateParameters(apiType, modelId, params);
-      
+
       if (!isValid) {
         return {
           success: false,
@@ -204,20 +205,20 @@ class CentralizedApiClientFactory {
             code: 'INVALID_PARAMETERS',
             message: 'Parameter validation failed',
             details: { apiType, modelId, params },
-            retryable: false
+            retryable: false,
           },
           metadata: {
             apiType,
             modelId,
             timestamp: new Date().toISOString(),
-            requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-          }
+            requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          },
         };
       }
 
       // Execute the API call
       const validatedParams = client.validateParams(params);
-      
+
       return await client.execute(validatedParams);
     } catch (error) {
       return {
@@ -226,14 +227,14 @@ class CentralizedApiClientFactory {
           code: 'EXECUTION_ERROR',
           message: error instanceof Error ? error.message : 'Unknown error occurred',
           details: { apiType, modelId, originalError: error },
-          retryable: true
+          retryable: true,
         },
         metadata: {
           apiType,
           modelId,
           timestamp: new Date().toISOString(),
-          requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        }
+          requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        },
       };
     }
   }

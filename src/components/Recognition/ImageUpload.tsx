@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -8,9 +9,9 @@ interface ImageUploadProps {
   isProcessing?: boolean;
 }
 
-export const ImageUpload: React.FC<ImageUploadProps> = ({ 
-  onImagesSelected, 
-  isProcessing = false 
+export const ImageUpload: React.FC<ImageUploadProps> = ({
+  onImagesSelected,
+  isProcessing = false,
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -18,9 +19,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   }, []);
@@ -29,11 +30,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    const files = Array.from(e.dataTransfer.files).filter(file => 
-      file.type.startsWith('image/')
+
+    const files = Array.from(e.dataTransfer.files).filter(file =>
+      file.type.startsWith('image/'),
     );
-    
+
     if (files.length > 0) {
       setSelectedFiles(files);
       onImagesSelected(files);
@@ -41,10 +42,10 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   }, [onImagesSelected]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(file => 
-      file.type.startsWith('image/')
+    const files = Array.from(e.target.files || []).filter(file =>
+      file.type.startsWith('image/'),
     );
-    
+
     if (files.length > 0) {
       setSelectedFiles(files);
       onImagesSelected(files);
@@ -62,8 +63,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       <CardContent className="p-6">
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            dragActive 
-              ? 'border-primary bg-primary/5' 
+            dragActive
+              ? 'border-primary bg-primary/5'
               : 'border-muted-foreground/25 hover:border-muted-foreground/50'
           } ${isProcessing ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
           onDragEnter={handleDrag}
@@ -91,7 +92,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               <Button>Select Files</Button>
             </div>
           )}
-          
+
           <input
             id="file-input"
             type="file"

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { Loader2, Search, Brain, BookOpen, Package } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Search, Brain, BookOpen, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ragService, RAGSearchResult, RAGResponse } from '@/services/ragService';
 
@@ -23,9 +24,9 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
   const handleSearch = async () => {
     if (!query.trim()) {
       toast({
-        title: "Search Query Required",
-        description: "Please enter a search query",
-        variant: "destructive"
+        title: 'Search Query Required',
+        description: 'Please enter a search query',
+        variant: 'destructive',
       });
       return;
     }
@@ -37,22 +38,22 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
         search_type: searchType,
         match_count: 10,
         include_context: includeContext,
-        match_threshold: 0.6
+        match_threshold: 0.6,
       });
 
       setSearchResults(results);
       onResultsFound?.(results.results);
 
       toast({
-        title: "Search Completed",
-        description: `Found ${results.results.length} results in ${results.processing_time_ms}ms`
+        title: 'Search Completed',
+        description: `Found ${results.results.length} results in ${results.processing_time_ms}ms`,
       });
     } catch (error) {
       console.error('Search error:', error);
       toast({
-        title: "Search Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Search Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
@@ -70,9 +71,9 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
     } catch (error) {
       console.error('Quick search error:', error);
       toast({
-        title: "Quick Search Failed",
-        description: "Please try again",
-        variant: "destructive"
+        title: 'Quick Search Failed',
+        description: 'Please try again',
+        variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
@@ -189,7 +190,7 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
                             <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{result.result_type}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div 
+                            <div
                               className={`w-2 h-2 rounded-full ${getConfidenceColor(result.similarity_score)}`}
                             />
                             <span className="text-sm text-muted-foreground">
@@ -197,10 +198,10 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
                             </span>
                           </div>
                         </div>
-                        
+
                         <p className="text-sm text-muted-foreground mb-3">
-                          {result.content.length > 200 
-                            ? `${result.content.substring(0, 200)}...` 
+                          {result.content.length > 200
+                            ? `${result.content.substring(0, 200)}...`
                             : result.content
                           }
                         </p>
@@ -217,7 +218,7 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
                               Type: {result.metadata.content_type}
                             </span>
                           )}
-                          {result.metadata?.tags && Array.isArray(result.metadata.tags) && 
+                          {result.metadata?.tags && Array.isArray(result.metadata.tags) &&
                             result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
                               <span key={i} className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{tag}</span>
                             ))

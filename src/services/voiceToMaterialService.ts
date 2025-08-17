@@ -3,7 +3,7 @@
  * Connects to the voice-to-material edge function for voice recognition and material search
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 
 export interface VoiceToMaterialRequest {
   audio_data?: string; // base64 encoded audio
@@ -45,7 +45,7 @@ export interface VoiceToMaterialResult {
 }
 
 class VoiceToMaterialService {
-  
+
   /**
    * Process voice input and find matching materials
    */
@@ -56,8 +56,8 @@ class VoiceToMaterialService {
       const { data, error } = await supabase.functions.invoke('voice-to-material', {
         body: {
           user_id: (await supabase.auth.getUser()).data.user?.id,
-          ...request
-        }
+          ...request,
+        },
       });
 
       if (error) {
@@ -78,22 +78,22 @@ class VoiceToMaterialService {
    */
   async recordAndProcess(
     duration: number = 5000, // 5 seconds default
-    context: 'search' | 'description' | 'properties' | 'general' = 'search'
+    context: 'search' | 'description' | 'properties' | 'general' = 'search',
   ): Promise<VoiceToMaterialResult> {
     return new Promise(async (resolve, reject) => {
       try {
         // Request microphone access
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             sampleRate: 16000,
             channelCount: 1,
             echoCancellation: true,
-            noiseSuppression: true
-          }
+            noiseSuppression: true,
+          },
         });
 
         const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: 'audio/webm;codecs=opus'
+          mimeType: 'audio/webm;codecs=opus',
         });
 
         const audioChunks: BlobPart[] = [];
@@ -108,11 +108,11 @@ class VoiceToMaterialService {
           try {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             const audioData = await this.blobToBase64(audioBlob);
-            
+
             const result = await this.processVoiceInput({
               audio_data: audioData,
               context: context,
-              language: 'en'
+              language: 'en',
             });
 
             // Stop all tracks
@@ -151,11 +151,11 @@ class VoiceToMaterialService {
   async processAudioFile(file: File, context: string = 'search'): Promise<VoiceToMaterialResult> {
     try {
       const audioData = await this.fileToBase64(file);
-      
+
       return this.processVoiceInput({
         audio_data: audioData,
         context: context as any,
-        language: 'en'
+        language: 'en',
       });
     } catch (error) {
       console.error('Error processing audio file:', error);
@@ -236,7 +236,7 @@ class VoiceToMaterialService {
    */
   startContinuousRecognition(
     onResult: (result: VoiceToMaterialResult) => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
   ): () => void {
     let isActive = true;
     let mediaRecorder: MediaRecorder | null = null;
@@ -261,15 +261,15 @@ class VoiceToMaterialService {
           try {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             const audioData = await this.blobToBase64(audioBlob);
-            
+
             const result = await this.processVoiceInput({
               audio_data: audioData,
               context: 'search',
-              language: 'en'
+              language: 'en',
             });
 
             onResult(result);
-            
+
             // Restart recognition
             setTimeout(startRecognition, 100);
           } catch (error) {
@@ -278,7 +278,7 @@ class VoiceToMaterialService {
         };
 
         mediaRecorder.start();
-        
+
         // Record in 3-second chunks
         setTimeout(() => {
           if (mediaRecorder && isActive) {

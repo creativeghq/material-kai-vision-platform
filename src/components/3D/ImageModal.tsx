@@ -1,7 +1,8 @@
 import React from 'react';
+import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -16,13 +17,13 @@ export const ImageModal: React.FC<ImageModalProps> = ({
   onClose,
   images,
   currentIndex,
-  onNavigate
+  onNavigate,
 }) => {
   const currentImage = images[currentIndex];
 
   const handleDownload = () => {
     if (!currentImage) return;
-    
+
     const link = document.createElement('a');
     link.href = currentImage.url;
     link.download = `interior-design-${currentImage.modelName}-${Date.now()}.png`;
@@ -49,14 +50,14 @@ export const ImageModal: React.FC<ImageModalProps> = ({
             </div>
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="flex-1 relative bg-background/95">
-          <img 
+          <img
             src={currentImage.url}
             alt={`Interior design by ${currentImage.modelName}`}
             className="w-full h-full object-contain"
           />
-          
+
           {/* Navigation buttons */}
           {images.length > 1 && (
             <>
@@ -67,7 +68,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              
+
               <Button
                 onClick={() => onNavigate('next')}
                 className="absolute right-4 top-1/2 -translate-y-1/2 px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -78,7 +79,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({
             </>
           )}
         </div>
-        
+
         <div className="p-4 pt-2 border-t">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

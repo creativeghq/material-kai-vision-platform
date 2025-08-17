@@ -1,7 +1,8 @@
-import { MLResult } from './types';
-import { DeviceDetector } from './deviceDetector';
 import { BaseService, ServiceConfig } from '../base/BaseService';
 import { ApiRegistry } from '../../config/apiConfig';
+
+import { MLResult } from './types';
+import { DeviceDetector } from './deviceDetector';
 
 export interface StyleAnalysisResult {
   primaryStyle: string;
@@ -101,7 +102,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
       maxImageSize: 512,
       enableAdvancedFeatures: true,
       defaultTargetRooms: ['living_room', 'bedroom', 'kitchen', 'bathroom', 'office'],
-      enableBrowserOptimizations: true
+      enableBrowserOptimizations: true,
     };
 
     const finalConfig = { ...defaultConfig, ...config };
@@ -113,7 +114,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
    */
   async analyzeStyle(
     imageSource: string | File | Blob,
-    options: StyleAnalysisOptions = {}
+    options: StyleAnalysisOptions = {},
   ): Promise<MLResult> {
     const startTime = performance.now();
 
@@ -123,24 +124,24 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
         includeRoomSuitability: true,
         includeTrendAnalysis: true,
         targetRooms: ['living_room', 'bedroom', 'kitchen', 'bathroom', 'office'],
-        ...options
+        ...options,
       };
 
       // Load and analyze the image
       const imageData = await this.loadImage(imageSource);
-      
+
       const styleAnalysis: StyleAnalysisResult = {
         primaryStyle: await this.classifyStyle(imageData),
         styleConfidence: 0.8, // Will be calculated based on feature consistency
         colorPalette: opts.includeColorAnalysis ? await this.analyzeColorPalette(imageData) : {
           dominantColors: [],
           colorHarmony: 'unknown',
-          warmthScore: 0
+          warmthScore: 0,
         },
         roomSuitability: opts.includeRoomSuitability ? this.analyzeRoomSuitability(imageData, opts.targetRooms) : {},
         aestheticProperties: this.analyzeAestheticProperties(imageData),
         trendScore: opts.includeTrendAnalysis ? this.calculateTrendScore(imageData) : 0,
-        designTags: this.generateDesignTags(imageData)
+        designTags: this.generateDesignTags(imageData),
       };
 
       // Calculate overall confidence based on analysis consistency
@@ -152,7 +153,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
         success: true,
         data: styleAnalysis,
         confidence: styleAnalysis.styleConfidence,
-        processingTime: Math.round(processingTime)
+        processingTime: Math.round(processingTime),
       };
 
     } catch (error) {
@@ -162,7 +163,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Style analysis failed',
-        processingTime: Math.round(processingTime)
+        processingTime: Math.round(processingTime),
       };
     }
   }
@@ -177,11 +178,11 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
 
     return new Promise((resolve, reject) => {
       const img = new Image();
-      
+
       img.onload = () => {
         this.canvas!.width = Math.min(img.width, 512);
         this.canvas!.height = Math.min(img.height, 512);
-        
+
         this.ctx!.drawImage(img, 0, 0, this.canvas!.width, this.canvas!.height);
         const imageData = this.ctx!.getImageData(0, 0, this.canvas!.width, this.canvas!.height);
         resolve(imageData);
@@ -203,10 +204,10 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
   private async classifyStyle(imageData: ImageData): Promise<string> {
     // Analyze visual features to classify style
     const features = this.extractVisualFeatures(imageData);
-    
+
     // Simple heuristic-based style classification
     // In production, this would use a trained ML model
-    
+
     if (features.edgeSharpness > 0.7 && features.colorVariance < 0.3) {
       return 'minimalist';
     } else if (features.patternComplexity > 0.6 && features.colorCount > 5) {
@@ -233,7 +234,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
     return {
       dominantColors: colors.map(c => `rgb(${c.r}, ${c.g}, ${c.b})`),
       colorHarmony,
-      warmthScore
+      warmthScore,
     };
   }
 
@@ -276,7 +277,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
 
       suitability[room] = {
         score: Math.min(Math.max(score, 0), 1),
-        reasoning
+        reasoning,
       };
     });
 
@@ -293,7 +294,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
       texture: features.roughness > 0.6 ? 'rough' : features.roughness > 0.3 ? 'textured' : 'smooth',
       finish: features.metallic > 0.5 ? 'metallic' : features.glossiness > 0.6 ? 'gloss' : features.glossiness > 0.3 ? 'satin' : 'matte',
       pattern: features.patternComplexity > 0.7 ? 'geometric' : features.patternComplexity > 0.4 ? 'textured' : 'solid',
-      modernityScore: features.edgeSharpness * 0.4 + (1 - features.ornamental) * 0.6
+      modernityScore: features.edgeSharpness * 0.4 + (1 - features.ornamental) * 0.6,
     };
   }
 
@@ -302,19 +303,19 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
    */
   private calculateTrendScore(imageData: ImageData): number {
     const features = this.extractVisualFeatures(imageData);
-    
+
     // Simple trend scoring based on current design preferences
     let trendScore = 0.5; // Base score
 
     // Sustainable/natural materials are trending
     trendScore += features.naturalness * 0.2;
-    
+
     // Minimalist designs are popular
     trendScore += (1 - features.patternComplexity) * 0.15;
-    
+
     // Warm tones are trending
     trendScore += features.warmth * 0.15;
-    
+
     // Textured surfaces are popular
     trendScore += features.roughness * 0.1;
 
@@ -347,44 +348,44 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
    */
   private extractVisualFeatures(imageData: ImageData): any {
     const { data, width, height } = imageData;
-    
+
     // Initialize feature accumulators
     let totalR = 0, totalG = 0, totalB = 0;
     let edgeCount = 0;
     let saturationSum = 0;
     let brightnessSum = 0;
-    
+
     // Sample analysis - analyze every 4th pixel for performance
     for (let i = 0; i < data.length; i += 16) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
-      
+
       totalR += r;
       totalG += g;
       totalB += b;
-      
+
       // Calculate HSL for saturation
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
       const lightness = (max + min) / 2;
       const saturation = lightness > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
-      
+
       saturationSum += saturation || 0;
       brightnessSum += lightness;
-      
+
       // Simple edge detection
       if (i + 4 < data.length) {
         const nextR = data[i + 4];
         if (Math.abs(r - nextR) > 30) edgeCount++;
       }
     }
-    
+
     const pixelCount = data.length / 4;
     const avgR = totalR / pixelCount;
     const avgG = totalG / pixelCount;
     const avgB = totalB / pixelCount;
-    
+
     return {
       warmth: (avgR - avgB) / 255 + 0.5, // Normalized warm/cool
       saturation: saturationSum / pixelCount,
@@ -407,7 +408,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
       hygiene: Math.random() * 0.5 + 0.4, // Placeholder
       professionalism: Math.random() * 0.5 + 0.4, // Placeholder
       focus: Math.random() * 0.5 + 0.4, // Placeholder
-      ornamental: this.detectOrnamental(edgeCount, pixelCount)
+      ornamental: this.detectOrnamental(edgeCount, pixelCount),
     };
   }
 
@@ -443,7 +444,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
       colors.push({
         r: Math.floor(Math.random() * 255),
         g: Math.floor(Math.random() * 255),
-        b: Math.floor(Math.random() * 255)
+        b: Math.floor(Math.random() * 255),
       });
     }
     return colors;
@@ -465,16 +466,16 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
   private calculateStyleConfidence(analysis: StyleAnalysisResult): number {
     // Calculate confidence based on analysis consistency
     let confidence = 0.7; // Base confidence
-    
+
     // Boost confidence if color analysis is consistent with style
     if (analysis.primaryStyle === 'minimalist' && analysis.colorPalette.dominantColors.length <= 3) {
       confidence += 0.1;
     }
-    
+
     if (analysis.primaryStyle === 'traditional' && analysis.aestheticProperties.pattern !== 'solid') {
       confidence += 0.1;
     }
-    
+
     return Math.min(confidence, 1.0);
   }
 
@@ -491,7 +492,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
       canAnalyzeColors: true,
       canAnalyzeTexture: false, // Would need advanced CV
       canAnalyzePatterns: true,
-      supportsRealtime: !!this.canvas
+      supportsRealtime: !!this.canvas,
     };
   }
 }

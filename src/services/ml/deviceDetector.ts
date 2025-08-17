@@ -1,5 +1,6 @@
-import { DeviceType } from './types';
 import { BaseService, ServiceConfig } from '../base/BaseService';
+
+import { DeviceType } from './types';
 
 interface DeviceDetectorServiceConfig extends ServiceConfig {
   enableWebGPUDetection: boolean;
@@ -22,7 +23,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     if (this.config.enableWebGPUDetection) {
       await this.executeOperation(
         () => this.initializeWebGPUDetection(),
-        'initialize-webgpu-detection'
+        'initialize-webgpu-detection',
       );
     }
 
@@ -30,7 +31,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     if (this.config.enableDeviceCapabilityCache) {
       await this.executeOperation(
         () => this.populateDeviceCache(),
-        'populate-device-cache'
+        'populate-device-cache',
       );
     }
   }
@@ -125,7 +126,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
         if (gpu && typeof gpu.requestAdapter === 'function') {
           const adapter = await gpu.requestAdapter();
           const result = !!adapter;
-          
+
           // Cache the result if caching is enabled
           if (this.config.enableDeviceCapabilityCache) {
             this.deviceCapabilityCache.set('webgpu-support', result);
@@ -133,10 +134,10 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
               this.deviceCapabilityCache.set('webgpu-adapter', adapter);
             }
           }
-          
+
           return result;
         }
-        
+
         const result = false;
         if (this.config.enableDeviceCapabilityCache) {
           this.deviceCapabilityCache.set('webgpu-support', result);
@@ -153,8 +154,8 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     }, 'check-webgpu-support');
   }
 
-  public async getDeviceInfo(): Promise<{ 
-    supportsWebGPU: boolean; 
+  public async getDeviceInfo(): Promise<{
+    supportsWebGPU: boolean;
     optimalDevice: DeviceType;
     userAgent: string;
   }> {
@@ -171,7 +172,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
       const deviceInfo = {
         supportsWebGPU,
         optimalDevice,
-        userAgent
+        userAgent,
       };
 
       // Cache the result if caching is enabled
@@ -183,15 +184,15 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     }, 'get-device-info');
   }
 
-  private getDeviceInfoSync(): { 
-    supportsWebGPU: boolean; 
+  private getDeviceInfoSync(): {
+    supportsWebGPU: boolean;
     optimalDevice: DeviceType;
     userAgent: string;
   } {
     return {
       supportsWebGPU: typeof navigator !== 'undefined' && 'gpu' in navigator,
       optimalDevice: this.getOptimalDevice(),
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
     };
   }
 
@@ -204,7 +205,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     return {
       size: this.deviceCapabilityCache.size,
       lastUpdate: this.lastCacheUpdate,
-      isValid: this.isCacheValid()
+      isValid: this.isCacheValid(),
     };
   }
 
@@ -219,7 +220,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
       enableDeviceCapabilityCache: true,
       cacheExpirationMs: 5 * 60 * 1000, // 5 minutes
       enablePerformanceProfiling: false,
-      fallbackDevice: 'cpu'
+      fallbackDevice: 'cpu',
     };
 
     const finalConfig = { ...defaultConfig, ...config };
@@ -240,8 +241,8 @@ export class DeviceDetector {
     return deviceDetectorService.checkWebGPUSupport();
   }
 
-  static getDeviceInfo(): Promise<{ 
-    supportsWebGPU: boolean; 
+  static getDeviceInfo(): Promise<{
+    supportsWebGPU: boolean;
     optimalDevice: DeviceType;
     userAgent: string;
   }> {

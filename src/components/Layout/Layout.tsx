@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 
@@ -11,9 +12,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
-      <Header 
-        searchQuery={searchQuery} 
-        onSearchChange={setSearchQuery} 
+      <Header
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
       <div className="flex">
         <Sidebar />

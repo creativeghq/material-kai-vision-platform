@@ -46,13 +46,13 @@ export class JWTAuthMiddleware {
    */
   static async authenticate(
     request: AuthenticatedRequest,
-    options: JWTAuthOptions = {}
+    options: JWTAuthOptions = {},
   ): Promise<AuthenticationResult> {
     const {
       allowApiKey = true,
       requiredScopes = [],
       workspaceRequired = false,
-      allowInternalToken = false
+      allowInternalToken = false,
     } = options;
 
     try {
@@ -67,8 +67,8 @@ export class JWTAuthMiddleware {
           success: true,
           authContext: {
             isAuthenticated: true,
-            user: { id: 'internal-system' }
-          }
+            user: { id: 'internal-system' },
+          },
         };
       }
 
@@ -80,8 +80,8 @@ export class JWTAuthMiddleware {
           error: {
             code: 'MISSING_AUTHORIZATION',
             message: 'Authorization header or API key required',
-            statusCode: 401
-          }
+            statusCode: 401,
+          },
         };
       }
 
@@ -97,13 +97,13 @@ export class JWTAuthMiddleware {
               error: {
                 code: 'WORKSPACE_REQUIRED',
                 message: 'Workspace ID required for this operation',
-                statusCode: 400
-              }
+                statusCode: 400,
+              },
             };
           }
           return jwtResult;
         }
-        
+
         // If JWT failed and API key not allowed, return JWT error
         if (!allowApiKey) {
           return jwtResult;
@@ -122,8 +122,8 @@ export class JWTAuthMiddleware {
               error: {
                 code: 'WORKSPACE_REQUIRED',
                 message: 'Workspace ID required for this operation',
-                statusCode: 400
-              }
+                statusCode: 400,
+              },
             };
           }
           return apiKeyResult;
@@ -138,8 +138,8 @@ export class JWTAuthMiddleware {
         error: {
           code: 'INVALID_AUTHENTICATION',
           message: 'Invalid or expired authentication credentials',
-          statusCode: 401
-        }
+          statusCode: 401,
+        },
       };
     } catch (error) {
       console.error('Authentication middleware error:', error);
@@ -149,8 +149,8 @@ export class JWTAuthMiddleware {
         error: {
           code: 'AUTHENTICATION_ERROR',
           message: 'Internal authentication error',
-          statusCode: 500
-        }
+          statusCode: 500,
+        },
       };
     }
   }
@@ -160,7 +160,7 @@ export class JWTAuthMiddleware {
    */
   private static async authenticateJWT(
     authHeader: string,
-    requiredScopes: string[] = []
+    requiredScopes: string[] = [],
   ): Promise<AuthenticationResult> {
     try {
       // Extract token from Bearer header
@@ -172,14 +172,14 @@ export class JWTAuthMiddleware {
           error: {
             code: 'INVALID_TOKEN_FORMAT',
             message: 'Invalid authorization header format. Expected: Bearer <token>',
-            statusCode: 401
-          }
+            statusCode: 401,
+          },
         };
       }
 
       // Verify JWT token with Supabase
       const { data: { user }, error } = await supabase.auth.getUser(token);
-      
+
       if (error || !user) {
         return {
           success: false,
@@ -187,8 +187,8 @@ export class JWTAuthMiddleware {
           error: {
             code: 'INVALID_JWT_TOKEN',
             message: 'Invalid or expired JWT token',
-            statusCode: 401
-          }
+            statusCode: 401,
+          },
         };
       }
 
@@ -199,8 +199,8 @@ export class JWTAuthMiddleware {
       // For now, assume all authenticated users are active
       // Check required scopes - since no user_profiles table, skip scope validation
       const userScopes: string[] = [];
-      const hasRequiredScopes = requiredScopes.every(scope => 
-        userScopes.includes(scope) || userScopes.includes('*')
+      const hasRequiredScopes = requiredScopes.every(scope =>
+        userScopes.includes(scope) || userScopes.includes('*'),
       );
 
       if (requiredScopes.length > 0 && !hasRequiredScopes) {
@@ -210,8 +210,8 @@ export class JWTAuthMiddleware {
           error: {
             code: 'INSUFFICIENT_SCOPES',
             message: `Missing required scopes: ${requiredScopes.join(', ')}`,
-            statusCode: 403
-          }
+            statusCode: 403,
+          },
         };
       }
 
@@ -219,10 +219,10 @@ export class JWTAuthMiddleware {
         success: true,
         authContext: {
           user: {
-            id: user.id
+            id: user.id,
           },
-          isAuthenticated: true
-        }
+          isAuthenticated: true,
+        },
       };
     } catch (error) {
       console.error('JWT authentication error:', error);
@@ -232,8 +232,8 @@ export class JWTAuthMiddleware {
         error: {
           code: 'JWT_VERIFICATION_ERROR',
           message: 'Failed to verify JWT token',
-          statusCode: 500
-        }
+          statusCode: 500,
+        },
       };
     }
   }
@@ -243,7 +243,7 @@ export class JWTAuthMiddleware {
    */
   private static async authenticateApiKey(
     apiKey: string,
-    requiredScopes: string[] = []
+    requiredScopes: string[] = [],
   ): Promise<AuthenticationResult> {
     try {
       // Validate API key format
@@ -254,8 +254,8 @@ export class JWTAuthMiddleware {
           error: {
             code: 'INVALID_API_KEY_FORMAT',
             message: 'Invalid API key format',
-            statusCode: 401
-          }
+            statusCode: 401,
+          },
         };
       }
 
@@ -273,8 +273,8 @@ export class JWTAuthMiddleware {
           error: {
             code: 'INVALID_API_KEY',
             message: 'Invalid or inactive API key',
-            statusCode: 401
-          }
+            statusCode: 401,
+          },
         };
       }
 
@@ -286,15 +286,15 @@ export class JWTAuthMiddleware {
           error: {
             code: 'API_KEY_EXPIRED',
             message: 'API key has expired',
-            statusCode: 401
-          }
+            statusCode: 401,
+          },
         };
       }
 
       // Check required scopes
       const apiKeyScopes = apiKeyData.allowed_endpoints || [];
-      const hasRequiredScopes = requiredScopes.every(scope => 
-        apiKeyScopes.includes(scope) || apiKeyScopes.includes('*')
+      const hasRequiredScopes = requiredScopes.every(scope =>
+        apiKeyScopes.includes(scope) || apiKeyScopes.includes('*'),
       );
 
       if (requiredScopes.length > 0 && !hasRequiredScopes) {
@@ -304,8 +304,8 @@ export class JWTAuthMiddleware {
           error: {
             code: 'INSUFFICIENT_API_KEY_SCOPES',
             message: `API key missing required scopes: ${requiredScopes.join(', ')}`,
-            statusCode: 403
-          }
+            statusCode: 403,
+          },
         };
       }
 
@@ -323,8 +323,8 @@ export class JWTAuthMiddleware {
           error: {
             code: 'INVALID_API_KEY',
             message: 'API key is not associated with a valid user',
-            statusCode: 403
-          }
+            statusCode: 403,
+          },
         };
       }
 
@@ -332,10 +332,10 @@ export class JWTAuthMiddleware {
         success: true,
         authContext: {
           user: {
-            id: apiKeyData.user_id
+            id: apiKeyData.user_id,
           },
-          isAuthenticated: true
-        }
+          isAuthenticated: true,
+        },
       };
     } catch (error) {
       console.error('API key authentication error:', error);
@@ -345,8 +345,8 @@ export class JWTAuthMiddleware {
         error: {
           code: 'API_KEY_VERIFICATION_ERROR',
           message: 'Failed to verify API key',
-          statusCode: 500
-        }
+          statusCode: 500,
+        },
       };
     }
   }
@@ -373,7 +373,7 @@ export class JWTAuthMiddleware {
 
       // Check if endpoint is in allowed list
       return apiKeyData.allowed_endpoints.some((allowedEndpoint: string) =>
-        endpoint.startsWith(allowedEndpoint)
+        endpoint.startsWith(allowedEndpoint),
       );
     } catch (error) {
       console.error('Endpoint access check error:', error);
@@ -403,8 +403,8 @@ export class JWTAuthMiddleware {
    */
   static extractWorkspaceId(request: AuthenticatedRequest): string | undefined {
     // Try to get workspace ID from various sources
-    return request.body?.workspaceId || 
-           request.headers['x-workspace-id'] || 
+    return request.body?.workspaceId ||
+           request.headers['x-workspace-id'] ||
            request.headers['X-Workspace-Id'];
   }
 
@@ -416,7 +416,7 @@ export class JWTAuthMiddleware {
       success: false,
       error: error.message,
       code: error.code,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -426,7 +426,7 @@ export class JWTAuthMiddleware {
  */
 export async function authenticateRequest(
   request: AuthenticatedRequest,
-  options?: JWTAuthOptions
+  options?: JWTAuthOptions,
 ) {
   return JWTAuthMiddleware.authenticate(request, options);
 }
@@ -437,11 +437,11 @@ export async function authenticateRequest(
 export async function authenticateWorkspaceRequest(
   request: AuthenticatedRequest,
   workspaceId: string,
-  options?: Omit<JWTAuthOptions, 'workspaceRequired'>
+  options?: Omit<JWTAuthOptions, 'workspaceRequired'>,
 ) {
   const authResult = await JWTAuthMiddleware.authenticate(request, {
     ...options,
-    workspaceRequired: true
+    workspaceRequired: true,
   });
 
   if (!authResult.success || !authResult.authContext.user) {
@@ -451,7 +451,7 @@ export async function authenticateWorkspaceRequest(
   // Check workspace access
   const hasAccess = await JWTAuthMiddleware.checkWorkspaceAccess(
     authResult.authContext.user.id,
-    workspaceId
+    workspaceId,
   );
 
   if (!hasAccess) {
@@ -461,8 +461,8 @@ export async function authenticateWorkspaceRequest(
       error: {
         code: 'WORKSPACE_ACCESS_DENIED',
         message: 'Access denied to workspace',
-        statusCode: 403
-      }
+        statusCode: 403,
+      },
     };
   }
 

@@ -1,7 +1,8 @@
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { MLResult, MaterialAnalysisResult, ImageClassificationResult } from './types';
 import { ImageClassifierService } from './imageClassifier';
 import { TextEmbedderService } from './textEmbedder';
-import { BaseService, ServiceConfig } from '../base/BaseService';
 
 export interface MaterialProperties {
   // Physical Properties
@@ -15,7 +16,7 @@ export interface MaterialProperties {
     porosity: number;
     surfaceRoughness: number;
   };
-  
+
   // Mechanical Properties
   mechanicalProperties: {
     tensileStrength: number;
@@ -26,7 +27,7 @@ export interface MaterialProperties {
     wearResistance: number;
     creepResistance: number;
   };
-  
+
   // Chemical Properties
   chemicalProperties: {
     composition: { [element: string]: number };
@@ -37,7 +38,7 @@ export interface MaterialProperties {
     alkalineResistance: number;
     solventResistance: number;
   };
-  
+
   // Environmental Properties
   environmentalProperties: {
     weatherResistance: number;
@@ -49,7 +50,7 @@ export interface MaterialProperties {
     carbonFootprint: number;
     toxicity: string;
   };
-  
+
   // Performance Characteristics
   performanceCharacteristics: {
     durability: number;
@@ -60,7 +61,7 @@ export interface MaterialProperties {
     costEffectiveness: number;
     availabilityScore: number;
   };
-  
+
   // Standards & Compliance
   compliance: {
     standards: string[];
@@ -114,11 +115,11 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
   private imageClassifier: ImageClassifierService;
   private textEmbedder: TextEmbedderService;
   private static knowledgeBase = new Map<string, Partial<MaterialProperties>>();
-  
+
   constructor(
     config: MaterialAnalyzerServiceConfig,
     imageClassifier?: ImageClassifierService,
-    textEmbedder?: TextEmbedderService
+    textEmbedder?: TextEmbedderService,
   ) {
     super(config);
     // Use dependency injection with fallback to new instances
@@ -126,13 +127,13 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       name: 'ImageClassifier',
       version: '1.0.0',
       environment: config.environment,
-      enabled: true
+      enabled: true,
     });
     this.textEmbedder = textEmbedder || new TextEmbedderService({
       name: 'TextEmbedder',
       version: '1.0.0',
       environment: config.environment,
-      enabled: true
+      enabled: true,
     });
   }
 
@@ -145,7 +146,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     // Initialize dependent services
     await Promise.all([
       this.imageClassifier.initialize(),
-      this.textEmbedder.initialize()
+      this.textEmbedder.initialize(),
     ]);
   }
 
@@ -178,7 +179,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
   async analyzeMaterial(imageSource: string | File | Blob, description?: string): Promise<MLResult> {
     return this.executeOperation(async () => {
       const startTime = performance.now();
-      
+
       const imageAnalysis = await this.imageClassifier.classify(imageSource);
       let textAnalysis = null;
 
@@ -194,15 +195,15 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         combined: {
           materialType: this.extractMaterialType(imageAnalysis.data),
           confidence: imageAnalysis.confidence || 0,
-          features: imageAnalysis.data?.slice(0, 3) || []
-        }
+          features: imageAnalysis.data?.slice(0, 3) || [],
+        },
       };
 
       return {
         success: imageAnalysis.success && (!description || textAnalysis?.success),
         data: result,
         confidence: imageAnalysis.confidence,
-        processingTime: Math.round(processingTime)
+        processingTime: Math.round(processingTime),
       };
     }, 'analyzeMaterial');
   }
@@ -212,10 +213,10 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
    */
   async analyzeAdvancedProperties(
     imageFile: File,
-    options: MaterialAnalysisOptions = { 
-      analysisDepth: this.config.defaultAnalysisDepth || 'standard', 
-      focusAreas: [] 
-    }
+    options: MaterialAnalysisOptions = {
+      analysisDepth: this.config.defaultAnalysisDepth || 'standard',
+      focusAreas: [],
+    },
   ): Promise<MLResult> {
     return this.executeOperation(async () => {
       const startTime = performance.now();
@@ -226,23 +227,23 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
       // Create image bitmap for analysis
       const imageBitmap = await createImageBitmap(imageFile);
-      
+
       // Perform visual analysis
       const visualAnalysis = await this.performVisualAnalysis(imageBitmap);
-      
+
       // Get material properties from knowledge base
-      const baseProperties = MaterialAnalyzerService.knowledgeBase.get(visualAnalysis.materialType.toLowerCase()) || 
+      const baseProperties = MaterialAnalyzerService.knowledgeBase.get(visualAnalysis.materialType.toLowerCase()) ||
                            this.getDefaultProperties();
-      
+
       // Enhance properties based on visual analysis
       const enhancedProperties = this.enhancePropertiesFromVisual(baseProperties, visualAnalysis);
-      
+
       // Apply analysis depth and focus areas
       const finalProperties = this.applyAnalysisOptions(enhancedProperties, options);
-      
+
       // Generate recommendations
       const recommendations = this.generateRecommendations(visualAnalysis.materialType, finalProperties);
-      
+
       // Assess quality
       const qualityAssessment = this.assessQuality(finalProperties, visualAnalysis);
 
@@ -252,13 +253,13 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         properties: finalProperties,
         recommendations,
         qualityAssessment,
-        processingTime: performance.now() - startTime
+        processingTime: performance.now() - startTime,
       };
 
       return {
         success: true,
         data: result,
-        processingTime: performance.now() - startTime
+        processingTime: performance.now() - startTime,
       };
     }, 'analyzeAdvancedProperties');
   }
@@ -270,7 +271,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     return this.executeOperation(async () => {
       await Promise.all([
         this.imageClassifier.initialize(),
-        this.textEmbedder.initialize()
+        this.textEmbedder.initialize(),
       ]);
     }, 'preloadModels');
   }
@@ -278,22 +279,22 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
   /**
    * Get service status including dependent services
    */
-  getAnalysisStatus(): { 
-    initialized: boolean; 
+  getAnalysisStatus(): {
+    initialized: boolean;
     models: Array<{ name: string; initialized: boolean }>;
     knowledgeBaseSize: number;
     capabilities: string[];
   } {
     const capabilities = [];
-    
+
     if (this.config.enableAdvancedAnalysis) {
       capabilities.push('Advanced Analysis');
     }
-    
+
     if (this.config.enableVisualAnalysis) {
       capabilities.push('Visual Analysis');
     }
-    
+
     if (typeof window !== 'undefined' && 'createImageBitmap' in window) {
       capabilities.push('Image Processing');
     }
@@ -302,10 +303,10 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       initialized: this.imageClassifier.isReady() && this.textEmbedder.isReady(),
       models: [
         this.imageClassifier.getModelInfo(),
-        this.textEmbedder.getModelInfo()
+        this.textEmbedder.getModelInfo(),
       ],
       knowledgeBaseSize: MaterialAnalyzerService.knowledgeBase.size,
-      capabilities
+      capabilities,
     };
   }
 
@@ -330,7 +331,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       'concrete': 'concrete',
       'rubber': 'rubber',
       'stone': 'ceramics',
-      'leather': 'textiles'
+      'leather': 'textiles',
     };
 
     for (const [key, category] of Object.entries(materialMappings)) {
@@ -353,7 +354,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         electricalConductivity: 6,
         magneticProperties: 'ferromagnetic',
         porosity: 0,
-        surfaceRoughness: 1.6
+        surfaceRoughness: 1.6,
       },
       mechanicalProperties: {
         tensileStrength: 400,
@@ -362,7 +363,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         fatigueResistance: 8,
         impactResistance: 9,
         wearResistance: 8,
-        creepResistance: 7
+        creepResistance: 7,
       },
       environmentalProperties: {
         weatherResistance: 4,
@@ -372,8 +373,8 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         fireResistance: 9,
         recyclability: 10,
         carbonFootprint: 6,
-        toxicity: 'low'
-      }
+        toxicity: 'low',
+      },
     });
 
     // Concrete properties template
@@ -386,7 +387,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         electricalConductivity: 0,
         magneticProperties: 'non-magnetic',
         porosity: 15,
-        surfaceRoughness: 50
+        surfaceRoughness: 50,
       },
       mechanicalProperties: {
         tensileStrength: 4,
@@ -395,7 +396,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         fatigueResistance: 6,
         impactResistance: 4,
         wearResistance: 7,
-        creepResistance: 8
+        creepResistance: 8,
       },
       environmentalProperties: {
         weatherResistance: 8,
@@ -405,8 +406,8 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         fireResistance: 10,
         recyclability: 8,
         carbonFootprint: 4,
-        toxicity: 'very low'
-      }
+        toxicity: 'very low',
+      },
     });
 
     // Plastic (PVC) properties template
@@ -419,7 +420,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         electricalConductivity: 0,
         magneticProperties: 'non-magnetic',
         porosity: 0,
-        surfaceRoughness: 0.8
+        surfaceRoughness: 0.8,
       },
       mechanicalProperties: {
         tensileStrength: 50,
@@ -428,7 +429,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         fatigueResistance: 6,
         impactResistance: 5,
         wearResistance: 6,
-        creepResistance: 5
+        creepResistance: 5,
       },
       environmentalProperties: {
         weatherResistance: 7,
@@ -438,8 +439,8 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         fireResistance: 3,
         recyclability: 6,
         carbonFootprint: 3,
-        toxicity: 'low'
-      }
+        toxicity: 'low',
+      },
     });
   }
 
@@ -458,27 +459,27 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
     ctx.drawImage(imageBitmap, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
+
     // Analyze color patterns
     const colorAnalysis = this.analyzeColors(imageData);
-    
+
     // Analyze texture patterns
     const textureAnalysis = this.analyzeTexture(imageData);
-    
+
     // Analyze surface features
     const surfaceAnalysis = this.analyzeSurface(imageData);
-    
+
     // Determine material type based on visual features
     const materialType = this.classifyMaterial(colorAnalysis, textureAnalysis, surfaceAnalysis);
-    
+
     return {
       materialType: materialType.type,
       confidence: materialType.confidence,
       visualFeatures: {
         color: colorAnalysis,
         texture: textureAnalysis,
-        surface: surfaceAnalysis
-      }
+        surface: surfaceAnalysis,
+      },
     };
   }
 
@@ -489,7 +490,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       contrast: 0,
       dominantColors: [] as string[],
       metallic: 0,
-      matte: 0
+      matte: 0,
     };
 
     let totalBrightness = 0;
@@ -499,14 +500,14 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
-      
+
       const brightness = (r + g + b) / 3;
       totalBrightness += brightness;
-      
+
       // Quantize color for dominant color detection
       const quantizedColor = `${Math.floor(r / 32) * 32},${Math.floor(g / 32) * 32},${Math.floor(b / 32) * 32}`;
       colorMap.set(quantizedColor, (colorMap.get(quantizedColor) || 0) + 1);
-      
+
       // Detect metallic properties (high contrast, specific color ranges)
       if (brightness > 200 && Math.abs(r - g) < 30 && Math.abs(g - b) < 30) {
         colorStats.metallic++;
@@ -514,13 +515,13 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     }
 
     colorStats.brightness = totalBrightness / (data.length / 4);
-    
+
     // Get dominant colors
     const sortedColors = Array.from(colorMap.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([color]) => color);
-    
+
     colorStats.dominantColors = sortedColors;
     colorStats.metallic = colorStats.metallic / (data.length / 4);
     colorStats.matte = 1 - colorStats.metallic;
@@ -530,7 +531,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   private analyzeTexture(imageData: ImageData): any {
     const { data, width, height } = imageData;
-    
+
     // Simple texture analysis using local binary patterns
     let roughness = 0;
     let uniformity = 0;
@@ -540,40 +541,40 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       for (let x = 1; x < width - 1; x++) {
         const centerIdx = (y * width + x) * 4;
         const center = (data[centerIdx] + data[centerIdx + 1] + data[centerIdx + 2]) / 3;
-        
+
         let pattern = 0;
         let variance = 0;
-        
+
         // Check 8 neighbors
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             if (dx === 0 && dy === 0) continue;
-            
+
             const neighborIdx = ((y + dy) * width + (x + dx)) * 4;
             const neighbor = (data[neighborIdx] + data[neighborIdx + 1] + data[neighborIdx + 2]) / 3;
-            
+
             if (neighbor > center) pattern++;
             variance += Math.abs(neighbor - center);
           }
         }
-        
+
         roughness += variance / 8;
         if (pattern > 4) edgeCount++;
       }
     }
 
     const pixelCount = (width - 2) * (height - 2);
-    
+
     return {
       roughness: roughness / pixelCount,
       edgeDensity: edgeCount / pixelCount,
-      uniformity: 1 - (edgeCount / pixelCount)
+      uniformity: 1 - (edgeCount / pixelCount),
     };
   }
 
   private analyzeSurface(imageData: ImageData): any {
     const { data } = imageData;
-    
+
     let reflection = 0;
     let glossiness = 0;
     let porosity = 0;
@@ -582,16 +583,16 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
-      
+
       const brightness = (r + g + b) / 3;
       const saturation = Math.max(r, g, b) - Math.min(r, g, b);
-      
+
       // High brightness with low saturation indicates reflection
       if (brightness > 200 && saturation < 30) {
         reflection++;
         glossiness += brightness / 255;
       }
-      
+
       // Dark spots might indicate porosity
       if (brightness < 50) {
         porosity++;
@@ -599,12 +600,12 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     }
 
     const pixelCount = data.length / 4;
-    
+
     return {
       reflection: reflection / pixelCount,
       glossiness: glossiness / Math.max(reflection, 1),
       porosity: porosity / pixelCount,
-      smoothness: 1 - (porosity / pixelCount)
+      smoothness: 1 - (porosity / pixelCount),
     };
   }
 
@@ -618,7 +619,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       smooth: surfaceAnalysis.smoothness > 0.8,
       dark: colorAnalysis.brightness < 100,
       bright: colorAnalysis.brightness > 180,
-      porous: surfaceAnalysis.porosity > 0.2
+      porous: surfaceAnalysis.porosity > 0.2,
     };
 
     // Classification logic
@@ -645,29 +646,29 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         electricalConductivity: 0,
         magneticProperties: 'non-magnetic',
         porosity: 10,
-        surfaceRoughness: 20
-      }
+        surfaceRoughness: 20,
+      },
     };
   }
 
   private enhancePropertiesFromVisual(
     baseProperties: Partial<MaterialProperties>,
-    visualAnalysis: any
+    visualAnalysis: any,
   ): MaterialProperties {
     const enhanced = JSON.parse(JSON.stringify(baseProperties)) as MaterialProperties;
-    
+
     // Enhance based on visual features
     if (visualAnalysis.visualFeatures.surface.roughness > 100) {
       if (enhanced.physicalProperties) {
         enhanced.physicalProperties.surfaceRoughness *= 1.5;
       }
     }
-    
+
     if (visualAnalysis.visualFeatures.surface.porosity > 0.2) {
       if (enhanced.physicalProperties) {
         enhanced.physicalProperties.porosity = Math.max(
-          enhanced.physicalProperties.porosity, 
-          visualAnalysis.visualFeatures.surface.porosity * 100
+          enhanced.physicalProperties.porosity,
+          visualAnalysis.visualFeatures.surface.porosity * 100,
         );
       }
     }
@@ -686,7 +687,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         magneticProperties: 'non-magnetic',
         porosity: 5,
         surfaceRoughness: 10,
-        ...properties.physicalProperties
+        ...properties.physicalProperties,
       },
       mechanicalProperties: {
         tensileStrength: 100,
@@ -696,7 +697,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         impactResistance: 5,
         wearResistance: 5,
         creepResistance: 5,
-        ...properties.mechanicalProperties
+        ...properties.mechanicalProperties,
       },
       chemicalProperties: {
         composition: {},
@@ -706,7 +707,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         acidResistance: 5,
         alkalineResistance: 5,
         solventResistance: 5,
-        ...properties.chemicalProperties
+        ...properties.chemicalProperties,
       },
       environmentalProperties: {
         weatherResistance: 5,
@@ -717,7 +718,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         recyclability: 5,
         carbonFootprint: 5,
         toxicity: 'unknown',
-        ...properties.environmentalProperties
+        ...properties.environmentalProperties,
       },
       performanceCharacteristics: {
         durability: 5,
@@ -727,7 +728,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         qualityRating: 5,
         costEffectiveness: 5,
         availabilityScore: 5,
-        ...properties.performanceCharacteristics
+        ...properties.performanceCharacteristics,
       },
       compliance: {
         standards: [],
@@ -735,14 +736,14 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         regulatoryCompliance: [],
         safetyRatings: [],
         industryGrades: [],
-        ...properties.compliance
-      }
+        ...properties.compliance,
+      },
     };
   }
 
   private applyAnalysisOptions(
     properties: MaterialProperties,
-    options: MaterialAnalysisOptions
+    options: MaterialAnalysisOptions,
   ): MaterialProperties {
     // Apply analysis depth filtering
     if (options.analysisDepth === 'basic') {
@@ -751,24 +752,24 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         ...properties,
         chemicalProperties: {
           ...properties.chemicalProperties,
-          composition: {} // Remove detailed composition for basic analysis
-        }
+          composition: {}, // Remove detailed composition for basic analysis
+        },
       };
     }
-    
+
     return properties;
   }
 
   private generateRecommendations(
     materialType: string,
-    properties: MaterialProperties
+    properties: MaterialProperties,
   ): AdvancedMaterialAnalysisResult['recommendations'] {
     const recommendations = {
       applications: [] as string[],
       suitableEnvironments: [] as string[],
       incompatibleMaterials: [] as string[],
       maintenanceGuidelines: [] as string[],
-      safetyPrecautions: [] as string[]
+      safetyPrecautions: [] as string[],
     };
 
     // Generate based on material type and properties
@@ -780,7 +781,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         recommendations.maintenanceGuidelines = ['Regular corrosion inspection', 'Protective coating renewal'];
         recommendations.safetyPrecautions = ['Fire safety compliance', 'Proper grounding'];
         break;
-        
+
       case 'concrete':
         recommendations.applications = ['Foundations', 'Structural elements', 'Pavements'];
         recommendations.suitableEnvironments = ['All weather conditions', 'Underground', 'Marine (with treatment)'];
@@ -788,7 +789,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         recommendations.maintenanceGuidelines = ['Crack monitoring', 'Surface sealing', 'Freeze-thaw protection'];
         recommendations.safetyPrecautions = ['Proper curing', 'Load capacity adherence'];
         break;
-        
+
       default:
         recommendations.applications = ['General construction', 'Non-critical applications'];
         recommendations.suitableEnvironments = ['Standard indoor conditions'];
@@ -800,17 +801,17 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   private assessQuality(
     properties: MaterialProperties,
-    visualAnalysis: any
+    visualAnalysis: any,
   ): AdvancedMaterialAnalysisResult['qualityAssessment'] {
     const scores = {
       mechanical: (properties.mechanicalProperties.tensileStrength / 500) * 10,
       environmental: (properties.environmentalProperties.weatherResistance / 10) * 10,
       durability: (properties.performanceCharacteristics.durability / 10) * 10,
-      visual: visualAnalysis.confidence * 10
+      visual: visualAnalysis.confidence * 10,
     };
 
     const overallScore = Object.values(scores).reduce((a, b) => a + b, 0) / Object.keys(scores).length;
-    
+
     let grade = 'F';
     if (overallScore >= 9) grade = 'A+';
     else if (overallScore >= 8) grade = 'A';
@@ -822,13 +823,13 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       overallGrade: grade,
       strengthAreas: this.identifyStrengths(properties),
       weaknessAreas: this.identifyWeaknesses(properties),
-      improvementSuggestions: this.generateImprovementSuggestions(properties, grade)
+      improvementSuggestions: this.generateImprovementSuggestions(properties, grade),
     };
   }
 
   private identifyStrengths(properties: MaterialProperties): string[] {
     const strengths = [];
-    
+
     if (properties.mechanicalProperties.tensileStrength > 300) {
       strengths.push('High tensile strength');
     }
@@ -847,7 +848,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   private identifyWeaknesses(properties: MaterialProperties): string[] {
     const weaknesses = [];
-    
+
     if (properties.mechanicalProperties.tensileStrength < 100) {
       weaknesses.push('Low tensile strength');
     }
@@ -866,19 +867,19 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   private generateImprovementSuggestions(
     properties: MaterialProperties,
-    grade: string
+    grade: string,
   ): string[] {
     const suggestions = [];
-    
+
     if (grade < 'B') {
       suggestions.push('Consider material treatment or coating for enhanced performance');
       suggestions.push('Evaluate alternative materials with better properties');
     }
-    
+
     if (properties.chemicalProperties.corrosionResistance < 6) {
       suggestions.push('Apply protective coating to improve corrosion resistance');
     }
-    
+
     if (properties.performanceCharacteristics.lifecycle < 15) {
       suggestions.push('Implement preventive maintenance program to extend lifecycle');
     }
@@ -898,18 +899,18 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       timeout: 30000,
       retries: 2,
       rateLimit: {
-        requestsPerMinute: 20
+        requestsPerMinute: 20,
       },
       healthCheck: {
         enabled: true,
         interval: 300000, // 5 minutes
-        timeout: 10000
+        timeout: 10000,
       },
       enableAdvancedAnalysis: true,
       knowledgeBaseSize: 100,
       defaultAnalysisDepth: 'standard',
       enableVisualAnalysis: true,
-      ...config
+      ...config,
     };
 
     return new MaterialAnalyzerService(defaultConfig);

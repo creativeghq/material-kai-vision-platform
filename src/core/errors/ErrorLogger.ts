@@ -59,9 +59,9 @@ export class ErrorLogger {
         ...(error instanceof AppError && {
           code: error.code,
           category: error.category,
-          severity: error.severity
-        })
-      }
+          severity: error.severity,
+        }),
+      },
     };
 
     this.addLogEntry(entry);
@@ -79,7 +79,7 @@ export class ErrorLogger {
       service: context.service,
       operation: context.operation,
       message,
-      metadata: context.metadata
+      metadata: context.metadata,
     };
 
     this.addLogEntry(entry);
@@ -97,7 +97,7 @@ export class ErrorLogger {
       service: context.service,
       operation: context.operation,
       message,
-      metadata: context.metadata
+      metadata: context.metadata,
     };
 
     this.addLogEntry(entry);
@@ -117,7 +117,7 @@ export class ErrorLogger {
         service: context.service,
         operation: context.operation,
         message,
-        metadata: context.metadata
+        metadata: context.metadata,
       };
 
       this.addLogEntry(entry);
@@ -162,7 +162,7 @@ export class ErrorLogger {
 
   private addLogEntry(entry: LogEntry): void {
     this.logs.push(entry);
-    
+
     // Keep only the most recent logs to prevent memory issues
     if (this.logs.length > this.maxLogs) {
       this.logs = this.logs.slice(-this.maxLogs);
@@ -171,7 +171,7 @@ export class ErrorLogger {
 
   private outputToConsole(entry: LogEntry): void {
     const logMessage = `[${entry.timestamp}] [${entry.level.toUpperCase()}] [${entry.correlationId}] ${entry.service}:${entry.operation} - ${entry.message}`;
-    
+
     switch (entry.level) {
       case 'error':
         console.error(logMessage, entry.error, entry.metadata);

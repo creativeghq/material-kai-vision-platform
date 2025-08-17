@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Eye, 
-  Download, 
-  Copy, 
-  FileText, 
-  Image as ImageIcon, 
-  Table, 
+import {
+  Eye,
+  Download,
+  Copy,
+  FileText,
+  Image as ImageIcon,
+  Table,
   FileSpreadsheet,
   Search,
   Filter,
@@ -14,8 +14,9 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Loader2
+  Loader2,
 } from 'lucide-react';
+
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -49,20 +50,20 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
   // Filter results based on props and filters
   const filteredResults = useMemo(() => {
     let filtered = showAllResults ? results : results.filter(r => r.id === analysisId);
-    
+
     if (searchTerm) {
       filtered = filtered.filter(result =>
         result.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (result.results?.ocr && searchTerm.toLowerCase().includes('ocr')) ||
         (result.results?.objects && searchTerm.toLowerCase().includes('object')) ||
-        (result.results?.classification && searchTerm.toLowerCase().includes('classification'))
+        (result.results?.classification && searchTerm.toLowerCase().includes('classification')),
       );
     }
-    
+
     if (statusFilter !== 'all') {
       filtered = filtered.filter(result => result.status === statusFilter);
     }
-    
+
     if (typeFilter !== 'all') {
       filtered = filtered.filter(result => {
         switch (typeFilter) {
@@ -79,7 +80,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
         }
       });
     }
-    
+
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [results, analysisId, showAllResults, searchTerm, statusFilter, typeFilter]);
 
@@ -154,7 +155,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
           <p className="text-sm">{block.text}</p>
           {block.boundingBox && (
             <p className="text-xs text-gray-500 mt-1">
-              Position: ({block.boundingBox.x}, {block.boundingBox.y}) 
+              Position: ({block.boundingBox.x}, {block.boundingBox.y})
               Size: {block.boundingBox.width}×{block.boundingBox.height}
             </p>
           )}
@@ -178,7 +179,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
           </div>
           {obj.boundingBox && (
             <p className="text-xs text-gray-500">
-              Position: ({obj.boundingBox.x}, {obj.boundingBox.y}) 
+              Position: ({obj.boundingBox.x}, {obj.boundingBox.y})
               Size: {obj.boundingBox.width}×{obj.boundingBox.height}
             </p>
           )}
@@ -282,7 +283,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Status</label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -298,7 +299,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Type</label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -338,7 +339,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                       )}
                     </CollapsibleTrigger>
                   </Collapsible>
-                  
+
                   <div>
                     <CardTitle className="text-lg">Analysis {result.id}</CardTitle>
                     <div className="flex items-center gap-2 mt-1">
@@ -365,7 +366,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {onResultSelect && (
                     <Button
@@ -384,7 +385,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                 </div>
               </div>
             </CardHeader>
-            
+
             <Collapsible open={expandedResults.has(result.id)}>
               <CollapsibleContent>
                 <CardContent>
@@ -393,7 +394,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                       <p className="text-red-700 text-sm">{result.error}</p>
                     </div>
                   )}
-                  
+
                   {result.status === 'completed' && result.results && (
                     <Tabs defaultValue="overview" className="w-full">
                       <TabsList className="grid w-full grid-cols-5">
@@ -403,7 +404,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                         <TabsTrigger value="tables">Tables</TabsTrigger>
                         <TabsTrigger value="forms">Forms</TabsTrigger>
                       </TabsList>
-                      
+
                       <TabsContent value="overview" className="mt-4">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <Card className="p-3">
@@ -415,7 +416,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                               </p>
                             </div>
                           </Card>
-                          
+
                           <Card className="p-3">
                             <div className="text-center">
                               <ImageIcon className="h-6 w-6 mx-auto mb-2 text-green-500" />
@@ -425,7 +426,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                               </p>
                             </div>
                           </Card>
-                          
+
                           <Card className="p-3">
                             <div className="text-center">
                               <Table className="h-6 w-6 mx-auto mb-2 text-purple-500" />
@@ -435,7 +436,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                               </p>
                             </div>
                           </Card>
-                          
+
                           <Card className="p-3">
                             <div className="text-center">
                               <FileSpreadsheet className="h-6 w-6 mx-auto mb-2 text-orange-500" />
@@ -446,7 +447,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                             </div>
                           </Card>
                         </div>
-                        
+
                         {result.results.metadata && (
                           <Card className="mt-4 p-3">
                             <h4 className="font-medium mb-2">Metadata</h4>
@@ -467,7 +468,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                           </Card>
                         )}
                       </TabsContent>
-                      
+
                       <TabsContent value="ocr" className="mt-4">
                         <ScrollArea className="h-96">
                           {result.results?.ocr?.blocks && result.results.ocr.blocks.length > 0 ? (
@@ -477,7 +478,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                           )}
                         </ScrollArea>
                       </TabsContent>
-                      
+
                       <TabsContent value="objects" className="mt-4">
                         <ScrollArea className="h-96">
                           {result.results?.objects && result.results.objects.length > 0 ? (
@@ -487,7 +488,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                           )}
                         </ScrollArea>
                       </TabsContent>
-                      
+
                       <TabsContent value="tables" className="mt-4">
                         <ScrollArea className="h-96">
                           {result.results?.ocr?.tables && result.results.ocr.tables.length > 0 ? (
@@ -497,7 +498,7 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
                           )}
                         </ScrollArea>
                       </TabsContent>
-                      
+
                       <TabsContent value="forms" className="mt-4">
                         <ScrollArea className="h-96">
                           {result.results?.ocr?.forms && result.results.ocr.forms.length > 0 ? (

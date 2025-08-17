@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -41,7 +41,7 @@ interface RAGSearchResult {
 // Generate embeddings using OpenAI
 async function generateQueryEmbedding(text: string): Promise<number[]> {
   console.log('Generating embedding for query:', text.substring(0, 100));
-  
+
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
@@ -66,8 +66,8 @@ async function generateQueryEmbedding(text: string): Promise<number[]> {
 
 // Perform enhanced vector search
 async function performRAGSearch(
-  queryEmbedding: number[], 
-  searchParams: RAGSearchRequest
+  queryEmbedding: number[],
+  searchParams: RAGSearchRequest,
 ): Promise<any[]> {
   console.log('Performing RAG search with params:', searchParams);
 
@@ -77,7 +77,7 @@ async function performRAGSearch(
       search_type: searchParams.search_type || 'hybrid',
       embedding_types: searchParams.embedding_types || ['clip'],
       match_threshold: searchParams.match_threshold || 0.7,
-      match_count: searchParams.match_count || 10
+      match_count: searchParams.match_count || 10,
     });
 
   if (error) {
@@ -91,7 +91,7 @@ async function performRAGSearch(
 // Generate contextual response using RAG results
 async function generateRAGContext(query: string, searchResults: any[]): Promise<string> {
   if (!searchResults.length) {
-    return "No relevant materials or knowledge found for your query.";
+    return 'No relevant materials or knowledge found for your query.';
   }
 
   // Prepare context from search results
@@ -131,15 +131,15 @@ Provide a comprehensive answer that synthesizes this information and directly ad
       messages: [
         {
           role: 'system',
-          content: 'You are a material expert assistant. Provide helpful, accurate information about materials based on the provided context.'
+          content: 'You are a material expert assistant. Provide helpful, accurate information about materials based on the provided context.',
         },
         {
           role: 'user',
-          content: contextPrompt
-        }
+          content: contextPrompt,
+        },
       ],
       max_tokens: 1000,
-      temperature: 0.3
+      temperature: 0.3,
     }),
   });
 
@@ -169,7 +169,7 @@ serve(async (req) => {
     if (!requestBody.query) {
       return new Response(
         JSON.stringify({ error: 'Query is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 },
       );
     }
 
@@ -194,25 +194,25 @@ serve(async (req) => {
       context,
       query_embedding: requestBody.include_context ? undefined : queryEmbedding, // Only include if no context needed
       search_params: requestBody,
-      processing_time_ms: processingTime
+      processing_time_ms: processingTime,
     };
 
     console.log(`RAG search completed in ${processingTime}ms`);
 
     return new Response(
       JSON.stringify(result),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
 
   } catch (error) {
     console.error('RAG search error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'RAG search failed', 
+      JSON.stringify({
+        error: 'RAG search failed',
         details: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 },
     );
   }
 });

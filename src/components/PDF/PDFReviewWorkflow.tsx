@@ -1,12 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
 import {
   Check,
   X,
@@ -16,10 +8,20 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Zap
+  Zap,
 } from 'lucide-react';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+
 import { PDFExportOptions } from './PDFExportOptions';
 
 interface PDFTile {
@@ -62,14 +64,14 @@ interface PDFReviewWorkflowProps {
   onWorkflowComplete?: (results: any) => void;
 }
 
-export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({ 
-  processingId, 
-  tiles, 
-  onWorkflowComplete 
+export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
+  processingId,
+  tiles,
+  onWorkflowComplete,
 }) => {
   const { toast } = useToast();
   const [reviewedTiles, setReviewedTiles] = useState<ReviewedTile[]>(
-    tiles.map(tile => ({ ...tile, reviewed: false, approved: false }))
+    tiles.map(tile => ({ ...tile, reviewed: false, approved: false })),
   );
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set());
   const [workflowActions, setWorkflowActions] = useState<Set<string>>(new Set());
@@ -82,22 +84,22 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
       type: 'ai_analysis',
       label: 'AI Analysis',
       description: 'Deep analysis with AI models',
-      icon: <Brain className="h-4 w-4" />
+      icon: <Brain className="h-4 w-4" />,
     },
     {
       id: 'image_generation',
       type: 'image_generation',
       label: 'Generate Images',
       description: 'Create visual representations of materials',
-      icon: <ImageIcon className="h-4 w-4" />
-    }
+      icon: <ImageIcon className="h-4 w-4" />,
+    },
   ];
 
   const updateTileReview = (tileId: string, updates: Partial<ReviewedTile>) => {
-    setReviewedTiles(prev => 
-      prev.map(tile => 
-        tile.id === tileId ? { ...tile, ...updates } : tile
-      )
+    setReviewedTiles(prev =>
+      prev.map(tile =>
+        tile.id === tileId ? { ...tile, ...updates } : tile,
+      ),
     );
   };
 
@@ -135,9 +137,9 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
   const executeWorkflow = async () => {
     if (selectedTiles.size === 0 || workflowActions.size === 0) {
       toast({
-        title: "Selection Required",
-        description: "Please select tiles and workflow actions",
-        variant: "destructive",
+        title: 'Selection Required',
+        description: 'Please select tiles and workflow actions',
+        variant: 'destructive',
       });
       return;
     }
@@ -158,14 +160,14 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         if (!action) continue;
 
         console.log(`Executing workflow: ${action.label}`);
-        
+
         try {
           switch (action.type) {
             case 'ai_analysis':
               workflowResults.ai_analysis = await performAIAnalysis(selectedTileData);
               break;
-              
-              
+
+
             case 'image_generation':
               workflowResults.image_generation = await generateMaterialImages(selectedTileData);
               break;
@@ -180,7 +182,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
       }
 
       toast({
-        title: "Workflow Complete",
+        title: 'Workflow Complete',
         description: `Successfully processed ${selectedTiles.size} tiles through ${workflowActions.size} workflows`,
       });
 
@@ -189,9 +191,9 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
     } catch (error) {
       console.error('Workflow execution error:', error);
       toast({
-        title: "Workflow Failed",
+        title: 'Workflow Failed',
         description: error instanceof Error ? error.message : 'Unknown error',
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setProcessingWorkflow(false);
@@ -208,8 +210,8 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         text: tile.corrected_text || tile.extracted_text,
         material_type: tile.corrected_material_type || tile.material_type,
         structured_data: tile.structured_data,
-        image_url: tile.image_url
-      }))
+        image_url: tile.image_url,
+      })),
     });
 
     if (!result.success) throw new Error(result.error?.message || 'AI analysis failed');
@@ -219,7 +221,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
   const generateMaterialImages = async (tiles: ReviewedTile[]) => {
     const images = [];
-    
+
     for (const tile of tiles) {
       try {
         const prompt = `High-quality technical illustration of ${tile.corrected_material_type || tile.material_type} material. 
@@ -230,7 +232,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         const result = await apiService.executeSupabaseFunction('generate-material-image', {
           prompt,
           material_type: tile.corrected_material_type || tile.material_type,
-          tile_id: tile.id
+          tile_id: tile.id,
         });
 
         if (!result.success) throw new Error(result.error?.message || 'Image generation failed');
@@ -298,7 +300,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
               Select All Approved
             </Button>
           </div>
-          
+
           <div className="grid gap-4">
             {reviewedTiles.map((tile) => (
               <Card key={tile.id} className={`transition-colors ${tile.approved ? 'border-green-200 bg-green-50/50' : ''}`}>
@@ -326,7 +328,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       {tile.reviewed ? (
                         tile.approved ? (
@@ -425,7 +427,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
             <h3 className="text-lg font-semibold mb-4">Select Workflow Actions</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {availableWorkflows.map((workflow) => (
-                <Card 
+                <Card
                   key={workflow.id}
                   className={`cursor-pointer transition-colors ${workflowActions.has(workflow.id) ? 'border-primary bg-primary/5' : ''}`}
                   onClick={() => toggleWorkflowAction(workflow.id)}
@@ -477,8 +479,8 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
               )}
 
               <div className="flex gap-2">
-                <Button 
-                  onClick={executeWorkflow} 
+                <Button
+                  onClick={executeWorkflow}
                   disabled={selectedTiles.size === 0 || workflowActions.size === 0 || processingWorkflow}
                   className="flex-1"
                 >
@@ -486,8 +488,8 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                   Execute Pipeline
                 </Button>
               </div>
-              
-              <PDFExportOptions 
+
+              <PDFExportOptions
                 processingId={processingId}
                 tiles={reviewedTiles}
                 resultSummary={stats}

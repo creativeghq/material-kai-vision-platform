@@ -1,6 +1,6 @@
 /**
  * Main Configuration Index
- * 
+ *
  * This file provides a unified interface for both the legacy API configuration system
  * and the new centralized configuration management system for microservice integration.
  */
@@ -29,14 +29,14 @@ export const initializeConfiguration = async (): Promise<AppConfig> => {
   try {
     // Initialize the centralized configuration first
     globalConfig = await configFactory.create();
-    
+
     // Initialize legacy API configuration system
     initializeApiConfigurations();
-    
+
     console.log('✅ Complete configuration system initialized successfully');
     console.log('📊 Centralized config summary:', configFactory.getConfigSummary());
     console.log('🔌 API config summary:', ApiConfigManager.getConfigSummary());
-    
+
     return globalConfig;
   } catch (error) {
     console.error('❌ Failed to initialize configuration system:', error);
@@ -58,7 +58,7 @@ export const getConfig = (): AppConfig => {
  * Get configuration for a specific service
  */
 export const getServiceConfig = <T extends keyof AppConfig['services']>(
-  serviceName: T
+  serviceName: T,
 ): AppConfig['services'][T] => {
   const config = getConfig();
   return config.services[serviceName];
@@ -69,7 +69,7 @@ export const getServiceConfig = <T extends keyof AppConfig['services']>(
  */
 export const isFeatureEnabled = (feature: string): boolean => {
   const config = getConfig();
-  
+
   switch (feature) {
     case 'debug':
       return config.debug;
@@ -92,11 +92,11 @@ export const isFeatureEnabled = (feature: string): boolean => {
 export const reloadConfiguration = async (): Promise<AppConfig> => {
   await configFactory.reload();
   globalConfig = configFactory.getCurrentConfig();
-  
+
   if (!globalConfig) {
     throw new Error('Failed to reload configuration');
   }
-  
+
   console.log('🔄 Configuration reloaded successfully');
   return globalConfig;
 };
@@ -105,10 +105,10 @@ export const reloadConfiguration = async (): Promise<AppConfig> => {
 export function initializeApiConfigurations(): void {
   // Register Replicate API configuration
   apiRegistry.registerApi(replicateConfig);
-  
+
   // Register Supabase API configuration
   apiRegistry.registerApi(supabaseConfig);
-  
+
   // Register Hugging Face API configuration
   apiRegistry.registerApi(huggingfaceConfig);
 }
@@ -173,7 +173,7 @@ export class ApiConfigManager {
    */
   public static getApiConfigByType<T extends ApiConfig>(type: string): T | null {
     const config = apiRegistry.getApiConfigByType<T>(type);
-    
+
     if (!config) {
       return null;
     }
@@ -208,7 +208,7 @@ export class ApiConfigManager {
       if (config.type === 'replicate' && isServerSide && !config.apiKey) {
         missing.push('REPLICATE_API_TOKEN');
       }
-      
+
       if (config.type === 'supabase') {
         const supabaseConfig = config as any;
         // Public environment variables should always be available
@@ -219,7 +219,7 @@ export class ApiConfigManager {
           missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
         }
       }
-      
+
       // Only validate private API keys on server-side
       if (config.type === 'huggingface' && isServerSide && !config.apiKey) {
         missing.push('HUGGINGFACE_API_TOKEN');
@@ -228,7 +228,7 @@ export class ApiConfigManager {
 
     return {
       valid: missing.length === 0,
-      missing: [...new Set(missing)] // Remove duplicates
+      missing: Array.from(new Set(missing)), // Remove duplicates
     };
   }
 
@@ -243,7 +243,7 @@ export class ApiConfigManager {
   } {
     const configs = apiRegistry.getAllConfigs();
     const configsByType: Record<string, number> = {};
-    
+
     configs.forEach(config => {
       configsByType[config.type] = (configsByType[config.type] || 0) + 1;
     });
@@ -286,7 +286,7 @@ export class ApiConfigManager {
           missingFields.push('apiKey');
         }
         break;
-      
+
       case 'supabase':
         const supabaseConfig = config as any;
         if (!supabaseConfig.projectUrl) {
@@ -298,7 +298,7 @@ export class ApiConfigManager {
           missingFields.push('anonKey');
         }
         break;
-      
+
       case 'huggingface':
         // HuggingFace configs need API key (server-side only)
         if (typeof window === 'undefined' && !config.apiKey) {
@@ -311,7 +311,7 @@ export class ApiConfigManager {
     return {
       isValid: errors.length === 0,
       errors,
-      missingFields
+      missingFields,
     };
   }
 
@@ -331,7 +331,7 @@ export class ApiConfigManager {
    */
   public static initialize(): void {
     initializeApiConfigurations();
-    
+
     this.validateEnvironment();
     // Silently handle missing environment variables in production
     // Configuration summary and validation details are available via getConfigSummary() and validateEnvironment()
@@ -371,7 +371,7 @@ export const cleanupConfiguration = () => {
 if (process.env.NODE_ENV !== 'test' && process.env.DISABLE_AUTO_INIT !== 'true') {
   // Initialize legacy API system immediately
   ApiConfigManager.initialize();
-  
+
   // Initialize centralized system asynchronously
   initializeConfiguration().catch(error => {
     console.error('Failed to auto-initialize centralized configuration:', error);

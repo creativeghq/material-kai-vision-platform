@@ -1,6 +1,8 @@
-import { BaseApiClient, StandardizedApiResponse, withRetry } from './standardizedApiClient';
-import { supabaseConfig, SupabaseConfigUtils } from '../../config/apis/supabaseConfig';
 import { z } from 'zod';
+
+import { supabaseConfig, SupabaseConfigUtils } from '../../config/apis/supabaseConfig';
+
+import { BaseApiClient, StandardizedApiResponse, withRetry } from './standardizedApiClient';
 
 // Define types for Supabase Edge Functions
 export type SupabaseParams = {
@@ -23,7 +25,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
 
   constructor(apiKey: string, functionName?: string) {
     super('supabase', functionName);
-    
+
     // Extract Supabase URL and key from the API key
     // Expected format: "url|key" or just the key if URL is in env
     const parts = apiKey.split('|');
@@ -48,7 +50,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
     }
 
     const typedParams = params as any;
-    
+
     if (!typedParams.functionName || typeof typedParams.functionName !== 'string') {
       throw new Error('Function name is required and must be a string');
     }
@@ -71,7 +73,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
           const userFriendlyErrors = error.errors
             .filter(e => e.message.includes('required') || e.message.includes('valid'))
             .map(e => e.message);
-          
+
           if (userFriendlyErrors.length > 0) {
             throw new Error(`Please check: ${userFriendlyErrors.join(', ')}`);
           }
@@ -82,7 +84,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
 
     return {
       functionName: typedParams.functionName,
-      data: typedParams.data
+      data: typedParams.data,
     };
   }
 
@@ -144,8 +146,8 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
             modelId: params.functionName,
             timestamp: new Date().toISOString(),
             requestId: `supabase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            statusCode: response.status
-          }
+            statusCode: response.status,
+          },
         };
       } catch (error) {
         // Clear timeout on error as well
@@ -170,7 +172,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
     // FIXED: Send the data fields directly at the top level, not nested under 'data'
     // This ensures the server receives the prompt field at the expected location
     const requestBody = params.data || {};
-    
+
     return {
       method: 'POST',
       headers,
@@ -182,7 +184,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
   private async handleErrorResponse(response: Response): Promise<never> {
     const errorText = await response.text();
     let errorMessage = `Supabase Edge Function error: ${response.status} ${response.statusText}`;
-    
+
     try {
       const errorData = JSON.parse(errorText);
       if (errorData.error) {

@@ -1,13 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import {
   Loader2,
   Search,
@@ -21,16 +12,26 @@ import {
   ThumbsDown,
   Lightbulb,
   ExternalLink,
-  BarChart3
+  BarChart3,
 } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  EnhancedRAGService, 
-  type EnhancedRAGRequest, 
+import {
+  EnhancedRAGService,
+  type EnhancedRAGRequest,
   type EnhancedRAGResponse,
-  
-  
-  
+
+
+
 } from '@/services/enhancedRAGService';
 
 interface EnhancedRAGInterfaceProps {
@@ -47,10 +48,10 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
   const [context, setContext] = useState({
     roomType: '',
     stylePreferences: [] as string[],
-    materialCategories: [] as string[]
+    materialCategories: [] as string[],
   });
   const [analytics, setAnalytics] = useState<any>(null);
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -70,7 +71,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
   const loadQueryHistory = async () => {
     try {
       await EnhancedRAGService.getQueryHistory(10);
-      
+
     } catch (error) {
       console.error('Error loading query history:', error);
     }
@@ -79,9 +80,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
   const handleSearch = async () => {
     if (!query.trim()) {
       toast({
-        title: "Search Query Required",
-        description: "Please enter a search query",
-        variant: "destructive"
+        title: 'Search Query Required',
+        description: 'Please enter a search query',
+        variant: 'destructive',
       });
       return;
     }
@@ -97,23 +98,23 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
         },
         searchType,
         maxResults,
-        includeRealTime
+        includeRealTime,
       };
 
       const results = await EnhancedRAGService.search(request);
       setSearchResults(results);
-      
+
       // Combine all results for callback
       const allResults = [
         ...results.results.knowledgeBase,
         ...results.results.materialKnowledge,
-        ...results.results.recommendations
+        ...results.results.recommendations,
       ];
       onResultsFound?.(allResults);
 
       toast({
-        title: "Enhanced Search Completed",
-        description: `Found ${allResults.length} results with ${results.semanticAnalysis.queryComplexity.toFixed(2)} complexity score`
+        title: 'Enhanced Search Completed',
+        description: `Found ${allResults.length} results with ${results.semanticAnalysis.queryComplexity.toFixed(2)} complexity score`,
       });
 
       // Refresh analytics and history
@@ -122,9 +123,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
     } catch (error) {
       console.error('Enhanced search error:', error);
       toast({
-        title: "Search Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Search Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
@@ -137,12 +138,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
     try {
       await EnhancedRAGService.provideFeedback(searchResults.analytics.sessionId, {
         satisfaction,
-        clickedResults
+        clickedResults,
       });
-      
+
       toast({
-        title: "Feedback Submitted",
-        description: "Thank you for your feedback!"
+        title: 'Feedback Submitted',
+        description: 'Thank you for your feedback!',
       });
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -254,7 +255,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                 onChange={(e) => setContext(prev => ({ ...prev, roomType: e.target.value }))}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Style Preferences</Label>
               <Input
@@ -265,7 +266,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                     if (value && !context.stylePreferences.includes(value)) {
                       setContext(prev => ({
                         ...prev,
-                        stylePreferences: [...prev.stylePreferences, value]
+                        stylePreferences: [...prev.stylePreferences, value],
                       }));
                       (e.target as HTMLInputElement).value = '';
                     }
@@ -274,12 +275,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               />
               <div className="flex flex-wrap gap-1">
                 {context.stylePreferences.map((style, i) => (
-                  <Badge 
-                    key={i} 
+                  <Badge
+                    key={i}
                     className="cursor-pointer"
                     onClick={() => setContext(prev => ({
                       ...prev,
-                      stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i)
+                      stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
                     }))}
                   >
                     {style} ×
@@ -298,7 +299,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                     if (value && !context.materialCategories.includes(value)) {
                       setContext(prev => ({
                         ...prev,
-                        materialCategories: [...prev.materialCategories, value]
+                        materialCategories: [...prev.materialCategories, value],
                       }));
                       (e.target as HTMLInputElement).value = '';
                     }
@@ -307,12 +308,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               />
               <div className="flex flex-wrap gap-1">
                 {context.materialCategories.map((category, i) => (
-                  <Badge 
-                    key={i} 
+                  <Badge
+                    key={i}
                     className="cursor-pointer"
                     onClick={() => setContext(prev => ({
                       ...prev,
-                      materialCategories: prev.materialCategories.filter((_, idx) => idx !== i)
+                      materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
                     }))}
                   >
                     {category} ×
@@ -348,13 +349,13 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                 )}
               </div>
             </div>
-            
+
             {/* Query Analysis */}
             <div className="space-y-2">
               <p className="text-sm">
                 <span className="font-medium">Processed Query:</span> {searchResults.processedQuery}
               </p>
-              
+
               {/* Detected Entities */}
               <div className="flex flex-wrap gap-2">
                 {Object.entries(searchResults.semanticAnalysis.detectedEntities).map(([key, values]) => {
@@ -432,10 +433,10 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                             </span>
                           </div>
                         </div>
-                        
+
                         <p className="text-sm text-muted-foreground mb-3">
-                          {result.content.length > 300 
-                            ? `${result.content.substring(0, 300)}...` 
+                          {result.content.length > 300
+                            ? `${result.content.substring(0, 300)}...`
                             : result.content
                           }
                         </p>
@@ -449,7 +450,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                               ))
                             )}
                           </div>
-                          
+
                           {/* PDF Link for additional details */}
                           {result.pdfUrl && (
                             <Button
@@ -460,7 +461,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                               View PDF Details
                             </Button>
                           )}
-                          
+
                           {/* Fallback to general source URL */}
                           {!result.pdfUrl && result.sourceUrl && (
                             <Button
@@ -501,7 +502,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                             </span>
                           </div>
                         </div>
-                        
+
                         <p className="text-sm text-muted-foreground">
                           {result.extractedKnowledge}
                         </p>
@@ -534,11 +535,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                             </span>
                           </div>
                         </div>
-                        
+
                         <p className="text-sm text-muted-foreground mb-2">
                           {rec.description}
                         </p>
-                        
+
                         <p className="text-xs text-muted-foreground">
                           Reasoning: {rec.reasoning}
                         </p>
@@ -558,7 +559,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                         <h3 className="font-semibold">Current Information</h3>
                         <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">Live Data</span>
                       </div>
-                      
+
                       <div className="prose prose-sm max-w-none">
                         <p className="whitespace-pre-wrap">
                           {searchResults.results.realTimeInfo.answer}

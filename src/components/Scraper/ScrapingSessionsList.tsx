@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { Clock, Globe, CheckCircle, XCircle, AlertCircle, Play, Trash2 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Clock, Globe, CheckCircle, XCircle, AlertCircle, Play, Trash2 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import type { Json } from '@/integrations/supabase/types';
 
 interface ScrapingSession {
   id: string;
   session_id: string;
+  user_id: string | null;
   source_url: string;
   status: string;
-  total_pages: number;
-  completed_pages: number;
-  failed_pages: number;
-  pending_pages: number;
-  total_materials_found: number;
-  progress_percentage: number;
+  scraping_config: Json | null;
+  progress_percentage: number | null;
+  total_pages: number | null;
+  completed_pages: number | null;
+  failed_pages: number | null;
+  materials_processed: number | null;
   created_at: string;
   updated_at: string;
-  session_type: string;
 }
 
 interface ScrapingSessionsListProps {
@@ -31,7 +33,7 @@ interface ScrapingSessionsListProps {
 
 export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
   onSelectSession,
-  onCreateNew
+  onCreateNew,
 }) => {
   const { toast } = useToast();
   const [sessions, setSessions] = useState<ScrapingSession[]>([]);
@@ -39,7 +41,7 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
 
   useEffect(() => {
     loadSessions();
-    
+
     // Set up real-time subscription for session updates
     const channel = supabase
       .channel('scraping_sessions_changes')
@@ -48,11 +50,11 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
         {
           event: '*',
           schema: 'public',
-          table: 'scraping_sessions'
+          table: 'scraping_sessions',
         },
         () => {
           loadSessions();
-        }
+        },
       )
       .subscribe();
 
@@ -73,9 +75,9 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
     } catch (error) {
       console.error('Error loading sessions:', error);
       toast({
-        title: "Error",
-        description: "Failed to load scraping sessions",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load scraping sessions',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -103,17 +105,17 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
         .eq('id', sessionId);
 
       toast({
-        title: "Success",
-        description: "Session deleted successfully",
+        title: 'Success',
+        description: 'Session deleted successfully',
       });
-      
+
       loadSessions();
     } catch (error) {
       console.error('Error deleting session:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete session",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to delete session',
+        variant: 'destructive',
       });
     }
   };
@@ -200,17 +202,14 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => onSelectSession(session.id)}
+                      className="h-9 rounded-md px-3 border border-input bg-background hover:bg-accent hover:text-accent-foreground"
                     >
                       View Details
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => deleteSession(session.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="h-9 rounded-md px-3 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -226,7 +225,7 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
                     </div>
                     <Progress value={session.progress_percentage || 0} className="h-2" />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Total Pages</p>
@@ -242,7 +241,7 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
                     </div>
                     <div>
                       <p className="text-muted-foreground">Materials Found</p>
-                      <p className="font-semibold text-blue-600">{session.total_materials_found}</p>
+                      <p className="font-semibold text-blue-600">{session.materials_processed || 0}</p>
                     </div>
                   </div>
                 </div>

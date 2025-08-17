@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Play,
+  Pause,
+  Square,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  Activity,
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { 
-  Play, 
-  Pause, 
-  Square, 
-  Clock, 
-  CheckCircle, 
-  AlertCircle, 
-  Loader2,
-  Activity
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+
 
 export interface ProgressStep {
   id: string;
@@ -66,7 +68,7 @@ const getStatusConfig = (status: ProgressData['status']) => {
         bgColor: 'bg-blue-100',
         label: 'Running',
         variant: 'default' as const,
-        animate: true
+        animate: true,
       };
     case 'paused':
       return {
@@ -74,7 +76,7 @@ const getStatusConfig = (status: ProgressData['status']) => {
         color: 'text-yellow-600',
         bgColor: 'bg-yellow-100',
         label: 'Paused',
-        variant: 'secondary' as const
+        variant: 'secondary' as const,
       };
     case 'completed':
       return {
@@ -82,7 +84,7 @@ const getStatusConfig = (status: ProgressData['status']) => {
         color: 'text-green-600',
         bgColor: 'bg-green-100',
         label: 'Completed',
-        variant: 'default' as const
+        variant: 'default' as const,
       };
     case 'failed':
       return {
@@ -90,7 +92,7 @@ const getStatusConfig = (status: ProgressData['status']) => {
         color: 'text-red-600',
         bgColor: 'bg-red-100',
         label: 'Failed',
-        variant: 'destructive' as const
+        variant: 'destructive' as const,
       };
     case 'cancelled':
       return {
@@ -98,7 +100,7 @@ const getStatusConfig = (status: ProgressData['status']) => {
         color: 'text-gray-600',
         bgColor: 'bg-gray-100',
         label: 'Cancelled',
-        variant: 'outline' as const
+        variant: 'outline' as const,
       };
     case 'idle':
     default:
@@ -107,7 +109,7 @@ const getStatusConfig = (status: ProgressData['status']) => {
         color: 'text-gray-600',
         bgColor: 'bg-gray-100',
         label: 'Idle',
-        variant: 'outline' as const
+        variant: 'outline' as const,
       };
   }
 };
@@ -118,28 +120,28 @@ const getStepStatusConfig = (status: ProgressStep['status']) => {
       return {
         icon: Loader2,
         color: 'text-blue-600',
-        animate: true
+        animate: true,
       };
     case 'completed':
       return {
         icon: CheckCircle,
-        color: 'text-green-600'
+        color: 'text-green-600',
       };
     case 'failed':
       return {
         icon: AlertCircle,
-        color: 'text-red-600'
+        color: 'text-red-600',
       };
     case 'skipped':
       return {
         icon: Square,
-        color: 'text-gray-400'
+        color: 'text-gray-400',
       };
     case 'pending':
     default:
       return {
         icon: Clock,
-        color: 'text-gray-400'
+        color: 'text-gray-400',
       };
   }
 };
@@ -155,14 +157,14 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   className,
   onStatusChange,
   onComplete,
-  onError
+  onError,
 }) => {
   const [progressData, setProgressData] = useState<ProgressData>({
     id: progressId,
     title: title || 'Progress',
     status: 'idle',
     overallProgress: 0,
-    steps: []
+    steps: [],
   });
 
   const { send, isConnected } = useWebSocket(websocketUrl, {
@@ -170,20 +172,20 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       if (message.type === 'progress_update' && message.payload.id === progressId) {
         const newData = message.payload as ProgressData;
         setProgressData(newData);
-        
+
         if (onStatusChange && newData.status !== progressData.status) {
           onStatusChange(newData.status);
         }
-        
+
         if (newData.status === 'completed' && onComplete) {
           onComplete(newData);
         }
-        
+
         if (newData.status === 'failed' && onError) {
           onError(newData.metadata?.error || 'Process failed');
         }
       }
-    }
+    },
   });
 
   // Subscribe to progress updates
@@ -191,7 +193,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     if (isConnected) {
       send({
         type: 'subscribe_progress',
-        payload: { progressId }
+        payload: { progressId },
       });
     }
   }, [isConnected, progressId, send]);
@@ -200,7 +202,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     if (isConnected) {
       send({
         type: 'progress_control',
-        payload: { progressId, action }
+        payload: { progressId, action },
       });
     }
   };
@@ -209,7 +211,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes % 60}m`;
     } else if (minutes > 0) {
@@ -221,10 +223,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
 
   const getEstimatedTimeRemaining = () => {
     if (!progressData.startTime || !progressData.estimatedDuration) return null;
-    
+
     const elapsed = Date.now() - progressData.startTime.getTime();
     const remaining = progressData.estimatedDuration - elapsed;
-    
+
     return remaining > 0 ? remaining : 0;
   };
 
@@ -236,11 +238,11 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     return (
       <div className={cn('flex items-center gap-3', className)}>
         <div className="flex items-center gap-2">
-          <StatusIcon 
+          <StatusIcon
             className={cn(
               'h-4 w-4',
               statusConfig.color,
-              statusConfig.animate && 'animate-spin'
+              statusConfig.animate && 'animate-spin',
             )}
           />
           <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
@@ -264,13 +266,13 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           <div className="flex items-center gap-3">
             <div className={cn(
               'p-2 rounded-full',
-              statusConfig.bgColor
+              statusConfig.bgColor,
             )}>
-              <StatusIcon 
+              <StatusIcon
                 className={cn(
                   'h-5 w-5',
                   statusConfig.color,
-                  statusConfig.animate && 'animate-spin'
+                  statusConfig.animate && 'animate-spin',
                 )}
               />
             </div>
@@ -283,7 +285,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               )}
             </div>
           </div>
-          
+
           {showControls && (
             <div className="flex items-center gap-2">
               {progressData.status === 'idle' && (
@@ -399,7 +401,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               {progressData.steps.map((step) => {
                 const stepConfig = getStepStatusConfig(step.status);
                 const StepIcon = stepConfig.icon;
-                
+
                 return (
                   <div
                     key={step.id}
@@ -407,14 +409,14 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                       'flex items-center gap-3 p-2 rounded-md border',
                       step.status === 'in_progress' && 'bg-blue-50 border-blue-200',
                       step.status === 'completed' && 'bg-green-50 border-green-200',
-                      step.status === 'failed' && 'bg-red-50 border-red-200'
+                      step.status === 'failed' && 'bg-red-50 border-red-200',
                     )}
                   >
-                    <StepIcon 
+                    <StepIcon
                       className={cn(
                         'h-4 w-4',
                         stepConfig.color,
-                        stepConfig.animate && 'animate-spin'
+                        stepConfig.animate && 'animate-spin',
                       )}
                     />
                     <div className="flex-1 min-w-0">
@@ -468,17 +470,17 @@ export const SimpleProgressBar: React.FC<{
         setProgress(data.overallProgress);
         setStatus(data.status);
       }
-    }
+    },
   });
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <Progress 
-        value={progress} 
+      <Progress
+        value={progress}
         className={cn(
           'flex-1',
           status === 'failed' && 'bg-red-100',
-          status === 'completed' && 'bg-green-100'
+          status === 'completed' && 'bg-green-100',
         )}
       />
       {showPercentage && (

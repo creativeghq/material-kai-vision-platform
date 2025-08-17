@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AITestingPanel } from './AITestingPanel';
-import { MetadataFieldsManagement } from './MetadataFieldsManagement';
-import { RAGManagementPanel } from './RAGManagementPanel';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
+import {
   Activity,
   Brain,
   CheckCircle,
   Clock,
   Zap,
   Star,
-  BarChart3
+  BarChart3,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+
+// import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+
+import { RAGManagementPanel } from './RAGManagementPanel';
+import { MetadataFieldsManagement } from './MetadataFieldsManagement';
+import { AITestingPanel } from './AITestingPanel';
 
 interface AnalyticsEvent {
   id: string;
@@ -44,7 +48,7 @@ export const AdminPanel: React.FC = () => {
     avgScore: 0,
     openaiSuccess: 0,
     claudeSuccess: 0,
-    avgProcessingTime: 0
+    avgProcessingTime: 0,
   });
   const { toast } = useToast();
 
@@ -55,20 +59,24 @@ export const AdminPanel: React.FC = () => {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch all AI-related analytics events
-      const { data, error } = await supabase
-        .from('analytics_events')
-        .select('*')
-        .or('event_type.ilike.%ai%,event_type.ilike.%hybrid%')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      // TODO: Create analytics_events table in database schema
+      // const { data, error } = await supabase
+      //   .from('analytics_events')
+      //   .select('*')
+      //   .or('event_type.ilike.%ai%,event_type.ilike.%hybrid%')
+      //   .order('created_at', { ascending: false })
+      //   .limit(100);
 
-      if (error) {
-        throw error;
-      }
+      // if (error) {
+      //   throw error;
+      // }
 
-      const filteredData = (data || []).filter(item => item.created_at !== null) as AnalyticsEvent[];
+      // Mock response until analytics_events table is created
+      const data: any = null;
+
+      const filteredData = (data || []).filter((item: any) => item.created_at !== null) as AnalyticsEvent[];
       setAnalyticsData(filteredData);
       calculateStats(filteredData);
     } catch (error) {
@@ -76,7 +84,7 @@ export const AdminPanel: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to fetch analytics data',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -85,7 +93,7 @@ export const AdminPanel: React.FC = () => {
 
   const calculateStats = (data: AnalyticsEvent[]) => {
     const hybridEvents = data.filter(e => e.event_type.includes('hybrid'));
-    
+
     let totalScore = 0;
     let scoreCount = 0;
     let openaiCount = 0;
@@ -94,15 +102,15 @@ export const AdminPanel: React.FC = () => {
 
     hybridEvents.forEach(event => {
       const eventData = event.event_data;
-      
+
       if (eventData.final_score) {
         totalScore += eventData.final_score;
         scoreCount++;
       }
-      
+
       if (eventData.final_provider === 'openai') openaiCount++;
       if (eventData.final_provider === 'claude') claudeCount++;
-      
+
       if (eventData.processing_time_ms) {
         totalProcessingTime += eventData.processing_time_ms;
       }
@@ -113,7 +121,7 @@ export const AdminPanel: React.FC = () => {
       avgScore: scoreCount > 0 ? totalScore / scoreCount : 0,
       openaiSuccess: openaiCount,
       claudeSuccess: claudeCount,
-      avgProcessingTime: hybridEvents.length > 0 ? totalProcessingTime / hybridEvents.length : 0
+      avgProcessingTime: hybridEvents.length > 0 ? totalProcessingTime / hybridEvents.length : 0,
     });
   };
 
@@ -274,20 +282,20 @@ export const AdminPanel: React.FC = () => {
                         <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">{event.event_type}</Badge>
                       </TableCell>
                       <TableCell>
-                        {event.event_data.final_score ? 
-                          getScoreBadge(event.event_data.final_score) : 
+                        {event.event_data.final_score ?
+                          getScoreBadge(event.event_data.final_score) :
                           '-'
                         }
                       </TableCell>
                       <TableCell>
-                        {event.event_data.final_provider ? 
-                          getProviderBadge(event.event_data.final_provider) : 
+                        {event.event_data.final_provider ?
+                          getProviderBadge(event.event_data.final_provider) :
                           '-'
                         }
                       </TableCell>
                       <TableCell>
-                        {event.event_data.processing_time_ms ? 
-                          `${(event.event_data.processing_time_ms / 1000).toFixed(2)}s` : 
+                        {event.event_data.processing_time_ms ?
+                          `${(event.event_data.processing_time_ms / 1000).toFixed(2)}s` :
                           '-'
                         }
                       </TableCell>

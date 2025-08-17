@@ -76,8 +76,8 @@ export class AIMaterialAPI {
         body: {
           file_id: request.fileId,
           analysis_type: request.analysisType,
-          include_similar: request.includeSimilar
-        }
+          include_similar: request.includeSimilar,
+        },
       });
 
       if (error) {
@@ -101,8 +101,8 @@ export class AIMaterialAPI {
           category_filter: request.categoryFilter,
           confidence_threshold: request.confidenceThreshold || 0.7,
           limit: request.limit || 10,
-          search_type: request.searchType
-        }
+          search_type: request.searchType,
+        },
       });
 
       if (error) {
@@ -124,8 +124,8 @@ export class AIMaterialAPI {
           audio_data: request.audioData,
           user_id: request.userId,
           language: request.language || 'en',
-          enhance_with_ai: request.enhanceWithAI !== false
-        }
+          enhance_with_ai: request.enhanceWithAI !== false,
+        },
       });
 
       if (error) {
@@ -165,7 +165,7 @@ export class AIMaterialAPI {
         vector_searches: 0,
         avg_confidence: 0,
         most_recognized_categories: {},
-        recent_activities: data?.slice(0, 10) || []
+        recent_activities: data?.slice(0, 10) || [],
       };
 
       let totalConfidence = 0;
@@ -173,7 +173,7 @@ export class AIMaterialAPI {
 
         data?.forEach(event => {
         const eventData = event.event_data as any;
-        
+
         switch (event.event_type) {
           case 'material_identified':
             analytics.total_recognitions++;
@@ -196,7 +196,7 @@ export class AIMaterialAPI {
         // Track categories
         if (eventData?.material_category) {
           const category = eventData.material_category;
-          analytics.most_recognized_categories[category] = 
+          analytics.most_recognized_categories[category] =
             (analytics.most_recognized_categories[category] || 0) + 1;
         }
       });
@@ -214,13 +214,13 @@ export class AIMaterialAPI {
   static async batchAnalyze(fileIds: string[], analysisType: AIAnalysisRequest['analysisType'] = 'quick') {
     try {
       const results = await Promise.allSettled(
-        fileIds.map(fileId => 
+        fileIds.map(fileId =>
           this.analyzeWithAI({
             fileId,
             analysisType,
-            includeSimilar: false
-          })
-        )
+            includeSimilar: false,
+          }),
+        ),
       );
 
       const successful = results
@@ -235,7 +235,7 @@ export class AIMaterialAPI {
         successful_count: successful.length,
         failed_count: failed.length,
         results: successful,
-        errors: failed
+        errors: failed,
       };
     } catch (error) {
       console.error('Batch analysis error:', error);
@@ -264,8 +264,8 @@ export class AIMaterialAPI {
           event_data: {
             result_id: resultId,
             new_confidence: newConfidence,
-            updated_at: new Date().toISOString()
-          }
+            updated_at: new Date().toISOString(),
+          },
         });
 
       return { success: true };

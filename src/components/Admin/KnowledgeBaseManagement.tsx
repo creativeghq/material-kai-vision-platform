@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import EmbeddingGenerationPanel from './EmbeddingGenerationPanel';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search,
   Plus,
@@ -23,10 +12,23 @@ import {
   RefreshCw,
   ExternalLink,
   Image,
-  Zap
+  Zap,
 } from 'lucide-react';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+
+import EmbeddingGenerationPanel from './EmbeddingGenerationPanel';
 
 interface KnowledgeEntry {
   id: string;
@@ -67,37 +69,34 @@ const KnowledgeBaseManagement: React.FC = () => {
   const fetchEntries = async () => {
     try {
       const { data, error } = await supabase
-        .from('enhanced_knowledge_base')
+        .from('materials_catalog')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      // Handle potential null values from database
+      // Handle potential null values from database and map fields to KnowledgeEntry interface
       const processedData = (data || []).map(entry => ({
-        ...entry,
-        status: entry.status || 'draft',
-        title: entry.title || '',
-        content: entry.content || '',
+        id: entry.id,
+        title: entry.name || '',
+        content: entry.description || '',
+        content_type: entry.category || 'material',
+        status: 'active', // materials_catalog doesn't have status field
+        created_at: entry.created_at || '',
         created_by: entry.created_by || '',
-        updated_at: entry.updated_at || null,
-        source_url: entry.source_url || '',
-        content_type: entry.content_type || 'text',
-        
-        metadata: entry.metadata || {},
-        
-        confidence_scores: entry.confidence_scores || {},
-        approved_by: entry.approved_by || null,
-        approved_at: entry.approved_at || null,
-        version: entry.version || 1,
-        accuracy_score: entry.accuracy_score || null
+        semantic_tags: [], // materials_catalog doesn't have tags field
+        material_ids: [entry.id],
+        relevance_score: 0, // materials_catalog doesn't have confidence_score field
+        source_url: '', // materials_catalog doesn't have source_url field
+        pdf_url: '', // materials_catalog doesn't have pdf_url field
+        metadata: {}, // materials_catalog doesn't have metadata field
       }));
       setEntries(processedData as KnowledgeEntry[]);
     } catch (error) {
       console.error('Error fetching knowledge entries:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch knowledge base entries",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to fetch knowledge base entries',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -108,10 +107,10 @@ const KnowledgeBaseManagement: React.FC = () => {
     let filtered = entries;
 
     if (searchTerm) {
-      filtered = filtered.filter(entry => 
+      filtered = filtered.filter(entry =>
         entry.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.semantic_tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+        entry.semantic_tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())),
       );
     }
 
@@ -130,38 +129,41 @@ const KnowledgeBaseManagement: React.FC = () => {
     try {
       // Get the entry first to check for associated files
       const { data: entry, error: fetchError } = await supabase
-        .from('enhanced_knowledge_base')
-        .select('metadata')
+        .from('materials_catalog')
+        .select('properties, thumbnail_url')
         .eq('id', id)
         .single();
 
       if (fetchError) throw fetchError;
 
       // Delete associated storage files if they exist
-      if (entry?.metadata && typeof entry.metadata === 'object') {
-        const filesToDelete = [];
-        const metadata = entry.metadata as any;
-        
+      const filesToDelete = [];
+      if (entry?.thumbnail_url) {
+        filesToDelete.push(entry.thumbnail_url);
+      }
+      if (entry?.properties && typeof entry.properties === 'object') {
+        const properties = entry.properties as any;
+
         // Check for processed images
-        if (metadata.processed_images && Array.isArray(metadata.processed_images)) {
-          for (const image of metadata.processed_images) {
+        if (properties.processed_images && Array.isArray(properties.processed_images)) {
+          for (const image of properties.processed_images) {
             if (image.storage_path) {
               filesToDelete.push(image.storage_path);
             }
           }
         }
-        
+
         // Check for document files
-        if (metadata.file_path) {
-          filesToDelete.push(metadata.file_path);
+        if (properties.file_path) {
+          filesToDelete.push(properties.file_path);
         }
-        
+
         // Delete from material-images bucket
         if (filesToDelete.length > 0) {
           const { error: storageError } = await supabase.storage
             .from('material-images')
             .remove(filesToDelete);
-          
+
           if (storageError) {
             console.warn('Some storage files could not be deleted:', storageError);
           }
@@ -170,7 +172,7 @@ const KnowledgeBaseManagement: React.FC = () => {
 
       // Delete the database entry
       const { error } = await supabase
-        .from('enhanced_knowledge_base')
+        .from('materials_catalog')
         .delete()
         .eq('id', id);
 
@@ -178,15 +180,15 @@ const KnowledgeBaseManagement: React.FC = () => {
 
       setEntries(entries.filter(entry => entry.id !== id));
       toast({
-        title: "Success",
-        description: "Knowledge entry and associated files deleted successfully"
+        title: 'Success',
+        description: 'Knowledge entry and associated files deleted successfully',
       });
     } catch (error) {
       console.error('Error deleting entry:', error);
       toast({
-        title: "Error", 
-        description: "Failed to delete knowledge entry",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to delete knowledge entry',
+        variant: 'destructive',
       });
     }
   };
@@ -196,12 +198,12 @@ const KnowledgeBaseManagement: React.FC = () => {
 
     try {
       const { error } = await supabase
-        .from('enhanced_knowledge_base')
+        .from('materials_catalog')
         .update({
           title: updatedEntry.title || '',
           content: updatedEntry.content || '',
           status: updatedEntry.status || 'draft',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', selectedEntry.id);
 
@@ -210,17 +212,17 @@ const KnowledgeBaseManagement: React.FC = () => {
       await fetchEntries();
       setIsEditDialogOpen(false);
       setSelectedEntry(null);
-      
+
       toast({
-        title: "Success",
-        description: "Knowledge entry updated successfully"
+        title: 'Success',
+        description: 'Knowledge entry updated successfully',
       });
     } catch (error) {
       console.error('Error updating entry:', error);
       toast({
-        title: "Error",
-        description: "Failed to update knowledge entry",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to update knowledge entry',
+        variant: 'destructive',
       });
     }
   };
@@ -289,7 +291,7 @@ const KnowledgeBaseManagement: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
-        
+
         <Tabs defaultValue="entries" className="space-y-4">
           <TabsList>
             <TabsTrigger value="entries">Knowledge Entries</TabsTrigger>
@@ -315,7 +317,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
@@ -495,7 +497,7 @@ const KnowledgeBaseManagement: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="status">Status</Label>
-                <Select 
+                <Select
                   defaultValue={selectedEntry.status}
                   onValueChange={(value: string) => setSelectedEntry({...selectedEntry, status: value})}
                 >
@@ -510,7 +512,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 </Select>
               </div>
               <div className="flex justify-end gap-2">
-                <Button 
+                <Button
                   className="border border-border bg-background text-foreground"
                   onClick={() => setIsEditDialogOpen(false)}
                 >
@@ -524,7 +526,7 @@ const KnowledgeBaseManagement: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
-          
+
           </TabsContent>
 
           <TabsContent value="images" className="space-y-4">
@@ -548,7 +550,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                       sourceTitle: entry.title,
                       sourceId: entry.id,
                       sourceType: entry.content_type,
-                      createdAt: entry.created_at
+                      createdAt: entry.created_at,
                     }));
                   });
 
@@ -560,7 +562,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                         <p className="text-muted-foreground mb-4">
                           Process some PDF documents first to see extracted images here.
                         </p>
-                        <Button 
+                        <Button
                           className="border border-border bg-background text-foreground"
                           onClick={() => navigate('/admin/pdf-processing')}
                         >
@@ -663,8 +665,8 @@ const KnowledgeBaseManagement: React.FC = () => {
                                     onClick={() => {
                                       navigator.clipboard.writeText(image.supabase_url);
                                       toast({
-                                        title: "Copied!",
-                                        description: "Image URL copied to clipboard"
+                                        title: 'Copied!',
+                                        description: 'Image URL copied to clipboard',
                                       });
                                     }}
                                   >

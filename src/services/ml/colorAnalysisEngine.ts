@@ -88,22 +88,22 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
   protected async doInitialize(): Promise<void> {
     // Check if we're in a browser environment
     this.isBrowserEnvironment = typeof window !== 'undefined' && typeof document !== 'undefined';
-    
+
     if (this.isBrowserEnvironment) {
       try {
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d');
-        
+
         if (!this.ctx) {
           throw new Error('Failed to get 2D rendering context');
         }
-        
+
         // Test canvas functionality
         this.canvas.width = 1;
         this.canvas.height = 1;
         this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, 1, 1);
-        
+
       } catch (error) {
         console.warn('Canvas initialization failed, some features may be limited:', error);
         this.canvas = null;
@@ -116,12 +116,12 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     if (this.isBrowserEnvironment && (!this.canvas || !this.ctx)) {
       throw new Error('Canvas context not available for color analysis');
     }
-    
+
     // Verify configuration
     if (!this.config) {
       throw new Error('ColorAnalysisEngine configuration not found');
     }
-    
+
     if (this.config.maxImageSize <= 0 || this.config.maxSamples <= 0) {
       throw new Error('Invalid configuration values for image processing');
     }
@@ -144,7 +144,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       enableCulturalAssociations: true,
       enablePsychologicalProfile: true,
       enablePaletteRecommendations: true,
-      enableBrowserOptimizations: true
+      enableBrowserOptimizations: true,
     };
 
     const finalConfig = { ...defaultConfig, ...config };
@@ -162,11 +162,11 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       }
 
       const imageData = await this.loadImageData(imageFile);
-      
+
       const dominantColors = await this.extractDominantColors(imageData, this.config?.maxSamples || 8);
       const colorHarmony = this.analyzeColorHarmony(dominantColors);
       const colorCategories = this.categorizeColors(dominantColors);
-      
+
       let culturalAssociations: CulturalAssociation[] = [];
       let psychologicalProfile: PsychologicalProfile;
       let paletteRecommendations: ColorPalette[] = [];
@@ -184,7 +184,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
           energy: 0,
           formality: 0,
           warmth: 0,
-          trustworthiness: 0
+          trustworthiness: 0,
         };
       }
 
@@ -199,7 +199,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
         colorSpaces: this.convertColorSpaces(dominantColors[0]),
         culturalAssociations,
         psychologicalProfile,
-        paletteRecommendations
+        paletteRecommendations,
       };
     }, 'analyzeImage');
   }
@@ -216,7 +216,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
   }> {
     return this.executeOperation(async () => {
       const configuredFeatures: string[] = [];
-      
+
       if (this.config?.enableAdvancedAnalysis) configuredFeatures.push('advancedAnalysis');
       if (this.config?.enableCulturalAssociations) configuredFeatures.push('culturalAssociations');
       if (this.config?.enablePsychologicalProfile) configuredFeatures.push('psychologicalProfile');
@@ -228,7 +228,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
         browserEnvironment: this.isBrowserEnvironment,
         configuredFeatures,
         maxImageSize: this.config?.maxImageSize || 400,
-        maxSamples: this.config?.maxSamples || 1000
+        maxSamples: this.config?.maxSamples || 1000,
       };
     }, 'getAnalysisStatus');
   }
@@ -239,12 +239,12 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
   private async extractDominantColors(imageData: ImageData, k: number = 8): Promise<Color[]> {
     const pixels = this.samplePixels(imageData, 1000); // Sample for performance
     const clusters = this.kMeansCluster(pixels, k);
-    
+
     return clusters.map((cluster, index) => {
       const rgb = {
         r: Math.round(cluster.centroid[0]),
         g: Math.round(cluster.centroid[1]),
-        b: Math.round(cluster.centroid[2])
+        b: Math.round(cluster.centroid[2]),
       };
 
       return {
@@ -255,7 +255,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
         pantone: this.findClosestPantone(rgb),
         ral: this.findClosestRAL(rgb),
         percentage: cluster.points.length / pixels.length,
-        name: this.getColorName(rgb)
+        name: this.getColorName(rgb),
       };
     }).sort((a, b) => b.percentage - a.percentage);
   }
@@ -265,18 +265,18 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
    */
   private kMeansCluster(points: number[][], k: number, maxIterations: number = 50) {
     // Initialize centroids randomly
-    let centroids = Array.from({ length: k }, () => 
-      points[Math.floor(Math.random() * points.length)].slice()
+    let centroids = Array.from({ length: k }, () =>
+      points[Math.floor(Math.random() * points.length)].slice(),
     );
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       // Assign points to nearest centroid
       const clusters = centroids.map(() => ({ centroid: [], points: [] as number[][] }));
-      
+
       for (const point of points) {
         let minDistance = Infinity;
         let nearestCluster = 0;
-        
+
         for (let i = 0; i < centroids.length; i++) {
           const distance = this.euclideanDistance(point, centroids[i]);
           if (distance < minDistance) {
@@ -284,7 +284,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
             nearestCluster = i;
           }
         }
-        
+
         clusters[nearestCluster].points.push(point);
       }
 
@@ -292,22 +292,22 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       let hasChanged = false;
       for (let i = 0; i < clusters.length; i++) {
         if (clusters[i].points.length === 0) continue;
-        
+
         const newCentroid = [0, 0, 0];
         for (const point of clusters[i].points) {
           newCentroid[0] += point[0];
           newCentroid[1] += point[1];
           newCentroid[2] += point[2];
         }
-        
+
         newCentroid[0] /= clusters[i].points.length;
         newCentroid[1] /= clusters[i].points.length;
         newCentroid[2] /= clusters[i].points.length;
-        
+
         if (this.euclideanDistance(centroids[i], newCentroid) > 1) {
           hasChanged = true;
         }
-        
+
         centroids[i] = newCentroid;
         clusters[i].centroid = newCentroid;
       }
@@ -320,7 +320,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       points: points.filter(point => {
         let minDistance = Infinity;
         let nearestCluster = 0;
-        
+
         for (let j = 0; j < centroids.length; j++) {
           const distance = this.euclideanDistance(point, centroids[j]);
           if (distance < minDistance) {
@@ -328,9 +328,9 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
             nearestCluster = j;
           }
         }
-        
+
         return nearestCluster === i;
-      })
+      }),
     }));
   }
 
@@ -343,7 +343,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
         harmonyType: 'monochromatic',
         balance: 1.0,
         contrast: 0.0,
-        vibrancy: colors[0]?.hsv.s || 0
+        vibrancy: colors[0]?.hsv.s || 0,
       };
     }
 
@@ -353,13 +353,13 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
 
     // Determine harmony type
     const harmonyType = this.determineHarmonyType(hues);
-    
+
     // Calculate balance (how evenly distributed the colors are)
     const balance = this.calculateColorBalance(colors);
-    
+
     // Calculate contrast (difference in lightness)
     const contrast = this.calculateContrast(values);
-    
+
     // Calculate vibrancy (average saturation)
     const vibrancy = saturations.reduce((sum, s) => sum + s, 0) / saturations.length;
 
@@ -367,7 +367,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       harmonyType,
       balance,
       contrast,
-      vibrancy
+      vibrancy,
     };
   }
 
@@ -414,7 +414,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
    */
   private getCulturalAssociations(colors: Color[]): CulturalAssociation[] {
     const associations: CulturalAssociation[] = [];
-    
+
     for (const color of colors) {
       const colorAssociations = this.getColorCulturalMeanings(color);
       associations.push(...colorAssociations);
@@ -451,7 +451,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       energy: energySum,
       formality: formalitySum,
       warmth: warmthSum,
-      trustworthiness: trustSum
+      trustworthiness: trustSum,
     };
   }
 
@@ -467,7 +467,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       name: 'Complementary',
       colors: [baseColor, this.getComplementaryColor(baseColor)],
       useCase: 'High contrast designs, call-to-action elements',
-      harmony: 0.9
+      harmony: 0.9,
     });
 
     // Analogous palette
@@ -475,7 +475,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       name: 'Analogous',
       colors: [baseColor, ...this.getAnalogousColors(baseColor, 3)],
       useCase: 'Harmonious, soothing designs',
-      harmony: 0.95
+      harmony: 0.95,
     });
 
     // Triadic palette
@@ -483,7 +483,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       name: 'Triadic',
       colors: this.getTriadicColors(baseColor),
       useCase: 'Vibrant, balanced designs',
-      harmony: 0.85
+      harmony: 0.85,
     });
 
     return palettes;
@@ -517,7 +517,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
 
   private euclideanDistance(a: number[], b: number[]): number {
     return Math.sqrt(
-      (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
+      (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2,
     );
   }
 
@@ -554,7 +554,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     return {
       l: (0.299 * r + 0.587 * g + 0.114 * b) * 100,
       a: (r - g) * 127,
-      b: (g - b) * 127
+      b: (g - b) * 127,
     };
   }
 
@@ -568,7 +568,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       hsv: color.hsv,
       lab: color.lab,
       xyz: this.labToXyz(color.lab),
-      lch: this.labToLch(color.lab)
+      lch: this.labToLch(color.lab),
     };
   }
 
@@ -601,10 +601,10 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
 
   private determineHarmonyType(hues: number[]): ColorHarmony['harmonyType'] {
     if (hues.length < 2) return 'monochromatic';
-    
+
     const sortedHues = [...hues].sort((a, b) => a - b);
     const maxDiff = sortedHues[sortedHues.length - 1] - sortedHues[0];
-    
+
     if (maxDiff < 30) return 'monochromatic';
     if (Math.abs(hues[0] - hues[1]) > 150 && Math.abs(hues[0] - hues[1]) < 210) return 'complementary';
     if (hues.length === 3) return 'triadic';
@@ -645,8 +645,8 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
         culture: 'Western',
         meanings: ['Modern', 'Clean'],
         context: 'Interior Design',
-        confidence: 0.8
-      }
+        confidence: 0.8,
+      },
     ];
   }
 
@@ -657,7 +657,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       energy: Math.random(),
       formality: Math.random(),
       warmth: Math.random(),
-      trust: Math.random()
+      trust: Math.random(),
     };
   }
 
@@ -685,7 +685,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     return [
       color,
       this.hsvToColor({ h: hue1, s: color.hsv.s, v: color.hsv.v }),
-      this.hsvToColor({ h: hue2, s: color.hsv.s, v: color.hsv.v })
+      this.hsvToColor({ h: hue2, s: color.hsv.s, v: color.hsv.v }),
     ];
   }
 
@@ -697,7 +697,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
       lab: this.rgbToLab(rgb),
       hex: this.rgbToHex(rgb),
       percentage: 0,
-      name: this.getColorName(rgb)
+      name: this.getColorName(rgb),
     };
   }
 
@@ -719,7 +719,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     return {
       r: Math.round((r + m) * 255),
       g: Math.round((g + m) * 255),
-      b: Math.round((b + m) * 255)
+      b: Math.round((b + m) * 255),
     };
   }
 }

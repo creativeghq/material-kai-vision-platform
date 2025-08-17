@@ -20,9 +20,9 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Method not allowed. Use POST.' 
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Method not allowed. Use POST.',
     }), {
       status: 405,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -31,9 +31,9 @@ Deno.serve(async (req) => {
 
   try {
     const { sessionId, action }: SessionManagerRequest = await req.json();
-    
+
     console.log(`Session manager: ${action} for session ${sessionId}`);
-    
+
     if (!sessionId || !action) {
       throw new Error('Missing required parameters: sessionId, action');
     }
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
     // Get auth info
@@ -79,18 +79,18 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       action,
-      sessionId
+      sessionId,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Error in session manager:', error);
-    
+
     return new Response(JSON.stringify({
       success: false,
       error: error.message || 'Unknown error occurred',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
 async function startProcessing(supabase: any, sessionId: string, req: Request) {
   console.log(`Starting processing for session: ${sessionId}`);
-  
+
   // Update session status
   await supabase
     .from('scraping_sessions')
@@ -111,13 +111,13 @@ async function startProcessing(supabase: any, sessionId: string, req: Request) {
   EdgeRuntime.waitUntil(
     processSessionPages(supabase, sessionId, req).catch(error => {
       console.error('Background processing error:', error);
-    })
+    }),
   );
 }
 
 async function pauseProcessing(supabase: any, sessionId: string) {
   console.log(`Pausing processing for session: ${sessionId}`);
-  
+
   await supabase
     .from('scraping_sessions')
     .update({ status: 'paused' })
@@ -126,7 +126,7 @@ async function pauseProcessing(supabase: any, sessionId: string) {
 
 async function stopProcessing(supabase: any, sessionId: string) {
   console.log(`Stopping processing for session: ${sessionId}`);
-  
+
   await supabase
     .from('scraping_sessions')
     .update({ status: 'stopped' })
@@ -135,7 +135,7 @@ async function stopProcessing(supabase: any, sessionId: string) {
 
 async function processSessionPages(supabase: any, sessionId: string, req: Request) {
   console.log(`Background processing started for session: ${sessionId}`);
-  
+
   try {
     // Get session details
     const { data: session, error: sessionError } = await supabase
@@ -192,8 +192,8 @@ async function processSessionPages(supabase: any, sessionId: string, req: Reques
       console.log(`Processing batch of ${pendingPages.length} pages`);
 
       // Process pages in parallel
-      const pagePromises = pendingPages.map(page => 
-        processIndividualPage(supabase, sessionId, page, config, req)
+      const pagePromises = pendingPages.map(page =>
+        processIndividualPage(supabase, sessionId, page, config, req),
       );
 
       await Promise.allSettled(pagePromises);
@@ -206,28 +206,28 @@ async function processSessionPages(supabase: any, sessionId: string, req: Reques
 
   } catch (error) {
     console.error(`Error in background processing for session ${sessionId}:`, error);
-    
+
     // Mark session as failed
     await supabase
       .from('scraping_sessions')
-      .update({ 
+      .update({
         status: 'failed',
-        error_message: error.message 
+        error_message: error.message,
       })
       .eq('id', sessionId);
   }
 }
 
 async function processIndividualPage(
-  supabase: any, 
-  sessionId: string, 
-  page: any, 
-  config: any, 
-  req: Request
+  supabase: any,
+  sessionId: string,
+  page: any,
+  config: any,
+  req: Request,
 ) {
   try {
     console.log(`Processing page: ${page.url}`);
-    
+
     // Update current page in session
     await supabase
       .from('scraping_sessions')
@@ -236,7 +236,7 @@ async function processIndividualPage(
 
     // Call the single page scraper
     const authHeader = req.headers.get('authorization');
-    
+
     const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-single-page`, {
       method: 'POST',
       headers: {
@@ -250,13 +250,13 @@ async function processIndividualPage(
         options: {
           service: config.service || 'firecrawl',
           prompt: config.extractionPrompt,
-          timeout: 30000
-        }
-      })
+          timeout: 30000,
+        },
+      }),
     });
 
     const result = await response.json();
-    
+
     if (!result.success) {
       console.error(`Failed to process page ${page.url}:`, result.error);
     } else {
@@ -265,14 +265,14 @@ async function processIndividualPage(
 
   } catch (error) {
     console.error(`Error processing individual page ${page.url}:`, error);
-    
+
     // Mark page as failed
     await supabase
       .from('scraping_pages')
       .update({
         status: 'failed',
         error_message: error.message,
-        completed_at: new Date().toISOString()
+        completed_at: new Date().toISOString(),
       })
       .eq('id', page.id);
   }

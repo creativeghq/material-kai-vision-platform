@@ -1,6 +1,8 @@
-import { RateLimitHelper, ApiResponse, AuthContext } from './consolidatedPDFController';
-import { supabase } from '../../integrations/supabase/client';
 import { z } from 'zod';
+
+import { supabase } from '../../integrations/supabase/client';
+
+import { RateLimitHelper, ApiResponse, AuthContext } from './consolidatedPDFController';
 
 /**
  * Request/Response types for document workflow API
@@ -100,23 +102,23 @@ const DocumentProcessingRequestSchema = z.object({
     extractionType: z.enum(['markdown', 'tables', 'images', 'all']),
     pageRange: z.object({
       start: z.number().int().positive().optional(),
-      end: z.number().int().positive().optional()
+      end: z.number().int().positive().optional(),
     }).optional(),
     chunkingOptions: z.object({
       maxChunkSize: z.number().int().positive().max(8000).optional(),
-      overlapSize: z.number().int().min(0).max(500).optional()
+      overlapSize: z.number().int().min(0).max(500).optional(),
     }).optional(),
     embeddingOptions: z.object({
       model: z.string().optional(),
-      dimensions: z.number().int().positive().optional()
-    }).optional()
+      dimensions: z.number().int().positive().optional(),
+    }).optional(),
   }),
   metadata: z.object({
     filename: z.string().optional(),
     source: z.enum(['upload', 'url', 'workspace']).optional(),
     tags: z.array(z.string()).optional(),
-    priority: z.enum(['low', 'normal', 'high']).optional()
-  }).optional()
+    priority: z.enum(['low', 'normal', 'high']).optional(),
+  }).optional(),
 });
 
 const DocumentSearchRequestSchema = z.object({
@@ -126,13 +128,13 @@ const DocumentSearchRequestSchema = z.object({
     limit: z.number().int().positive().max(100).optional(),
     threshold: z.number().min(0).max(1).optional(),
     includeMetadata: z.boolean().optional(),
-    filterByTags: z.array(z.string()).optional()
-  }).optional()
+    filterByTags: z.array(z.string()).optional(),
+  }).optional(),
 });
 
 /**
  * Document Workflow Controller Class
- * 
+ *
  * Simplified API controller for document processing workflow operations.
  * This controller provides REST endpoints for:
  * - Triggering document processing workflows
@@ -140,7 +142,7 @@ const DocumentSearchRequestSchema = z.object({
  * - Retrieving processed documents and results
  * - Managing workspace-based document search
  * - Batch processing operations
- * 
+ *
  * Note: This is a simplified implementation that can be extended with
  * full service integration as the backend services mature.
  */
@@ -172,10 +174,10 @@ export class DocumentWorkflowController {
           components: {
             controller: { status: 'healthy' },
             database: { status: 'healthy' },
-            authentication: { status: 'healthy' }
-          }
+            authentication: { status: 'healthy' },
+          },
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       return {
@@ -186,9 +188,9 @@ export class DocumentWorkflowController {
           status: 'unhealthy',
           service: 'document-workflow',
           timestamp: new Date().toISOString(),
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -197,12 +199,12 @@ export class DocumentWorkflowController {
    * Start a new document processing workflow
    */
   async startWorkflow(
-    file: File, 
-    request: DocumentProcessingRequest, 
-    authContext: AuthContext
+    file: File,
+    request: DocumentProcessingRequest,
+    authContext: AuthContext,
   ): Promise<ApiResponse> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -210,7 +212,7 @@ export class DocumentWorkflowController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -221,21 +223,21 @@ export class DocumentWorkflowController {
           success: false,
           error: 'Invalid request data',
           code: 'VALIDATION_ERROR',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
       // Check workspace access
       const hasAccess = await this.checkWorkspaceAccess(
-        authContext.user.id, 
-        request.workspaceId
+        authContext.user.id,
+        request.workspaceId,
       );
       if (!hasAccess) {
         return {
           success: false,
           error: 'Access denied to workspace',
           code: 'FORBIDDEN',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -252,7 +254,7 @@ export class DocumentWorkflowController {
         options: request.options,
         metadata: request.metadata,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       // Store job in memory (in production, this would be in a database)
@@ -270,20 +272,20 @@ export class DocumentWorkflowController {
         'client',
         authContext.user.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: true,
         data: {
           jobId: job.id,
-          status: job.status
+          status: job.status,
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Workflow start error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/workflow/start',
@@ -291,14 +293,14 @@ export class DocumentWorkflowController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: false,
         error: 'Failed to start workflow',
         code: 'WORKFLOW_START_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -307,11 +309,11 @@ export class DocumentWorkflowController {
    * Get workflow status and progress
    */
   async getWorkflowStatus(
-    jobId: string, 
-    authContext: AuthContext
+    jobId: string,
+    authContext: AuthContext,
   ): Promise<ApiResponse<WorkflowStatusResponse>> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -319,7 +321,7 @@ export class DocumentWorkflowController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -330,21 +332,21 @@ export class DocumentWorkflowController {
           success: false,
           error: 'Job not found',
           code: 'NOT_FOUND',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
       // Check workspace access
       const hasAccess = await this.checkWorkspaceAccess(
-        authContext.user.id, 
-        job.workspaceId
+        authContext.user.id,
+        job.workspaceId,
       );
       if (!hasAccess) {
         return {
           success: false,
           error: 'Access denied to workspace',
           code: 'FORBIDDEN',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -352,8 +354,8 @@ export class DocumentWorkflowController {
       const allStages = ['pending', 'processing', 'extracting', 'transforming', 'rag-integrating', 'completed'];
       const currentStageIndex = allStages.indexOf(job.status);
       const completedStages = allStages.slice(0, Math.max(0, currentStageIndex));
-      const percentage = job.status === 'completed' ? 100 : 
-                        job.status === 'failed' ? 0 : 
+      const percentage = job.status === 'completed' ? 100 :
+                        job.status === 'failed' ? 0 :
                         Math.round((currentStageIndex / (allStages.length - 1)) * 100);
 
       const statusResponse: WorkflowStatusResponse = {
@@ -363,15 +365,15 @@ export class DocumentWorkflowController {
           currentStage: job.status,
           completedStages,
           totalStages: allStages.length,
-          percentage
+          percentage,
         },
         results: job.results,
         error: job.error,
         timestamps: {
           created: job.createdAt.toISOString(),
           started: job.startedAt?.toISOString(),
-          completed: job.completedAt?.toISOString()
-        }
+          completed: job.completedAt?.toISOString(),
+        },
       };
 
       // Log usage
@@ -381,17 +383,17 @@ export class DocumentWorkflowController {
         'client',
         authContext.user.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: true,
         data: statusResponse,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Get workflow status error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/workflow/status',
@@ -399,14 +401,14 @@ export class DocumentWorkflowController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: false,
         error: 'Failed to get workflow status',
         code: 'STATUS_RETRIEVAL_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -415,11 +417,11 @@ export class DocumentWorkflowController {
    * Search documents in workspace using vector similarity
    */
   async searchDocuments(
-    request: DocumentSearchRequest, 
-    authContext: AuthContext
+    request: DocumentSearchRequest,
+    authContext: AuthContext,
   ): Promise<ApiResponse<DocumentSearchResponse>> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -427,7 +429,7 @@ export class DocumentWorkflowController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -438,21 +440,21 @@ export class DocumentWorkflowController {
           success: false,
           error: 'Invalid request data',
           code: 'VALIDATION_ERROR',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
       // Check workspace access
       const hasAccess = await this.checkWorkspaceAccess(
-        authContext.user.id, 
-        request.workspaceId
+        authContext.user.id,
+        request.workspaceId,
       );
       if (!hasAccess) {
         return {
           success: false,
           error: 'Access denied to workspace',
           code: 'FORBIDDEN',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -468,12 +470,12 @@ export class DocumentWorkflowController {
               filename: 'sample.pdf',
               pageNumber: 1,
               chunkIndex: 0,
-              tags: ['sample', 'document']
-            }
-          }
+              tags: ['sample', 'document'],
+            },
+          },
         ],
         totalResults: 1,
-        searchTime: Date.now() - startTime
+        searchTime: Date.now() - startTime,
       };
 
       // Log usage
@@ -483,17 +485,17 @@ export class DocumentWorkflowController {
         'client',
         authContext.user.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: true,
         data: mockResults,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Document search error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/workflow/search',
@@ -501,14 +503,14 @@ export class DocumentWorkflowController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: false,
         error: 'Document search failed',
         code: 'SEARCH_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -517,16 +519,16 @@ export class DocumentWorkflowController {
    * List documents in workspace
    */
   async listDocuments(
-    workspaceId: string, 
+    workspaceId: string,
     authContext: AuthContext,
     options?: {
       limit?: number;
       offset?: number;
       tags?: string[];
-    }
+    },
   ): Promise<ApiResponse> {
     const startTime = Date.now();
-    
+
     try {
       // Validate authentication
       if (!authContext.isAuthenticated || !authContext.user?.id) {
@@ -534,21 +536,21 @@ export class DocumentWorkflowController {
           success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
       // Check workspace access
       const hasAccess = await this.checkWorkspaceAccess(
-        authContext.user.id, 
-        workspaceId
+        authContext.user.id,
+        workspaceId,
       );
       if (!hasAccess) {
         return {
           success: false,
           error: 'Access denied to workspace',
           code: 'FORBIDDEN',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -563,13 +565,13 @@ export class DocumentWorkflowController {
             metadata: {
               fileSize: 1024000,
               pageCount: 10,
-              tags: ['sample', 'document']
-            }
-          }
+              tags: ['sample', 'document'],
+            },
+          },
         ],
         totalCount: 1,
         limit: options?.limit || 50,
-        offset: options?.offset || 0
+        offset: options?.offset || 0,
       };
 
       // Log usage
@@ -579,17 +581,17 @@ export class DocumentWorkflowController {
         'client',
         authContext.user.id,
         200,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: true,
         data: mockDocuments,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('List documents error:', error);
-      
+
       // Log usage with error
       await RateLimitHelper.logUsage(
         '/api/workflow/documents',
@@ -597,14 +599,14 @@ export class DocumentWorkflowController {
         'client',
         authContext.user?.id,
         500,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
 
       return {
         success: false,
         error: 'Failed to list documents',
         code: 'DOCUMENT_LIST_ERROR',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -629,9 +631,9 @@ export class DocumentWorkflowController {
       // Check if workspace exists by looking for any document chunks in this workspace
       // This validates that the workspace exists and is accessible
       const { data: workspaceCheck, error: workspaceError } = await supabase
-        .from('document_chunks')
-        .select('workspace_id')
-        .eq('workspace_id', workspaceId)
+        .from('workspaces')
+        .select('id')
+        .eq('id', workspaceId)
         .limit(1);
 
       if (workspaceError) {
@@ -639,26 +641,10 @@ export class DocumentWorkflowController {
         return false;
       }
 
-      // If no document chunks exist for this workspace, check if it's a valid workspace
-      // by attempting to query other workspace-related tables
+      // If workspace doesn't exist, deny access
       if (!workspaceCheck || workspaceCheck.length === 0) {
-        // Check document_images table as an alternative
-        const { data: imageCheck, error: imageError } = await supabase
-          .from('document_images')
-          .select('workspace_id')
-          .eq('workspace_id', workspaceId)
-          .limit(1);
-
-        if (imageError) {
-          console.error('Workspace image validation error:', imageError);
-          return false;
-        }
-
-        // If no data found in either table, workspace might not exist or be empty
-        // For now, allow access to empty workspaces for authenticated users
-        if (!imageCheck || imageCheck.length === 0) {
-          console.log(`Workspace ${workspaceId} appears to be empty or new - allowing access for authenticated user`);
-        }
+        console.log(`Workspace ${workspaceId} not found - denying access`);
+        return false;
       }
 
       // Additional security: Verify the user exists in the auth system
@@ -667,12 +653,12 @@ export class DocumentWorkflowController {
         // Note: In a real implementation, you might want to verify the user
         // exists in your user management system. For now, we rely on the
         // authentication middleware to have validated the user.
-        
+
         // The workspace access is granted based on:
         // 1. Valid UUID format for both user and workspace
         // 2. Workspace exists (or is empty/new)
         // 3. User is authenticated (validated by middleware)
-        
+
         return true;
       } catch (authError) {
         console.error('User validation error:', authError);
@@ -706,11 +692,11 @@ export class DocumentWorkflowController {
       if (currentStageIndex < stages.length) {
         job.status = stages[currentStageIndex];
         job.updatedAt = new Date();
-        
+
         if (currentStageIndex === 0) {
           job.startedAt = new Date();
         }
-        
+
         if (currentStageIndex === stages.length - 1) {
           job.completedAt = new Date();
           job.results = {
@@ -718,12 +704,12 @@ export class DocumentWorkflowController {
             ragIntegration: {
               documentsStored: 1,
               embeddingsGenerated: 25,
-              vectorsIndexed: 25
-            }
+              vectorsIndexed: 25,
+            },
           };
           clearInterval(progressInterval);
         }
-        
+
         currentStageIndex++;
       }
     }, 2000); // Progress every 2 seconds

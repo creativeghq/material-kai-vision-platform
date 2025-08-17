@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+
 import { WebSocketManager, WebSocketConfig, WebSocketMessage, WebSocketState, WebSocketEventHandlers } from '@/services/websocket/WebSocketManager';
 
 export interface UseWebSocketOptions extends Omit<WebSocketConfig, 'url'> {
@@ -46,7 +47,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
     state: WebSocketState.DISCONNECTED,
     reconnectAttempts: 0,
     queuedMessages: 0,
-    isConnected: false
+    isConnected: false,
   });
 
   // Initialize WebSocket manager
@@ -55,7 +56,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
 
     const config: WebSocketConfig = {
       url,
-      ...wsConfig
+      ...wsConfig,
     };
 
     wsManagerRef.current = new WebSocketManager(config);
@@ -89,7 +90,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
       onReconnectFailed: () => {
         setError('Failed to reconnect after maximum attempts');
         updateStats();
-      }
+      },
     };
 
     wsManagerRef.current.setHandlers(handlers);
@@ -175,7 +176,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
     send,
     stats,
     lastMessage,
-    error
+    error,
   };
 }
 
@@ -186,7 +187,7 @@ export function useWebSocketSubscription(
   url: string,
   messageType: string,
   onMessage: (payload: any) => void,
-  options: UseWebSocketOptions = {}
+  options: UseWebSocketOptions = {},
 ) {
   const { lastMessage } = useWebSocket(url, options);
 
@@ -203,7 +204,7 @@ export function useWebSocketSubscription(
 export function useRealTimeStatus(
   url: string,
   entityId: string,
-  options: UseWebSocketOptions = {}
+  options: UseWebSocketOptions = {},
 ) {
   const [status, setStatus] = useState<any>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -218,7 +219,7 @@ export function useRealTimeStatus(
       if (options.onMessage) {
         options.onMessage(message);
       }
-    }
+    },
   });
 
   // Subscribe to status updates for this entity
@@ -226,7 +227,7 @@ export function useRealTimeStatus(
     if (isConnected) {
       send({
         type: 'subscribe_status',
-        payload: { entityId }
+        payload: { entityId },
       });
     }
   }, [isConnected, entityId, send]);
@@ -234,6 +235,6 @@ export function useRealTimeStatus(
   return {
     status,
     lastUpdate,
-    isConnected
+    isConnected,
   };
 }

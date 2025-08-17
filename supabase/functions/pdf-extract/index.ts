@@ -1,11 +1,12 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
 import {
   corsHeaders,
   AuthUtils,
   Logger,
   Utils,
-  ValidationSchemas
+  ValidationSchemas,
 } from '../_shared/config.ts';
 
 interface PdfExtractionRequest {
@@ -67,7 +68,7 @@ interface MivaaApiResponse {
 
 serve(async (req) => {
   const startTime = Date.now();
-  
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -112,7 +113,7 @@ serve(async (req) => {
       const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
         supabase,
         authResult.userId!,
-        requestBody.workspaceId
+        requestBody.workspaceId,
       );
       if (!workspaceCheck.success) {
         return Utils.createErrorResponse(workspaceCheck.error || 'Workspace access denied', 403, startTime);
@@ -130,7 +131,7 @@ serve(async (req) => {
       supabase,
       requestBody.documentId,
       authResult.userId!,
-      requestBody.workspaceId || authResult.workspaceId
+      requestBody.workspaceId || authResult.workspaceId,
     );
     if (!hasPermission) {
       return Utils.createErrorResponse('Insufficient permissions', 403, startTime);
@@ -150,7 +151,7 @@ serve(async (req) => {
     const extractionResult = await processPdfWithMivaa(
       documentInfo,
       requestBody.extractionType,
-      requestBody.options
+      requestBody.options,
     );
 
     if (!extractionResult.success) {
@@ -164,7 +165,7 @@ serve(async (req) => {
       return Utils.createErrorResponse(
         extractionResult.error || 'PDF processing failed',
         500,
-        startTime
+        startTime,
       );
     }
 
@@ -174,7 +175,7 @@ serve(async (req) => {
       ragDocuments = await transformToRagDocuments(
         extractionResult.data.markdown,
         documentInfo,
-        requestBody.options
+        requestBody.options,
       );
     }
 
@@ -233,18 +234,18 @@ serve(async (req) => {
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
 
   } catch (error) {
     console.error('PDF extraction error:', error);
-    
+
     const responseTime = Date.now() - startTime;
-    
+
     return Utils.createErrorResponse(
       'Internal server error during PDF extraction',
       500,
-      startTime
+      startTime,
     );
   }
 });
@@ -306,7 +307,7 @@ async function checkDocumentPermissions(
   supabase: any,
   documentId: string,
   userId: string,
-  workspaceId?: string
+  workspaceId?: string,
 ): Promise<boolean> {
   try {
     // Get document ownership and workspace info
@@ -332,7 +333,7 @@ async function checkDocumentPermissions(
       const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
         supabase,
         userId,
-        docData.workspace_id
+        docData.workspace_id,
       );
       return workspaceCheck.success;
     }
@@ -358,7 +359,7 @@ async function createProcessingRecord(supabase: any, data: any): Promise<any> {
         metadata: {
           extraction_type: data.extractionType,
           options: data.options,
-          processing_type: 'pdf_extract'
+          processing_type: 'pdf_extract',
         },
         created_at: new Date().toISOString(),
       })
@@ -419,7 +420,7 @@ async function updateProcessingRecord(supabase: any, recordId: string, updates: 
 async function processPdfWithMivaa(
   documentInfo: any,
   extractionType: string,
-  options?: any
+  options?: any,
 ): Promise<MivaaApiResponse> {
   try {
     const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'http://localhost:8000';
@@ -476,7 +477,7 @@ async function processPdfWithMivaa(
     }
 
     console.log(`Calling Mivaa API: ${endpoint}`);
-    
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
@@ -504,7 +505,7 @@ async function processPdfWithMivaa(
 
   } catch (error) {
     console.error('Error calling Mivaa API:', error);
-    
+
     if (error instanceof Error && error.name === 'TimeoutError') {
       return {
         success: false,
@@ -522,15 +523,15 @@ async function processPdfWithMivaa(
 async function transformToRagDocuments(
   markdownContent: string,
   documentInfo: any,
-  options?: any
+  options?: any,
 ): Promise<Array<any>> {
   try {
     const chunkSize = options?.chunkSize || 1000;
     const overlapSize = options?.overlapSize || 100;
-    
+
     // Simple text chunking implementation
     const chunks = chunkText(markdownContent, chunkSize, overlapSize);
-    
+
     return chunks.map((chunk, index) => ({
       id: `${documentInfo.id}_chunk_${index}`,
       content: chunk,
@@ -571,7 +572,7 @@ function chunkText(text: string, chunkSize: number, overlapSize: number): string
 async function storeRagDocuments(
   supabase: any,
   ragDocuments: Array<any>,
-  context: { documentId: string; userId: string; workspaceId?: string }
+  context: { documentId: string; userId: string; workspaceId?: string },
 ): Promise<void> {
   try {
     const documentsToInsert = ragDocuments.map(doc => ({
@@ -603,17 +604,17 @@ function getClientIP(req: Request): string {
   if (forwarded) {
     return forwarded.split(',')[0].trim();
   }
-  
+
   const realIP = req.headers.get('x-real-ip');
   if (realIP) {
     return realIP;
   }
-  
+
   const cfConnectingIP = req.headers.get('cf-connecting-ip');
   if (cfConnectingIP) {
     return cfConnectingIP;
   }
-  
+
   return '127.0.0.1';
 }
 
@@ -634,10 +635,10 @@ async function logApiUsage(supabase: any, logData: any): Promise<void> {
 function createErrorResponse(
   message: string,
   status: number,
-  startTime: number
+  startTime: number,
 ): Response {
   const responseTime = Date.now() - startTime;
-  
+
   const response: PdfExtractionResponse = {
     success: false,
     error: message,
@@ -649,6 +650,6 @@ function createErrorResponse(
     {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    }
+    },
   );
 }

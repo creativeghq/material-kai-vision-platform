@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 interface StyleAnalysisRequest {
@@ -175,7 +175,7 @@ async function analyzeColors(contentData: any, contentType: string): Promise<Col
     { hex: '#3498DB', rgb: [52, 152, 219] as [number, number, number], hsl: [204, 70, 53] as [number, number, number], percentage: 25, color_name: 'Bright Blue' },
     { hex: '#ECF0F1', rgb: [236, 240, 241] as [number, number, number], hsl: [192, 15, 94] as [number, number, number], percentage: 20, color_name: 'Light Gray' },
     { hex: '#E74C3C', rgb: [231, 76, 60] as [number, number, number], hsl: [6, 78, 57] as [number, number, number], percentage: 12, color_name: 'Red' },
-    { hex: '#F39C12', rgb: [243, 156, 18] as [number, number, number], hsl: [37, 90, 51] as [number, number, number], percentage: 8, color_name: 'Orange' }
+    { hex: '#F39C12', rgb: [243, 156, 18] as [number, number, number], hsl: [37, 90, 51] as [number, number, number], percentage: 8, color_name: 'Orange' },
   ];
 
   const colorHarmony = {
@@ -183,23 +183,23 @@ async function analyzeColors(contentData: any, contentType: string): Promise<Col
     harmony_score: 0.85,
     temperature: 'cool' as const,
     saturation_level: 'medium' as const,
-    brightness_level: 'medium' as const
+    brightness_level: 'medium' as const,
   };
 
   const accessibility = {
     contrast_ratios: [
       { foreground: '#2C3E50', background: '#ECF0F1', ratio: 12.5, wcag_level: 'AAA' },
       { foreground: '#3498DB', background: '#ECF0F1', ratio: 4.8, wcag_level: 'AA' },
-      { foreground: '#E74C3C', background: '#ECF0F1', ratio: 5.2, wcag_level: 'AA' }
+      { foreground: '#E74C3C', background: '#ECF0F1', ratio: 5.2, wcag_level: 'AA' },
     ],
     color_blind_friendly: true,
-    accessibility_score: 0.92
+    accessibility_score: 0.92,
   };
 
   return {
     dominant_colors: dominantColors,
     color_harmony: colorHarmony,
-    accessibility
+    accessibility,
   };
 }
 
@@ -207,26 +207,26 @@ async function analyzeTypography(contentData: any): Promise<TypographyAnalysis> 
   const fontsDetected = [
     { font_family: 'Roboto', font_weight: '400', font_style: 'normal', font_size: '16px', usage_context: 'body text' },
     { font_family: 'Roboto', font_weight: '700', font_style: 'normal', font_size: '24px', usage_context: 'headings' },
-    { font_family: 'Roboto Mono', font_weight: '400', font_style: 'normal', font_size: '14px', usage_context: 'code blocks' }
+    { font_family: 'Roboto Mono', font_weight: '400', font_style: 'normal', font_size: '14px', usage_context: 'code blocks' },
   ];
 
   const typographyHierarchy = [
     { level: 'h1' as const, font_size: 32, font_weight: 700, line_height: 1.2, letter_spacing: -0.5 },
     { level: 'h2' as const, font_size: 24, font_weight: 700, line_height: 1.3, letter_spacing: -0.25 },
     { level: 'h3' as const, font_size: 20, font_weight: 600, line_height: 1.4, letter_spacing: 0 },
-    { level: 'body' as const, font_size: 16, font_weight: 400, line_height: 1.6, letter_spacing: 0 }
+    { level: 'body' as const, font_size: 16, font_weight: 400, line_height: 1.6, letter_spacing: 0 },
   ];
 
   const readability = {
     readability_score: 0.88,
     font_pairing_quality: 'excellent' as const,
-    consistency_score: 0.92
+    consistency_score: 0.92,
   };
 
   return {
     fonts_detected: fontsDetected,
     typography_hierarchy: typographyHierarchy,
-    readability
+    readability,
   };
 }
 
@@ -236,7 +236,7 @@ async function analyzeLayout(contentData: any): Promise<LayoutAnalysis> {
     balance: 'asymmetrical' as const,
     alignment: 'left' as const,
     spacing_consistency: 0.85,
-    visual_hierarchy_score: 0.90
+    visual_hierarchy_score: 0.90,
   };
 
   const designPrinciples = {
@@ -244,19 +244,19 @@ async function analyzeLayout(contentData: any): Promise<LayoutAnalysis> {
     repetition: 0.82,
     alignment: 0.90,
     proximity: 0.85,
-    white_space_usage: 0.78
+    white_space_usage: 0.78,
   };
 
   const responsiveDesign = {
     mobile_friendly: true,
     breakpoint_consistency: true,
-    adaptive_elements: ['navigation', 'grid layout', 'typography scaling', 'image sizing']
+    adaptive_elements: ['navigation', 'grid layout', 'typography scaling', 'image sizing'],
   };
 
   return {
     composition,
     design_principles: designPrinciples,
-    responsive_design: responsiveDesign
+    responsive_design: responsiveDesign,
   };
 }
 
@@ -265,26 +265,26 @@ async function analyzeMaterialAesthetics(contentData: any): Promise<MaterialAest
     texture: 'smooth' as const,
     finish: 'polished' as const,
     transparency: 'opaque' as const,
-    reflectivity: 'medium' as const
+    reflectivity: 'medium' as const,
   };
 
   const aestheticQualities = {
     style_category: 'modern' as const,
     sophistication_level: 0.85,
     visual_appeal_score: 0.88,
-    uniqueness_factor: 0.72
+    uniqueness_factor: 0.72,
   };
 
   const contextualFit = {
     application_suitability: ['consumer electronics', 'automotive interior', 'furniture', 'architectural elements'],
     target_audience: ['professionals', 'design-conscious consumers', 'tech enthusiasts'],
-    market_positioning: 'premium' as const
+    market_positioning: 'premium' as const,
   };
 
   return {
     surface_properties: surfaceProperties,
     aesthetic_qualities: aestheticQualities,
-    contextual_fit: contextualFit
+    contextual_fit: contextualFit,
   };
 }
 
@@ -299,7 +299,7 @@ function classifyStyle(colorAnalysis: ColorAnalysis, typography?: TypographyAnal
     secondary_styles: ['corporate', 'clean'],
     style_confidence: 0.87,
     design_era: 'contemporary',
-    cultural_influences: ['scandinavian', 'japanese minimalism']
+    cultural_influences: ['scandinavian', 'japanese minimalism'],
   };
 }
 
@@ -309,26 +309,26 @@ function identifyDesignPatterns(analysisData: any): any {
       pattern_name: 'Card-based Layout',
       pattern_type: 'layout' as const,
       confidence: 0.92,
-      description: 'Content organized in distinct card containers with consistent spacing'
+      description: 'Content organized in distinct card containers with consistent spacing',
     },
     {
       pattern_name: 'Monochromatic Color Scheme',
       pattern_type: 'color' as const,
       confidence: 0.85,
-      description: 'Primary use of blue tones with minimal accent colors'
+      description: 'Primary use of blue tones with minimal accent colors',
     },
     {
       pattern_name: 'Typography Scale',
       pattern_type: 'typography' as const,
       confidence: 0.88,
-      description: 'Consistent typographic hierarchy with clear size relationships'
-    }
+      description: 'Consistent typographic hierarchy with clear size relationships',
+    },
   ];
 
   return {
     identified_patterns: patterns,
     pattern_consistency: 0.86,
-    innovation_score: 0.74
+    innovation_score: 0.74,
   };
 }
 
@@ -338,26 +338,26 @@ function generateRecommendations(analysisResult: any): any {
       'Increase color contrast for better accessibility',
       'Add more visual hierarchy through typography weight variation',
       'Consider adding subtle animations for enhanced user engagement',
-      'Optimize spacing consistency across different screen sizes'
+      'Optimize spacing consistency across different screen sizes',
     ],
     style_alternatives: [
       'Dark mode variant with inverted color scheme',
       'High-contrast version for accessibility',
       'Colorful accent variant for creative industries',
-      'Minimal monochrome version for professional contexts'
+      'Minimal monochrome version for professional contexts',
     ],
     accessibility_improvements: [
       'Ensure all text meets WCAG AA contrast requirements',
       'Add focus indicators for keyboard navigation',
       'Provide alternative text for decorative elements',
-      'Test with screen readers and assistive technologies'
+      'Test with screen readers and assistive technologies',
     ],
     trend_alignment: [
       'Incorporate subtle gradients for modern appeal',
       'Consider glassmorphism effects for depth',
       'Add micro-interactions for enhanced UX',
-      'Explore sustainable design principles'
-    ]
+      'Explore sustainable design principles',
+    ],
   };
 }
 
@@ -367,16 +367,16 @@ function calculateQualityMetrics(analysisData: any): any {
     aesthetic_appeal: 0.88,
     functional_design: 0.82,
     innovation_factor: 0.74,
-    market_relevance: 0.86
+    market_relevance: 0.86,
   };
 }
 
 async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<StyleAnalysisResult> {
   const startTime = Date.now();
-  
+
   try {
     console.log(`Analyzing ${request.content_type} style`);
-    
+
     // Get content data
     let contentData: any = {};
     if (request.content_id) {
@@ -385,7 +385,7 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
         .select('*')
         .eq('id', request.content_id)
         .single();
-      
+
       if (error) throw new Error(`Content not found: ${error.message}`);
       contentData = data;
     } else if (request.content_url) {
@@ -405,7 +405,7 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
       layout_composition: true,
       material_aesthetics: false,
       design_patterns: true,
-      brand_consistency: false
+      brand_consistency: false,
     };
 
     const visualAnalysis: any = {};
@@ -434,14 +434,14 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
     const styleClassification = classifyStyle(
       visualAnalysis.color_analysis,
       visualAnalysis.typography_analysis,
-      visualAnalysis.layout_analysis
+      visualAnalysis.layout_analysis,
     );
 
     // Design patterns
     const designPatterns = focus.design_patterns ? identifyDesignPatterns(visualAnalysis) : {
       identified_patterns: [],
       pattern_consistency: 0,
-      innovation_score: 0
+      innovation_score: 0,
     };
 
     // Brand analysis (if requested)
@@ -451,7 +451,7 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
         brand_consistency: 0.82,
         brand_recognition_elements: ['logo placement', 'color scheme', 'typography'],
         brand_personality_traits: ['professional', 'trustworthy', 'innovative'],
-        competitive_differentiation: 0.75
+        competitive_differentiation: 0.75,
       };
     }
 
@@ -459,14 +459,14 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
     const recommendations = generateRecommendations({
       visual: visualAnalysis,
       style: styleClassification,
-      patterns: designPatterns
+      patterns: designPatterns,
     });
 
     // Calculate quality metrics
     const qualityMetrics = calculateQualityMetrics({
       visual: visualAnalysis,
       style: styleClassification,
-      patterns: designPatterns
+      patterns: designPatterns,
     });
 
     const result: StyleAnalysisResult = {
@@ -474,14 +474,14 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
         content_type: request.content_type,
         content_id: request.content_id,
         analysis_timestamp: new Date().toISOString(),
-        processing_method: 'ai_style_analysis'
+        processing_method: 'ai_style_analysis',
       },
       visual_analysis: visualAnalysis,
       style_classification: styleClassification,
       design_patterns: designPatterns,
       brand_analysis: brandAnalysis,
       recommendations,
-      quality_metrics: qualityMetrics
+      quality_metrics: qualityMetrics,
     };
 
     // Store analysis results
@@ -495,7 +495,7 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
         quality_metrics: qualityMetrics,
         recommendations,
         user_id: request.user_id,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       });
 
     // Log analytics
@@ -509,8 +509,8 @@ async function processStyleAnalysis(request: StyleAnalysisRequest): Promise<Styl
             content_type: request.content_type,
             analysis_focus: Object.keys(request.analysis_focus || {}).filter(key => request.analysis_focus![key as keyof typeof request.analysis_focus]),
             style_score: qualityMetrics.overall_style_score,
-            processing_time_ms: Date.now() - startTime
-          }
+            processing_time_ms: Date.now() - startTime,
+          },
         });
     }
 
@@ -529,32 +529,32 @@ serve(async (req) => {
 
   try {
     const request: StyleAnalysisRequest = await req.json();
-    
+
     console.log('Processing style analysis request:', {
       content_type: request.content_type,
       has_content_id: !!request.content_id,
       has_content_url: !!request.content_url,
       has_content_data: !!request.content_data,
-      analysis_focus: request.analysis_focus
+      analysis_focus: request.analysis_focus,
     });
 
     if (!request.content_id && !request.content_url && !request.content_data) {
       return new Response(
         JSON.stringify({ error: 'One of content_id, content_url, or content_data is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
     if (!['image', 'text', 'document', 'webpage', 'material_sample'].includes(request.content_type)) {
       return new Response(
         JSON.stringify({ error: 'Invalid content_type. Must be one of: image, text, document, webpage, material_sample' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -562,23 +562,23 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
 
   } catch (error) {
     console.error('Style analysis error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'Style analysis failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Style analysis failed',
+        details: error.message,
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });

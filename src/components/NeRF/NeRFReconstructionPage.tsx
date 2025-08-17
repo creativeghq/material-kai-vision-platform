@@ -1,4 +1,7 @@
 import React, { useState, useCallback } from 'react';
+import { Upload, Camera, Download, Share2, Eye, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -6,8 +9,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ThreeJsViewer } from '@/components/3D/ThreeJsViewer';
 import { useToast } from '@/hooks/use-toast';
 import { NeRFProcessingAPI, NeRFReconstructionRecord } from '@/services/nerfProcessingAPI';
-import { Upload, Camera, Download, Share2, Eye, AlertCircle, CheckCircle, Clock } from 'lucide-react';
-import { useDropzone } from 'react-dropzone';
 
 interface NeRFReconstructionPageProps {}
 
@@ -19,15 +20,15 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
   const [progress, setProgress] = useState(0);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const imageFiles = acceptedFiles.filter(file => 
-      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024 // 10MB limit
+    const imageFiles = acceptedFiles.filter(file =>
+      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024, // 10MB limit
     );
-    
+
     if (imageFiles.length !== acceptedFiles.length) {
       toast({
-        title: "Invalid files",
-        description: "Some files were rejected. Only images under 10MB are allowed.",
-        variant: "destructive"
+        title: 'Invalid files',
+        description: 'Some files were rejected. Only images under 10MB are allowed.',
+        variant: 'destructive',
       });
     }
 
@@ -37,9 +38,9 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
     },
-    multiple: true
+    multiple: true,
   });
 
   const removeFile = (index: number) => {
@@ -49,9 +50,9 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
   const handleStartReconstruction = async () => {
     if (uploadedFiles.length < 3) {
       toast({
-        title: "Not enough images",
-        description: "You need at least 3 images for NeRF reconstruction.",
-        variant: "destructive"
+        title: 'Not enough images',
+        description: 'You need at least 3 images for NeRF reconstruction.',
+        variant: 'destructive',
       });
       return;
     }
@@ -61,8 +62,8 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
 
     try {
       toast({
-        title: "Starting reconstruction",
-        description: "Uploading images and initializing NeRF processing..."
+        title: 'Starting reconstruction',
+        description: 'Uploading images and initializing NeRF processing...',
       });
 
       // Simulate progress updates
@@ -85,10 +86,10 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
         // Fetch the complete reconstruction record
         const reconstructionRecord = await NeRFProcessingAPI.getReconstruction(result.reconstruction_id);
         setReconstruction(reconstructionRecord);
-        
+
         toast({
-          title: "Reconstruction completed!",
-          description: `3D model generated with quality score: ${result.quality_score?.toFixed(2) || 'N/A'}`
+          title: 'Reconstruction completed!',
+          description: `3D model generated with quality score: ${result.quality_score?.toFixed(2) || 'N/A'}`,
         });
       } else {
         throw new Error(result.error_message || 'Reconstruction failed');
@@ -97,9 +98,9 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
     } catch (error) {
       console.error('Reconstruction error:', error);
       toast({
-        title: "Reconstruction failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive"
+        title: 'Reconstruction failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
@@ -127,7 +128,7 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
           NeRF 3D Reconstruction
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Upload multiple images of a scene to create a 3D Neural Radiance Field reconstruction. 
+          Upload multiple images of a scene to create a 3D Neural Radiance Field reconstruction.
           You can then view and interact with the generated 3D model.
         </p>
       </div>
@@ -190,7 +191,7 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
               </Alert>
             )}
 
-            <Button 
+            <Button
               onClick={handleStartReconstruction}
               disabled={uploadedFiles.length < 3 || isProcessing}
               className="w-full"
@@ -243,14 +244,14 @@ export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () 
                   </div>
                 </div>
 
-                <ThreeJsViewer 
+                <ThreeJsViewer
                   imageUrl={reconstruction.source_image_urls[0]}
                   className="h-80 w-full"
                 />
 
                 {reconstruction.reconstruction_status === 'completed' && (
                   <div className="text-sm text-muted-foreground">
-                    <p>Processing time: {reconstruction.processing_time_ms ? 
+                    <p>Processing time: {reconstruction.processing_time_ms ?
                       `${(reconstruction.processing_time_ms / 1000).toFixed(1)}s` : 'N/A'}</p>
                     <p>Source images: {reconstruction.source_image_urls.length}</p>
                   </div>

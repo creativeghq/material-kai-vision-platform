@@ -49,7 +49,7 @@ export interface ServiceMetrics {
 
 /**
  * Base Service Class
- * 
+ *
  * Provides standardized functionality for all services including:
  * - Singleton pattern implementation
  * - Configuration management
@@ -131,7 +131,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
     if (!this.isReady()) {
       return {
         status: 'unhealthy',
-        error: 'Service not initialized or disabled'
+        error: 'Service not initialized or disabled',
       };
     }
 
@@ -144,13 +144,13 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
         status: 'healthy',
         latency,
         lastCheck: new Date(),
-        uptime: Date.now() - this.startTime.getTime()
+        uptime: Date.now() - this.startTime.getTime(),
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         error: error instanceof Error ? error.message : 'Unknown error',
-        lastCheck: new Date()
+        lastCheck: new Date(),
       };
     }
   }
@@ -170,7 +170,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
       errorCount: this.errorCount,
       averageLatency,
       lastActivity: this.lastActivity,
-      rateLimitingEnabled: !!this.config.rateLimit
+      rateLimitingEnabled: !!this.config.rateLimit,
     };
   }
 
@@ -179,7 +179,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
    */
   protected async executeOperation<T>(
     operation: () => Promise<T>,
-    operationName: string
+    operationName: string,
   ): Promise<T> {
     if (!this.isReady()) {
       throw new Error(`Service ${this.config.name} is not ready`);
@@ -213,11 +213,11 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
   protected handleError(error: any, context: string): Error {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const serviceError = new Error(`${this.config.name} service error in ${context}: ${errorMessage}`);
-    
+
     console.error(`Service ${this.config.name} error:`, {
       context,
       error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
 
     return serviceError;
@@ -237,7 +237,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
 
     // Get or create request history for this operation
     let requests = this.rateLimitTracker.get(operation) || [];
-    
+
     // Remove requests outside the current window
     requests = requests.filter(timestamp => now - timestamp < windowMs);
 
@@ -245,7 +245,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
     if (requests.length >= maxRequests) {
       const oldestRequest = Math.min(...requests);
       const waitTime = windowMs - (now - oldestRequest);
-      
+
       if (waitTime > 0) {
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }

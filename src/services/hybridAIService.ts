@@ -41,7 +41,7 @@ export interface HybridAIServiceConfig extends ServiceConfig {
 export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   private readonly PROVIDERS: AIProvider[] = [
     { name: 'openai', priority: 1, available: true },
-    { name: 'claude', priority: 2, available: true }
+    { name: 'claude', priority: 2, available: true },
   ];
 
   private readonly DEFAULT_MIN_SCORE = 0.7;
@@ -79,10 +79,10 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
       }
 
       const attemptStart = Date.now();
-      
+
       try {
         console.log(`Attempting ${request.type} with ${provider.name}`);
-        
+
         let result: any;
         switch (provider.name) {
           case 'openai':
@@ -103,7 +103,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
           provider: provider.name,
           success: true,
           score: validation.score,
-          processing_time_ms: processingTime
+          processing_time_ms: processingTime,
         });
 
         // Check if this is the best result so far
@@ -123,12 +123,12 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 
       } catch (error) {
         const processingTime = Date.now() - attemptStart;
-        
+
         attempts.push({
           provider: provider.name,
           success: false,
           error: error.message,
-          processing_time_ms: processingTime
+          processing_time_ms: processingTime,
         });
 
         console.error(`${provider.name} failed:`, error.message);
@@ -146,7 +146,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
         attempts,
         final_score: bestScore,
         validation: bestValidation,
-        total_processing_time_ms: totalProcessingTime
+        total_processing_time_ms: totalProcessingTime,
       };
     } else {
       return {
@@ -156,7 +156,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
         attempts,
         final_score: 0,
         validation: { score: 0, issues: ['All providers failed'] },
-        total_processing_time_ms: totalProcessingTime
+        total_processing_time_ms: totalProcessingTime,
       };
     }
   }
@@ -164,9 +164,9 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   // Call hybrid analysis edge function
   static async callHybridAnalysis(request: any): Promise<HybridResponse> {
     const { supabase } = await import('@/integrations/supabase/client');
-    
+
     const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
-      body: request
+      body: request,
     });
 
     if (error) {
@@ -227,13 +227,13 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     // Basic validation for all request types - server now handles detailed validation
     const hasContent = result && (result.text || result.raw_response || result.image_url || Object.keys(result).length > 0);
     const hasError = result?.error || result?.status === 'error';
-    
+
     return {
       score: hasError ? 0.1 : (hasContent ? 0.9 : 0.3),
       confidence: hasContent ? 0.8 : 0.2,
       reasoning: hasContent ? 'Response contains content' : 'Response is empty or invalid',
       issues: hasContent ? [] : ['Empty or invalid response'],
-      suggestions: hasContent ? [] : ['Retry with different parameters']
+      suggestions: hasContent ? [] : ['Retry with different parameters'],
     };
   }
 
@@ -241,9 +241,9 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   static async checkProviderAvailability(): Promise<Record<string, boolean>> {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      
+
       const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
-        body: { check_availability: true }
+        body: { check_availability: true },
       });
 
       if (error) {
@@ -266,11 +266,11 @@ const hybridAIConfig: HybridAIServiceConfig = {
   enabled: true,
   providers: [
     { name: 'openai', priority: 1, available: true },
-    { name: 'claude', priority: 2, available: true }
+    { name: 'claude', priority: 2, available: true },
   ],
   defaultMinScore: 0.7,
   defaultMaxRetries: 2,
-  enableValidation: true
+  enableValidation: true,
 };
 
 let hybridAIInstance: HybridAIService | null = null;
@@ -283,7 +283,7 @@ export const HybridAIServiceStatic = {
       await hybridAIInstance.initialize();
     }
     return hybridAIInstance.processRequest(request);
-  }
+  },
 };
 
 // Extend the class with static methods for backward compatibility

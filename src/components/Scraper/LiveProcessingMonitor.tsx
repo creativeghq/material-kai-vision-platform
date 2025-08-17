@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Activity, Clock, Globe, CheckCircle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Activity, Clock, Globe, CheckCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 
 interface LiveProcessingMonitorProps {
   sessionId: string;
@@ -29,7 +30,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
     pagesPerMinute: 0,
     avgProcessingTime: 0,
     estimatedTimeRemaining: 'Calculating...',
-    recentActivity: []
+    recentActivity: [],
   });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [startTime] = useState(Date.now());
@@ -42,7 +43,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
 
     // Load processing stats
     loadProcessingStats();
-    
+
     // Set up real-time subscription for page updates
     const channel = supabase
       .channel(`live_processing_${sessionId}`)
@@ -52,11 +53,11 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
           event: '*',
           schema: 'public',
           table: 'scraping_pages',
-          filter: `session_id=eq.${sessionId}`
+          filter: `session_id=eq.${sessionId}`,
         },
         () => {
           loadProcessingStats();
-        }
+        },
       )
       .subscribe();
 
@@ -103,9 +104,9 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
       // Calculate stats
       const now = new Date();
       const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
-      
+
       const recentCompletions = pages.filter(page =>
-        page.completed_at && new Date(page.completed_at) > last5Minutes
+        page.completed_at && new Date(page.completed_at) > last5Minutes,
       );
 
       const pagesPerMinute = recentCompletions.length;
@@ -127,7 +128,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
         const estimatedMinutes = pagesPerMinute > 0
           ? Math.ceil(remainingPages / pagesPerMinute)
           : 0;
-        
+
         estimatedTimeRemaining = estimatedMinutes > 0
           ? `~${estimatedMinutes} minutes`
           : 'Calculating...';
@@ -141,7 +142,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
         processingTime: page.completed_at && page.started_at
           ? new Date(page.completed_at).getTime() - new Date(page.started_at).getTime()
           : 0,
-        timestamp: page.completed_at || page.created_at || ''
+        timestamp: page.completed_at || page.created_at || '',
       }));
 
       setStats({
@@ -149,7 +150,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
         pagesPerMinute,
         avgProcessingTime,
         estimatedTimeRemaining,
-        recentActivity
+        recentActivity,
       });
 
     } catch (error) {
@@ -160,7 +161,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
         pagesPerMinute: 0,
         avgProcessingTime: 0,
         estimatedTimeRemaining: 'Error loading data',
-        recentActivity: []
+        recentActivity: [],
       });
     }
   };
@@ -169,7 +170,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
     } else if (minutes > 0) {
@@ -196,7 +197,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
             </p>
             <p className="text-sm text-gray-600">Elapsed Time</p>
           </div>
-          
+
           <div className="text-center p-3 bg-white rounded-lg border">
             <Globe className="h-6 w-6 text-green-600 mx-auto mb-2" />
             <p className="text-lg font-bold text-green-600">
@@ -204,7 +205,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
             </p>
             <p className="text-sm text-gray-600">Pages/5min</p>
           </div>
-          
+
           <div className="text-center p-3 bg-white rounded-lg border">
             <Activity className="h-6 w-6 text-orange-600 mx-auto mb-2" />
             <p className="text-lg font-bold text-orange-600">
@@ -212,7 +213,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
             </p>
             <p className="text-sm text-gray-600">Avg Time/Page</p>
           </div>
-          
+
           <div className="text-center p-3 bg-white rounded-lg border">
             <Clock className="h-6 w-6 text-purple-600 mx-auto mb-2" />
             <p className="text-lg font-bold text-purple-600">
@@ -239,7 +240,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
             <CheckCircle className="h-4 w-4" />
             Recent Activity
           </h4>
-          
+
           {stats.recentActivity.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-4">
               No recent activity yet...

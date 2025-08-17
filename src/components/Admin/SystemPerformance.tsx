@@ -1,17 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Activity,
   Cpu,
@@ -22,11 +9,26 @@ import {
   Brain,
   Home,
   ArrowLeft,
-  Gauge
+  Gauge,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+
 
 interface SystemMetrics {
   total_processing_jobs: number;
@@ -69,8 +71,8 @@ export const SystemPerformance: React.FC = () => {
       openai_success: 0,
       claude_success: 0,
       openai_avg_time: 0,
-      claude_avg_time: 0
-    }
+      claude_avg_time: 0,
+    },
   });
   const [processingJobs, setProcessingJobs] = useState<ProcessingJob[]>([]);
   const [mlTasks, setMLTasks] = useState<MLTask[]>([]);
@@ -84,10 +86,10 @@ export const SystemPerformance: React.FC = () => {
   const fetchPerformanceData = async () => {
     try {
       setLoading(true);
-      
+
       // Use existing table since processing_queue doesn't exist
       const { data: queueData, error: queueError } = await supabase
-        .from('material_knowledge')
+        .from('materials_catalog')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
@@ -151,8 +153,8 @@ export const SystemPerformance: React.FC = () => {
           openai_success: openaiCount,
           claude_success: claudeCount,
           openai_avg_time: openaiCount > 0 ? Math.round(openaiTime / openaiCount) : 0,
-          claude_avg_time: claudeCount > 0 ? Math.round(claudeTime / claudeCount) : 0
-        }
+          claude_avg_time: claudeCount > 0 ? Math.round(claudeTime / claudeCount) : 0,
+        },
       });
 
     } catch (error) {
@@ -160,7 +162,7 @@ export const SystemPerformance: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to fetch performance data',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -321,9 +323,9 @@ export const SystemPerformance: React.FC = () => {
                         <span>Avg Response Time</span>
                         <span>{metrics.ai_model_performance.openai_avg_time}ms</span>
                       </div>
-                      <Progress 
-                        value={metrics.ai_model_performance.openai_success > 0 ? 85 : 0} 
-                        className="h-2 mt-1" 
+                      <Progress
+                        value={metrics.ai_model_performance.openai_success > 0 ? 85 : 0}
+                        className="h-2 mt-1"
                       />
                     </div>
                     <div>
@@ -335,9 +337,9 @@ export const SystemPerformance: React.FC = () => {
                         <span>Avg Response Time</span>
                         <span>{metrics.ai_model_performance.claude_avg_time}ms</span>
                       </div>
-                      <Progress 
-                        value={metrics.ai_model_performance.claude_success > 0 ? 78 : 0} 
-                        className="h-2 mt-1" 
+                      <Progress
+                        value={metrics.ai_model_performance.claude_success > 0 ? 78 : 0}
+                        className="h-2 mt-1"
                       />
                     </div>
                   </div>
@@ -353,14 +355,14 @@ export const SystemPerformance: React.FC = () => {
                     <div className="flex justify-between">
                       <span className="text-sm">OpenAI Efficiency</span>
                       <span className="font-mono text-sm">
-                        {metrics.ai_model_performance.openai_avg_time > 0 ? 
+                        {metrics.ai_model_performance.openai_avg_time > 0 ?
                           Math.round(1000 / metrics.ai_model_performance.openai_avg_time * 100) / 100 : 0} req/s
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">Claude Efficiency</span>
                       <span className="font-mono text-sm">
-                        {metrics.ai_model_performance.claude_avg_time > 0 ? 
+                        {metrics.ai_model_performance.claude_avg_time > 0 ?
                           Math.round(1000 / metrics.ai_model_performance.claude_avg_time * 100) / 100 : 0} req/s
                       </span>
                     </div>

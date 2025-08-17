@@ -1,9 +1,10 @@
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { MLResult, FeatureExtractionOptions } from './types';
 import { ImageClassifierService } from './imageClassifier';
 import { TextEmbedderService } from './textEmbedder';
 import { MaterialAnalyzerService } from './materialAnalyzer';
 import { DeviceDetector } from './deviceDetector';
-import { BaseService, ServiceConfig } from '../base/BaseService';
 
 /**
  * Configuration interface for ClientMLService
@@ -32,7 +33,7 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
     config: ClientMLServiceConfig,
     imageClassifier?: ImageClassifierService,
     textEmbedder?: TextEmbedderService,
-    materialAnalyzer?: MaterialAnalyzerService
+    materialAnalyzer?: MaterialAnalyzerService,
   ) {
     super(config);
     // Use dependency injection with fallback to new instances
@@ -48,7 +49,7 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
     config: Partial<ClientMLServiceConfig> = {},
     imageClassifier?: ImageClassifierService,
     textEmbedder?: TextEmbedderService,
-    materialAnalyzer?: MaterialAnalyzerService
+    materialAnalyzer?: MaterialAnalyzerService,
   ): ClientMLService {
     const defaultConfig: ClientMLServiceConfig = {
       name: 'ClientMLService',
@@ -66,13 +67,13 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
       timeout: 30000,
       retries: 3,
       rateLimit: {
-        requestsPerMinute: 60
+        requestsPerMinute: 60,
       },
       healthCheck: {
         enabled: true,
-        interval: 300000
+        interval: 300000,
       },
-      ...config
+      ...config,
     };
     return new ClientMLService(defaultConfig, imageClassifier, textEmbedder, materialAnalyzer);
   }
@@ -87,25 +88,25 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
         name: 'ImageClassifierService',
         version: '1.0.0',
         environment: this.config.environment,
-        enabled: true
+        enabled: true,
       });
     }
-    
+
     if (this.config.enableTextEmbedding && !this.textEmbedder) {
       this.textEmbedder = new TextEmbedderService({
         name: 'TextEmbedderService',
         version: '1.0.0',
         environment: this.config.environment,
-        enabled: true
+        enabled: true,
       });
     }
-    
+
     if (this.config.enableMaterialAnalysis && !this.materialAnalyzer) {
       this.materialAnalyzer = new MaterialAnalyzerService({
         name: 'MaterialAnalyzerService',
         version: '1.0.0',
         environment: this.config.environment,
-        enabled: true
+        enabled: true,
       });
     }
 
@@ -129,7 +130,7 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
     if (this.imageClassifier && !this.imageClassifier.isReady) {
       throw new Error('Image classifier service not properly initialized');
     }
-    
+
     if (this.textEmbedder && !this.textEmbedder.isReady) {
       throw new Error('Text embedder service not properly initialized');
     }
@@ -149,8 +150,8 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
    * Generate text embeddings for semantic analysis
    */
   async generateTextEmbedding(
-    text: string | string[], 
-    options: FeatureExtractionOptions = { pooling: 'mean', normalize: true }
+    text: string | string[],
+    options: FeatureExtractionOptions = { pooling: 'mean', normalize: true },
   ): Promise<MLResult> {
     if (!this.textEmbedder) {
       throw new Error('Text embedder not initialized');
@@ -192,22 +193,22 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
   /**
    * Get the current status of all ML services
    */
-  async getStatus(): Promise<{ 
-    initialized: boolean; 
+  async getStatus(): Promise<{
+    initialized: boolean;
     models: string[];
     device: string;
   }> {
     const deviceInfo = await DeviceDetector.getDeviceInfo();
     const imageStatus = this.imageClassifier ? true : false;
     const textStatus = this.textEmbedder ? true : false;
-    
+
     return {
       initialized: imageStatus && textStatus,
       models: [
         imageStatus ? 'image-classifier' : '',
-        textStatus ? 'text-embedder' : ''
+        textStatus ? 'text-embedder' : '',
       ].filter(Boolean),
-      device: deviceInfo.optimalDevice
+      device: deviceInfo.optimalDevice,
     };
   }
 
@@ -220,9 +221,9 @@ class ClientMLService extends BaseService<ClientMLServiceConfig> {
       services: {
         imageClassifier: this.imageClassifier ? 'initialized' : 'not initialized',
         textEmbedder: this.textEmbedder ? 'initialized' : 'not initialized',
-        materialAnalyzer: this.materialAnalyzer ? 'initialized' : 'not initialized'
+        materialAnalyzer: this.materialAnalyzer ? 'initialized' : 'not initialized',
       },
-      device: deviceInfo
+      device: deviceInfo,
     };
   }
 }

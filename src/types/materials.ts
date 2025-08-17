@@ -476,7 +476,7 @@ export const MATERIAL_CATEGORIES = {
   RUBBER: 'rubber',
   CONCRETE: 'concrete',
   STONE: 'stone',
-  OTHER: 'other'
+  OTHER: 'other',
 } as const;
 
 /**

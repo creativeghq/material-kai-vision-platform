@@ -1,8 +1,9 @@
-import { OpenAI } from 'openai';
-import { Logger } from 'winston';
 import { createHash } from 'crypto';
 import { performance } from 'perf_hooks';
 import { EventEmitter } from 'events';
+
+import { Logger } from 'winston';
+import { OpenAI } from 'openai';
 
 /**
  * Configuration interface for the EmbeddingGenerationService
@@ -139,19 +140,19 @@ export class EmbeddingGenerationService extends EventEmitter {
     batchesProcessed: 0,
     errors: 0,
     averageProcessingTime: 0,
-    rateLimitHits: 0
+    rateLimitHits: 0,
   };
 
   constructor(config: EmbeddingGenerationConfig, logger: Logger) {
     super();
     this.config = config;
     this.logger = logger;
-    
+
     // Initialize OpenAI client
     this.openai = new OpenAI({
       apiKey: config.openai.apiKey,
       baseURL: config.openai.baseURL,
-      timeout: config.openai.timeout || 30000
+      timeout: config.openai.timeout || 30000,
     });
 
     // Initialize cache
@@ -166,7 +167,7 @@ export class EmbeddingGenerationService extends EventEmitter {
     this.logger.info('EmbeddingGenerationService initialized', {
       model: config.openai.model,
       batchSize: config.batch.maxSize,
-      cacheEnabled: config.cache.enabled
+      cacheEnabled: config.cache.enabled,
     });
   }
 
@@ -175,7 +176,7 @@ export class EmbeddingGenerationService extends EventEmitter {
    */
   async generateEmbedding(input: EmbeddingInput): Promise<EmbeddingOutput> {
     const startTime = performance.now();
-    
+
     try {
       // Check cache first
       if (this.config.cache.enabled) {
@@ -183,7 +184,7 @@ export class EmbeddingGenerationService extends EventEmitter {
         if (cached) {
           this.metrics.cacheHits++;
           this.emit('cacheHit', { id: input.id, text: input.text });
-          
+
           return {
             id: input.id,
             embedding: cached.embedding,
@@ -192,7 +193,7 @@ export class EmbeddingGenerationService extends EventEmitter {
             usage: cached.usage,
             metadata: input.metadata,
             processingTime: performance.now() - startTime,
-            cached: true
+            cached: true,
           };
         }
         this.metrics.cacheMisses++;
@@ -200,13 +201,13 @@ export class EmbeddingGenerationService extends EventEmitter {
 
       // Estimate token count for rate limiting
       const estimatedTokens = this.estimateTokenCount(input.text);
-      
+
       // Check rate limits
       if (!this.rateLimiter.canMakeRequest(estimatedTokens)) {
         const waitTime = this.rateLimiter.getWaitTime(estimatedTokens);
         this.metrics.rateLimitHits++;
         this.emit('rateLimitHit', { waitTime, tokens: estimatedTokens });
-        
+
         if (waitTime > 0) {
           await this.delay(waitTime);
         }
@@ -214,10 +215,10 @@ export class EmbeddingGenerationService extends EventEmitter {
 
       // Generate embedding with retry logic
       const result = await this.generateWithRetry(input.text);
-      
+
       // Record rate limit usage
       this.rateLimiter.recordRequest(result.usage.total_tokens);
-      
+
       // Cache the result
       if (this.config.cache.enabled) {
         this.cacheEmbedding(input.text, result);
@@ -235,11 +236,11 @@ export class EmbeddingGenerationService extends EventEmitter {
         model: result.model,
         usage: {
           promptTokens: result.usage.prompt_tokens,
-          totalTokens: result.usage.total_tokens
+          totalTokens: result.usage.total_tokens,
         },
         metadata: input.metadata,
         processingTime: performance.now() - startTime,
-        cached: false
+        cached: false,
       };
 
       this.emit('embeddingGenerated', output);
@@ -250,9 +251,9 @@ export class EmbeddingGenerationService extends EventEmitter {
       this.logger.error('Failed to generate embedding', {
         id: input.id,
         error: error instanceof Error ? error.message : String(error),
-        processingTime: performance.now() - startTime
+        processingTime: performance.now() - startTime,
       });
-      
+
       this.emit('error', { id: input.id, error });
       throw error;
     }
@@ -270,12 +271,12 @@ export class EmbeddingGenerationService extends EventEmitter {
 
     this.logger.info('Starting batch embedding generation', {
       batchSize: inputs.length,
-      maxConcurrency: this.config.batch.concurrency
+      maxConcurrency: this.config.batch.concurrency,
     });
 
     // Process inputs in chunks based on concurrency limit
     const chunks = this.chunkArray(inputs, this.config.batch.concurrency);
-    
+
     for (const chunk of chunks) {
       const promises = chunk.map(async (input) => {
         try {
@@ -287,7 +288,7 @@ export class EmbeddingGenerationService extends EventEmitter {
           failed.push({
             id: input.id,
             error: error instanceof Error ? error.message : String(error),
-            input
+            input,
           });
         }
       });
@@ -306,8 +307,8 @@ export class EmbeddingGenerationService extends EventEmitter {
         successRate: successful.length / inputs.length,
         totalTokens,
         processingTime,
-        cacheHitRate: cacheHits / inputs.length
-      }
+        cacheHitRate: cacheHits / inputs.length,
+      },
     };
 
     this.logger.info('Batch embedding generation completed', {
@@ -315,7 +316,7 @@ export class EmbeddingGenerationService extends EventEmitter {
       successful: successful.length,
       failed: failed.length,
       processingTime,
-      successRate: result.metrics.successRate
+      successRate: result.metrics.successRate,
     });
 
     this.emit('batchCompleted', result);
@@ -331,7 +332,7 @@ export class EmbeddingGenerationService extends EventEmitter {
         input,
         resolve,
         reject,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Start batch timer if not already running
@@ -357,7 +358,7 @@ export class EmbeddingGenerationService extends EventEmitter {
       cacheSize: this.cache.size,
       queueSize: this.batchQueue.length,
       cacheHitRate: this.metrics.cacheHits / (this.metrics.cacheHits + this.metrics.cacheMisses) || 0,
-      errorRate: this.metrics.errors / this.metrics.totalRequests || 0
+      errorRate: this.metrics.errors / this.metrics.totalRequests || 0,
     };
   }
 
@@ -427,14 +428,14 @@ export class EmbeddingGenerationService extends EventEmitter {
 
         // Find the oldest request that would need to expire
         const relevantRequests = requests.filter(req => req.timestamp >= oneMinuteAgo);
-        
+
         if (relevantRequests.length === 0) return 0;
 
         const oldestRequest = relevantRequests[0];
         const waitTime = oldestRequest.timestamp + 60000 - now;
-        
+
         return Math.max(0, waitTime);
-      }
+      },
     };
   }
 
@@ -443,32 +444,32 @@ export class EmbeddingGenerationService extends EventEmitter {
    */
   private async generateWithRetry(text: string): Promise<any> {
     let lastError: Error;
-    
+
     for (let attempt = 1; attempt <= this.config.retry.maxAttempts; attempt++) {
       try {
         const response = await this.openai.embeddings.create({
           model: this.config.openai.model,
           input: text,
-          dimensions: this.config.openai.dimensions
+          dimensions: this.config.openai.dimensions,
         });
 
         return response;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         if (attempt === this.config.retry.maxAttempts) {
           break;
         }
 
         const delay = Math.min(
           this.config.retry.baseDelay * Math.pow(2, attempt - 1),
-          this.config.retry.maxDelay
+          this.config.retry.maxDelay,
         );
 
         this.logger.warn('Embedding generation attempt failed, retrying', {
           attempt,
           delay,
-          error: lastError.message
+          error: lastError.message,
         });
 
         await this.delay(delay);
@@ -514,10 +515,10 @@ export class EmbeddingGenerationService extends EventEmitter {
       model: result.model,
       usage: {
         promptTokens: result.usage.prompt_tokens,
-        totalTokens: result.usage.total_tokens
+        totalTokens: result.usage.total_tokens,
       },
       timestamp: Date.now(),
-      accessCount: 1
+      accessCount: 1,
     };
 
     this.cache.set(key, entry);
@@ -620,7 +621,7 @@ export class EmbeddingGenerationService extends EventEmitter {
    */
   private updateAverageProcessingTime(processingTime: number): void {
     const totalRequests = this.metrics.totalRequests;
-    this.metrics.averageProcessingTime = 
+    this.metrics.averageProcessingTime =
       (this.metrics.averageProcessingTime * (totalRequests - 1) + processingTime) / totalRequests;
   }
 
@@ -652,25 +653,25 @@ export const defaultEmbeddingConfig: EmbeddingGenerationConfig = {
     model: 'text-embedding-3-small',
     maxTokens: 8192,
     dimensions: 1536,
-    timeout: 30000
+    timeout: 30000,
   },
   batch: {
     maxSize: 100,
     maxWaitTime: 1000,
-    concurrency: 5
+    concurrency: 5,
   },
   cache: {
     enabled: true,
     ttl: 3600000, // 1 hour
-    maxSize: 10000
+    maxSize: 10000,
   },
   rateLimit: {
     requestsPerMinute: 3000,
-    tokensPerMinute: 1000000
+    tokensPerMinute: 1000000,
   },
   retry: {
     maxAttempts: 3,
     baseDelay: 1000,
-    maxDelay: 10000
-  }
+    maxDelay: 10000,
+  },
 };

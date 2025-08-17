@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Upload, X, FileImage, AlertCircle, CheckCircle, Clock, Loader2 } from 'lucide-react';
+
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -42,17 +43,17 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
     extract_tables: true,
     extract_forms: true,
   });
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { analyzeImage, results, isAnalyzing } = useImageAnalysis({
     onComplete: (result) => {
       // Update file status
-      setFiles(prev => prev.map(file => 
-        file.analysisId === result.id 
+      setFiles(prev => prev.map(file =>
+        file.analysisId === result.id
           ? { ...file, status: 'completed', progress: 100 }
-          : file
+          : file,
       ));
-      
+
       if (onAnalysisComplete) {
         onAnalysisComplete(result.id);
       }
@@ -69,7 +70,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
           setFiles(prev => prev.map(file =>
             file.analysisId === latestResult.id
               ? { ...file, progress }
-              : file
+              : file,
           ));
         }
       }
@@ -100,12 +101,12 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
       const fileWithPreview = file as FileWithPreview;
       fileWithPreview.status = 'pending';
       fileWithPreview.progress = 0;
-      
+
       // Create preview for images
       if (file.type.startsWith('image/')) {
         fileWithPreview.preview = URL.createObjectURL(file);
       }
-      
+
       return fileWithPreview;
     });
 
@@ -126,7 +127,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    
+
     const droppedFiles = e.dataTransfer.files;
     handleFileSelect(droppedFiles);
   }, [handleFileSelect]);
@@ -143,12 +144,12 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
     setFiles(prev => {
       const newFiles = [...prev];
       const file = newFiles[index];
-      
+
       // Revoke preview URL to prevent memory leaks
       if (file && file.preview) {
         URL.revokeObjectURL(file.preview);
       }
-      
+
       newFiles.splice(index, 1);
       return newFiles;
     });
@@ -157,37 +158,37 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
   // Start analysis for all pending files
   const startAnalysis = useCallback(async () => {
     const pendingFiles = files.filter(file => file.status === 'pending');
-    
+
     for (const file of pendingFiles) {
       try {
         // Update file status to analyzing
-        setFiles(prev => prev.map(f => 
-          f === file ? { ...f, status: 'analyzing' } : f
+        setFiles(prev => prev.map(f =>
+          f === file ? { ...f, status: 'analyzing' } : f,
         ));
-        
+
         const analysisId = await analyzeImage(file, {
           analysisType,
           options,
         });
-        
+
         // Update file with analysis ID
-        setFiles(prev => prev.map(f => 
-          f === file ? { ...f, analysisId } : f
+        setFiles(prev => prev.map(f =>
+          f === file ? { ...f, analysisId } : f,
         ));
-        
+
         if (onAnalysisStart) {
           onAnalysisStart(analysisId);
         }
       } catch (error) {
         // Update file status to failed
-        setFiles(prev => prev.map(f => 
-          f === file 
-            ? { 
-                ...f, 
-                status: 'failed', 
-                error: error instanceof Error ? error.message : 'Analysis failed' 
-              } 
-            : f
+        setFiles(prev => prev.map(f =>
+          f === file
+            ? {
+                ...f,
+                status: 'failed',
+                error: error instanceof Error ? error.message : 'Analysis failed',
+              }
+            : f,
         ));
       }
     }
@@ -252,8 +253,8 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
           <div
             className={`
               border-2 border-dashed rounded-lg p-8 text-center transition-colors
-              ${isDragOver 
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' 
+              ${isDragOver
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                 : 'border-gray-300 dark:border-gray-600'
               }
               ${files.length >= maxFiles ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}
@@ -273,7 +274,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
             <p className="text-xs text-gray-400">
               {files.length} / {maxFiles} files uploaded
             </p>
-            
+
             <input
               ref={fileInputRef}
               type="file"
@@ -298,7 +299,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
                 <Label htmlFor="analysis-type">Analysis Type</Label>
                 <Select
                   value={analysisType}
-                  onValueChange={(value: ImageAnalysisRequest['analysisType']) => 
+                  onValueChange={(value: ImageAnalysisRequest['analysisType']) =>
                     setAnalysisType(value)
                   }
                 >
@@ -426,11 +427,11 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
                         </span>
                       </Badge>
                     </div>
-                    
+
                     <p className="text-xs text-gray-500">
                       {(file.size / 1024 / 1024).toFixed(2)} MB
                     </p>
-                    
+
                     {file.status === 'analyzing' && file.progress !== undefined && (
                       <div className="mt-2">
                         <Progress value={file.progress} className="h-2" />
@@ -439,7 +440,7 @@ const ImageAnalysisUpload: React.FC<ImageAnalysisUploadProps> = ({
                         </p>
                       </div>
                     )}
-                    
+
                     {file.status === 'failed' && file.error && (
                       <p className="text-xs text-red-500 mt-1">{file.error}</p>
                     )}

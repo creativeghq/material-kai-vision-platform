@@ -1,4 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Loader2,
+  Database,
+  Brain,
+  Zap,
+  Upload,
+  Settings,
+  Rocket,
+  Search,
+  BookOpen,
+  Package,
+  Lightbulb,
+
+  BarChart3,
+  History,
+  Clock,
+  TrendingUp,
+  ThumbsUp,
+  ThumbsDown,
+
+} from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,36 +30,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-
 import { Separator } from '@/components/ui/separator';
-import { 
-  Loader2, 
-  Database, 
-  Brain, 
-  Zap, 
-  Upload, 
-  Settings, 
-  Rocket, 
-  Search,
-  BookOpen, 
-  Package, 
-  Lightbulb,
-  
-  BarChart3,
-  History,
-  Clock,
-  TrendingUp,
-  ThumbsUp,
-  ThumbsDown,
-  
-} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ragService } from '@/services/ragService';
-import { 
-  EnhancedRAGService, 
-  type EnhancedRAGRequest, 
-  type EnhancedRAGResponse 
+import {
+  EnhancedRAGService,
+  type EnhancedRAGRequest,
+  type EnhancedRAGResponse,
 } from '@/services/enhancedRAGService';
+
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 export const IntegratedRAGManagement: React.FC = () => {
@@ -49,7 +50,7 @@ export const IntegratedRAGManagement: React.FC = () => {
     content: '',
     content_type: 'expert_knowledge' as const,
     tags: '',
-    source_url: ''
+    source_url: '',
   });
 
   // Enhanced RAG Interface State
@@ -62,7 +63,7 @@ export const IntegratedRAGManagement: React.FC = () => {
   const [context, setContext] = useState({
     roomType: '',
     stylePreferences: [] as string[],
-    materialCategories: [] as string[]
+    materialCategories: [] as string[],
   });
   const [analytics, setAnalytics] = useState<any>(null);
   const [queryHistory, setQueryHistory] = useState<any[]>([]);
@@ -91,11 +92,11 @@ export const IntegratedRAGManagement: React.FC = () => {
       const result = await ragService.startCLIPFineTuning(
         `kai-clip-${Date.now()}`,
         undefined,
-        3
+        3,
       );
 
       toast({
-        title: "CLIP Training Started",
+        title: 'CLIP Training Started',
         description: `Training job created: ${result.estimated_training_time}`,
       });
 
@@ -103,9 +104,9 @@ export const IntegratedRAGManagement: React.FC = () => {
     } catch (error) {
       console.error('Training error:', error);
       toast({
-        title: "Training Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Training Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsTraining(false);
@@ -118,11 +119,11 @@ export const IntegratedRAGManagement: React.FC = () => {
       const result = await ragService.startMaterialClassification(
         `kai-materialnet-${Date.now()}`,
         undefined,
-        5
+        5,
       );
 
       toast({
-        title: "Material Classification Training Started",
+        title: 'Material Classification Training Started',
         description: `Training job created: ${result.estimated_training_time}`,
       });
 
@@ -130,9 +131,9 @@ export const IntegratedRAGManagement: React.FC = () => {
     } catch (error) {
       console.error('Training error:', error);
       toast({
-        title: "Training Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Training Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsTraining(false);
@@ -142,9 +143,9 @@ export const IntegratedRAGManagement: React.FC = () => {
   const handleAddKnowledgeEntry = async () => {
     if (!newKnowledgeEntry.title || !newKnowledgeEntry.content) {
       toast({
-        title: "Missing Information",
-        description: "Title and content are required",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Title and content are required',
+        variant: 'destructive',
       });
       return;
     }
@@ -155,12 +156,12 @@ export const IntegratedRAGManagement: React.FC = () => {
         content: newKnowledgeEntry.content,
         content_type: newKnowledgeEntry.content_type,
         tags: newKnowledgeEntry.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-        source_url: newKnowledgeEntry.source_url || undefined
+        source_url: newKnowledgeEntry.source_url || undefined,
       });
 
       toast({
-        title: "Knowledge Entry Added",
-        description: "Successfully added to knowledge base"
+        title: 'Knowledge Entry Added',
+        description: 'Successfully added to knowledge base',
       });
 
       setNewKnowledgeEntry({
@@ -168,14 +169,14 @@ export const IntegratedRAGManagement: React.FC = () => {
         content: '',
         content_type: 'expert_knowledge',
         tags: '',
-        source_url: ''
+        source_url: '',
       });
     } catch (error) {
       console.error('Add knowledge error:', error);
       toast({
-        title: "Failed to Add Knowledge",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Failed to Add Knowledge',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     }
   };
@@ -202,9 +203,9 @@ export const IntegratedRAGManagement: React.FC = () => {
   const handleEnhancedSearch = async () => {
     if (!query.trim()) {
       toast({
-        title: "Search Query Required",
-        description: "Please enter a search query",
-        variant: "destructive"
+        title: 'Search Query Required',
+        description: 'Please enter a search query',
+        variant: 'destructive',
       });
       return;
     }
@@ -216,25 +217,25 @@ export const IntegratedRAGManagement: React.FC = () => {
         context: {
           roomType: context.roomType || undefined,
           stylePreferences: context.stylePreferences.length > 0 ? context.stylePreferences : undefined,
-          materialCategories: context.materialCategories.length > 0 ? context.materialCategories : undefined
+          materialCategories: context.materialCategories.length > 0 ? context.materialCategories : undefined,
         },
         searchType,
         maxResults,
-        includeRealTime
+        includeRealTime,
       };
 
       const results = await EnhancedRAGService.search(request);
       setSearchResults(results);
-      
+
       const allResults = [
         ...results.results.knowledgeBase,
         ...results.results.materialKnowledge,
-        ...results.results.recommendations
+        ...results.results.recommendations,
       ];
 
       toast({
-        title: "Enhanced Search Completed",
-        description: `Found ${allResults.length} results with ${results.semanticAnalysis.queryComplexity.toFixed(2)} complexity score`
+        title: 'Enhanced Search Completed',
+        description: `Found ${allResults.length} results with ${results.semanticAnalysis.queryComplexity.toFixed(2)} complexity score`,
       });
 
       loadAnalytics();
@@ -242,9 +243,9 @@ export const IntegratedRAGManagement: React.FC = () => {
     } catch (error) {
       console.error('Enhanced search error:', error);
       toast({
-        title: "Search Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Search Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
@@ -257,12 +258,12 @@ export const IntegratedRAGManagement: React.FC = () => {
     try {
       await EnhancedRAGService.provideFeedback(searchResults.analytics.sessionId, {
         satisfaction,
-        clickedResults
+        clickedResults,
       });
-      
+
       toast({
-        title: "Feedback Submitted",
-        description: "Thank you for your feedback!"
+        title: 'Feedback Submitted',
+        description: 'Thank you for your feedback!',
       });
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -298,12 +299,12 @@ export const IntegratedRAGManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <GlobalAdminHeader 
+      <GlobalAdminHeader
         title="Integrated RAG System Management"
         description="Enhanced knowledge search, management, and model training"
         breadcrumbs={[
           { label: 'Admin', path: '/admin' },
-          { label: 'RAG Management' }
+          { label: 'RAG Management' },
         ]}
       />
 
@@ -405,7 +406,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                       onChange={(e) => setContext(prev => ({ ...prev, roomType: e.target.value }))}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Style Preferences</Label>
                     <Input
@@ -416,7 +417,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                           if (value && !context.stylePreferences.includes(value)) {
                             setContext(prev => ({
                               ...prev,
-                              stylePreferences: [...prev.stylePreferences, value]
+                              stylePreferences: [...prev.stylePreferences, value],
                             }));
                             (e.target as HTMLInputElement).value = '';
                           }
@@ -430,7 +431,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                           className="cursor-pointer bg-secondary text-secondary-foreground hover:bg-secondary/80"
                           onClick={() => setContext(prev => ({
                             ...prev,
-                            stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i)
+                            stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
                           }))}
                         >
                           {style} ×
@@ -449,7 +450,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                           if (value && !context.materialCategories.includes(value)) {
                             setContext(prev => ({
                               ...prev,
-                              materialCategories: [...prev.materialCategories, value]
+                              materialCategories: [...prev.materialCategories, value],
                             }));
                             (e.target as HTMLInputElement).value = '';
                           }
@@ -463,7 +464,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                           className="cursor-pointer bg-secondary text-secondary-foreground hover:bg-secondary/80"
                           onClick={() => setContext(prev => ({
                             ...prev,
-                            materialCategories: prev.materialCategories.filter((_, idx) => idx !== i)
+                            materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
                           }))}
                         >
                           {category} ×
@@ -497,13 +498,13 @@ export const IntegratedRAGManagement: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      
+
                       {/* Query Analysis */}
                       <div className="space-y-2">
                         <p className="text-sm">
                           <span className="font-medium">Processed Query:</span> {searchResults.processedQuery}
                         </p>
-                        
+
                         {/* Detected Entities */}
                         <div className="flex flex-wrap gap-2">
                           {Object.entries(searchResults.semanticAnalysis.detectedEntities).map(([key, values]) => {
@@ -581,10 +582,10 @@ export const IntegratedRAGManagement: React.FC = () => {
                                       </span>
                                     </div>
                                   </div>
-                                  
+
                                   <p className="text-sm text-muted-foreground mb-3">
-                                    {result.content.length > 300 
-                                      ? `${result.content.substring(0, 300)}...` 
+                                    {result.content.length > 300
+                                      ? `${result.content.substring(0, 300)}...`
                                       : result.content
                                     }
                                   </p>
@@ -625,9 +626,9 @@ export const IntegratedRAGManagement: React.FC = () => {
                                       </span>
                                     </div>
                                   </div>
-                                  
+
                                   <p className="text-sm text-muted-foreground mb-3">
-                                    {result.extractedKnowledge ? 
+                                    {result.extractedKnowledge ?
                                       (result.extractedKnowledge.length > 300 ? result.extractedKnowledge.substring(0, 300) + '...' : result.extractedKnowledge) :
                                       'Material knowledge entry'
                                     }
@@ -664,7 +665,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                                       </span>
                                     </div>
                                   </div>
-                                  
+
                                   <p className="text-sm text-muted-foreground mb-3">
                                     {result.type || 'AI-generated recommendation'}
                                   </p>
@@ -729,8 +730,8 @@ export const IntegratedRAGManagement: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Content Type</label>
-                    <Select 
-                      value={newKnowledgeEntry.content_type} 
+                    <Select
+                      value={newKnowledgeEntry.content_type}
                       onValueChange={(value: any) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value }))}
                     >
                       <SelectTrigger>
@@ -805,7 +806,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                         <p>• Training Data: Materials + Knowledge Base</p>
                         <p>• Estimated Time: 2-4 hours</p>
                       </div>
-                      <Button 
+                      <Button
                         onClick={handleStartCLIPTraining}
                         disabled={isTraining}
                         className="w-full mt-4"
@@ -831,7 +832,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                         <p>• Training Data: Material Images + Categories</p>
                         <p>• Estimated Time: 1-3 hours</p>
                       </div>
-                      <Button 
+                      <Button
                         onClick={handleStartMaterialClassification}
                         disabled={isTraining}
                         className="w-full mt-4"

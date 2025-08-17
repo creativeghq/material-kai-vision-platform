@@ -1,18 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { 
-  validateMivaaDocument, 
+
+import {
+  validateMivaaDocument,
   validatePartialMivaaDocument,
   MivaaDocumentSchema,
-  PartialMivaaDocumentSchema 
+  PartialMivaaDocumentSchema,
 } from '../schemas/mivaaValidation.js';
-import { 
-  validateTransformationConfig, 
+import {
+  validateTransformationConfig,
   validatePartialTransformationConfig,
   validateTransformationJobRequest,
   TransformationConfigSchema,
   PartialTransformationConfigSchema,
-  TransformationJobRequestSchema 
+  TransformationJobRequestSchema,
 } from '../schemas/transformationValidation.js';
 
 /**
@@ -45,7 +46,7 @@ export class ValidationError extends Error {
     message: string,
     errors: Array<{ path: string; message: string; code: string; value?: any }>,
     validationType: string,
-    requestId?: string
+    requestId?: string,
   ) {
     super(message);
     this.name = 'ValidationError';
@@ -113,15 +114,15 @@ function endPerformanceTracking(metrics: ValidationMetrics): ValidationMetrics {
 function logPerformanceMetrics(
   validationType: string,
   metrics: ValidationMetrics,
-  requestId?: string
+  requestId?: string,
 ) {
   if (metrics.duration && metrics.duration > 25) { // Log if over half the limit
     console.warn(`[Validation Performance] ${validationType} took ${metrics.duration.toFixed(2)}ms`, {
       requestId,
       validationType,
       duration: metrics.duration,
-      memoryDelta: metrics.memoryAfter && metrics.memoryBefore 
-        ? metrics.memoryAfter - metrics.memoryBefore 
+      memoryDelta: metrics.memoryAfter && metrics.memoryBefore
+        ? metrics.memoryAfter - metrics.memoryBefore
         : undefined,
     });
   }
@@ -133,7 +134,7 @@ function logPerformanceMetrics(
 function createValidationMiddleware<T>(
   schema: z.ZodSchema<T>,
   validationType: string,
-  options: ValidationOptions = {}
+  options: ValidationOptions = {},
 ) {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
@@ -179,7 +180,7 @@ function createValidationMiddleware<T>(
           `${validationType} validation failed`,
           errors,
           validationType,
-          requestId
+          requestId,
         );
 
         if (opts.customErrorHandler) {
@@ -194,7 +195,7 @@ function createValidationMiddleware<T>(
       next();
     } catch (error) {
       endPerformanceTracking(metrics);
-      
+
       console.error(`[Validation Error] Unexpected error in ${validationType}`, {
         requestId,
         error: error instanceof Error ? error.message : String(error),
@@ -209,7 +210,7 @@ function createValidationMiddleware<T>(
           code: 'internal_error',
         }],
         validationType,
-        requestId
+        requestId,
       );
 
       return res.status(500).json(validationError.toJSON());
@@ -233,7 +234,7 @@ export const validateMivaaDocumentMiddleware = (options?: ValidationOptions) => 
   return createValidationMiddleware(
     MivaaDocumentSchema,
     'MivaaDocument',
-    options
+    options,
   );
 };
 
@@ -244,7 +245,7 @@ export const validatePartialMivaaDocumentMiddleware = (options?: ValidationOptio
   return createValidationMiddleware(
     PartialMivaaDocumentSchema,
     'PartialMivaaDocument',
-    options
+    options,
   );
 };
 
@@ -255,7 +256,7 @@ export const validateTransformationConfigMiddleware = (options?: ValidationOptio
   return createValidationMiddleware(
     TransformationConfigSchema,
     'TransformationConfig',
-    options
+    options,
   );
 };
 
@@ -266,7 +267,7 @@ export const validatePartialTransformationConfigMiddleware = (options?: Validati
   return createValidationMiddleware(
     PartialTransformationConfigSchema,
     'PartialTransformationConfig',
-    options
+    options,
   );
 };
 
@@ -277,7 +278,7 @@ export const validateTransformationJobRequestMiddleware = (options?: ValidationO
   return createValidationMiddleware(
     TransformationJobRequestSchema,
     'TransformationJobRequest',
-    options
+    options,
   );
 };
 
@@ -293,7 +294,7 @@ export const validateQueryParams = (schema: z.ZodSchema<any>, options?: Validati
 
     try {
       const result = schema.safeParse(req.query);
-      
+
       endPerformanceTracking(metrics);
 
       if (opts.logPerformance) {
@@ -312,7 +313,7 @@ export const validateQueryParams = (schema: z.ZodSchema<any>, options?: Validati
           'Query parameter validation failed',
           errors,
           'QueryParams',
-          requestId
+          requestId,
         );
 
         return res.status(400).json(validationError.toJSON());
@@ -322,7 +323,7 @@ export const validateQueryParams = (schema: z.ZodSchema<any>, options?: Validati
       next();
     } catch (error) {
       endPerformanceTracking(metrics);
-      
+
       console.error('[Validation Error] Unexpected error in query validation', {
         requestId,
         error: error instanceof Error ? error.message : String(error),
@@ -350,7 +351,7 @@ export const validateUrlParams = (schema: z.ZodSchema<any>, options?: Validation
 
     try {
       const result = schema.safeParse(req.params);
-      
+
       endPerformanceTracking(metrics);
 
       if (opts.logPerformance) {
@@ -369,7 +370,7 @@ export const validateUrlParams = (schema: z.ZodSchema<any>, options?: Validation
           'URL parameter validation failed',
           errors,
           'UrlParams',
-          requestId
+          requestId,
         );
 
         return res.status(400).json(validationError.toJSON());
@@ -379,7 +380,7 @@ export const validateUrlParams = (schema: z.ZodSchema<any>, options?: Validation
       next();
     } catch (error) {
       endPerformanceTracking(metrics);
-      
+
       console.error('[Validation Error] Unexpected error in URL parameter validation', {
         requestId,
         error: error instanceof Error ? error.message : String(error),
@@ -402,7 +403,7 @@ export const validationErrorHandler = (
   error: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   if (error instanceof ValidationError) {
     return res.status(error.statusCode).json(error.toJSON());
@@ -418,7 +419,7 @@ export const validationErrorHandler = (
         code: err.code,
       })),
       'Unknown',
-      req.headers['x-request-id'] as string
+      req.headers['x-request-id'] as string,
     );
 
     return res.status(400).json(validationError.toJSON());
@@ -447,15 +448,15 @@ export const CommonParamSchemas = {
   id: z.object({
     id: z.string().min(1, 'ID is required'),
   }),
-  
+
   documentId: z.object({
     documentId: z.string().min(1, 'Document ID is required'),
   }),
-  
+
   configId: z.object({
     configId: z.string().min(1, 'Configuration ID is required'),
   }),
-  
+
   jobId: z.object({
     jobId: z.string().min(1, 'Job ID is required'),
   }),
@@ -470,14 +471,14 @@ export const CommonQuerySchemas = {
     limit: z.string().regex(/^\d+$/).transform(Number).optional(),
     offset: z.string().regex(/^\d+$/).transform(Number).optional(),
   }),
-  
+
   search: z.object({
     q: z.string().optional(),
     filter: z.string().optional(),
     sort: z.string().optional(),
     order: z.enum(['asc', 'desc']).optional(),
   }),
-  
+
   dateRange: z.object({
     startDate: z.string().datetime().optional(),
     endDate: z.string().datetime().optional(),

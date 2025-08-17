@@ -1,9 +1,9 @@
 /**
  * Standardized API Client Infrastructure
- * 
+ *
  * This module provides consistent wrapper patterns for API calls while preserving
  * each API's unique schemas, authentication methods, and response formats.
- * 
+ *
  * Key Principles:
  * - Standardize the INTERFACE, not the implementation
  * - Preserve API-specific parameter schemas
@@ -12,6 +12,7 @@
  */
 
 import { z } from 'zod';
+
 import { ApiConfig, ApiConfigManager } from '../../config';
 
 // Standardized response wrapper (preserves original data structure)
@@ -46,16 +47,16 @@ export interface StandardizedError {
 export interface StandardizedApiClient<TParams = any, TResponse = any> {
   readonly apiType: string;
   readonly modelId?: string;
-  
+
   // Core execution method - parameters stay API-specific
   execute(params: TParams): Promise<StandardizedApiResponse<TResponse>>;
-  
+
   // Validation using API-specific schemas
   validateParams(params: unknown): TParams;
-  
+
   // Error handling preserving API-specific details
   handleError(error: unknown): StandardizedError;
-  
+
   // Health check for the API
   healthCheck(): Promise<boolean>;
 }
@@ -67,7 +68,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
 
   constructor(
     public readonly apiType: string,
-    public readonly modelId?: string
+    public readonly modelId?: string,
   ) {
     const config = ApiConfigManager.getApiConfigByType(apiType);
     if (!config) {
@@ -87,7 +88,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
       code: 'UNKNOWN_ERROR',
       message: 'An unknown error occurred',
       retryable: false,
-      originalError: error
+      originalError: error,
     };
 
     if (error instanceof Error) {
@@ -108,7 +109,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
   protected createResponse<T>(
     data: T,
     startTime: number,
-    requestId: string
+    requestId: string,
   ): StandardizedApiResponse<T> {
     return {
       success: true,
@@ -118,8 +119,8 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
         modelId: this.modelId,
         timestamp: new Date().toISOString(),
         requestId,
-        duration: Date.now() - startTime
-      }
+        duration: Date.now() - startTime,
+      },
     };
   }
 
@@ -127,7 +128,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
   protected createErrorResponse(
     error: StandardizedError,
     startTime: number,
-    requestId: string
+    requestId: string,
   ): StandardizedApiResponse {
     return {
       success: false,
@@ -137,8 +138,8 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
         modelId: this.modelId,
         timestamp: new Date().toISOString(),
         requestId,
-        duration: Date.now() - startTime
-      }
+        duration: Date.now() - startTime,
+      },
     };
   }
 }
@@ -158,13 +159,13 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   baseDelay: 1000,
   maxDelay: 10000,
   backoffMultiplier: 2,
-  retryableErrors: ['NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMIT', 'SERVER_ERROR']
+  retryableErrors: ['NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMIT', 'SERVER_ERROR'],
 };
 
 // Retry utility function
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  config: Partial<RetryConfig> = {}
+  config: Partial<RetryConfig> = {},
 ): Promise<T> {
   const retryConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
   let lastError: any;
@@ -174,7 +175,7 @@ export async function withRetry<T>(
       return await operation();
     } catch (error) {
       lastError = error;
-      
+
       // Don't retry on last attempt
       if (attempt === retryConfig.maxAttempts) {
         break;
@@ -189,7 +190,7 @@ export async function withRetry<T>(
       // Calculate delay with exponential backoff
       const delay = Math.min(
         retryConfig.baseDelay * Math.pow(retryConfig.backoffMultiplier, attempt - 1),
-        retryConfig.maxDelay
+        retryConfig.maxDelay,
       );
 
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -209,7 +210,7 @@ export class ApiClientFactory {
 
   static getClient<TParams, TResponse>(
     apiType: string,
-    modelId?: string
+    modelId?: string,
   ): StandardizedApiClient<TParams, TResponse> | null {
     const key = modelId ? `${apiType}:${modelId}` : apiType;
     return this.clients.get(key) as StandardizedApiClient<TParams, TResponse> || null;

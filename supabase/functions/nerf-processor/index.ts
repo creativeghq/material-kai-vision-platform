@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -15,7 +15,7 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
     const { imageUrls, userId } = await req.json();
@@ -23,7 +23,7 @@ serve(async (req) => {
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0 || !userId) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: imageUrls (array) and userId' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -35,7 +35,7 @@ serve(async (req) => {
       .insert({
         user_id: userId,
         source_image_urls: imageUrls,
-        reconstruction_status: 'processing'
+        reconstruction_status: 'processing',
       })
       .select()
       .single();
@@ -46,7 +46,7 @@ serve(async (req) => {
 
     // Simulate NeRF processing
     const processingTimeMs = Math.floor(Math.random() * 30000) + 15000; // 15-45 seconds
-    
+
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const qualityScore = Math.random() * 0.3 + 0.7; // 0.7-1.0
@@ -68,8 +68,8 @@ serve(async (req) => {
           camera_positions: imageUrls.length,
           reconstruction_method: 'instant-ngp',
           resolution: '1024x1024',
-          training_iterations: 5000
-        }
+          training_iterations: 5000,
+        },
       })
       .eq('id', reconstruction.id);
 
@@ -87,16 +87,16 @@ serve(async (req) => {
         modelUrl: modelFileUrl,
         meshUrl: meshFileUrl,
         pointCloudUrl: pointCloudUrl,
-        processingTime: processingTimeMs
+        processingTime: processingTimeMs,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
 
   } catch (error) {
     console.error('Error in NeRF processing:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

@@ -1,8 +1,4 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Search,
   Sparkles,
@@ -15,11 +11,17 @@ import {
   SortAsc,
   SortDesc,
   Grid,
-  List
+  List,
 } from 'lucide-react';
+
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { SemanticSearchInput, SearchOptions } from './SemanticSearchInput';
 import { supabase } from '@/integrations/supabase/client';
+
+import { SemanticSearchInput, SearchOptions } from './SemanticSearchInput';
 
 // Types for search results
 export interface SearchResult {
@@ -74,7 +76,7 @@ export interface SemanticSearchProps {
 }
 
 // Database search function
-const searchDatabase = async (query: string, options?: SearchOptions): Promise<SearchResult[]> => {
+const searchDatabase = async (query: string, _options?: SearchOptions): Promise<SearchResult[]> => {
   try {
     // Search across multiple tables for comprehensive results
     const searchPromises = [];
@@ -98,7 +100,7 @@ const searchDatabase = async (query: string, options?: SearchOptions): Promise<S
         `)
         .or(`document_id.ilike.%${query}%,extracted_content.ilike.%${query}%,metadata->>title.ilike.%${query}%`)
         .eq('status', 'completed')
-        .limit(20)
+        .limit(20),
     );
 
     // Search materials catalog
@@ -116,7 +118,7 @@ const searchDatabase = async (query: string, options?: SearchOptions): Promise<S
           metadata
         `)
         .or(`name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
-        .limit(20)
+        .limit(20),
     );
 
     const [processingResults, materialsResults] = await Promise.all(searchPromises);
@@ -142,10 +144,10 @@ const searchDatabase = async (query: string, options?: SearchOptions): Promise<S
             size: item.file_size_bytes || 0,
             tags: metadata.tags || [],
             processingStatus: item.status as 'completed' | 'processing' | 'failed',
-            confidence: 0.8 + Math.random() * 0.2
+            confidence: 0.8 + Math.random() * 0.2,
           },
           highlights: [item.extraction_type, 'document processing', 'analysis'],
-          url: `/processing/${item.id}`
+          url: `/processing/${item.id}`,
         });
       });
     }
@@ -168,10 +170,10 @@ const searchDatabase = async (query: string, options?: SearchOptions): Promise<S
             fileType: 'Material Data',
             tags: metadata.tags || [item.category],
             processingStatus: 'completed' as const,
-            confidence: 0.85 + Math.random() * 0.15
+            confidence: 0.85 + Math.random() * 0.15,
           },
           highlights: [item.category, 'material properties', 'catalog'],
-          url: `/materials/${item.id}`
+          url: `/materials/${item.id}`,
         });
       });
     }
@@ -192,7 +194,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
   showFilters = true,
   showStats = true,
   viewMode: initialViewMode = 'list',
-  enableViewToggle = true
+  enableViewToggle = true,
 }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -205,7 +207,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
     dateRange: {},
     minRelevance: 0.5,
     sortBy: 'relevance',
-    sortOrder: 'desc'
+    sortOrder: 'desc',
   });
 
   // Search execution
@@ -219,26 +221,22 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
     setError(null);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Filter and sort mock results based on query and options
-      let filteredResults = mockResults.filter(result => {
-        const matchesQuery = result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           result.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           result.metadata.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-        
+      // Use the actual database search function
+      const searchResults = await searchDatabase(searchQuery, options);
+
+      // Apply filters to the database results
+      let filteredResults = searchResults.filter((result: SearchResult) => {
         const matchesCategory = !options?.category || result.category === options.category;
-        const matchesFilters = 
+        const matchesFilters =
           (filters.types.length === 0 || filters.types.includes(result.type)) &&
           (filters.categories.length === 0 || filters.categories.includes(result.category)) &&
           result.relevanceScore >= filters.minRelevance;
 
-        return matchesQuery && matchesCategory && matchesFilters;
+        return matchesCategory && matchesFilters;
       });
 
       // Sort results
-      filteredResults.sort((a, b) => {
+      filteredResults.sort((a: SearchResult, b: SearchResult) => {
         let comparison = 0;
         switch (filters.sortBy) {
           case 'relevance':
@@ -271,7 +269,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
     const updatedFilters = { ...filters, ...newFilters };
     setFilters(updatedFilters);
     onFiltersChange?.(updatedFilters);
-    
+
     // Re-execute search with new filters
     if (query.trim()) {
       executeSearch(query);
@@ -321,7 +319,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
 
   // Render result card
   const renderResultCard = (result: SearchResult) => (
-    <Card 
+    <Card
       key={result.id}
       className="cursor-pointer hover:shadow-md transition-shadow"
       onClick={() => onResultSelect?.(result)}
@@ -341,7 +339,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
               />
             </div>
           )}
-          
+
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
@@ -353,11 +351,11 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 <span className="capitalize">{result.type}</span>
               </div>
             </div>
-            
+
             <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
               {result.content}
             </p>
-            
+
             {/* Highlights */}
             {result.highlights && result.highlights.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
@@ -368,7 +366,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 ))}
               </div>
             )}
-            
+
             {/* Metadata */}
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center gap-3">
@@ -378,7 +376,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 )}
                 <span>{formatTimeAgo(result.timestamp)}</span>
               </div>
-              
+
               <Badge className="text-xs border border-border bg-background text-foreground">
                 {result.category}
               </Badge>
@@ -404,7 +402,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
   );
 
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn('space-y-6', className)}>
       {/* Search Input */}
       <SemanticSearchInput
         value={query}
@@ -431,12 +429,12 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
               </Button>
-              
+
               <Button
                 className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 onClick={() => handleFiltersChange({
                   sortBy: filters.sortBy,
-                  sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc'
+                  sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc',
                 })}
               >
                 {filters.sortOrder === 'desc' ? (
@@ -454,8 +452,8 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
             <div className="flex items-center gap-1">
               <Button
                 className={`h-8 px-3 text-sm ${viewMode === 'list'
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
                 onClick={() => setViewMode('list')}
               >
@@ -463,8 +461,8 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
               </Button>
               <Button
                 className={`h-8 px-3 text-sm ${viewMode === 'grid'
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
                 onClick={() => setViewMode('grid')}
               >

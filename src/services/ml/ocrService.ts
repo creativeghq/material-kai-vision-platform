@@ -1,5 +1,6 @@
-import { MLResult, TextEmbeddingResult } from './types';
 import { BaseService, ServiceConfig } from '../base/BaseService';
+
+import { MLResult, TextEmbeddingResult } from './types';
 
 export interface OCRResult {
   text: string;
@@ -43,7 +44,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
   protected async doInitialize(): Promise<void> {
     // Check browser support for OCR capabilities
     this.isSupported = this.checkBrowserSupport();
-    
+
     if (!this.isSupported) {
       console.warn('OCR capabilities limited in this browser environment');
     }
@@ -72,7 +73,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
     if (typeof window === 'undefined') {
       return false; // Server-side environment
     }
-    
+
     return 'createImageBitmap' in window && 'OffscreenCanvas' in window;
   }
 
@@ -81,7 +82,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
    */
   async extractText(
     imageFile: File,
-    options: OCROptions = {}
+    options: OCROptions = {},
   ): Promise<MLResult> {
     return this.executeOperation(async () => {
       const startTime = performance.now();
@@ -92,12 +93,12 @@ export class OCRService extends BaseService<OCRServiceConfig> {
 
       // Create image bitmap for processing
       const imageBitmap = await createImageBitmap(imageFile);
-      
+
       // Use browser's built-in text detection if available
       if ('TextDetector' in window) {
         const textDetector = new (window as any).TextDetector();
         const textResults = await textDetector.detect(imageBitmap);
-        
+
         const blocks: TextBlock[] = textResults.map((result: any) => ({
           text: result.rawValue,
           confidence: result.confidence || 0.8,
@@ -105,24 +106,24 @@ export class OCRService extends BaseService<OCRServiceConfig> {
             x: result.boundingBox.x,
             y: result.boundingBox.y,
             width: result.boundingBox.width,
-            height: result.boundingBox.height
-          } : undefined
+            height: result.boundingBox.height,
+          } : undefined,
         }));
 
         const fullText = blocks.map(block => block.text).join(' ');
-        
+
         const ocrResult: OCRResult = {
           text: fullText,
           confidence: blocks.reduce((avg, block) => avg + block.confidence, 0) / blocks.length,
           blocks,
           language: options.language || this.config.defaultLanguage || 'en',
-          processingTime: performance.now() - startTime
+          processingTime: performance.now() - startTime,
         };
 
         return {
           success: true,
           data: ocrResult,
-          processingTime: performance.now() - startTime
+          processingTime: performance.now() - startTime,
         };
       }
 
@@ -133,7 +134,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
         if (!ctx) throw new Error('Canvas context not available');
 
         ctx.drawImage(imageBitmap, 0, 0);
-        
+
         // Simple text detection using image analysis
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const extractedText = this.analyzeImageForText(imageData);
@@ -142,13 +143,13 @@ export class OCRService extends BaseService<OCRServiceConfig> {
           text: extractedText,
           confidence: 0.7, // Lower confidence for fallback method
           language: options.language || this.config.defaultLanguage || 'en',
-          processingTime: performance.now() - startTime
+          processingTime: performance.now() - startTime,
         };
 
         return {
           success: true,
           data: ocrResult,
-          processingTime: performance.now() - startTime
+          processingTime: performance.now() - startTime,
         };
       }
 
@@ -167,7 +168,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
         es: /[ñáéíóúü]/i,
         fr: /[àâäéèêëïîôöùûüÿç]/i,
         de: /[äöüß]/i,
-        it: /[àèéìíîòóù]/i
+        it: /[àèéìíîòóù]/i,
       };
 
       for (const [lang, pattern] of Object.entries(patterns)) {
@@ -186,7 +187,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
   async extractStructuredData(ocrResult: OCRResult): Promise<any> {
     return this.executeOperation(async () => {
       const { text } = ocrResult;
-      
+
       // Extract common material document patterns
       const patterns = {
         materialId: /(?:Material\s+ID|Product\s+Code|SKU)[:\s]+([A-Z0-9-]+)/i,
@@ -195,7 +196,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
         thickness: /(?:Thickness|Thick)[:\s]+([\d.]+\s*(?:mm|cm|inches?))/i,
         dimensions: /(?:Dimensions|Size)[:\s]+([\d.\s]+(?:x|×)\s*[\d.\s]+(?:\s*(?:mm|cm|inches?))?)/i,
         manufacturer: /(?:Manufacturer|Made\s+by|Brand)[:\s]+([^,\n]+)/i,
-        dateCode: /(?:Date|Manufactured|Prod\.?\s+Date)[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i
+        dateCode: /(?:Date|Manufactured|Prod\.?\s+Date)[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
       };
 
       const extractedData: any = {};
@@ -216,7 +217,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
    */
   getStatus(): { supported: boolean; features: string[] } {
     const features = [];
-    
+
     if (typeof window !== 'undefined') {
       if ('TextDetector' in window) {
         features.push('Native Text Detection');
@@ -233,7 +234,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
 
     return {
       supported: this.isSupported,
-      features
+      features,
     };
   }
 
@@ -243,17 +244,17 @@ export class OCRService extends BaseService<OCRServiceConfig> {
     // Basic text detection heuristics
     // This is a simplified approach - in production you'd use more sophisticated algorithms
     const { data, width, height } = imageData;
-    
+
     // Look for text-like patterns (high contrast edges, horizontal/vertical lines)
     let textConfidence = 0;
     const sampleSize = Math.min(width * height, 10000); // Sample for performance
-    
+
     for (let i = 0; i < sampleSize * 4; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
       const brightness = (r + g + b) / 3;
-      
+
       // Look for high contrast areas that might contain text
       if (brightness < 50 || brightness > 200) {
         textConfidence++;
@@ -280,17 +281,17 @@ export class OCRService extends BaseService<OCRServiceConfig> {
       timeout: 30000,
       retries: 2,
       rateLimit: {
-        requestsPerMinute: 30
+        requestsPerMinute: 30,
       },
       healthCheck: {
         enabled: true,
         interval: 300000, // 5 minutes
-        timeout: 10000
+        timeout: 10000,
       },
       defaultLanguage: 'en',
       enableStructuredData: true,
       fallbackToCanvas: true,
-      ...config
+      ...config,
     };
 
     return new OCRService(defaultConfig);

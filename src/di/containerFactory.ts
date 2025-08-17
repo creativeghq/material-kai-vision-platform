@@ -1,10 +1,11 @@
-import { ServiceContainer } from './container.js';
-import { IServiceContainer, ServiceLifetime } from './types.js';
 import { ConfigurationFactory } from '../config/configFactory.js';
 import { DocumentIntegrationService } from '../services/documentIntegrationService.js';
 import type {
-    AppConfig
+    AppConfig,
 } from '../config/types.js';
+
+import { IServiceContainer, ServiceLifetime } from './types.js';
+import { ServiceContainer } from './container.js';
 
 // Simple logger interface for DI container
 interface ILogger {
@@ -102,18 +103,18 @@ export class ContainerFactory {
                     if (!service) {
                         return false;
                     }
-                    
+
                     // If service implements healthCheck method, use it
                     if (typeof service.healthCheck === 'function') {
                         const result = await service.healthCheck();
                         return result.status === 'healthy';
                     }
-                    
+
                     return true; // Service is available
                 } catch (error) {
                     return false;
                 }
-            }
+            },
         });
 
         // Register MivaaEmbeddingIntegration service with health check
@@ -131,17 +132,17 @@ export class ContainerFactory {
                     if (!service) {
                         return false;
                     }
-                    
+
                     if (typeof service.healthCheck === 'function') {
                         const result = await service.healthCheck();
                         return result.status === 'healthy';
                     }
-                    
+
                     return true;
                 } catch (error) {
                     return false;
                 }
-            }
+            },
         });
 
         // Register MivaaSearchIntegration service with health check
@@ -159,17 +160,17 @@ export class ContainerFactory {
                     if (!service) {
                         return false;
                     }
-                    
+
                     if (typeof service.healthCheck === 'function') {
                         const result = await service.healthCheck();
                         return result.status === 'healthy';
                     }
-                    
+
                     return true;
                 } catch (error) {
                     return false;
                 }
-            }
+            },
         });
 
         // Register MivaaToRagTransformerService with health check
@@ -185,17 +186,17 @@ export class ContainerFactory {
                     if (!service) {
                         return false;
                     }
-                    
+
                     if (typeof service.healthCheck === 'function') {
                         const result = await service.healthCheck();
                         return result.status === 'healthy';
                     }
-                    
+
                     return true;
                 } catch (error) {
                     return false;
                 }
-            }
+            },
         });
 
         // Register BatchProcessingService with health check
@@ -211,17 +212,17 @@ export class ContainerFactory {
                     if (!service) {
                         return false;
                     }
-                    
+
                     if (typeof service.healthCheck === 'function') {
                         const result = await service.healthCheck();
                         return result.status === 'healthy';
                     }
-                    
+
                     return true;
                 } catch (error) {
                     return false;
                 }
-            }
+            },
         });
 
         // Register ValidationIntegrationService with health check
@@ -237,17 +238,17 @@ export class ContainerFactory {
                     if (!service) {
                         return false;
                     }
-                    
+
                     if (typeof service.healthCheck === 'function') {
                         const result = await service.healthCheck();
                         return result.status === 'healthy';
                     }
-                    
+
                     return true;
                 } catch (error) {
                     return false;
                 }
-            }
+            },
         });
 
         // Register DocumentIntegrationService with health check
@@ -256,7 +257,7 @@ export class ContainerFactory {
             factory: (resolver) => {
                 const config = resolver.resolve<AppConfig>('AppConfig');
                 const ragService = resolver.resolve<any>('IBaseService'); // Will be replaced with actual RAG service interface
-                
+
                 return new DocumentIntegrationService(ragService, config);
             },
             lifetime: ServiceLifetime.Singleton,
@@ -266,17 +267,17 @@ export class ContainerFactory {
                     if (!service) {
                         return false;
                     }
-                    
+
                     if (typeof service.getHealthStatus === 'function') {
                         const result = await service.getHealthStatus();
                         return result.status === 'healthy';
                     }
-                    
+
                     return true;
                 } catch (error) {
                     return false;
                 }
-            }
+            },
         });
     }
 
@@ -285,20 +286,20 @@ export class ContainerFactory {
      */
     public createTestContainer(): IServiceContainer {
         const container = new ServiceContainer();
-        
+
         // Register only essential services for testing
         container.register({
             identifier: 'Logger',
             factory: () => new SimpleLogger({ level: 'error', enableConsole: false }),
             lifetime: ServiceLifetime.Singleton,
-            dependencies: []
+            dependencies: [],
         });
 
         container.register({
             identifier: 'ConfigurationFactory',
             factory: () => ConfigurationFactory.getInstance(),
             lifetime: ServiceLifetime.Singleton,
-            dependencies: []
+            dependencies: [],
         });
 
         return container;
@@ -313,7 +314,7 @@ export class ContainerFactory {
             identifier: 'ConfigurationFactory',
             factory: () => ConfigurationFactory.getInstance(),
             lifetime: ServiceLifetime.Singleton,
-            dependencies: []
+            dependencies: [],
         });
 
         // Register Logger with configuration from ConfigFactory
@@ -327,11 +328,11 @@ export class ContainerFactory {
                 }
                 return new SimpleLogger({
                     level: config.logLevel,
-                    enableConsole: config.debug
+                    enableConsole: config.debug,
                 });
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         // Register configuration objects as singletons for easy injection
@@ -352,7 +353,7 @@ export class ContainerFactory {
                 return configFactory.getCurrentConfig();
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         container.register({
@@ -366,7 +367,7 @@ export class ContainerFactory {
                 return config.services.documentChunking;
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         container.register({
@@ -380,7 +381,7 @@ export class ContainerFactory {
                 return config.services.embeddingGeneration;
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         container.register({
@@ -394,7 +395,7 @@ export class ContainerFactory {
                 return config.services.mivaaToRagTransformer;
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         container.register({
@@ -408,7 +409,7 @@ export class ContainerFactory {
                 return config.services.batchProcessing;
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         container.register({
@@ -422,7 +423,7 @@ export class ContainerFactory {
                 return config.services.validationIntegration;
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         container.register({
@@ -436,7 +437,7 @@ export class ContainerFactory {
                 return config.performance;
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
 
         container.register({
@@ -450,7 +451,7 @@ export class ContainerFactory {
                 return config.externalDependencies;
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
     }
 
@@ -467,7 +468,7 @@ export class ContainerFactory {
     public configureForEnvironment(container: IServiceContainer, environment: string): void {
         // Environment-specific configuration can be added here
         // For example, different logging levels, database connections, etc.
-        
+
         switch (environment.toLowerCase()) {
             case 'development':
                 this.configureDevelopmentServices(container);
@@ -494,11 +495,11 @@ export class ContainerFactory {
             factory: (_resolver) => {
                 return new SimpleLogger({
                     level: 'debug',
-                    enableConsole: true
+                    enableConsole: true,
                 });
             },
             lifetime: ServiceLifetime.Singleton,
-            dependencies: ['ConfigurationFactory']
+            dependencies: ['ConfigurationFactory'],
         });
     }
 
@@ -543,12 +544,12 @@ export class ContainerFactory {
 
             return {
                 isValid: errors.length === 0,
-                errors
+                errors,
             };
         } catch (error) {
             return {
                 isValid: false,
-                errors: [`Container validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`]
+                errors: [`Container validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
             };
         }
     }

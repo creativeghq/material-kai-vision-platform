@@ -24,14 +24,14 @@ export class AgentPerformanceOptimizer {
       'critical': 1.0,
       'high': 0.8,
       'medium': 0.6,
-      'low': 0.4
+      'low': 0.4,
     },
     specializedAgents: {
       'material_analysis': [],
       'image_processing': [],
       'text_analysis': [],
-      'ml_training': []
-    }
+      'ml_training': [],
+    },
   };
 
   async getAgentPerformanceMetrics(agentId: string): Promise<AgentPerformanceMetrics | null> {
@@ -62,10 +62,10 @@ export class AgentPerformanceOptimizer {
       // Calculate performance metrics
       const completedTasks = agentTasks.filter(task => task.status === 'completed');
       const failedTasks = agentTasks.filter(task => task.status === 'failed');
-      
+
       const taskCompletionRate = completedTasks.length / agentTasks.length;
       const errorRate = failedTasks.length / agentTasks.length;
-      
+
       const averageProcessingTime = completedTasks
         .filter(task => task.processing_time_ms)
         .reduce((sum, task) => sum + (task.processing_time_ms || 0), 0) / completedTasks.length || 0;
@@ -84,7 +84,7 @@ export class AgentPerformanceOptimizer {
         errorRate,
         specializations,
         loadFactor,
-        lastActiveTime: new Date().toISOString()
+        lastActiveTime: new Date().toISOString(),
       };
 
       // Update cache
@@ -116,14 +116,14 @@ export class AgentPerformanceOptimizer {
         agents.map(async (agent) => {
           const metrics = await this.getAgentPerformanceMetrics(agent.id);
           return { agent, metrics };
-        })
+        }),
       );
 
       // Filter agents suitable for the task
       const suitableAgents = agentMetrics.filter(({ agent, metrics }) => {
         // Check if agent has required specialization
-        const hasSpecialization = agent.specialization === taskType || 
-          (agent.capabilities && typeof agent.capabilities === 'object' && 
+        const hasSpecialization = agent.specialization === taskType ||
+          (agent.capabilities && typeof agent.capabilities === 'object' &&
            (agent.capabilities as any)?.supported_tasks?.includes(taskType));
 
         // Check load factor
@@ -144,7 +144,7 @@ export class AgentPerformanceOptimizer {
           score *= metrics.taskCompletionRate || 0.5;
           score *= (1 - metrics.errorRate);
           score *= (1 - metrics.loadFactor);
-          
+
           // Speed bonus (inverse of processing time)
           if (metrics.averageProcessingTime > 0) {
             score *= Math.max(0.1, 1 / (metrics.averageProcessingTime / 1000));
@@ -168,7 +168,7 @@ export class AgentPerformanceOptimizer {
         priority,
         selectedAgents,
         totalAgents: agents.length,
-        suitableAgents: suitableAgents.length
+        suitableAgents: suitableAgents.length,
       });
 
       return selectedAgents;
@@ -197,7 +197,7 @@ export class AgentPerformanceOptimizer {
 
       // Calculate current load for each agent
       const agentLoads = new Map<string, number>();
-      
+
       activeTasks?.forEach(task => {
         task.assigned_agents.forEach((agentId: string) => {
           agentLoads.set(agentId, (agentLoads.get(agentId) || 0) + 1);
@@ -221,15 +221,15 @@ export class AgentPerformanceOptimizer {
 
       // Redistribute tasks from overloaded to underloaded agents
       for (const overloadedAgentId of overloadedAgents) {
-        const tasksToRedistribute = activeTasks?.filter(task => 
-          task.status === 'pending' && 
-          task.assigned_agents.includes(overloadedAgentId)
+        const tasksToRedistribute = activeTasks?.filter(task =>
+          task.status === 'pending' &&
+          task.assigned_agents.includes(overloadedAgentId),
         ) || [];
 
         for (const task of tasksToRedistribute.slice(0, 2)) { // Redistribute up to 2 tasks
           if (underloadedAgents.length > 0) {
             const targetAgent = underloadedAgents[0];
-            
+
             // Update task assignment
             const newAssignedAgents = task.assigned_agents
               .filter((id: string) => id !== overloadedAgentId)
@@ -237,9 +237,9 @@ export class AgentPerformanceOptimizer {
 
             await supabase
               .from('agent_tasks')
-              .update({ 
+              .update({
                 assigned_agents: newAssignedAgents,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               })
               .eq('id', task.id);
 
@@ -247,7 +247,7 @@ export class AgentPerformanceOptimizer {
 
             // Update load tracking
             agentLoads.set(targetAgent, (agentLoads.get(targetAgent) || 0) + 1);
-            
+
             // Remove from underloaded if now approaching capacity
             const newLoad = agentLoads.get(targetAgent) || 0;
             if (newLoad / this.loadBalancingConfig.maxConcurrentTasks > 0.6) {
@@ -261,7 +261,7 @@ export class AgentPerformanceOptimizer {
       console.log('Load balancing completed:', {
         overloadedAgents: overloadedAgents.length,
         underloadedAgents: underloadedAgents.length,
-        totalAgents: agents?.length || 0
+        totalAgents: agents?.length || 0,
       });
 
     } catch (error) {
@@ -280,25 +280,25 @@ export class AgentPerformanceOptimizer {
 
       if (error) throw error;
 
-      const currentMetrics = (agent?.performance_metrics && typeof agent.performance_metrics === 'object') ? 
+      const currentMetrics = (agent?.performance_metrics && typeof agent.performance_metrics === 'object') ?
         agent.performance_metrics as any : {};
-      
+
       // Update performance metrics based on task result
       const updatedMetrics = {
         ...currentMetrics,
         last_updated: new Date().toISOString(),
         total_tasks: (currentMetrics.total_tasks || 0) + 1,
-        successful_tasks: taskResult.success ? 
-          (currentMetrics.successful_tasks || 0) + 1 : 
+        successful_tasks: taskResult.success ?
+          (currentMetrics.successful_tasks || 0) + 1 :
           (currentMetrics.successful_tasks || 0),
         average_processing_time: this.calculateMovingAverage(
           currentMetrics.average_processing_time || 0,
           taskResult.processing_time_ms || 0,
-          currentMetrics.total_tasks || 0
+          currentMetrics.total_tasks || 0,
         ),
-        error_count: taskResult.success ? 
-          (currentMetrics.error_count || 0) : 
-          (currentMetrics.error_count || 0) + 1
+        error_count: taskResult.success ?
+          (currentMetrics.error_count || 0) :
+          (currentMetrics.error_count || 0) + 1,
       };
 
       // Calculate derived metrics
@@ -308,9 +308,9 @@ export class AgentPerformanceOptimizer {
       // Update agent performance in database
       await supabase
         .from('crewai_agents')
-        .update({ 
+        .update({
           performance_metrics: updatedMetrics,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', agentId);
 
@@ -353,9 +353,9 @@ export class AgentPerformanceOptimizer {
       const activeAgents = agents?.filter(agent => agent.status === 'active').length || 0;
 
       // Calculate system load
-      const totalActiveTasks = activeTasks?.reduce((sum, task) => 
+      const totalActiveTasks = activeTasks?.reduce((sum, task) =>
         sum + task.assigned_agents.length, 0) || 0;
-      
+
       const maxCapacity = activeAgents * this.loadBalancingConfig.maxConcurrentTasks;
       const averageLoad = maxCapacity > 0 ? totalActiveTasks / maxCapacity : 0;
 
@@ -371,7 +371,7 @@ export class AgentPerformanceOptimizer {
         totalAgents,
         activeAgents,
         averageLoad,
-        systemHealth
+        systemHealth,
       };
 
     } catch (error) {
@@ -380,7 +380,7 @@ export class AgentPerformanceOptimizer {
         totalAgents: 0,
         activeAgents: 0,
         averageLoad: 0,
-        systemHealth: 'critical'
+        systemHealth: 'critical',
       };
     }
   }

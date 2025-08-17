@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
+import {
+  TestTube,
+  Brain,
+  Zap,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Activity,
+
+  ArrowLeft,
+  Home,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { 
-  TestTube, 
-  Brain, 
-  Zap, 
-  Clock, 
-  CheckCircle, 
-  XCircle,
-  Activity,
-  
-  ArrowLeft,
-  Home
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
@@ -42,14 +43,14 @@ export const AITestingPanel: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Please provide an image URL to test',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
 
     setTesting(true);
     setResults([]);
-    
+
     try {
       // Mock test file data since uploaded_files table doesn't exist
       const testFile = {
@@ -59,7 +60,7 @@ export const AITestingPanel: React.FC = () => {
         file_type: 'image',
         storage_path: testImageUrl,
         file_size: 0,
-        metadata: { test: true, original_url: testImageUrl }
+        metadata: { test: true, original_url: testImageUrl },
       };
 
       // Test hybrid analysis
@@ -69,7 +70,7 @@ export const AITestingPanel: React.FC = () => {
         analysis_type: 'comprehensive',
         include_similar: false,
         minimum_score: 0.5,
-        max_retries: 2
+        max_retries: 2,
       });
 
       if (!result.success) {
@@ -80,7 +81,7 @@ export const AITestingPanel: React.FC = () => {
 
       // Process results
       const testResults: TestResult[] = [];
-      
+
       if (data.attempts) {
         data.attempts.forEach((attempt: any) => {
           testResults.push({
@@ -88,7 +89,7 @@ export const AITestingPanel: React.FC = () => {
             score: attempt.score || 0,
             success: attempt.success,
             processing_time_ms: attempt.processing_time_ms,
-            error: attempt.error
+            error: attempt.error,
           });
         });
       }
@@ -102,7 +103,7 @@ export const AITestingPanel: React.FC = () => {
       toast({
         title: 'Test Completed',
         description: `Analysis completed with score: ${data.final_score?.toFixed(2) || 'N/A'}`,
-        variant: 'default'
+        variant: 'default',
       });
 
     } catch (error) {
@@ -110,7 +111,7 @@ export const AITestingPanel: React.FC = () => {
       toast({
         title: 'Test Failed',
         description: error instanceof Error ? error.message : 'An unknown error occurred',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setTesting(false);
@@ -119,14 +120,14 @@ export const AITestingPanel: React.FC = () => {
 
   const test3DGeneration = async () => {
     setTesting(true);
-    
+
     try {
       const apiService = ApiIntegrationService.getInstance();
       const result = await apiService.executeSupabaseFunction('crewai-3d-generation', {
         user_id: (await supabase.auth.getUser()).data.user?.id,
         prompt: testPrompt,
         room_type: 'living room',
-        style: 'modern'
+        style: 'modern',
       });
 
       if (!result.success) {
@@ -138,7 +139,7 @@ export const AITestingPanel: React.FC = () => {
       toast({
         title: '3D Generation Test Completed',
         description: `Generation completed in ${(data?.processing_time_ms / 1000).toFixed(2)}s`,
-        variant: 'default'
+        variant: 'default',
       });
 
     } catch (error) {
@@ -146,7 +147,7 @@ export const AITestingPanel: React.FC = () => {
       toast({
         title: '3D Test Failed',
         description: error instanceof Error ? error.message : 'An unknown error occurred',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setTesting(false);
@@ -156,7 +157,7 @@ export const AITestingPanel: React.FC = () => {
   const getSampleImageUrls = () => [
     'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800',
     'https://images.unsplash.com/photo-1556912167-f556f1e54343?w=800',
-    'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800'
+    'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800',
   ];
 
   return (
@@ -173,7 +174,7 @@ export const AITestingPanel: React.FC = () => {
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
-              <Button 
+              <Button
                 onClick={() => navigate('/admin')}
                 className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
@@ -225,9 +226,9 @@ export const AITestingPanel: React.FC = () => {
                 ))}
               </div>
             </div>
-            
-            <Button 
-              onClick={testMaterialAnalysis} 
+
+            <Button
+              onClick={testMaterialAnalysis}
               disabled={testing || !testImageUrl}
               className="w-full"
             >
@@ -264,9 +265,9 @@ export const AITestingPanel: React.FC = () => {
                 rows={3}
               />
             </div>
-            
-            <Button 
-              onClick={test3DGeneration} 
+
+            <Button
+              onClick={test3DGeneration}
               disabled={testing || !testPrompt}
               className="w-full"
             >

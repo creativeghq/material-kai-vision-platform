@@ -2,7 +2,7 @@ import { ZodError, ZodIssue } from 'zod';
 
 /**
  * Error Reporting Utilities
- * 
+ *
  * Provides comprehensive error reporting and formatting for validation errors,
  * including detailed messages, context information, and structured error responses.
  */
@@ -75,29 +75,29 @@ export const ERROR_CODES = {
   INVALID_URL: 'VAL_011',
   INVALID_DATE: 'VAL_012',
   CUSTOM_VALIDATION_FAILED: 'VAL_013',
-  
+
   // Security errors
   MALICIOUS_CONTENT_DETECTED: 'SEC_001',
   SCRIPT_TAG_DETECTED: 'SEC_002',
   DANGEROUS_URL_DETECTED: 'SEC_003',
   CONTENT_TOO_LARGE: 'SEC_004',
   SUSPICIOUS_FILENAME: 'SEC_005',
-  
+
   // Business logic errors
   INVALID_DOCUMENT_STRUCTURE: 'BIZ_001',
   INCONSISTENT_TABLE_DATA: 'BIZ_002',
   MISSING_REQUIRED_METADATA: 'BIZ_003',
   INVALID_TRANSFORMATION_CONFIG: 'BIZ_004',
-  
+
   // Performance errors
   PROCESSING_TIMEOUT: 'PERF_001',
   MEMORY_LIMIT_EXCEEDED: 'PERF_002',
   RATE_LIMIT_EXCEEDED: 'PERF_003',
-  
+
   // System errors
   INTERNAL_SERVER_ERROR: 'SYS_001',
   DATABASE_ERROR: 'SYS_002',
-  EXTERNAL_SERVICE_ERROR: 'SYS_003'
+  EXTERNAL_SERVICE_ERROR: 'SYS_003',
 } as const;
 
 // Error message templates with placeholders
@@ -115,56 +115,56 @@ const ERROR_MESSAGES: Record<string, string> = {
   [ERROR_CODES.INVALID_URL]: 'Field "{field}" must be a valid URL',
   [ERROR_CODES.INVALID_DATE]: 'Field "{field}" must be a valid date',
   [ERROR_CODES.CUSTOM_VALIDATION_FAILED]: 'Custom validation failed for field "{field}": {details}',
-  
+
   [ERROR_CODES.MALICIOUS_CONTENT_DETECTED]: 'Malicious content detected in field "{field}"',
   [ERROR_CODES.SCRIPT_TAG_DETECTED]: 'Script tags are not allowed in field "{field}"',
   [ERROR_CODES.DANGEROUS_URL_DETECTED]: 'Dangerous URL detected in field "{field}": {url}',
   [ERROR_CODES.CONTENT_TOO_LARGE]: 'Content in field "{field}" exceeds size limit of {maxSize}',
   [ERROR_CODES.SUSPICIOUS_FILENAME]: 'Suspicious filename detected: {filename}',
-  
+
   [ERROR_CODES.INVALID_DOCUMENT_STRUCTURE]: 'Document structure is invalid: {details}',
   [ERROR_CODES.INCONSISTENT_TABLE_DATA]: 'Table data is inconsistent: {details}',
   [ERROR_CODES.MISSING_REQUIRED_METADATA]: 'Required metadata is missing: {fields}',
   [ERROR_CODES.INVALID_TRANSFORMATION_CONFIG]: 'Transformation configuration is invalid: {details}',
-  
+
   [ERROR_CODES.PROCESSING_TIMEOUT]: 'Processing timeout exceeded: {timeout}ms',
   [ERROR_CODES.MEMORY_LIMIT_EXCEEDED]: 'Memory limit exceeded: {limit}MB',
   [ERROR_CODES.RATE_LIMIT_EXCEEDED]: 'Rate limit exceeded: {limit} requests per {window}',
-  
+
   [ERROR_CODES.INTERNAL_SERVER_ERROR]: 'Internal server error occurred',
   [ERROR_CODES.DATABASE_ERROR]: 'Database error: {details}',
-  [ERROR_CODES.EXTERNAL_SERVICE_ERROR]: 'External service error: {service} - {details}'
+  [ERROR_CODES.EXTERNAL_SERVICE_ERROR]: 'External service error: {service} - {details}',
 };
 
 // Suggestions for common error types
 const ERROR_SUGGESTIONS: Record<string, string[]> = {
   [ERROR_CODES.REQUIRED_FIELD_MISSING]: [
     'Ensure all required fields are included in the request',
-    'Check the API documentation for required field specifications'
+    'Check the API documentation for required field specifications',
   ],
   [ERROR_CODES.INVALID_TYPE]: [
     'Verify the data type matches the expected format',
-    'Convert the value to the correct type before sending'
+    'Convert the value to the correct type before sending',
   ],
   [ERROR_CODES.INVALID_FORMAT]: [
     'Check the format specification in the API documentation',
-    'Use the correct format pattern for this field'
+    'Use the correct format pattern for this field',
   ],
   [ERROR_CODES.MALICIOUS_CONTENT_DETECTED]: [
     'Remove any script tags or malicious content',
     'Use plain text or safe HTML only',
-    'Consider using markdown for formatting'
+    'Consider using markdown for formatting',
   ],
   [ERROR_CODES.SCRIPT_TAG_DETECTED]: [
     'Remove all <script> tags from the content',
     'Use alternative formatting methods',
-    'Sanitize content before submission'
+    'Sanitize content before submission',
   ],
   [ERROR_CODES.CONTENT_TOO_LARGE]: [
     'Reduce the content size',
     'Split large content into smaller chunks',
-    'Compress images or other media'
-  ]
+    'Compress images or other media',
+  ],
 };
 
 /**
@@ -190,7 +190,7 @@ export class ErrorReporter {
       severity: ErrorSeverity.MEDIUM,
       category: ErrorCategory.VALIDATION,
       suggestions: ERROR_SUGGESTIONS[error.code] || [],
-      ...error
+      ...error,
     };
 
     this.errors.push(errorDetails);
@@ -222,7 +222,7 @@ export class ErrorReporter {
         message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid type error', {
           field,
           expectedType: issue.expected,
-          actualType: issue.received
+          actualType: issue.received,
         });
         break;
 
@@ -237,7 +237,7 @@ export class ErrorReporter {
           code = ERROR_CODES.INVALID_FORMAT;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid format error', {
             field,
-            expectedFormat: issue.validation
+            expectedFormat: issue.validation,
           });
         }
         severity = ErrorSeverity.MEDIUM;
@@ -248,20 +248,20 @@ export class ErrorReporter {
           code = ERROR_CODES.ARRAY_TOO_SHORT;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Array too short error', {
             field,
-            minLength: issue.minimum
+            minLength: issue.minimum,
           });
         } else if (issue.type === 'string') {
           code = ERROR_CODES.STRING_TOO_SHORT;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'String too short error', {
             field,
-            minLength: issue.minimum
+            minLength: issue.minimum,
           });
         } else {
           code = ERROR_CODES.VALUE_OUT_OF_RANGE;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Value out of range error', {
             field,
             value: (issue as any).received,
-            range: `>= ${issue.minimum}`
+            range: `>= ${issue.minimum}`,
           });
         }
         severity = ErrorSeverity.MEDIUM;
@@ -272,20 +272,20 @@ export class ErrorReporter {
           code = ERROR_CODES.ARRAY_TOO_LONG;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Array too long error', {
             field,
-            maxLength: issue.maximum
+            maxLength: issue.maximum,
           });
         } else if (issue.type === 'string') {
           code = ERROR_CODES.STRING_TOO_LONG;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'String too long error', {
             field,
-            maxLength: issue.maximum
+            maxLength: issue.maximum,
           });
         } else {
           code = ERROR_CODES.VALUE_OUT_OF_RANGE;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Value out of range error', {
             field,
             value: (issue as any).received,
-            range: `<= ${issue.maximum}`
+            range: `<= ${issue.maximum}`,
           });
         }
         severity = ErrorSeverity.MEDIUM;
@@ -296,7 +296,7 @@ export class ErrorReporter {
         severity = ErrorSeverity.MEDIUM;
         message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid enum value error', {
           field,
-          allowedValues: issue.options?.join(', ') || 'unknown'
+          allowedValues: issue.options?.join(', ') || 'unknown',
         });
         break;
 
@@ -305,7 +305,7 @@ export class ErrorReporter {
         severity = ErrorSeverity.HIGH;
         message = this.formatMessage(ERROR_MESSAGES[code] || 'Custom validation failed', {
           field,
-          details: issue.message
+          details: issue.message,
         });
         break;
 
@@ -324,8 +324,8 @@ export class ErrorReporter {
       category,
       suggestions: ERROR_SUGGESTIONS[code] || [],
       context: {
-        zodIssue: issue
-      }
+        zodIssue: issue,
+      },
     };
   }
 
@@ -350,7 +350,7 @@ export class ErrorReporter {
       totalErrors: this.errors.length,
       criticalErrors: this.errors.filter(e => e.severity === ErrorSeverity.CRITICAL).length,
       highSeverityErrors: this.errors.filter(e => e.severity === ErrorSeverity.HIGH).length,
-      categories: this.calculateCategoryStats()
+      categories: this.calculateCategoryStats(),
     };
 
     return {
@@ -361,8 +361,8 @@ export class ErrorReporter {
       summary,
       performance: {
         validationTime: totalProcessingTime,
-        totalProcessingTime
-      }
+        totalProcessingTime,
+      },
     };
   }
 
@@ -386,9 +386,9 @@ export class ErrorReporter {
    * Check if there are any critical or high severity errors
    */
   hasCriticalErrors(): boolean {
-    return this.errors.some(error => 
-      error.severity === ErrorSeverity.CRITICAL || 
-      error.severity === ErrorSeverity.HIGH
+    return this.errors.some(error =>
+      error.severity === ErrorSeverity.CRITICAL ||
+      error.severity === ErrorSeverity.HIGH,
     );
   }
 
@@ -426,7 +426,7 @@ export class ErrorReporter {
  */
 export function createErrorResponse(
   errorReport: ErrorReport,
-  includeDetails: boolean = true
+  includeDetails: boolean = true,
 ): {
   success: false;
   error: {
@@ -439,7 +439,7 @@ export function createErrorResponse(
   };
 } {
   const primaryError = errorReport.errors[0];
-  const message = errorReport.errors.length === 1 
+  const message = errorReport.errors.length === 1
     ? primaryError?.message || 'Validation failed'
     : `Validation failed with ${errorReport.errors.length} errors`;
 
@@ -449,8 +449,8 @@ export function createErrorResponse(
       message,
       code: primaryError?.code || 'VALIDATION_ERROR',
       requestId: errorReport.requestId,
-      timestamp: errorReport.timestamp
-    }
+      timestamp: errorReport.timestamp,
+    },
   };
 
   if (includeDetails) {
@@ -471,7 +471,7 @@ export function logErrorReport(errorReport: ErrorReport): void {
   console.error(`Total Errors: ${errorReport.summary.totalErrors}`);
   console.error(`Critical Errors: ${errorReport.summary.criticalErrors}`);
   console.error(`High Severity Errors: ${errorReport.summary.highSeverityErrors}`);
-  
+
   if (errorReport.performance) {
     console.error(`Processing Time: ${errorReport.performance.totalProcessingTime}ms`);
   }

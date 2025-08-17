@@ -47,19 +47,19 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       image: {
         type: 'string',
         required: true,
-        description: 'Input image URL'
+        description: 'Input image URL',
       },
       prompt: {
         type: 'string',
         required: true,
-        description: 'Text description of desired interior design'
+        description: 'Text description of desired interior design',
       },
       seed: {
         type: 'integer',
         required: false,
-        description: 'Random seed for reproducible results'
-      }
-    }
+        description: 'Random seed for reproducible results',
+      },
+    },
   },
 
   'julian-at/interiorly-gen1-dev': {
@@ -75,19 +75,19 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       image: {
         type: 'string',
         required: true,
-        description: 'Input image URL'
+        description: 'Input image URL',
       },
       prompt: {
         type: 'string',
         required: true,
-        description: 'Interior design prompt'
+        description: 'Interior design prompt',
       },
       seed: {
         type: 'integer',
         required: false,
-        description: 'Random seed'
-      }
-    }
+        description: 'Random seed',
+      },
+    },
   },
 
   'davisbrown/designer-architecture': {
@@ -103,24 +103,24 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       mask: {
         type: 'string',
         required: true,
-        description: 'Mask image URL for inpainting'
+        description: 'Mask image URL for inpainting',
       },
       seed: {
         type: 'integer',
         required: false,
-        description: 'Random seed for reproducible results'
+        description: 'Random seed for reproducible results',
       },
       image: {
         type: 'string',
         required: true,
-        description: 'Input image URL'
+        description: 'Input image URL',
       },
       model: {
         type: 'enum',
         required: false,
         default: 'RealVisXL_V4.0',
         options: ['RealVisXL_V4.0', 'juggernaut_reborn'],
-        description: 'Base model to use'
+        description: 'Base model to use',
       },
       width: {
         type: 'integer',
@@ -128,7 +128,7 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
         default: 1024,
         min: 256,
         max: 1536,
-        description: 'Output image width'
+        description: 'Output image width',
       },
       height: {
         type: 'integer',
@@ -136,23 +136,23 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
         default: 1024,
         min: 256,
         max: 1536,
-        description: 'Output image height'
+        description: 'Output image height',
       },
       prompt: {
         type: 'string',
         required: true,
-        description: 'Design prompt'
+        description: 'Design prompt',
       },
       go_fast: {
         type: 'boolean',
         required: false,
         default: true,
-        description: 'Enable fast processing mode'
+        description: 'Enable fast processing mode',
       },
       extra_lora: {
         type: 'string',
         required: false,
-        description: 'Additional LoRA model URL'
+        description: 'Additional LoRA model URL',
       },
       lora_scale: {
         type: 'number',
@@ -160,16 +160,16 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
         default: 1,
         min: -1,
         max: 2,
-        description: 'LoRA model influence scale'
+        description: 'LoRA model influence scale',
       },
       megapixels: {
         type: 'enum',
         required: false,
         default: '1',
         options: ['1', '0.25'],
-        description: 'Output resolution in megapixels'
-      }
-    }
+        description: 'Output resolution in megapixels',
+      },
+    },
   },
 
   // FAILING MODELS (4/7) - CORRECTED PARAMETER SCHEMAS
@@ -189,18 +189,18 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       image: {
         type: 'string',
         required: true,
-        description: 'Input image URL for transformation'
+        description: 'Input image URL for transformation',
       },
       prompt: {
         type: 'string',
         required: true,
-        description: 'Interior design prompt'
+        description: 'Interior design prompt',
       },
       negative_prompt: {
         type: 'string',
         required: true,
         default: 'lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional, realistic',
-        description: 'Negative prompt to avoid unwanted elements'
+        description: 'Negative prompt to avoid unwanted elements',
       },
       guidance_scale: {
         type: 'number',
@@ -208,7 +208,7 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
         default: 15,
         min: 1,
         max: 20,
-        description: 'Guidance scale for generation'
+        description: 'Guidance scale for generation',
       },
       prompt_strength: {
         type: 'number',
@@ -216,7 +216,7 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
         default: 0.8,
         min: 0.1,
         max: 1.0,
-        description: 'Strength of the prompt influence'
+        description: 'Strength of the prompt influence',
       },
       num_inference_steps: {
         type: 'integer',
@@ -224,9 +224,9 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
         default: 50,
         min: 1,
         max: 100,
-        description: 'Number of inference steps'
-      }
-    }
+        description: 'Number of inference steps',
+      },
+    },
   },
 
   'erayyavuz/interior-ai': {
@@ -245,9 +245,9 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       prompt: {
         type: 'string',
         required: true,
-        description: 'Interior design description'
-      }
-    }
+        description: 'Interior design description',
+      },
+    },
   },
 
   'jschoormans/interior-v2': {
@@ -266,9 +266,9 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       prompt: {
         type: 'string',
         required: true,
-        description: 'Design prompt'
-      }
-    }
+        description: 'Design prompt',
+      },
+    },
   },
 
   'rocketdigitalai/interior-design-sdxl': {
@@ -287,10 +287,10 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       prompt: {
         type: 'string',
         required: true,
-        description: 'Interior design prompt'
-      }
-    }
-  }
+        description: 'Interior design prompt',
+      },
+    },
+  },
 };
 
 /**
@@ -302,7 +302,7 @@ export class ModelParameterValidator {
    */
   static validateAndTransformParameters(
     modelId: string,
-    inputParameters: Record<string, any>
+    inputParameters: Record<string, any>,
   ): Record<string, any> {
     const config = INTERIOR_DESIGN_MODELS[modelId];
     if (!config) {
@@ -347,7 +347,7 @@ export class ModelParameterValidator {
   private static validateParameter(
     name: string,
     value: any,
-    config: ModelParameter
+    config: ModelParameter,
   ): any {
     switch (config.type) {
       case 'string':
@@ -413,7 +413,7 @@ export class ModelParameterValidator {
    */
   static getModelsByCategory(category: string): ModelConfig[] {
     return Object.values(INTERIOR_DESIGN_MODELS).filter(
-      model => model.category === category
+      model => model.category === category,
     );
   }
 
@@ -422,7 +422,7 @@ export class ModelParameterValidator {
    */
   static getWorkingModels(): ModelConfig[] {
     return Object.values(INTERIOR_DESIGN_MODELS).filter(
-      model => model.status === 'working'
+      model => model.status === 'working',
     );
   }
 

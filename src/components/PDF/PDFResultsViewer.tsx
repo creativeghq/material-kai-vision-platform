@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   FileText,
   Grid3X3,
   BarChart3,
-  Package
+  Package,
 } from 'lucide-react';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
 import { PDFReviewWorkflow } from './PDFReviewWorkflow';
 import { MaterialsListViewer } from './MaterialsListViewer';
-import { supabase } from '@/integrations/supabase/client';
 
 interface PDFProcessingResult {
   id: string;
@@ -69,7 +71,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
       setLoading(true);
 
       console.log('Loading PDF processing results for ID:', processingId);
-      
+
       // Load processing result from processing_results table using correct column names
       const { data: processingResult, error: resultError } = await supabase
         .from('processing_results')
@@ -111,7 +113,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
         processing_time_ms: processingResult.processing_time_ms || 0,
         document_title: (processingResult.results as any)?.document_title || 'Untitled Document',
         document_author: (processingResult.results as any)?.document_author || 'Unknown Author',
-        created_at: processingResult.created_at || new Date().toISOString()
+        created_at: processingResult.created_at || new Date().toISOString(),
       };
 
       setResult(mappedResult);
@@ -120,7 +122,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
       // The tiles data would typically come from the results JSON field or a separate table
       const totalTiles = mappedResult.total_tiles_extracted || Math.min(mappedResult.total_pages * 4, 20);
       const materialTypes = ['concrete', 'steel', 'aluminum', 'composite'];
-      
+
       const sampleTiles: PDFTile[] = Array.from({ length: totalTiles }, (_, i) => ({
         id: `tile-${processingId}-${i}`,
         page_number: Math.floor(i / 4) + 1,
@@ -133,27 +135,27 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
         structured_data: {
           tile_index: i,
           extraction_type: processingResult.extraction_type,
-          page_number: Math.floor(i / 4) + 1
+          page_number: Math.floor(i / 4) + 1,
         },
         metadata_extracted: {
           processing_id: processingId,
           file_size: processingResult.file_size_bytes,
-          processing_time: processingResult.processing_time_ms
+          processing_time: processingResult.processing_time_ms,
         },
         x_coordinate: (i % 2) * 200,
         y_coordinate: Math.floor((i % 4) / 2) * 150,
         width: 200,
         height: 150,
-        image_url: `/api/processing-images/tile-${processingId}-${i}.jpg`
+        image_url: `/api/processing-images/tile-${processingId}-${i}.jpg`,
       }));
 
       setTiles(sampleTiles);
     } catch (error) {
       console.error('Error loading processing results:', error);
       toast({
-        title: "Loading Failed",
+        title: 'Loading Failed',
         description: error instanceof Error ? error.message : 'Unknown error',
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -162,7 +164,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
 
   const getFilteredTiles = () => {
     let filtered = tiles.filter(tile => tile.page_number === selectedPage);
-    
+
     if (materialFilter !== 'all') {
       if (materialFilter === 'detected') {
         filtered = filtered.filter(tile => tile.material_detected);
@@ -170,7 +172,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
         filtered = filtered.filter(tile => tile.material_type === materialFilter);
       }
     }
-    
+
     return filtered;
   };
 
@@ -320,7 +322,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
         </TabsList>
 
         <TabsContent value="materials" className="space-y-4">
-          <MaterialsListViewer 
+          <MaterialsListViewer
             processingId={processingId}
             tiles={tiles}
           />
@@ -335,8 +337,8 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                 <Button
                   key={page}
                   className={selectedPage === page
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                   }
                   onClick={() => setSelectedPage(page)}
                 >
@@ -363,8 +365,8 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
           {/* Tiles Grid with Images */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredTiles.map((tile) => (
-              <Card 
-                key={tile.id} 
+              <Card
+                key={tile.id}
                 className={`cursor-pointer transition-colors ${tile.material_detected ? 'border-green-200' : 'border-gray-200'} ${selectedTile?.id === tile.id ? 'ring-2 ring-primary' : ''}`}
                 onClick={() => setSelectedTile(tile)}
               >
@@ -378,25 +380,25 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Extracted Image */}
                   {tile.image_url && (
                     <div className="mb-3">
-                      <img 
-                        src={tile.image_url} 
+                      <img
+                        src={tile.image_url}
                         alt={`Tile ${tile.tile_index + 1} from page ${tile.page_number}`}
                         className="w-full h-32 object-cover rounded border"
                       />
                     </div>
                   )}
-                  
+
                   {/* Tile Information */}
                   <div className="space-y-2">
                     <div className="text-xs text-muted-foreground grid grid-cols-2 gap-2">
                       <span>Position: {tile.x_coordinate}, {tile.y_coordinate}</span>
                       <span>Size: {tile.width} × {tile.height}</span>
                     </div>
-                    
+
                     {tile.extracted_text && (
                       <div className="text-sm bg-muted p-2 rounded">
                         <p className="text-xs text-muted-foreground mb-1">Extracted Text:</p>
@@ -406,7 +408,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                         </p>
                       </div>
                     )}
-                    
+
                     {/* Material Properties */}
                     {tile.material_detected && tile.structured_data && (
                       <div className="text-sm bg-primary/5 p-2 rounded">
@@ -430,7 +432,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                         )}
                       </div>
                     )}
-                    
+
                     {/* Confidence Scores */}
                     <div className="flex justify-between text-xs">
                       <span>OCR: {formatConfidence(tile.ocr_confidence || 0)}</span>
@@ -455,15 +457,15 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
 
 
         <TabsContent value="review" className="space-y-4">
-          <PDFReviewWorkflow 
+          <PDFReviewWorkflow
             processingId={processingId}
             tiles={tiles}
             onWorkflowComplete={(results) => {
               toast({
-                title: "Workflow Complete",
-                description: "Materials have been successfully processed through the selected workflows",
+                title: 'Workflow Complete',
+                description: 'Materials have been successfully processed through the selected workflows',
               });
-              console.log("Workflow results:", results);
+              console.log('Workflow results:', results);
             }}
           />
         </TabsContent>
@@ -544,7 +546,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                 </div>
               )}
             </div>
-            
+
             {selectedTile.extracted_text && (
               <div>
                 <p className="font-medium mb-2">Extracted Text</p>
@@ -553,7 +555,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                 </div>
               </div>
             )}
-            
+
             {selectedTile.structured_data && Object.keys(selectedTile.structured_data).length > 0 && (
               <div>
                 <p className="font-medium mb-2">Structured Data</p>

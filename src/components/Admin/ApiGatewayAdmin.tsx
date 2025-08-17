@@ -1,26 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Settings,
+  Search,
+  Plus,
+  Eye,
+  Key,
+  Shield,
+  Activity,
+  Network,
 
-import { 
-  Settings, 
-  Search, 
-  Plus, 
-  Eye, 
-  Key, 
-  Shield, 
-  Activity, 
-  Network, 
-  
   Copy,
   CheckCircle,
   XCircle,
@@ -28,11 +16,24 @@ import {
   Lock,
   ArrowLeft,
   Home,
-  Edit
+  Edit,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey, type RateLimitRule } from '@/services/apiGateway/apiGatewayService';
 import { toast } from 'sonner';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey, type RateLimitRule } from '@/services/apiGateway/apiGatewayService';
+
 
 export const ApiGatewayAdmin: React.FC = () => {
   const navigate = useNavigate();
@@ -54,7 +55,7 @@ export const ApiGatewayAdmin: React.FC = () => {
     recognition: 20,
     search: 60,
     admin: 10,
-    analytics: 100
+    analytics: 100,
   });
 
   useEffect(() => {
@@ -86,10 +87,10 @@ export const ApiGatewayAdmin: React.FC = () => {
   const toggleEndpointPublicAccess = async (endpointId: string, currentValue: boolean) => {
     try {
       await apiGatewayService.toggleEndpointPublicAccess(endpointId, !currentValue);
-      setEndpoints(prev => 
-        prev.map(ep => 
-          ep.id === endpointId ? { ...ep, is_public: !currentValue } : ep
-        )
+      setEndpoints(prev =>
+        prev.map(ep =>
+          ep.id === endpointId ? { ...ep, is_public: !currentValue } : ep,
+        ),
       );
       toast.success(`Endpoint ${!currentValue ? 'enabled' : 'disabled'} for public access`);
     } catch (error) {
@@ -101,10 +102,10 @@ export const ApiGatewayAdmin: React.FC = () => {
   const toggleEndpointInternalAccess = async (endpointId: string, currentValue: boolean) => {
     try {
       await apiGatewayService.toggleEndpointInternalAccess(endpointId, !currentValue);
-      setEndpoints(prev => 
-        prev.map(ep => 
-          ep.id === endpointId ? { ...ep, is_internal: !currentValue } : ep
-        )
+      setEndpoints(prev =>
+        prev.map(ep =>
+          ep.id === endpointId ? { ...ep, is_internal: !currentValue } : ep,
+        ),
       );
       toast.success(`Endpoint ${!currentValue ? 'enabled' : 'disabled'} for internal access`);
     } catch (error) {
@@ -115,10 +116,10 @@ export const ApiGatewayAdmin: React.FC = () => {
 
   const updateEndpointRateLimit = async (endpointId: string, newLimit: number) => {
     try {
-      setEndpoints(prev => 
-        prev.map(ep => 
-          ep.id === endpointId ? { ...ep, rate_limit_per_minute: newLimit } : ep
-        )
+      setEndpoints(prev =>
+        prev.map(ep =>
+          ep.id === endpointId ? { ...ep, rate_limit_per_minute: newLimit } : ep,
+        ),
       );
       toast.success('Rate limit updated');
     } catch (error) {
@@ -131,7 +132,7 @@ export const ApiGatewayAdmin: React.FC = () => {
     try {
       setGlobalRateLimits(prev => ({
         ...prev,
-        [category]: newLimit
+        [category]: newLimit,
       }));
       toast.success(`Global ${category} rate limit updated to ${newLimit} req/min`);
     } catch (error) {
@@ -169,32 +170,32 @@ export const ApiGatewayAdmin: React.FC = () => {
     const examples: Record<string, string> = {
       '/api/materials': JSON.stringify({
         data: [
-          { id: "uuid", name: "Material Name", category: "metals", properties: {} }
+          { id: 'uuid', name: 'Material Name', category: 'metals', properties: {} },
         ],
-        success: true
+        success: true,
       }, null, 2),
       '/api/recognition': JSON.stringify({
         data: {
-          detected_materials: ["Steel", "Aluminum"],
+          detected_materials: ['Steel', 'Aluminum'],
           confidence_score: 0.95,
-          processing_time_ms: 1200
+          processing_time_ms: 1200,
         },
-        success: true
+        success: true,
       }, null, 2),
       '/api/search': JSON.stringify({
         data: {
           results: [],
           total: 0,
-          query_time_ms: 45
+          query_time_ms: 45,
         },
-        success: true
-      }, null, 2)
+        success: true,
+      }, null, 2),
     };
-    
+
     return examples[path] || JSON.stringify({
       data: {},
       success: true,
-      message: "Operation completed successfully"
+      message: 'Operation completed successfully',
     }, null, 2);
   };
 
@@ -288,7 +289,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                     recognition: { value: globalRateLimits.recognition, color: 'text-orange-600', description: 'AI processing' },
                     search: { value: globalRateLimits.search, color: 'text-purple-600', description: 'Vector & text search' },
                     admin: { value: globalRateLimits.admin, color: 'text-red-600', description: 'Administrative ops' },
-                    analytics: { value: globalRateLimits.analytics, color: 'text-cyan-600', description: 'Event tracking' }
+                    analytics: { value: globalRateLimits.analytics, color: 'text-cyan-600', description: 'Event tracking' },
                   }).map(([category, config]) => (
                     <div key={category} className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
@@ -326,7 +327,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                                   placeholder="Enter rate limit"
                                 />
                               </div>
-                              <Button 
+                              <Button
                                 onClick={(e) => {
                                   const input = (e.target as HTMLButtonElement).parentElement?.querySelector('input');
                                   if (input) {
@@ -418,7 +419,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                       <TableBody>
                         {filteredEndpoints.map((endpoint) => (
                           <TableRow key={endpoint.id}>
-                            <TableCell 
+                            <TableCell
                               className="font-mono text-sm cursor-pointer hover:text-blue-600"
                               onClick={() => {
                                 setSelectedEndpoint(endpoint);
@@ -438,8 +439,8 @@ export const ApiGatewayAdmin: React.FC = () => {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
-                                <Input 
-                                  type="number" 
+                                <Input
+                                  type="number"
                                   value={endpoint.rate_limit_per_minute}
                                   onChange={(e) => {
                                     const newLimit = parseInt(e.target.value);
@@ -453,17 +454,17 @@ export const ApiGatewayAdmin: React.FC = () => {
                                       updateEndpointRateLimit(endpoint.id, newLimit);
                                     }
                                   }}
-                                  className="w-20 h-8" 
+                                  className="w-20 h-8"
                                 />
                                 <span className="text-xs text-muted-foreground">req/min</span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Input 
-                                type="number" 
-                                step="0.001" 
-                                placeholder="$0.000" 
-                                className="w-20 h-8" 
+                              <Input
+                                type="number"
+                                step="0.001"
+                                placeholder="$0.000"
+                                className="w-20 h-8"
                                 defaultValue="0.001"
                               />
                             </TableCell>
@@ -471,7 +472,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                               <div className="flex items-center space-x-2">
                                 <Switch
                                   checked={endpoint.is_public}
-                                  onCheckedChange={() => 
+                                  onCheckedChange={() =>
                                     toggleEndpointPublicAccess(endpoint.id, endpoint.is_public)
                                   }
                                 />
@@ -486,7 +487,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                               <div className="flex items-center space-x-2">
                                 <Switch
                                   checked={endpoint.is_internal}
-                                  onCheckedChange={() => 
+                                  onCheckedChange={() =>
                                     toggleEndpointInternalAccess(endpoint.id, endpoint.is_internal)
                                   }
                                 />
@@ -533,8 +534,8 @@ export const ApiGatewayAdmin: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h4 className="font-medium">{apiKey.key_name}</h4>
-                              <Badge className={apiKey.is_active ? "bg-blue-100 text-blue-800 text-xs px-2 py-1" : "bg-gray-100 text-gray-800 text-xs px-2 py-1"}>
-                                {apiKey.is_active ? "Active" : "Revoked"}
+                              <Badge className={apiKey.is_active ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1' : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'}>
+                                {apiKey.is_active ? 'Active' : 'Revoked'}
                               </Badge>
                               {apiKey.rate_limit_override && (
                                 <Badge className="border border-gray-300 text-xs px-2 py-1">
@@ -545,7 +546,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                             <p className="text-sm text-muted-foreground font-mono mb-3">
                               {apiKey.api_key.substring(0, 20)}...
                             </p>
-                            
+
                             {/* User Analytics Summary */}
                             <div className="grid grid-cols-4 gap-4 mb-3">
                               <div className="text-center p-2 bg-muted rounded">
@@ -565,7 +566,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                                 <div className="text-xs text-muted-foreground">Last Used</div>
                               </div>
                             </div>
-                            
+
                             <div className="text-xs text-muted-foreground">
                               Created: {new Date(apiKey.created_at).toLocaleDateString()}
                               {apiKey.expires_at && ` • Expires: ${new Date(apiKey.expires_at).toLocaleDateString()}`}
@@ -601,7 +602,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                                       Leave empty to use global rate limits
                                     </p>
                                   </div>
-                                  
+
                                   <div className="space-y-2">
                                     <Label>Allowed Endpoints</Label>
                                     <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -613,7 +614,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                                             defaultChecked={apiKey.allowed_endpoints?.includes(endpoint.id)}
                                             className="rounded"
                                           />
-                                          <Label 
+                                          <Label
                                             htmlFor={`endpoint-${endpoint.id}`}
                                             className="text-sm font-mono"
                                           >
@@ -762,8 +763,8 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Public Access</span>
-                        <Badge className={selectedEndpoint.is_public ? "bg-blue-100 text-blue-800 text-xs px-2 py-1" : "bg-gray-100 text-gray-800 text-xs px-2 py-1"}>
-                          {selectedEndpoint.is_public ? "Enabled" : "Disabled"}
+                        <Badge className={selectedEndpoint.is_public ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1' : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'}>
+                          {selectedEndpoint.is_public ? 'Enabled' : 'Disabled'}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
@@ -773,8 +774,8 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Internal Access</span>
-                        <Badge className={selectedEndpoint.is_internal ? "bg-blue-100 text-blue-800 text-xs px-2 py-1" : "bg-gray-100 text-gray-800 text-xs px-2 py-1"}>
-                          {selectedEndpoint.is_internal ? "Enabled" : "Disabled"}
+                        <Badge className={selectedEndpoint.is_internal ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1' : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'}>
+                          {selectedEndpoint.is_internal ? 'Enabled' : 'Disabled'}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">

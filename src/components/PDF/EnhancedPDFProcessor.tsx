@@ -1,5 +1,21 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import {
+
+  Upload,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Eye,
+  Brain,
+  Search,
+  Image,
+  Layout,
+  Zap,
+  Settings,
+  BarChart3,
+} from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,24 +26,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-   
-  Upload, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  Eye, 
-  Brain,
-  Search,
-  Image,
-  Layout,
-  Zap,
-  Settings,
-  BarChart3
-} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MivaaIntegrationService } from '@/services/pdf/mivaaIntegrationService';
+
 import { PDFResultsViewer } from './PDFResultsViewer';
 // Note: hybridPDFPipelineAPI service will be implemented in future phases
 type ProcessingOptions = {
@@ -117,15 +119,15 @@ export const EnhancedPDFProcessor: React.FC = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf']
+      'application/pdf': ['.pdf'],
     },
     maxFiles: 5,
-    maxSize: 50 * 1024 * 1024 // 50MB
+    maxSize: 50 * 1024 * 1024, // 50MB
   });
 
   const processFile = async (file: File) => {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Add to processing queue
     const newJob: ProcessingJob = {
       id: jobId,
@@ -133,7 +135,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
       status: 'pending',
       progress: 0,
       currentStep: 'Initializing...',
-      startTime: new Date()
+      startTime: new Date(),
     };
 
     setProcessingJobs(prev => [...prev, newJob]);
@@ -174,37 +176,37 @@ export const EnhancedPDFProcessor: React.FC = () => {
         file: new File([], 'dummy.pdf'), // MIVAA service uses documentId as file_path
         options: {
           extractionType: 'all' as const,
-          outputFormat: 'json' as const
-        }
+          outputFormat: 'json' as const,
+        },
       });
-      
+
       console.log('MIVAA extraction result:', extractionResult);
-      
+
       // Create a document ID for tracking (using filename + timestamp as fallback)
       const documentId = `${file.name.replace(/\.[^/.]+$/, '')}_${Date.now()}`;
-      
+
       if (!documentId) {
         console.error('No document ID found in response:', extractionResult);
         throw new Error('Document was not properly added to knowledge base. Please try again.');
       }
-      
+
       console.log('Document successfully added to knowledge base with ID:', documentId);
 
       updateJobStatus(jobId, 'processing', 50, 'Starting enhanced processing simulation...');
 
       // Update job with document ID
       setProcessingJobs(prev => prev.map(job =>
-        job.id === jobId ? { ...job, documentId } : job
+        job.id === jobId ? { ...job, documentId } : job,
       ));
       // Show enhanced processing workflow
       updateJobStatus(jobId, 'processing', 70, 'Applying enhanced processing features...');
-      
+
       // Processing time for enhanced features
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       updateJobStatus(jobId, 'processing', 90, 'Generating quality metrics...');
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Create mock results structure for now
       const mockResults = {
         documentId,
@@ -220,8 +222,8 @@ export const EnhancedPDFProcessor: React.FC = () => {
             pageNumber: 1,
             metadata: { enhanced: true },
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
+            updatedAt: new Date().toISOString(),
+          },
         ],
         images: [],
         layout: [],
@@ -234,44 +236,44 @@ export const EnhancedPDFProcessor: React.FC = () => {
           overallQuality: 0.85,
           statistics: { totalChunks: 1, totalImages: 0 },
           processingTimeMs: 3000,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         },
         summary: {
           totalChunks: 1,
           totalImages: 0,
           totalPages: 1,
-          overallQuality: 0.85
-        }
+          overallQuality: 0.85,
+        },
       };
-      
+
       updateJobStatus(jobId, 'completed', 100, 'Enhanced processing completed successfully');
       setProcessingJobs(prev => prev.map(job =>
         job.id === jobId
           ? { ...job, results: mockResults, endTime: new Date() }
-          : job
+          : job,
       ));
 
       toast({
-        title: "PDF Processing Complete!",
+        title: 'PDF Processing Complete!',
         description: `${file.name} has been processed and added to your knowledge base. You can now search through it or view the processing results in the Results tab.`,
         duration: 5000,
       });
 
     } catch (error) {
       console.error('Enhanced PDF processing error:', error);
-      
+
       updateJobStatus(
-        jobId, 
-        'failed', 
-        0, 
+        jobId,
+        'failed',
+        0,
         'Processing failed',
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : 'Unknown error',
       );
 
       toast({
-        title: "Processing Failed",
+        title: 'Processing Failed',
         description: `Failed to process ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setUploadProgress(0);
@@ -283,7 +285,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
     status: ProcessingStatus['status'],
     progress: number,
     currentStep: string,
-    error?: string
+    error?: string,
   ) => {
     setProcessingJobs(prev => prev.map(job => {
       if (job.id === jobId) {
@@ -291,7 +293,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
           ...job,
           status,
           progress,
-          currentStep
+          currentStep,
         };
         if (error !== undefined) {
           updatedJob.error = error;
@@ -315,7 +317,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
           page_number: 1,
           chunk_index: 0,
           similarity_score: 0.85,
-          metadata: { enhanced: true }
+          metadata: { enhanced: true },
         },
         {
           id: 'result-2',
@@ -324,22 +326,22 @@ export const EnhancedPDFProcessor: React.FC = () => {
           page_number: 1,
           chunk_index: 1,
           similarity_score: 0.78,
-          metadata: { enhanced: true }
-        }
+          metadata: { enhanced: true },
+        },
       ];
-      
+
       setSearchResults(mockResults);
-      
+
       toast({
-        title: "Search Complete!",
+        title: 'Search Complete!',
         description: `Found ${mockResults.length} sample results. This demonstrates the enhanced search capabilities that will work with your processed documents.`,
       });
     } catch (error) {
       console.error('Search error:', error);
       toast({
-        title: "Search Failed",
+        title: 'Search Failed',
         description: error instanceof Error ? error.message : 'Unknown error',
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -417,15 +419,15 @@ export const EnhancedPDFProcessor: React.FC = () => {
                   <Settings className="h-4 w-4" />
                   <Label className="text-base font-medium">Processing Configuration</Label>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="enableLayoutAnalysis"
                       checked={options.enableLayoutAnalysis}
                       onCheckedChange={(checked: boolean) => setOptions(prev => ({
-                        ...prev, 
-                        enableLayoutAnalysis: !!checked 
+                        ...prev,
+                        enableLayoutAnalysis: !!checked,
                       }))}
                     />
                     <Label htmlFor="enableLayoutAnalysis" className="flex items-center gap-2">
@@ -433,14 +435,14 @@ export const EnhancedPDFProcessor: React.FC = () => {
                       Layout Analysis
                     </Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="enableImageMapping"
                       checked={options.enableImageMapping}
                       onCheckedChange={(checked: boolean) => setOptions(prev => ({
-                        ...prev, 
-                        enableImageMapping: !!checked 
+                        ...prev,
+                        enableImageMapping: !!checked,
                       }))}
                     />
                     <Label htmlFor="enableImageMapping" className="flex items-center gap-2">
@@ -455,7 +457,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
                     <Label htmlFor="chunkingStrategy">Chunking Strategy</Label>
                     <Select
                       value={options.chunkingStrategy}
-                      onValueChange={(value: 'semantic' | 'fixed' | 'hybrid') => 
+                      onValueChange={(value: 'semantic' | 'fixed' | 'hybrid') =>
                         setOptions(prev => ({ ...prev, chunkingStrategy: value }))
                       }
                     >
@@ -469,31 +471,31 @@ export const EnhancedPDFProcessor: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="maxChunkSize">Max Chunk Size</Label>
                     <Input
                       id="maxChunkSize"
                       type="number"
                       value={options.maxChunkSize}
-                      onChange={(e) => setOptions(prev => ({ 
-                        ...prev, 
-                        maxChunkSize: parseInt(e.target.value) || 1000 
+                      onChange={(e) => setOptions(prev => ({
+                        ...prev,
+                        maxChunkSize: parseInt(e.target.value) || 1000,
                       }))}
                       min={100}
                       max={5000}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="overlapSize">Overlap Size</Label>
                     <Input
                       id="overlapSize"
                       type="number"
                       value={options.overlapSize}
-                      onChange={(e) => setOptions(prev => ({ 
-                        ...prev, 
-                        overlapSize: parseInt(e.target.value) || 100 
+                      onChange={(e) => setOptions(prev => ({
+                        ...prev,
+                        overlapSize: parseInt(e.target.value) || 100,
                       }))}
                       min={0}
                       max={500}
@@ -507,7 +509,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
                     Enhanced pipeline preserves document layout, creates semantic chunks, and maps images to relevant text for superior RAG performance.
                   </AlertDescription>
                 </Alert>
-                
+
                 {processingJobs.some(job => job.status === 'completed') && (
                   <Alert className="border-green-200 bg-green-50">
                     <CheckCircle className="h-4 w-4 text-green-600" />
@@ -628,21 +630,21 @@ export const EnhancedPDFProcessor: React.FC = () => {
                             <span className="font-medium">{job.filename}</span>
                             {getStatusBadge(job.status)}
                           </div>
-                          
+
                           <div className="text-sm text-muted-foreground mb-2">
                             {formatProcessingStatus({
                               processingId: job.processingId || '',
                               status: job.status,
                               progress: job.progress,
                               currentStep: job.currentStep,
-                              startTime: job.startTime.toISOString()
+                              startTime: job.startTime.toISOString(),
                             })}
                           </div>
-                          
+
                           {job.status === 'processing' && (
                             <Progress value={job.progress} className="h-2" />
                           )}
-                          
+
                           {job.results && (
                             <div className="text-sm text-muted-foreground mt-2">
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -655,7 +657,7 @@ export const EnhancedPDFProcessor: React.FC = () => {
                               </div>
                             </div>
                           )}
-                          
+
                           {job.error && (
                             <Alert className="mt-2">
                               <AlertCircle className="h-4 w-4" />
@@ -664,9 +666,9 @@ export const EnhancedPDFProcessor: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      
+
                       {job.status === 'completed' && job.results && (
-                        <Button 
+                        <Button
                           onClick={() => {/* TODO: Implement results viewing functionality */}}
                         >
                           <Eye className="h-4 w-4 mr-2" />

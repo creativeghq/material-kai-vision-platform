@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Brain, 
-  Cpu, 
-  Clock, 
-  Users, 
+import {
+  Brain,
+  Cpu,
+  Clock,
+  Users,
   TrendingUp,
   Activity,
   RefreshCw,
   Play,
   Pause,
-  Square
+  Square,
 } from 'lucide-react';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -48,7 +49,7 @@ const AgentMLCoordination: React.FC = () => {
     totalTasks: 0,
     activeTasks: 0,
     completedTasks: 0,
-    avgProcessingTime: 0
+    avgProcessingTime: 0,
   });
   const { toast } = useToast();
 
@@ -58,23 +59,33 @@ const AgentMLCoordination: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [agentTasksResult, mlTasksResult] = await Promise.all([
-        supabase
-          .from('agent_tasks')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50),
+      // TODO: Create agent_tasks table in database schema
+      // const [agentTasksResult, mlTasksResult] = await Promise.all([
+      //   supabase
+      //     .from('agent_tasks')
+      //     .select('*')
+      //     .order('created_at', { ascending: false })
+      //     .limit(50),
+      //   supabase
+      //     .from('agent_ml_tasks')
+      //     .select('*')
+      //     .order('created_at', { ascending: false })
+
+      // Mock response for agent_tasks until table is created
+      const agentTasksResult: any = { data: null, error: null };
+
+      const [mlTasksResult] = await Promise.all([
         supabase
           .from('agent_ml_tasks')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(50)
+          .limit(50),
       ]);
 
       if (agentTasksResult.error) throw agentTasksResult.error;
       if (mlTasksResult.error) throw mlTasksResult.error;
 
-      const agentData = (agentTasksResult.data || []).filter(task => task.status !== null) as AgentTask[];
+      const agentData = (agentTasksResult.data || []).filter((task: any) => task.status !== null) as AgentTask[];
       const mlData = (mlTasksResult.data || []).filter(task => task.agent_task_id !== null && task.created_at !== null) as MLTask[];
 
       setAgentTasks(agentData);
@@ -92,15 +103,15 @@ const AgentMLCoordination: React.FC = () => {
         totalTasks,
         activeTasks,
         completedTasks,
-        avgProcessingTime: Math.round(avgProcessingTime)
+        avgProcessingTime: Math.round(avgProcessingTime),
       });
 
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch agent tasks data",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to fetch agent tasks data',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);

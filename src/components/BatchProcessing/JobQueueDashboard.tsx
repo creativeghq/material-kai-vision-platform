@@ -1,4 +1,24 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Play,
+  Pause,
+  Square,
+  RotateCcw,
+  Trash2,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Search,
+  Download,
+  Eye,
+  MoreHorizontal,
+  Users,
+  FileText,
+  Activity,
+  TrendingUp,
+} from 'lucide-react';
+
 import { useWebSocket, useWebSocketSubscription } from '@/hooks/useWebSocket';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,25 +29,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Play, 
-  Pause, 
-  Square, 
-  RotateCcw, 
-  Trash2, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle,
-  Search,
-  Download,
-  Eye,
-  MoreHorizontal,
-  Users,
-  FileText,
-  Activity,
-  TrendingUp
-} from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -80,7 +81,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
   maxHeight = '600px',
   showControls = true,
   autoRefresh = true,
-  refreshInterval = 5000
+  refreshInterval = 5000,
 }) => {
   // State management
   const [jobs, setJobs] = useState<JobItem[]>([]);
@@ -98,7 +99,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
 
   // WebSocket connection for real-time updates
   useWebSocket(
-    process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'
+    process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080',
   );
 
   // Subscribe to job queue updates
@@ -108,7 +109,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
     (data: any) => {
       if (data.type === 'job_updated') {
         setJobs(prev => prev.map(job =>
-          job.id === data.job.id ? { ...job, ...data.job } : job
+          job.id === data.job.id ? { ...job, ...data.job } : job,
         ));
       } else if (data.type === 'job_added') {
         setJobs(prev => [data.job, ...prev]);
@@ -117,7 +118,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
       } else if (data.type === 'stats_updated') {
         setStats(data.stats);
       }
-    }
+    },
   );
 
   // Load initial data
@@ -147,7 +148,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
       // In a real implementation, this would be an API call
       const response = await fetch('/api/jobs/queue');
       if (!response.ok) throw new Error('Failed to load job queue');
-      
+
       const data = await response.json();
       setJobs(data.jobs || []);
     } catch (err) {
@@ -163,7 +164,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
     try {
       const response = await fetch('/api/jobs/stats');
       if (!response.ok) throw new Error('Failed to load queue stats');
-      
+
       const data = await response.json();
       setStats(data.stats);
     } catch (err) {
@@ -202,7 +203,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
         job.name.toLowerCase().includes(query) ||
         job.userName.toLowerCase().includes(query) ||
         job.batchId.toLowerCase().includes(query) ||
-        job.tags.some(tag => tag.toLowerCase().includes(query))
+        job.tags.some(tag => tag.toLowerCase().includes(query)),
       );
     }
 
@@ -228,7 +229,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
   const handleJobAction = async (jobId: string, action: string) => {
     try {
       const response = await fetch(`/api/jobs/${jobId}/${action}`, {
-        method: 'POST'
+        method: 'POST',
       });
 
       if (!response.ok) throw new Error(`Failed to ${action} job`);
@@ -254,8 +255,8 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobIds: Array.from(selectedJobs),
-          action
-        })
+          action,
+        }),
       });
 
       if (!response.ok) throw new Error(`Failed to ${action} selected jobs`);
@@ -273,28 +274,28 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
     const variants = {
       pending: {
         className: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        icon: Clock
+        icon: Clock,
       },
       running: {
         className: 'bg-primary text-primary-foreground hover:bg-primary/80',
-        icon: Activity
+        icon: Activity,
       },
       completed: {
         className: 'bg-primary text-primary-foreground hover:bg-primary/80',
-        icon: CheckCircle
+        icon: CheckCircle,
       },
       failed: {
         className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        icon: XCircle
+        icon: XCircle,
       },
       paused: {
         className: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        icon: Pause
+        icon: Pause,
       },
       cancelled: {
         className: 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
-        icon: Square
-      }
+        icon: Square,
+      },
     };
 
     const config = variants[status];
@@ -329,7 +330,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
       low: 'outline' as const,
       normal: 'secondary' as const,
       high: 'default' as const,
-      urgent: 'destructive' as const
+      urgent: 'destructive' as const,
     };
 
     return (
@@ -353,7 +354,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
       pending: jobs.filter(j => j.status === 'pending').length,
       running: jobs.filter(j => j.status === 'running').length,
       completed: jobs.filter(j => j.status === 'completed').length,
-      failed: jobs.filter(j => j.status === 'failed').length
+      failed: jobs.filter(j => j.status === 'failed').length,
     };
   };
 
@@ -433,7 +434,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                   Monitor and manage batch processing jobs in real-time
                 </CardDescription>
               </div>
-              
+
               {showControls && (
                 <div className="flex items-center gap-2">
                   {selectedJobs.size > 0 && (
@@ -454,7 +455,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                       </Button>
                     </>
                   )}
-                  
+
                   <Button
                     className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => loadJobQueue()}
@@ -588,7 +589,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                                   {getStatusBadge(job.status)}
                                   {getPriorityBadge(job.priority)}
                                 </div>
-                                
+
                                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1">
                                     <Users className="h-3 w-3" />
@@ -691,7 +692,7 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                                     <Square className="h-4 w-4 mr-2" />
                                     Cancel Job
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem 
+                                  <DropdownMenuItem
                                     onClick={() => handleJobAction(job.id, 'delete')}
                                     className="text-red-600"
                                   >

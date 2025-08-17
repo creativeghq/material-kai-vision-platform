@@ -1,11 +1,12 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
 import {
   corsHeaders,
   AuthUtils,
   Logger,
   Utils,
-  ValidationSchemas
+  ValidationSchemas,
 } from '../_shared/config.ts';
 
 interface BatchProcessRequest {
@@ -66,7 +67,7 @@ interface BatchJob {
 
 serve(async (req) => {
   const startTime = Date.now();
-  
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -95,7 +96,7 @@ serve(async (req) => {
     return Utils.createErrorResponse(
       'Internal server error during batch processing',
       500,
-      startTime
+      startTime,
     );
   }
 });
@@ -130,7 +131,7 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
       const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
         supabase,
         authResult.userId!,
-        requestBody.workspaceId
+        requestBody.workspaceId,
       );
       if (!workspaceCheck.success) {
         return Utils.createErrorResponse(workspaceCheck.error || 'Workspace access denied', 403, startTime);
@@ -142,7 +143,7 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
       supabase,
       requestBody.documents,
       authResult.userId!,
-      requestBody.workspaceId || authResult.workspaceId
+      requestBody.workspaceId || authResult.workspaceId,
     );
 
     if (!documentValidation.success) {
@@ -198,7 +199,7 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
       {
         status: 202, // Accepted
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
 
   } catch (error) {
@@ -250,7 +251,7 @@ async function handleBatchStatus(req: Request, supabase: any, startTime: number)
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
 
   } catch (error) {
@@ -287,7 +288,7 @@ async function handleBatchCancel(req: Request, supabase: any, startTime: number)
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
 
   } catch (error) {
@@ -307,7 +308,7 @@ function validateBatchRequest(request: BatchProcessRequest): string | null {
 
   for (let i = 0; i < request.documents.length; i++) {
     const doc = request.documents[i];
-    
+
     if (!doc.documentId || !ValidationSchemas.documentId(doc.documentId)) {
       return `Document at index ${i} has invalid documentId`;
     }
@@ -338,11 +339,11 @@ async function validateDocuments(
   supabase: any,
   documents: Array<any>,
   userId: string,
-  workspaceId?: string
+  workspaceId?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const documentIds = documents.map(doc => doc.documentId);
-    
+
     // Check if all documents exist and user has access
     const { data, error } = await supabase
       .from('processing_results')
@@ -364,12 +365,12 @@ async function validateDocuments(
         if (!workspaceId || doc.workspace_id !== workspaceId) {
           return { success: false, error: `Insufficient permissions for document: ${doc.id}` };
         }
-        
+
         // Check if user is member of workspace
         const workspaceCheck = await AuthUtils.checkWorkspaceMembership(
           supabase,
           userId,
-          doc.workspace_id
+          doc.workspace_id,
         );
         if (!workspaceCheck.success) {
           return { success: false, error: `Insufficient workspace permissions for document: ${doc.id}` };
@@ -387,7 +388,7 @@ async function validateDocuments(
 async function createBatchJob(supabase: any, data: any): Promise<BatchJob> {
   try {
     const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const { data: record, error } = await supabase
       .from('pdf_batch_jobs')
       .insert({
@@ -519,11 +520,11 @@ async function processBatchAsync(
   supabase: any,
   batchId: string,
   documents: Array<any>,
-  options: any
+  options: any,
 ): Promise<void> {
   try {
     console.log(`Starting async processing for batch: ${batchId}`);
-    
+
     // Update batch status to processing
     await supabase
       .from('pdf_batch_jobs')
@@ -536,14 +537,14 @@ async function processBatchAsync(
     const maxConcurrent = options.maxConcurrent || 3;
     const pdfExtractUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/pdf-extract`;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
+
     let processedCount = 0;
     let failedCount = 0;
-    
+
     // Process documents in batches
     for (let i = 0; i < documents.length; i += maxConcurrent) {
       const batch = documents.slice(i, i + maxConcurrent);
-      
+
       const promises = batch.map(async (doc) => {
         try {
           const response = await fetch(pdfExtractUrl, {
@@ -576,7 +577,7 @@ async function processBatchAsync(
       });
 
       await Promise.allSettled(promises);
-      
+
       // Update progress
       await supabase
         .from('pdf_batch_jobs')
@@ -589,7 +590,7 @@ async function processBatchAsync(
     }
 
     // Update final status
-    const finalStatus = failedCount === 0 ? 'completed' : 
+    const finalStatus = failedCount === 0 ? 'completed' :
                        processedCount === 0 ? 'failed' : 'partial';
 
     await supabase
@@ -618,7 +619,7 @@ async function processBatchAsync(
 
   } catch (error) {
     console.error(`Error in batch processing: ${batchId}`, error);
-    
+
     // Update batch status to failed
     await supabase
       .from('pdf_batch_jobs')
@@ -657,17 +658,17 @@ function getClientIP(req: Request): string {
   if (forwarded) {
     return forwarded.split(',')[0].trim();
   }
-  
+
   const realIP = req.headers.get('x-real-ip');
   if (realIP) {
     return realIP;
   }
-  
+
   const cfConnectingIP = req.headers.get('cf-connecting-ip');
   if (cfConnectingIP) {
     return cfConnectingIP;
   }
-  
+
   return '127.0.0.1';
 }
 
@@ -688,10 +689,10 @@ async function logApiUsage(supabase: any, logData: any): Promise<void> {
 function createErrorResponse(
   message: string,
   status: number,
-  startTime: number
+  startTime: number,
 ): Response {
   const responseTime = Date.now() - startTime;
-  
+
   const response: BatchProcessResponse = {
     success: false,
     error: message,
@@ -703,6 +704,6 @@ function createErrorResponse(
     {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    }
+    },
   );
 }

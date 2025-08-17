@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Globe, Loader2, Plus, Settings, Zap, Brain, FileText, Search, Map, MousePointer } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,9 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { supabase } from '@/integrations/supabase/client';
-import { Globe, Loader2, Plus, Settings, Zap, Brain, FileText, Search, Map, MousePointer } from 'lucide-react';
-import { ScrapingSessionsList } from './ScrapingSessionsList';
-import { SessionDetailView } from './SessionDetailView';
 import {
   Select,
   SelectContent,
@@ -19,6 +18,9 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+
+import { SessionDetailView } from './SessionDetailView';
+import { ScrapingSessionsList } from './ScrapingSessionsList';
 
 interface NewScraperPageProps {}
 
@@ -30,10 +32,10 @@ export const NewScraperPage: React.FC<NewScraperPageProps> = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [creating, setCreating] = useState(false);
-  
+
   // Scraping mode selection
   const [scrapingMode, setScrapingMode] = useState<ScrapingMode>('single-page');
-  
+
   // Common form fields
   const [url, setUrl] = useState('');
   const [sitemapUrl, setSitemapUrl] = useState('');
@@ -71,10 +73,10 @@ Return a list of materials found on the page.`);
     schema: '',
     actions: [] as any[],
     maxAge: 0,
-    proxy: 'basic' as 'basic' | 'premium' | 'none'
+    proxy: 'basic' as 'basic' | 'premium' | 'none',
   });
 
-  // Jina AI Options  
+  // Jina AI Options
   const [jinaOptions, setJinaOptions] = useState({
     returnFormat: 'markdown' as 'markdown' | 'html' | 'text',
     targetSelector: '',
@@ -83,7 +85,7 @@ Return a list of materials found on the page.`);
     includeLinks: false,
     maxLength: 10000,
     removeAds: true,
-    removeForms: true
+    removeForms: true,
   });
 
   const getSourceUrl = () => {
@@ -100,26 +102,26 @@ Return a list of materials found on the page.`);
   const parseSitemap = async (url: string): Promise<string[]> => {
     try {
       console.log('Parsing sitemap:', url);
-      
+
       // Use the centralized API system to parse sitemap
       const apiService = ApiIntegrationService.getInstance();
       const result = await apiService.executeSupabaseFunction('parse-sitemap', {
         sitemapUrl: url,
-        maxPages: maxPages
+        maxPages: maxPages,
       });
-      
+
       if (!result.success) {
         console.error('Error parsing sitemap:', result.error);
         throw new Error(result.error?.message || 'Failed to parse sitemap');
       }
-      
+
       if (!result.data?.success) {
         throw new Error(result.data?.error || 'Failed to parse sitemap');
       }
-      
+
       console.log(`Found ${result.data.count} URLs in sitemap`);
       return result.data.urls;
-      
+
     } catch (error) {
       console.error('Error parsing sitemap:', error);
       throw new Error('Failed to parse sitemap. Please check the URL and try again.');
@@ -130,9 +132,9 @@ Return a list of materials found on the page.`);
     const sourceUrl = getSourceUrl();
     if (!sourceUrl.trim()) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: `Please enter a ${scrapingMode === 'search' ? 'search query' : 'URL'}`,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
@@ -140,7 +142,7 @@ Return a list of materials found on the page.`);
     setCreating(true);
     try {
       let urls: string[] = [];
-      
+
       // Handle different scraping modes
       switch (scrapingMode) {
         case 'single-page':
@@ -187,8 +189,8 @@ Return a list of materials found on the page.`);
           retryCount,
           concurrentPages,
           firecrawlOptions: selectedService === 'firecrawl' ? firecrawlOptions : undefined,
-          jinaOptions: selectedService === 'jina' ? jinaOptions : undefined
-        }
+          jinaOptions: selectedService === 'jina' ? jinaOptions : undefined,
+        },
       };
 
       // Insert session into database
@@ -211,7 +213,7 @@ Return a list of materials found on the page.`);
         page_index: index,
         materials_found: 0,
         processing_time_ms: null,
-        error_message: null
+        error_message: null,
       }));
 
       if (pageEntries.length > 0) {
@@ -227,20 +229,20 @@ Return a list of materials found on the page.`);
       }
 
       toast({
-        title: "Success",
+        title: 'Success',
         description: `${scrapingMode} session created with ${urls.length} ${urls.length === 1 ? 'page' : 'pages'}`,
       });
 
       // Navigate to session detail
       setSelectedSessionId(insertedSession.id);
       setViewMode('detail');
-      
+
     } catch (error) {
       console.error('Error creating session:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create session",
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create session',
+        variant: 'destructive',
       });
     } finally {
       setCreating(false);
@@ -294,8 +296,8 @@ Return a list of materials found on the page.`);
                 <div
                   key={mode}
                   className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                    scrapingMode === mode 
-                      ? 'border-primary bg-primary/5' 
+                    scrapingMode === mode
+                      ? 'border-primary bg-primary/5'
                       : 'border-muted hover:border-muted-foreground/50'
                   }`}
                   onClick={() => setScrapingMode(mode)}
@@ -318,7 +320,7 @@ Return a list of materials found on the page.`);
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {React.createElement(getModeIcon(scrapingMode), { className: "h-5 w-5" })}
+            {React.createElement(getModeIcon(scrapingMode), { className: 'h-5 w-5' })}
             {scrapingMode === 'single-page' && 'Page URL'}
             {scrapingMode === 'sitemap' && 'Sitemap Configuration'}
             {scrapingMode === 'crawl' && 'Website to Crawl'}
@@ -560,9 +562,9 @@ Return a list of materials found on the page.`);
                       onCheckedChange={(checked: boolean) => {
                         setFirecrawlOptions(prev => ({
                           ...prev,
-                          formats: checked 
+                          formats: checked
                             ? [...prev.formats, format]
-                            : prev.formats.filter(f => f !== format)
+                            : prev.formats.filter(f => f !== format),
                         }));
                       }}
                     />
@@ -602,7 +604,7 @@ Return a list of materials found on the page.`);
                 value={firecrawlOptions.excludeTags.join(', ')}
                 onChange={(e) => setFirecrawlOptions(prev => ({
                   ...prev,
-                  excludeTags: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  excludeTags: e.target.value.split(',').map(s => s.trim()).filter(Boolean),
                 }))}
                 placeholder="nav, footer, aside"
                 className="mt-1"
@@ -617,7 +619,7 @@ Return a list of materials found on the page.`);
                 value={firecrawlOptions.waitFor}
                 onChange={(e) => setFirecrawlOptions(prev => ({
                   ...prev,
-                  waitFor: parseInt(e.target.value) || 0
+                  waitFor: parseInt(e.target.value) || 0,
                 }))}
                 min="0"
                 max="10000"
@@ -627,9 +629,9 @@ Return a list of materials found on the page.`);
 
             <div>
               <Label>Extractor Mode</Label>
-              <Select 
-                value={firecrawlOptions.extractorMode} 
-                onValueChange={(value: 'llm-extraction' | 'css-extraction') => 
+              <Select
+                value={firecrawlOptions.extractorMode}
+                onValueChange={(value: 'llm-extraction' | 'css-extraction') =>
                   setFirecrawlOptions(prev => ({ ...prev, extractorMode: value }))
                 }
               >
@@ -646,7 +648,7 @@ Return a list of materials found on the page.`);
             {/* Advanced Firecrawl Options */}
             <Separator className="my-4" />
             <h4 className="font-medium text-sm mb-3">Advanced Options</h4>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -709,7 +711,7 @@ Return a list of materials found on the page.`);
                   value={firecrawlOptions.maxAge}
                   onChange={(e) => setFirecrawlOptions(prev => ({
                     ...prev,
-                    maxAge: parseInt(e.target.value) || 0
+                    maxAge: parseInt(e.target.value) || 0,
                   }))}
                   min="0"
                   max="86400"
@@ -718,9 +720,9 @@ Return a list of materials found on the page.`);
               </div>
               <div>
                 <Label>Proxy Level</Label>
-                <Select 
-                  value={firecrawlOptions.proxy} 
-                  onValueChange={(value: 'basic' | 'premium' | 'none') => 
+                <Select
+                  value={firecrawlOptions.proxy}
+                  onValueChange={(value: 'basic' | 'premium' | 'none') =>
                     setFirecrawlOptions(prev => ({ ...prev, proxy: value }))
                   }
                 >
@@ -750,9 +752,9 @@ Return a list of materials found on the page.`);
           <CardContent className="space-y-4">
             <div>
               <Label>Return Format</Label>
-              <Select 
-                value={jinaOptions.returnFormat} 
-                onValueChange={(value: 'markdown' | 'html' | 'text') => 
+              <Select
+                value={jinaOptions.returnFormat}
+                onValueChange={(value: 'markdown' | 'html' | 'text') =>
                   setJinaOptions(prev => ({ ...prev, returnFormat: value }))
                 }
               >
@@ -848,8 +850,8 @@ Return a list of materials found on the page.`);
         </Card>
       )}
 
-      <Button 
-        onClick={createNewSession} 
+      <Button
+        onClick={createNewSession}
         disabled={creating || !getSourceUrl().trim()}
         className="w-full h-11 px-8"
       >
@@ -872,15 +874,15 @@ Return a list of materials found on the page.`);
   switch (viewMode) {
     case 'create':
       return renderCreateForm();
-    
+
     case 'detail':
       return (
-        <SessionDetailView 
+        <SessionDetailView
           sessionId={selectedSessionId}
           onBack={() => setViewMode('sessions')}
         />
       );
-    
+
     default:
       return (
         <ScrapingSessionsList

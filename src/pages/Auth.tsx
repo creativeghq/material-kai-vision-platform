@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export const Auth: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -28,36 +29,36 @@ export const Auth: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     const { error } = await signIn(email, password);
-    
+
     if (!error) {
       navigate('/');
     }
-    
+
     setIsLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     const { error } = await signUp(email, password, displayName);
-    
+
     setIsLoading(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     const { error } = await resetPassword(email);
-    
+
     if (!error) {
       setShowForgotPassword(false);
       setEmail('');
     }
-    
+
     setIsLoading(false);
   };
 
@@ -76,7 +77,7 @@ export const Auth: React.FC = () => {
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="signin">
               {showForgotPassword ? (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
@@ -160,7 +161,7 @@ export const Auth: React.FC = () => {
                 </form>
               )}
             </TabsContent>
-            
+
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">

@@ -1,22 +1,22 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
-import { 
-  Search, 
-  Upload, 
-  Image as ImageIcon, 
-  Type, 
-  Sparkles, 
+import {
+  Search,
+  Upload,
+  Image as ImageIcon,
+  Type,
+  Sparkles,
   Loader2,
   Package,
   BookOpen,
   Brain,
-  X
+  X,
 } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { MivaaSearchIntegration } from '@/services/mivaaSearchIntegration';
 import { MivaaEmbeddingIntegration } from '@/services/mivaaEmbeddingIntegration';
@@ -38,7 +38,7 @@ interface UnifiedSearchInterfaceProps {
 
 export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   onResultsFound,
-  onMaterialSelect
+  onMaterialSelect,
 }) => {
   // Initialize MIVAA service instances
   const mivaaSearchService = new MivaaSearchIntegration();
@@ -47,7 +47,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [searchType, setSearchType] = useState<'text' | 'image' | 'hybrid'>('text');
+  const [_searchType, _setSearchType] = useState<'text' | 'image' | 'hybrid'>('text');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,45 +79,44 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const performSearch = useCallback(async () => {
     if (!query.trim() && !selectedImage) {
       toast({
-        title: "Search Input Required",
-        description: "Please enter a search query or upload an image",
-        variant: "destructive"
+        title: 'Search Input Required',
+        description: 'Please enter a search query or upload an image',
+        variant: 'destructive',
       });
       return;
     }
 
     setIsSearching(true);
     const actualSearchType = detectQueryType(query);
-    
+
     try {
       let searchResults: any;
 
       if (actualSearchType === 'text') {
         // Enhanced text search with MIVAA's LlamaIndex RAG
-        searchResults = await mivaaSearchService.searchDocuments({
+        searchResults = await mivaaSearchService.search({
           query: query.trim(),
-          searchType: 'enhanced_text',
-          includeKnowledge: true,
-          includePDFContent: true,
-          limit: 15
+          limit: 15,
         });
       } else if (actualSearchType === 'image') {
         // Image-based search using MIVAA embedding service
         const imageBase64 = imagePreview?.split(',')[1] || '';
-        const embeddings = await mivaaEmbeddingService.generateEmbeddings([imageBase64]);
-        searchResults = await mivaaSearchService.searchByEmbedding({
-          embedding: embeddings.embeddings[0],
-          threshold: 0.7,
-          limit: 12
+        const embeddingResponse = await mivaaEmbeddingService.generateEmbedding({
+          text: imageBase64,
+        });
+        searchResults = await mivaaSearchService.search({
+          query: `image_embedding:${embeddingResponse.embedding.join(',')}`,
+          limit: 12,
         });
       } else {
         // Hybrid search (text + image) using MIVAA services
         const imageBase64 = imagePreview?.split(',')[1] || '';
-        searchResults = await mivaaSearchService.hybridSearch({
-          textQuery: query.trim(),
-          imageData: imageBase64,
-          threshold: 0.6,
-          limit: 20
+        const embeddingResponse = await mivaaEmbeddingService.generateEmbedding({
+          text: imageBase64,
+        });
+        searchResults = await mivaaSearchService.search({
+          query: `${query.trim()} image_embedding:${embeddingResponse.embedding.join(',')}`,
+          limit: 20,
         });
       }
 
@@ -130,7 +129,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           type: result.result_type || 'material',
           similarity_score: result.similarity_score,
           source: result.source_type || 'database',
-          metadata: result.metadata || result.material_details
+          metadata: result.metadata || result.material_details,
         })),
         ...(searchResults.knowledge_results || []).map((result: any) => ({
           id: result.id,
@@ -139,8 +138,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           type: 'knowledge' as const,
           similarity_score: result.confidence || 0.7,
           source: result.source_type || 'knowledge_base',
-          metadata: result.metadata
-        }))
+          metadata: result.metadata,
+        })),
       ];
 
       // Sort by similarity score
@@ -150,16 +149,16 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       onResultsFound?.(unifiedResults);
 
       toast({
-        title: "Search Completed",
-        description: `Found ${unifiedResults.length} results using ${actualSearchType} search`
+        title: 'Search Completed',
+        description: `Found ${unifiedResults.length} results using ${actualSearchType} search`,
       });
 
     } catch (error) {
       console.error('Search error:', error);
       toast({
-        title: "Search Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Search Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
@@ -172,12 +171,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     setIsSearching(true);
     try {
       // Quick text-based search using MIVAA's fast search
-      const quickResults = await mivaaSearchService.searchDocuments({
+      const quickResults = await mivaaSearchService.search({
         query: searchQuery,
-        searchType: 'specification_match',
-        includeKnowledge: false,
-        includePDFContent: true,
-        limit: 8
+        limit: 8,
       });
 
       const formatted = quickResults.results.map((result: any) => ({
@@ -187,18 +183,18 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         type: result.type || 'material',
         similarity_score: result.confidence || 0.8,
         source: 'quick_search',
-        metadata: result.metadata
+        metadata: result.metadata,
       }));
 
       setResults(formatted);
       onResultsFound?.(formatted);
-      
+
     } catch (error) {
       console.error('Quick search error:', error);
       toast({
-        title: "Quick Search Failed",
-        description: "Please try the full search",
-        variant: "destructive"
+        title: 'Quick Search Failed',
+        description: 'Please try the full search',
+        variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
@@ -250,8 +246,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
               />
               <Type className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               onClick={() => handleQuickSearch(query)}
               disabled={isSearching || !query.trim()}
             >
@@ -271,17 +267,20 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 Material Image (Optional)
               </Label>
               {selectedImage && (
-                <Button variant="ghost" size="sm" onClick={removeImage}>
+                <Button
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"
+                  onClick={removeImage}
+                >
                   <X className="h-4 w-4" />
                 </Button>
               )}
             </div>
-            
+
             {imagePreview ? (
               <div className="flex items-center gap-4">
-                <img 
-                  src={imagePreview} 
-                  alt="Selected material" 
+                <img
+                  src={imagePreview}
+                  alt="Selected material"
                   className="w-20 h-20 object-cover rounded border"
                 />
                 <div className="flex-1">
@@ -292,7 +291,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 </div>
               </div>
             ) : (
-              <div 
+              <div
                 className="flex flex-col items-center justify-center py-8 cursor-pointer hover:bg-muted/50 rounded"
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -305,7 +304,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 </p>
               </div>
             )}
-            
+
             <input
               ref={fileInputRef}
               type="file"
@@ -320,16 +319,16 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
           {/* Search Type Indicator */}
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="flex items-center gap-1">
+            <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-1">
               {detectQueryType(query) === 'text' && <Type className="h-3 w-3" />}
               {detectQueryType(query) === 'image' && <ImageIcon className="h-3 w-3" />}
               {detectQueryType(query) === 'hybrid' && <Sparkles className="h-3 w-3" />}
               {detectQueryType(query).charAt(0).toUpperCase() + detectQueryType(query).slice(1)} Search
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {detectQueryType(query) === 'hybrid' && "Using both text and image for enhanced matching"}
-              {detectQueryType(query) === 'image' && "AI will analyze the image to identify materials"}
-              {detectQueryType(query) === 'text' && "Natural language processing for material specifications"}
+              {detectQueryType(query) === 'hybrid' && 'Using both text and image for enhanced matching'}
+              {detectQueryType(query) === 'image' && 'AI will analyze the image to identify materials'}
+              {detectQueryType(query) === 'text' && 'Natural language processing for material specifications'}
             </span>
           </div>
         </CardContent>
@@ -346,8 +345,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           <CardContent>
             <div className="space-y-4">
               {results.map((result, index) => (
-                <Card 
-                  key={index} 
+                <Card
+                  key={index}
                   className="border-l-4 border-l-primary hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => onMaterialSelect?.(result.id)}
                 >
@@ -356,15 +355,15 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                       <div className="flex items-center gap-2">
                         {getResultIcon(result.type)}
                         <h3 className="font-semibold">{result.title}</h3>
-                        <Badge variant="outline">{result.type}</Badge>
+                        <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{result.type}</Badge>
                         {result.source && (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 text-xs">
                             {result.source}
                           </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <div 
+                        <div
                           className={`w-2 h-2 rounded-full ${getConfidenceColor(result.similarity_score)}`}
                         />
                         <span className="text-sm text-muted-foreground">
@@ -372,10 +371,10 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                         </span>
                       </div>
                     </div>
-                    
+
                     <p className="text-sm text-muted-foreground mb-3">
-                      {result.content.length > 300 
-                        ? `${result.content.substring(0, 300)}...` 
+                      {result.content.length > 300
+                        ? `${result.content.substring(0, 300)}...`
                         : result.content
                       }
                     </p>
@@ -384,17 +383,17 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     {result.metadata && (
                       <div className="flex flex-wrap gap-2">
                         {result.metadata.category && (
-                          <Badge variant="secondary">
+                          <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
                             {result.metadata.category}
                           </Badge>
                         )}
-                        {result.metadata.material_categories && Array.isArray(result.metadata.material_categories) && 
+                        {result.metadata.material_categories && Array.isArray(result.metadata.material_categories) &&
                           result.metadata.material_categories.slice(0, 2).map((cat: string, i: number) => (
-                            <Badge key={i} variant="outline">{cat}</Badge>
+                            <Badge key={i} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{cat}</Badge>
                           ))
                         }
                         {result.metadata.technical_complexity && (
-                          <Badge variant="outline">
+                          <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
                             Complexity: {result.metadata.technical_complexity}/10
                           </Badge>
                         )}

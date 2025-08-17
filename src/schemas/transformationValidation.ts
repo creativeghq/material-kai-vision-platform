@@ -11,14 +11,14 @@ const ChunkSizeConfigSchema = z.object({
   (data) => data.overlap < data.maxTokens / 2,
   {
     message: 'Overlap must be less than half of max tokens',
-    path: ['overlap']
-  }
+    path: ['overlap'],
+  },
 ).refine(
   (data) => data.minChunkSize <= data.maxTokens,
   {
     message: 'Min chunk size must not exceed max tokens',
-    path: ['minChunkSize']
-  }
+    path: ['minChunkSize'],
+  },
 );
 
 /**
@@ -26,7 +26,7 @@ const ChunkSizeConfigSchema = z.object({
  */
 const EmbeddingConfigSchema = z.object({
   model: z.enum(['text-embedding-ada-002', 'text-embedding-3-small', 'text-embedding-3-large'], {
-    errorMap: () => ({ message: 'Invalid embedding model' })
+    errorMap: () => ({ message: 'Invalid embedding model' }),
   }),
   dimensions: z.number().int().min(256, 'Dimensions must be at least 256').max(3072, 'Dimensions cannot exceed 3072').optional(),
   batchSize: z.number().int().min(1, 'Batch size must be at least 1').max(100, 'Batch size cannot exceed 100').default(10),
@@ -38,7 +38,7 @@ const EmbeddingConfigSchema = z.object({
  */
 const OutputFormatSchema = z.object({
   format: z.enum(['json', 'jsonl', 'csv'], {
-    errorMap: () => ({ message: 'Format must be json, jsonl, or csv' })
+    errorMap: () => ({ message: 'Format must be json, jsonl, or csv' }),
   }),
   includeMetadata: z.boolean().default(true),
   includeEmbeddings: z.boolean().default(true),
@@ -116,8 +116,8 @@ export const TransformationConfigSchema = z.object({
   },
   {
     message: 'Embedding dimensions not compatible with selected model',
-    path: ['embedding', 'dimensions']
-  }
+    path: ['embedding', 'dimensions'],
+  },
 ).refine(
   (data) => {
     // Custom validation: ensure performance limits are reasonable
@@ -127,8 +127,8 @@ export const TransformationConfigSchema = z.object({
   },
   {
     message: 'Memory limit too low for the configured chunk size and batch size',
-    path: ['performance', 'maxMemoryUsage']
-  }
+    path: ['performance', 'maxMemoryUsage'],
+  },
 );
 
 /**
@@ -149,20 +149,20 @@ export function validateTransformationConfig(data: unknown): {
   }>;
 } {
   const result = TransformationConfigSchema.safeParse(data);
-  
+
   if (result.success) {
     return {
       success: true,
       data: result.data,
     };
   }
-  
+
   const errors = result.error.errors.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
   }));
-  
+
   return {
     success: false,
     errors,
@@ -207,20 +207,20 @@ export function validatePartialTransformationConfig(data: unknown): {
   }>;
 } {
   const result = PartialTransformationConfigSchema.safeParse(data);
-  
+
   if (result.success) {
     return {
       success: true,
       data: result.data,
     };
   }
-  
+
   const errors = result.error.errors.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
   }));
-  
+
   return {
     success: false,
     errors,
@@ -241,8 +241,8 @@ export const TransformationJobRequestSchema = z.object({
   (data) => data.configId || data.config,
   {
     message: 'Either configId or config must be provided',
-    path: ['config']
-  }
+    path: ['config'],
+  },
 );
 
 /**
@@ -258,20 +258,20 @@ export function validateTransformationJobRequest(data: unknown): {
   }>;
 } {
   const result = TransformationJobRequestSchema.safeParse(data);
-  
+
   if (result.success) {
     return {
       success: true,
       data: result.data,
     };
   }
-  
+
   const errors = result.error.errors.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
   }));
-  
+
   return {
     success: false,
     errors,

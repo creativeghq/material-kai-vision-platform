@@ -1,14 +1,16 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileImage, Loader2, CheckCircle, Brain } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { RecognitionResult } from '@/types/materials';
-import { RecognitionResults } from './RecognitionResults';
 import { integratedWorkflowService } from '@/services/integratedWorkflowService';
-import { toast } from 'sonner';
+
+import { RecognitionResults } from './RecognitionResults';
 
 // Enhanced recognition using integrated workflow service
 
@@ -26,15 +28,15 @@ export const MaterialRecognition: React.FC = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.bmp', '.tiff']
+      'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.bmp', '.tiff'],
     },
     multiple: true,
-    maxSize: 10 * 1024 * 1024 // 10MB
+    maxSize: 10 * 1024 * 1024, // 10MB
   });
 
   const startRecognition = async () => {
     if (files.length === 0) return;
-    
+
     setIsProcessing(true);
     setProgress(0);
     setResults([]);
@@ -53,7 +55,7 @@ export const MaterialRecognition: React.FC = () => {
     try {
       // Use the integrated workflow service for enhanced processing
       const { recognitionResults, enhancements } = await integratedWorkflowService.enhancedMaterialRecognition(files);
-      
+
       // Merge enhancements into recognition results
       const enhancedResults = recognitionResults.map(result => {
         const enhancement = enhancements[result.id];
@@ -64,33 +66,33 @@ export const MaterialRecognition: React.FC = () => {
               ...(enhancement.ocrExtraction && {
                 extracted_text: enhancement.ocrExtraction.extractedText,
                 specifications: enhancement.ocrExtraction.specifications,
-                ocr_confidence: enhancement.ocrExtraction.confidence
+                ocr_confidence: enhancement.ocrExtraction.confidence,
               }),
               ...(enhancement.svbrdfMaps && {
                 svbrdf_maps: enhancement.svbrdfMaps,
-                has_pbr_materials: true
+                has_pbr_materials: true,
               }),
               ...(enhancement.ragKnowledge && {
                 related_knowledge: enhancement.ragKnowledge.relatedKnowledge,
-                ai_context: enhancement.ragKnowledge.aiContext
-              })
-            }
+                ai_context: enhancement.ragKnowledge.aiContext,
+              }),
+            },
           };
-          
+
           return { ...result, metadata: enhancedMetadata };
         }
         return result;
       });
-      
+
       setResults(enhancedResults);
       setProgress(100);
-      
+
       const enhancementCount = Object.values(enhancements).reduce((count, enhancement) => {
         return count + Object.keys(enhancement).length;
       }, 0);
-      
+
       toast.success(`Analyzed ${recognitionResults.length} materials with ${enhancementCount} enhancements`);
-    
+
     } catch (error) {
       console.error('Recognition failed:', error);
       toast.error('Material recognition failed. Please try again.');

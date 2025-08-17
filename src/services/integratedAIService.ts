@@ -7,11 +7,11 @@ import {
   DatabaseError,
   ExternalServiceError,
   ErrorLogger,
-  errorLogger
+  errorLogger,
 } from '@/core/errors';
 
-// CrewAI Services
-export interface CrewAITaskRequest {
+// Material Agent Orchestrator Services
+export interface MaterialAgentTaskRequest {
   user_id: string;
   task_type: string;
   input_data: any;
@@ -29,7 +29,7 @@ export interface AgentExecution {
   reasoning: string;
 }
 
-export interface CrewAIResult {
+export interface MaterialAgentResult {
   success: boolean;
   task_id: string;
   coordinated_result: any;
@@ -90,39 +90,39 @@ export interface SpaceFormerResult {
   error_message?: string;
 }
 
-export class EnhancedCrewAIAPI {
+export class MaterialAgentOrchestratorAPI {
   /**
-   * Execute a coordinated task using CrewAI agents
+   * Execute a coordinated task using Material Agent Orchestrator
    */
-  static async executeTask(request: CrewAITaskRequest): Promise<CrewAIResult> {
+  static async executeTask(request: MaterialAgentTaskRequest): Promise<MaterialAgentResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         const authError = new APIError(
-          'User authentication required for CrewAI API access',
+          'User authentication required for Material Agent Orchestrator API access',
           {
             operation: 'executeTask',
-            service: 'EnhancedCrewAIAPI',
+            service: 'MaterialAgentOrchestratorAPI',
             metadata: { endpoint: 'executeTask' },
-            timestamp: new Date().toISOString()
-          }
+            timestamp: new Date().toISOString(),
+          },
         );
-        errorLogger.logError(authError, { service: 'EnhancedCrewAIAPI', method: 'executeTask' });
+        errorLogger.logError(authError, { service: 'MaterialAgentOrchestratorAPI', method: 'executeTask' });
         throw authError;
       }
 
-      const { data, error } = await supabase.functions.invoke('enhanced-crewai', {
+      const { data, error } = await supabase.functions.invoke('material-agent-orchestrator', {
         body: {
           ...request,
-          user_id: user.id
-        }
+          user_id: user.id,
+        },
       });
 
       if (error) {
         throw error;
       }
 
-      return data as CrewAIResult;
+      return data as MaterialAgentResult;
     } catch (error) {
       // DIAGNOSTIC: Validating error handling issues
       console.log('DEBUG: ErrorContext interface requires these fields:');
@@ -132,27 +132,31 @@ export class EnhancedCrewAIAPI {
       console.log('- timestamp: string');
       console.log('DEBUG: Additional context like "endpoint" should go in metadata field');
       console.log('DEBUG: logDiagnostic functions are undefined and need to be removed');
-      console.error('Error executing CrewAI task:', error);
+      console.error('Error executing Material Agent Orchestrator task:', error);
       throw error;
     }
   }
 
   /**
-   * Get available CrewAI agents
+   * Get available Material Agent Orchestrator agents
    */
   static async getAvailableAgents() {
     try {
-      const { data, error } = await supabase
-        .from('crewai_agents')
-        .select('*')
-        .eq('status', 'active')
-        .order('agent_name');
+      // TODO: Update when material_agents table is created
+      // For now, return empty array as the table doesn't exist in current schema
+      return [];
 
-      if (error) {
-        throw error;
-      }
+      // const { data, error } = await supabase
+      //   .from('material_agents')
+      //   .select('*')
+      //   .eq('status', 'active')
+      //   .order('agent_name');
 
-      return data || [];
+      // if (error) {
+      //   throw error;
+      // }
+
+      // return data || [];
     } catch (error) {
       console.error('Error fetching agents:', error);
       throw error;
@@ -224,8 +228,8 @@ export class SpaceFormerAPI {
       const { data, error } = await supabase.functions.invoke('spaceformer-analysis', {
         body: {
           ...request,
-          user_id: user.id
-        }
+          user_id: user.id,
+        },
       });
 
       if (error) {
@@ -296,7 +300,7 @@ export class SpaceFormerAPI {
     roomType: string,
     nerfReconstructionId?: string,
     svbrdfExtractionIds?: string[],
-    userPreferences?: any
+    userPreferences?: any,
   ): Promise<SpaceFormerResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -311,8 +315,8 @@ export class SpaceFormerAPI {
         nerf_reconstruction_id: nerfReconstructionId,
         user_preferences: userPreferences,
         constraints: {
-          svbrdf_extraction_ids: svbrdfExtractionIds
-        }
+          svbrdf_extraction_ids: svbrdfExtractionIds,
+        },
       };
 
       return await this.analyzeSpatialContext(request);
@@ -331,7 +335,7 @@ export class IntegratedAIService {
   static async generateCompleteDesign(
     images: File[],
     roomType: string,
-    userPreferences: any = {}
+    userPreferences: any = {},
   ) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -343,7 +347,7 @@ export class IntegratedAIService {
         nerfReconstruction: null,
         svbrdfExtractions: [],
         spatialAnalysis: null,
-        crewaiCoordination: null
+        crewaiCoordination: null,
       };
 
       // Step 1: NeRF Reconstruction (if multiple images)
@@ -355,7 +359,7 @@ export class IntegratedAIService {
       // Step 2: SVBRDF Material Extraction (for each image)
       if (images.length > 0) {
         const { SVBRDFExtractionAPI } = await import('./svbrdfExtractionAPI');
-        
+
         for (const image of images.slice(0, 3)) { // Limit to 3 for performance
           try {
             const extraction = await SVBRDFExtractionAPI.uploadImageAndExtract(image);
@@ -373,11 +377,11 @@ export class IntegratedAIService {
         roomType,
         results.nerfReconstruction?.reconstruction_id,
         results.svbrdfExtractions.map(e => e.extraction_id),
-        userPreferences
+        userPreferences,
       );
 
-      // Step 4: CrewAI Coordination and Final Recommendations
-      results.crewaiCoordination = await EnhancedCrewAIAPI.executeTask({
+      // Step 4: Material Agent Orchestrator Coordination and Final Recommendations
+      results.crewaiCoordination = await MaterialAgentOrchestratorAPI.executeTask({
         user_id: user.id,
         task_type: 'comprehensive_design',
         input_data: {
@@ -385,9 +389,9 @@ export class IntegratedAIService {
           nerf_data: results.nerfReconstruction,
           material_data: results.svbrdfExtractions,
           spatial_analysis: results.spatialAnalysis,
-          user_preferences: userPreferences
+          user_preferences: userPreferences,
         },
-        priority: 1
+        priority: 1,
       });
 
       return results;
@@ -400,12 +404,12 @@ export class IntegratedAIService {
           metadata: {
             roomType,
             imageCount: images.length,
-            originalError: error instanceof Error ? error.message : String(error)
+            originalError: error instanceof Error ? error.message : String(error),
           },
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       );
-      
+
       ErrorLogger.getInstance().logError(apiError);
       throw apiError;
     }
@@ -416,14 +420,14 @@ export class IntegratedAIService {
    */
   static async quickMaterialAnalysis(image: File) {
     try {
-      // Use CrewAI for coordinated material analysis
-      const result = await EnhancedCrewAIAPI.executeTask({
+      // Use Material Agent Orchestrator for coordinated material analysis
+      const result = await MaterialAgentOrchestratorAPI.executeTask({
         user_id: '', // Will be set by the API
         task_type: 'material_analysis',
         input_data: {
           image_data: image,
-          analysis_type: 'quick_assessment'
-        }
+          analysis_type: 'quick_assessment',
+        },
       });
 
       return result;
@@ -447,7 +451,7 @@ export class IntegratedAIService {
         supabase.from('nerf_reconstructions').select('*').eq('user_id', user.id),
         supabase.from('svbrdf_extractions').select('*').eq('user_id', user.id),
         supabase.from('spatial_analysis').select('*').eq('user_id', user.id),
-        supabase.from('agent_tasks').select('*').eq('user_id', user.id)
+        supabase.from('agent_tasks').select('*').eq('user_id', user.id),
       ]);
 
       return {
@@ -455,7 +459,7 @@ export class IntegratedAIService {
         svbrdf_extractions: svbrdfStats.status === 'fulfilled' ? svbrdfStats.value.data?.length || 0 : 0,
         spatial_analyses: spatialStats.status === 'fulfilled' ? spatialStats.value.data?.length || 0 : 0,
         agent_tasks: taskStats.status === 'fulfilled' ? taskStats.value.data?.length || 0 : 0,
-        integration_health: 'optimal' // Would be calculated based on success rates
+        integration_health: 'optimal', // Would be calculated based on success rates
       };
     } catch (error) {
       console.error('Error fetching integrated analytics:', error);

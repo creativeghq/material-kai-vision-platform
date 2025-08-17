@@ -1,4 +1,5 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { DocumentProcessingPipeline } from './documentProcessingPipeline';
 
 /**
@@ -197,7 +198,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
    */
   protected async doInitialize(): Promise<void> {
     await this.documentProcessor.initialize();
-    
+
     // Verify Mivaa service connectivity
     const healthCheck = await this.healthCheck();
     if (!healthCheck.isHealthy) {
@@ -222,27 +223,27 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.config.defaultTimeout);
-      
+
       // Use the gateway health endpoint instead of direct MIVAA call
       const response = await fetch('/api/mivaa/health', {
         method: 'GET',
-        signal: controller.signal
+        signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         return { isHealthy: true };
       } else {
         return {
           isHealthy: false,
-          error: `HTTP ${response.status}: ${response.statusText}`
+          error: `HTTP ${response.status}: ${response.statusText}`,
         };
       }
     } catch (error) {
       return {
         isHealthy: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -255,8 +256,8 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       method: 'POST',
       body: JSON.stringify({
         file_path: request.documentId, // Use documentId as file path
-        options: request.options
-      })
+        options: request.options,
+      }),
     });
 
     if (!response.ok) {
@@ -274,8 +275,8 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       method: 'POST',
       body: JSON.stringify({
         file_path: request.documentId, // Use documentId as file path
-        options: request.options
-      })
+        options: request.options,
+      }),
     });
 
     if (!response.ok) {
@@ -293,8 +294,8 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       method: 'POST',
       body: JSON.stringify({
         file_path: request.documentId, // Use documentId as file path
-        options: request.options
-      })
+        options: request.options,
+      }),
     });
 
     if (!response.ok) {
@@ -315,7 +316,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     const [markdown, tables, images] = await Promise.all([
       this.extractMarkdown(request),
       this.extractTables(request),
-      this.extractImages(request)
+      this.extractImages(request),
     ]);
 
     return { markdown, tables, images };
@@ -327,7 +328,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   private async makeRequest(endpoint: string, options: RequestInit, retries = 3): Promise<Response> {
     // Route through the gateway instead of making direct calls
     const gatewayUrl = '/api/mivaa/gateway';
-    
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const controller = new AbortController();
@@ -350,7 +351,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(gatewayPayload),
-          signal: controller.signal
+          signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
@@ -359,7 +360,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         if (attempt === retries) {
           throw error;
         }
-        
+
         // Wait before retry (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
@@ -403,14 +404,14 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         success: true,
         data: extractedData,
         ...(errors.length > 0 && { errors }),
-        ...(warnings.length > 0 && { warnings })
+        ...(warnings.length > 0 && { warnings }),
       };
     } catch (error) {
       errors.push(error instanceof Error ? error.message : 'Unknown extraction error');
       return {
         success: false,
         data: {},
-        errors
+        errors,
       };
     }
   }
@@ -421,13 +422,13 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   public async extractFromPdf(request: PdfExtractionRequest): Promise<ExtractionResult> {
     return this.executeOperation(async () => {
       const startTime = Date.now();
-      
+
       // Validate request
       this.validateExtractionRequest(request);
-      
+
       // Extract content using consolidated service
       const extractionResult = await this.extractContent(request);
-      
+
       // Process and standardize the result
       const standardizedResult: ExtractionResult = {
         documentId: request.documentId,
@@ -436,7 +437,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         data: extractionResult.data,
         processingTime: Date.now() - startTime,
         ...(extractionResult.errors && { errors: extractionResult.errors }),
-        ...(extractionResult.warnings && { warnings: extractionResult.warnings })
+        ...(extractionResult.warnings && { warnings: extractionResult.warnings }),
       };
 
       return standardizedResult;
@@ -450,7 +451,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     return this.executeOperation(async () => {
       // First extract content
       const extractionResult = await this.extractFromPdf(request);
-      
+
       if (extractionResult.status === 'failed') {
         throw new Error(`PDF extraction failed: ${extractionResult.errors?.join(', ')}`);
       }
@@ -458,7 +459,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       // Process through RAG pipeline
       const pipelineResult = await this.documentProcessor.processForRag(
         extractionResult,
-        request.options.workspaceAware || false
+        request.options.workspaceAware || false,
       );
 
       return pipelineResult;
@@ -492,9 +493,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
                 textChunks: 0,
                 tableChunks: 0,
                 imageChunks: 0,
-                processingTime: 0
+                processingTime: 0,
               },
-              errors: [result.reason?.message || 'Unknown error']
+              errors: [result.reason?.message || 'Unknown error'],
             });
           }
         });
@@ -515,7 +516,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     return this.executeOperation(async () => {
       // Get processing status from MIVAA service
       const response = await this.makeRequest(`/status/${documentId}`, {
-        method: 'GET'
+        method: 'GET',
       });
 
       if (!response.ok) {
@@ -574,15 +575,15 @@ export const defaultMivaaConfig: MivaaIntegrationConfig = {
   workspaceConfig: {
     enabled: true,
     contextWindow: 4000,
-    chunkSize: 1000
+    chunkSize: 1000,
   },
   rateLimit: {
     requestsPerMinute: 60,
-    burstLimit: 10
+    burstLimit: 10,
   },
   healthCheck: {
     enabled: true,
     interval: 30000,
-    timeout: 5000
-  }
+    timeout: 5000,
+  },
 };

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
@@ -39,7 +39,7 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 
 serve(async (req) => {
   const startTime = Date.now();
-  
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -59,17 +59,17 @@ serve(async (req) => {
     const userAgent = req.headers.get('user-agent') || undefined;
     const apiKey = req.headers.get('x-api-key');
     const authHeader = req.headers.get('authorization');
-    
+
     console.log(`API Gateway: ${method} ${path} from ${clientIP}`);
 
     // Check if IP is internal
     const { data: isInternalData, error: internalError } = await supabase
       .rpc('is_internal_ip', { ip_addr: clientIP });
-    
+
     if (internalError) {
       console.error('Error checking internal IP:', internalError);
     }
-    
+
     const isInternal = isInternalData || false;
 
     // Get endpoint configuration
@@ -209,17 +209,17 @@ function getClientIP(req: Request): string {
   if (forwarded) {
     return forwarded.split(',')[0].trim();
   }
-  
+
   const realIP = req.headers.get('x-real-ip');
   if (realIP) {
     return realIP;
   }
-  
+
   const cfConnectingIP = req.headers.get('cf-connecting-ip');
   if (cfConnectingIP) {
     return cfConnectingIP;
   }
-  
+
   // Fallback to a default IP
   return '127.0.0.1';
 }
@@ -232,15 +232,15 @@ function isSystemEndpoint(path: string): boolean {
     '/api/status',
     '/_internal/',
   ];
-  
+
   return systemPaths.some(systemPath => path.startsWith(systemPath));
 }
 
 function checkEndpointAccess(
-  endpoint: ApiEndpoint, 
-  isInternal: boolean, 
-  apiKey?: string | null, 
-  authHeader?: string | null
+  endpoint: ApiEndpoint,
+  isInternal: boolean,
+  apiKey?: string | null,
+  authHeader?: string | null,
 ): { allowed: boolean; reason?: string } {
   // If endpoint is public, allow access
   if (endpoint.is_public) {
@@ -263,9 +263,9 @@ function checkEndpointAccess(
     return { allowed: true };
   }
 
-  return { 
-    allowed: false, 
-    reason: 'This endpoint requires internal network access, authentication, or a valid API key' 
+  return {
+    allowed: false,
+    reason: 'This endpoint requires internal network access, authentication, or a valid API key',
   };
 }
 
@@ -280,17 +280,17 @@ function getRateLimitKey(clientIP: string, userId?: string, apiKey?: string | nu
 }
 
 async function getRateLimit(
-  supabase: any, 
-  path: string, 
-  clientIP: string, 
-  userId?: string
+  supabase: any,
+  path: string,
+  clientIP: string,
+  userId?: string,
 ): Promise<number> {
   try {
     const { data, error } = await supabase
-      .rpc('get_rate_limit', { 
-        endpoint_path: path, 
+      .rpc('get_rate_limit', {
+        endpoint_path: path,
         ip_addr: clientIP,
-        user_id_param: userId 
+        user_id_param: userId,
       });
 
     if (error) {
@@ -349,10 +349,10 @@ function updateRateLimit(key: string, limit: number): void {
 }
 
 async function forwardRequest(
-  req: Request, 
-  supabase: any, 
+  req: Request,
+  supabase: any,
   logData: Omit<ApiUsageLog, 'response_status' | 'response_time_ms'>,
-  startTime: number
+  startTime: number,
 ): Promise<Response> {
   try {
     // For now, we'll just return a success response
@@ -378,7 +378,7 @@ async function forwardRequest(
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
   } catch (error) {
     console.error('Error forwarding request:', error);
@@ -390,12 +390,12 @@ async function forwardRequest(
 }
 
 function createErrorResponse(
-  message: string, 
-  status: number, 
+  message: string,
+  status: number,
   startTime: number,
   logData: Omit<ApiUsageLog, 'response_time_ms'>,
   supabase?: any,
-  retryAfter?: number
+  retryAfter?: number,
 ): Response {
   const endTime = Date.now();
   const responseTime = endTime - startTime;
@@ -408,9 +408,9 @@ function createErrorResponse(
     }).catch(console.error);
   }
 
-  const headers: HeadersInit = { 
-    ...corsHeaders, 
-    'Content-Type': 'application/json' 
+  const headers: HeadersInit = {
+    ...corsHeaders,
+    'Content-Type': 'application/json',
   };
 
   if (retryAfter) {
@@ -427,7 +427,7 @@ function createErrorResponse(
     {
       status,
       headers,
-    }
+    },
   );
 }
 

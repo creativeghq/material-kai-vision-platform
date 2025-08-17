@@ -1,6 +1,6 @@
 /**
  * TextureAttentionModule - Self-attention mechanism optimized for texture pattern analysis
- * 
+ *
  * This module implements multi-head attention specifically designed for capturing
  * texture patterns, directional information, and spatial relationships in materials.
  */
@@ -63,11 +63,11 @@ export class TextureAttentionModule {
   private initializeMatrix(inputSize: number, outputSize: number): Float32Array {
     const limit = Math.sqrt(6.0 / (inputSize + outputSize));
     const weights = new Float32Array(inputSize * outputSize);
-    
+
     for (let i = 0; i < weights.length; i++) {
       weights[i] = (Math.random() * 2 - 1) * limit;
     }
-    
+
     return weights;
   }
 
@@ -116,7 +116,7 @@ export class TextureAttentionModule {
         attentionWeights: attentionOutput.attentionWeights,
         enhancedFeatures: attentionOutput.enhancedFeatures,
         textureDirections,
-        confidenceScores
+        confidenceScores,
       };
 
     } catch (error) {
@@ -157,8 +157,8 @@ export class TextureAttentionModule {
       for (let ch = 0; ch < channels; ch++) {
         const featureIdx = seq * channels + ch;
         const posIdx = seq * this.config.keyDim + (ch % this.config.keyDim);
-        
-        embeddedFeatures[featureIdx] = features[featureIdx] + 
+
+        embeddedFeatures[featureIdx] = features[featureIdx] +
           (this.positionEmbeddings[posIdx] || 0) * 0.1; // Scale factor for positional encoding
       }
     }
@@ -201,7 +201,7 @@ export class TextureAttentionModule {
 
       // Compute attention output
       const headOutput = this.applyAttention(attentionWeights, headV, sequenceLength, keyDim);
-      
+
       headOutputs.push(headOutput);
       headAttentions.push(attentionWeights);
     }
@@ -211,10 +211,10 @@ export class TextureAttentionModule {
 
     // Final linear transformation
     const enhancedFeatures = this.linearTransform(
-      concatenated, 
-      this.outputWeights, 
-      sequenceLength, 
-      headCount * keyDim
+      concatenated,
+      this.outputWeights,
+      sequenceLength,
+      headCount * keyDim,
     );
 
     // Combine attention weights from all heads
@@ -222,7 +222,7 @@ export class TextureAttentionModule {
 
     return {
       attentionWeights: combinedAttention,
-      enhancedFeatures
+      enhancedFeatures,
     };
   }
 
@@ -230,10 +230,10 @@ export class TextureAttentionModule {
    * Perform linear transformation for Q, K, V computation
    */
   private linearTransform(
-    input: Float32Array, 
-    weights: Float32Array, 
-    sequenceLength: number, 
-    inputDim: number
+    input: Float32Array,
+    weights: Float32Array,
+    sequenceLength: number,
+    inputDim: number,
   ): Float32Array {
     const outputDim = weights.length / inputDim;
     const output = new Float32Array(sequenceLength * outputDim);
@@ -257,11 +257,11 @@ export class TextureAttentionModule {
    * Extract features for a specific attention head
    */
   private extractHead(
-    input: Float32Array, 
-    headIdx: number, 
-    headCount: number, 
-    keyDim: number, 
-    sequenceLength: number
+    input: Float32Array,
+    headIdx: number,
+    headCount: number,
+    keyDim: number,
+    sequenceLength: number,
   ): Float32Array {
     const headFeatures = new Float32Array(sequenceLength * keyDim);
     const totalDim = headCount * keyDim;
@@ -281,10 +281,10 @@ export class TextureAttentionModule {
    * Compute attention scores between queries and keys
    */
   private computeAttentionScores(
-    queries: Float32Array, 
-    keys: Float32Array, 
-    sequenceLength: number, 
-    keyDim: number
+    queries: Float32Array,
+    keys: Float32Array,
+    sequenceLength: number,
+    keyDim: number,
   ): Float32Array {
     const scores = new Float32Array(sequenceLength * sequenceLength);
     const scale = 1.0 / Math.sqrt(keyDim) * this.config.temperatureScaling;
@@ -310,7 +310,7 @@ export class TextureAttentionModule {
 
     for (let i = 0; i < sequenceLength; i++) {
       const rowStart = i * sequenceLength;
-      
+
       // Find max for numerical stability
       let maxScore = -Infinity;
       for (let j = 0; j < sequenceLength; j++) {
@@ -349,10 +349,10 @@ export class TextureAttentionModule {
    * Apply attention weights to values
    */
   private applyAttention(
-    weights: Float32Array, 
-    values: Float32Array, 
-    sequenceLength: number, 
-    keyDim: number
+    weights: Float32Array,
+    values: Float32Array,
+    sequenceLength: number,
+    keyDim: number,
   ): Float32Array {
     const output = new Float32Array(sequenceLength * keyDim);
 

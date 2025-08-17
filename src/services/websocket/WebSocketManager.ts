@@ -56,7 +56,7 @@ export class WebSocketManager {
       reconnectInterval: config.reconnectInterval || 3000,
       maxReconnectAttempts: config.maxReconnectAttempts || 10,
       heartbeatInterval: config.heartbeatInterval || 30000,
-      connectionTimeout: config.connectionTimeout || 10000
+      connectionTimeout: config.connectionTimeout || 10000,
     };
   }
 
@@ -75,7 +75,7 @@ export class WebSocketManager {
 
       try {
         this.ws = new WebSocket(this.config.url, this.config.protocols);
-        
+
         // Set connection timeout
         this.connectionTimer = setTimeout(() => {
           if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
@@ -90,7 +90,7 @@ export class WebSocketManager {
           this.reconnectAttempts = 0;
           this.startHeartbeat();
           this.processMessageQueue();
-          
+
           if (this.handlers.onOpen) {
             this.handlers.onOpen(event);
           }
@@ -111,12 +111,12 @@ export class WebSocketManager {
         this.ws.onclose = (event) => {
           this.clearConnectionTimer();
           this.clearHeartbeat();
-          
+
           if (!this.isManualClose) {
             this.setState(WebSocketState.DISCONNECTED);
             this.scheduleReconnect();
           }
-          
+
           if (this.handlers.onClose) {
             this.handlers.onClose(event);
           }
@@ -125,11 +125,11 @@ export class WebSocketManager {
         this.ws.onerror = (event) => {
           this.clearConnectionTimer();
           console.error('WebSocket error:', event);
-          
+
           if (this.handlers.onError) {
             this.handlers.onError(event);
           }
-          
+
           if (this.ws?.readyState === WebSocket.CONNECTING) {
             reject(new Error('Failed to connect'));
           }
@@ -150,12 +150,12 @@ export class WebSocketManager {
     this.clearReconnectTimer();
     this.clearHeartbeat();
     this.clearConnectionTimer();
-    
+
     if (this.ws) {
       this.ws.close(1000, 'Manual disconnect');
       this.ws = null;
     }
-    
+
     this.setState(WebSocketState.DISCONNECTED);
   }
 
@@ -166,7 +166,7 @@ export class WebSocketManager {
     const fullMessage: WebSocketMessage = {
       ...message,
       timestamp: Date.now(),
-      id: this.generateMessageId()
+      id: this.generateMessageId(),
     };
 
     if (this.isConnected()) {
@@ -213,7 +213,7 @@ export class WebSocketManager {
       state: this.state,
       reconnectAttempts: this.reconnectAttempts,
       queuedMessages: this.messageQueue.length,
-      isConnected: this.isConnected()
+      isConnected: this.isConnected(),
     };
   }
 
@@ -252,7 +252,7 @@ export class WebSocketManager {
       if (this.isConnected()) {
         this.send({
           type: 'ping',
-          payload: { timestamp: Date.now() }
+          payload: { timestamp: Date.now() },
         });
       }
     }, this.config.heartbeatInterval);
@@ -281,7 +281,7 @@ export class WebSocketManager {
 
   private queueMessage(message: WebSocketMessage): void {
     this.messageQueue.push(message);
-    
+
     // Limit queue size to prevent memory issues
     if (this.messageQueue.length > 100) {
       this.messageQueue.shift();

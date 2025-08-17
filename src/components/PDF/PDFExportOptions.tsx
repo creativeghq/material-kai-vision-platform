@@ -1,11 +1,12 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Download,
   FileSpreadsheet,
-  FileJson
+  FileJson,
 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
 interface PDFTile {
@@ -32,16 +33,16 @@ interface PDFExportOptionsProps {
   resultSummary: any;
 }
 
-export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({ 
-  processingId, 
-  tiles, 
-  resultSummary 
+export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
+  processingId,
+  tiles,
+  resultSummary,
 }) => {
   const { toast } = useToast();
 
   const exportToCSV = () => {
     const materialTiles = tiles.filter(t => t.material_detected);
-    
+
     const csvHeaders = [
       'Page',
       'Tile Index',
@@ -51,7 +52,7 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
       'X Position',
       'Y Position',
       'Extracted Text',
-      'Structured Data'
+      'Structured Data',
     ];
 
     const csvRows = materialTiles.map(tile => [
@@ -63,7 +64,7 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
       tile.x_coordinate,
       tile.y_coordinate,
       `"${(tile.extracted_text || '').replace(/"/g, '""')}"`,
-      `"${JSON.stringify(tile.structured_data || {}).replace(/"/g, '""')}"`
+      `"${JSON.stringify(tile.structured_data || {}).replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = [csvHeaders, ...csvRows]
@@ -71,9 +72,9 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
       .join('\n');
 
     downloadFile(csvContent, `pdf_materials_${processingId}.csv`, 'text/csv');
-    
+
     toast({
-      title: "CSV Export",
+      title: 'CSV Export',
       description: `Exported ${materialTiles.length} materials to CSV`,
     });
   };
@@ -94,20 +95,20 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
           x: tile.x_coordinate,
           y: tile.y_coordinate,
           width: tile.width,
-          height: tile.height
+          height: tile.height,
         },
         extracted_text: tile.extracted_text,
         structured_data: tile.structured_data,
-        metadata: tile.metadata_extracted
-      }))
+        metadata: tile.metadata_extracted,
+      })),
     };
 
     const jsonContent = JSON.stringify(exportData, null, 2);
     downloadFile(jsonContent, `pdf_materials_${processingId}.json`, 'application/json');
-    
+
     toast({
-      title: "JSON Export",
-      description: `Exported complete data structure to JSON`,
+      title: 'JSON Export',
+      description: 'Exported complete data structure to JSON',
     });
   };
 
@@ -163,12 +164,12 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
             <FileSpreadsheet className="h-4 w-4" />
             Export CSV
           </Button>
-          
+
           <Button onClick={exportToJSON} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
             <FileJson className="h-4 w-4" />
             Export JSON
           </Button>
-          
+
         </div>
 
         <div className="text-xs text-muted-foreground">

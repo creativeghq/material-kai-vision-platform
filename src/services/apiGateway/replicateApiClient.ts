@@ -1,9 +1,9 @@
 /**
  * Replicate API Client Implementation
- * 
+ *
  * This client implements the standardized API interface while preserving
  * all Replicate-specific schemas, authentication, and response formats.
- * 
+ *
  * Key Features:
  * - Uses exact Replicate parameter schemas from configuration
  * - Preserves Replicate authentication and headers
@@ -12,8 +12,10 @@
  */
 
 import { z } from 'zod';
-import { BaseApiClient, StandardizedApiResponse, StandardizedError, withRetry } from './standardizedApiClient';
+
 import { ApiConfigManager, ReplicateApiConfig } from '../../config';
+
+import { BaseApiClient, StandardizedApiResponse, StandardizedError, withRetry } from './standardizedApiClient';
 
 // Replicate-specific types (preserving original structures)
 export interface ReplicateResponse {
@@ -50,7 +52,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
 
   constructor(modelId?: string) {
     super('replicate', modelId);
-    
+
     const config = ApiConfigManager.getApiConfig<ReplicateApiConfig>('replicate');
     if (!config) {
       throw new Error('Replicate configuration not found');
@@ -65,7 +67,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
     try {
       // Validate parameters using model-specific schema
       const validatedParams = this.validateParams(params);
-      
+
       // Get model configuration
       const modelConfig = this.getModelConfig();
       if (!modelConfig) {
@@ -77,8 +79,8 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
         () => this.makeReplicateRequest(modelConfig.version, validatedParams),
         {
           maxAttempts: this.replicateConfig.retryAttempts || 3,
-          retryableErrors: ['RATE_LIMIT', 'NETWORK_ERROR', 'SERVER_ERROR']
-        }
+          retryableErrors: ['RATE_LIMIT', 'NETWORK_ERROR', 'SERVER_ERROR'],
+        },
       );
 
       return this.createResponse(response, startTime, requestId);
@@ -128,7 +130,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
   protected enhanceError(baseError: StandardizedError, originalError: unknown): StandardizedError {
     if (originalError instanceof Response) {
       const response = originalError as Response;
-      
+
       baseError.apiSpecific = {
         statusCode: response.status,
         headers: Object.fromEntries(response.headers.entries()),
@@ -197,7 +199,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
 
   private async makeReplicateRequest(endpoint: string, params: any): Promise<ReplicateResponse> {
     const url = `${this.baseUrl}/predictions`;
-    
+
     const requestBody = {
       version: endpoint,
       input: params,
@@ -225,7 +227,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
     }
 
     const data: ReplicateResponse = await response.json();
-    
+
     // If the prediction is still processing, poll for completion
     if (data.status === 'starting' || data.status === 'processing') {
       return this.pollForCompletion(data);
@@ -251,8 +253,8 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
 
       const updatedPrediction: ReplicateResponse = await response.json();
 
-      if (updatedPrediction.status === 'succeeded' || 
-          updatedPrediction.status === 'failed' || 
+      if (updatedPrediction.status === 'succeeded' ||
+          updatedPrediction.status === 'failed' ||
           updatedPrediction.status === 'canceled') {
         return updatedPrediction;
       }
@@ -270,7 +272,7 @@ export function createReplicateClient(modelId: string): ReplicateApiClient {
 // Utility function for direct Replicate API calls (backward compatibility)
 export async function callReplicateModel(
   modelId: string,
-  params: any
+  params: any,
 ): Promise<StandardizedApiResponse<ReplicateResponse>> {
   const client = createReplicateClient(modelId);
   return client.execute(params);

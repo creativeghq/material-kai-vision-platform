@@ -1,19 +1,20 @@
 /**
  * OpenAI API Configuration
- * 
+ *
  * Manages OpenAI API models and their specific requirements for embedding generation.
  */
 
 import { z } from 'zod';
+
 import type { BaseApiConfig } from '../apiConfig';
 
 // OpenAI embedding input schema
 const embeddingInputSchema = z.object({
   input: z.union([
-    z.string().min(1, "Input text is required"),
-    z.array(z.string().min(1)).min(1, "At least one input text is required")
+    z.string().min(1, 'Input text is required'),
+    z.array(z.string().min(1)).min(1, 'At least one input text is required'),
   ]),
-  model: z.string().min(1, "Model is required"),
+  model: z.string().min(1, 'Model is required'),
   encoding_format: z.enum(['float', 'base64']).optional().default('float'),
   dimensions: z.number().int().min(1).optional(),
   user: z.string().optional(),
@@ -64,7 +65,7 @@ export const openaiConfig: OpenAIApiConfig = {
     burstLimit: 100,
   },
   environment: 'production',
-  
+
   models: {
     // Text Embedding 3 Small - 512 dimensions (legacy support)
     'text-embedding-3-small': {

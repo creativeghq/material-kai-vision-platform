@@ -1,6 +1,8 @@
 import React from 'react';
-import { SearchResult, SearchResultCard } from './SearchResultCard';
+
 import { cn } from '@/lib/utils';
+
+import { SearchResult, SearchResultCard } from './SearchResultCard';
 
 interface SearchResultsGridProps {
   results: SearchResult[];
@@ -105,7 +107,7 @@ export const SearchResultsGrid: React.FC<SearchResultsGridProps> = ({
             onTagClick={onTagClick || (() => {})}
             className={cn(
               'h-full transition-all duration-200 hover:shadow-lg hover:scale-[1.02]',
-              onSelect && 'pt-8'
+              onSelect && 'pt-8',
             )}
           />
         </div>

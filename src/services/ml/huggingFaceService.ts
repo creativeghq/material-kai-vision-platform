@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService, ServiceConfig } from '../base/BaseService';
 import { apiRegistry } from '../../config/apiConfig';
 
@@ -49,7 +50,7 @@ interface FeatureExtractionResult {
 
 export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   private apiKey: string | null = null;
-  
+
   // Recommended models for different tasks - corrected mappings
   private static readonly MODELS = {
     MATERIAL_CLASSIFICATION: 'google/vit-base-patch16-224', // Vision model for image classification
@@ -59,7 +60,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
     MATERIAL_DETECTION: 'facebook/detr-resnet-50', // Object detection model
     STYLE_ANALYSIS: 'openai/clip-vit-base-patch32', // CLIP for image-text understanding
     OCR_PROCESSING: 'microsoft/trocr-base-printed', // Correct for OCR
-    SENTIMENT_ANALYSIS: 'cardiffnlp/twitter-roberta-base-sentiment-latest' // Correct for sentiment
+    SENTIMENT_ANALYSIS: 'cardiffnlp/twitter-roberta-base-sentiment-latest', // Correct for sentiment
   };
 
   constructor(config: HuggingFaceServiceConfig) {
@@ -68,10 +69,10 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
 
   protected async doInitialize(): Promise<void> {
     // Try to get API key from config first, then from centralized config, then from edge function
-    this.apiKey = this.config.apiKey || 
+    this.apiKey = this.config.apiKey ||
                   await this.getApiKeyFromCentralizedConfig() ||
                   await this.getApiKeyFromEdgeFunction();
-    
+
     if (!this.apiKey) {
       throw new Error('HuggingFace API key not configured');
     }
@@ -87,9 +88,9 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ inputs: 'health check' })
+      body: JSON.stringify({ inputs: 'health check' }),
     });
 
     if (!response.ok) {
@@ -101,12 +102,12 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
     try {
       const apiRegistryInstance = apiRegistry;
       const hfConfig = apiRegistryInstance.getApiConfigByType('huggingface');
-      
+
       if (hfConfig) {
         const envConfig = hfConfig.environment[this.config.environment];
         return envConfig?.apiKey || null;
       }
-      
+
       return null;
     } catch (error) {
       console.warn('Could not get HuggingFace API key from centralized config:', error);
@@ -117,14 +118,14 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
   private async getApiKeyFromEdgeFunction(): Promise<string | null> {
     try {
       const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-        body: { action: 'get_api_key' }
+        body: { action: 'get_api_key' },
       });
-      
+
       if (error) {
         console.error('Error getting HF API key:', error);
         return null;
       }
-      
+
       return data?.apiKey || null;
     } catch (error) {
       console.error('Failed to get HF API key:', error);
@@ -167,7 +168,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
       return {
         features: result.features || result,
-        model
+        model,
       };
     }, 'extractImageFeatures');
   }
@@ -218,13 +219,13 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       }
       return imageData;
     }
-    
+
     if (imageData instanceof File) {
       // Validate file type
       if (!imageData.type.startsWith('image/')) {
         throw new Error(`Invalid file type: ${imageData.type}. Expected image file.`);
       }
-      
+
       // Convert File to base64
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -233,7 +234,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
         reader.readAsDataURL(imageData);
       });
     }
-    
+
     throw new Error('Invalid image input type. Expected string or File.');
   }
 
@@ -257,9 +258,9 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -273,14 +274,14 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
     if (Array.isArray(result)) {
       return result.map(item => ({
         label: item.label || item.class || 'unknown',
-        score: item.score || item.confidence || 0
+        score: item.score || item.confidence || 0,
       }));
     }
-    
+
     if (result.label && typeof result.score === 'number') {
       return [{ label: result.label, score: result.score }];
     }
-    
+
     return [];
   }
 
@@ -303,14 +304,14 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       timeout: 30000,
       retries: 3,
       rateLimit: {
-        requestsPerMinute: 60
+        requestsPerMinute: 60,
       },
       healthCheck: {
         enabled: true,
         interval: 300000, // 5 minutes
-        timeout: 10000
+        timeout: 10000,
       },
-      ...config
+      ...config,
     };
 
     return new HuggingFaceService(defaultConfig);

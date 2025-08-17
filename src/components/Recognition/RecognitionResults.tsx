@@ -1,8 +1,9 @@
 import React from 'react';
+import { Eye, Star, Download, Share2 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Eye, Star, Download, Share2 } from 'lucide-react';
 import { RecognitionResult } from '@/types/materials';
 
 interface RecognitionResultsProps {
@@ -10,9 +11,9 @@ interface RecognitionResultsProps {
   isLoading?: boolean;
 }
 
-export const RecognitionResults: React.FC<RecognitionResultsProps> = ({ 
-  results, 
-  isLoading = false 
+export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
+  results,
+  isLoading = false,
 }) => {
   if (isLoading) {
     return (
@@ -60,7 +61,7 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
             {results.length} material{results.length !== 1 ? 's' : ''} identified
           </Badge>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {results.map((result, index) => (
             <div
@@ -79,14 +80,14 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
               {/* Material Info */}
               <div className="space-y-2">
                 <h4 className="font-medium text-sm">{result.metadata?.detectedName || 'Unknown Material'}</h4>
-                
+
                 {/* Confidence Score */}
                 <div className="flex items-center justify-between">
                   <Badge
                     className={
-                      result.confidenceScore > 0.9 ? "bg-green-100 text-green-800 hover:bg-green-100/80" :
-                      result.confidenceScore > 0.7 ? "bg-secondary text-secondary-foreground hover:bg-secondary/80" :
-                      "border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                      result.confidenceScore > 0.9 ? 'bg-green-100 text-green-800 hover:bg-green-100/80' :
+                      result.confidenceScore > 0.7 ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' :
+                      'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
                     }
                   >
                     {Math.round(result.confidenceScore * 100)}% match
@@ -126,7 +127,7 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                     <span className="font-medium">Additional Properties Available</span>
                   </div>
                 )}
-                
+
                 {result.material && (
                   <div className="text-xs text-success mb-2">
                     <span className="font-medium">Material Data Available</span>

@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Loader2, Database, Brain, Zap, Upload, Settings, Rocket, ArrowLeft, Home } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,8 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Database, Brain, Zap, Upload, Settings, Rocket, ArrowLeft, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { ragService } from '@/services/ragService';
 
@@ -20,7 +21,7 @@ export const RAGManagementPanel: React.FC = () => {
     content: '',
     content_type: 'expert_knowledge' as const,
     tags: '',
-    source_url: ''
+    source_url: '',
   });
   const { toast } = useToast();
 
@@ -43,11 +44,11 @@ export const RAGManagementPanel: React.FC = () => {
       const result = await ragService.startCLIPFineTuning(
         `kai-clip-${Date.now()}`,
         undefined, // Include all categories
-        3 // epochs
+        3, // epochs
       );
 
       toast({
-        title: "CLIP Training Started",
+        title: 'CLIP Training Started',
         description: `Training job created: ${result.estimated_training_time}`,
       });
 
@@ -55,9 +56,9 @@ export const RAGManagementPanel: React.FC = () => {
     } catch (error) {
       console.error('Training error:', error);
       toast({
-        title: "Training Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Training Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsTraining(false);
@@ -70,11 +71,11 @@ export const RAGManagementPanel: React.FC = () => {
       const result = await ragService.startMaterialClassification(
         `kai-materialnet-${Date.now()}`,
         undefined, // Include all categories
-        5 // epochs
+        5, // epochs
       );
 
       toast({
-        title: "Material Classification Training Started",
+        title: 'Material Classification Training Started',
         description: `Training job created: ${result.estimated_training_time}`,
       });
 
@@ -82,9 +83,9 @@ export const RAGManagementPanel: React.FC = () => {
     } catch (error) {
       console.error('Training error:', error);
       toast({
-        title: "Training Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Training Failed',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsTraining(false);
@@ -94,9 +95,9 @@ export const RAGManagementPanel: React.FC = () => {
   const handleAddKnowledgeEntry = async () => {
     if (!newKnowledgeEntry.title || !newKnowledgeEntry.content) {
       toast({
-        title: "Missing Information",
-        description: "Title and content are required",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Title and content are required',
+        variant: 'destructive',
       });
       return;
     }
@@ -107,12 +108,12 @@ export const RAGManagementPanel: React.FC = () => {
         content: newKnowledgeEntry.content,
         content_type: newKnowledgeEntry.content_type,
         tags: newKnowledgeEntry.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-        source_url: newKnowledgeEntry.source_url || undefined
+        source_url: newKnowledgeEntry.source_url || undefined,
       });
 
       toast({
-        title: "Knowledge Entry Added",
-        description: "Successfully added to knowledge base"
+        title: 'Knowledge Entry Added',
+        description: 'Successfully added to knowledge base',
       });
 
       // Reset form
@@ -121,14 +122,14 @@ export const RAGManagementPanel: React.FC = () => {
         content: '',
         content_type: 'expert_knowledge',
         tags: '',
-        source_url: ''
+        source_url: '',
       });
     } catch (error) {
       console.error('Add knowledge error:', error);
       toast({
-        title: "Failed to Add Knowledge",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
+        title: 'Failed to Add Knowledge',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
       });
     }
   };
@@ -222,7 +223,7 @@ export const RAGManagementPanel: React.FC = () => {
                           <p>• Training Data: Materials + Knowledge Base</p>
                           <p>• Estimated Time: 2-4 hours</p>
                         </div>
-                        <Button 
+                        <Button
                           onClick={handleStartCLIPTraining}
                           disabled={isTraining}
                           className="w-full mt-4"
@@ -248,7 +249,7 @@ export const RAGManagementPanel: React.FC = () => {
                           <p>• Training Data: Material Images + Categories</p>
                           <p>• Estimated Time: 1-3 hours</p>
                         </div>
-                        <Button 
+                        <Button
                           onClick={handleStartMaterialClassification}
                           disabled={isTraining}
                           className="w-full mt-4"
@@ -318,8 +319,8 @@ export const RAGManagementPanel: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Content Type</label>
-                      <Select 
-                        value={newKnowledgeEntry.content_type} 
+                      <Select
+                        value={newKnowledgeEntry.content_type}
                         onValueChange={(value: any) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value }))}
                       >
                         <SelectTrigger>

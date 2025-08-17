@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
 import { TextureLoader } from 'three';
+
 import { Card } from '@/components/ui/card';
 
 interface ThreeJsViewerProps {
@@ -29,7 +30,7 @@ const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => {
 
 const ImageTexturedCube: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
   const texture = useLoader(TextureLoader, imageUrl);
-  
+
   return (
     <mesh position={[0, 0, 0]}>
       <boxGeometry args={[2, 2, 2]} />
@@ -38,21 +39,21 @@ const ImageTexturedCube: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
   );
 };
 
-const Scene: React.FC<{ 
-  imageUrl?: string; 
-  modelUrl?: string; 
-  meshUrl?: string; 
+const Scene: React.FC<{
+  imageUrl?: string;
+  modelUrl?: string;
+  meshUrl?: string;
 }> = ({ imageUrl, modelUrl, meshUrl: _meshUrl }) => {
   return (
     <>
       <PerspectiveCamera makeDefault fov={75} position={[0, 0, 5]} />
       <Environment preset="studio" />
-      
+
       {/* Enhanced lighting for 3D models */}
       <ambientLight intensity={0.6} />
       <directionalLight position={[10, 10, 5]} intensity={1.2} />
       <directionalLight position={[-10, -10, -5]} intensity={0.5} />
-      
+
       {/* Render NeRF model if available */}
       {modelUrl ? (
         <NeRFModel modelUrl={modelUrl} />
@@ -65,23 +66,23 @@ const Scene: React.FC<{
           <meshStandardMaterial color="hsl(210 40% 98%)" wireframe />
         </mesh>
       )}
-      
+
       {/* Floor plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
         <planeGeometry args={[10, 10]} />
         <meshStandardMaterial color="#6B7280" transparent opacity={0.3} />
       </mesh>
-      
+
       <OrbitControls enablePan enableZoom enableRotate />
     </>
   );
 };
 
-export const ThreeJsViewer: React.FC<ThreeJsViewerProps> = ({ 
-  imageUrl, 
+export const ThreeJsViewer: React.FC<ThreeJsViewerProps> = ({
+  imageUrl,
   modelUrl,
   meshUrl,
-  className = "h-96 w-full" 
+  className = 'h-96 w-full',
 }) => {
   return (
     <Card className={`${className} overflow-hidden`}>

@@ -60,26 +60,26 @@ export class MaterialEmbeddingSpace {
     materialId: string,
     crossModalFeatures: CrossModalFeatures,
     materialType: string,
-    properties: Record<string, any>
+    properties: Record<string, any>,
   ): MaterialEmbedding {
     // Project cross-modal features to embedding space
     const embedding = this.projectToEmbeddingSpace(crossModalFeatures);
-    
+
     const materialEmbedding: MaterialEmbedding = {
       id: materialId,
       embedding,
       materialType,
       properties,
       confidence: crossModalFeatures.crossModalSimilarity,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     this.embeddings.set(materialId, materialEmbedding);
     this.updateMaterialTypeIndex(materialId, materialType);
-    
+
     // Update embedding matrix for efficient batch operations
     this.updateEmbeddingMatrix();
-    
+
     return materialEmbedding;
   }
 
@@ -88,20 +88,20 @@ export class MaterialEmbeddingSpace {
    */
   private projectToEmbeddingSpace(features: CrossModalFeatures): Float32Array {
     const embedding = new Float32Array(this.config.embeddingDim);
-    
+
     // Weighted combination of multi-modal features
     const sourceFeatures = [
       { features: features.visualFeatures, weight: 0.3 },
       { features: features.spectralFeatures, weight: 0.25 },
       { features: features.thermalFeatures, weight: 0.2 },
       { features: features.textualFeatures, weight: 0.15 },
-      { features: features.fusedFeatures, weight: 0.1 }
+      { features: features.fusedFeatures, weight: 0.1 },
     ];
 
     let offset = 0;
     sourceFeatures.forEach(({ features, weight }) => {
       const projectionSize = Math.floor(this.config.embeddingDim * weight);
-      
+
       for (let i = 0; i < Math.min(features.length, projectionSize); i++) {
         if (offset + i < embedding.length) {
           embedding[offset + i] = features[i];
@@ -119,11 +119,11 @@ export class MaterialEmbeddingSpace {
   findSimilarMaterials(
     queryEmbedding: Float32Array,
     topK: number = 10,
-    materialTypeFilter?: string
+    materialTypeFilter?: string,
   ): SimilarityResult[] {
     const results: SimilarityResult[] = [];
-    
-    const candidateIds = materialTypeFilter 
+
+    const candidateIds = materialTypeFilter
       ? this.materialTypeIndex.get(materialTypeFilter) || []
       : Array.from(this.embeddings.keys());
 
@@ -138,7 +138,7 @@ export class MaterialEmbeddingSpace {
           similarity,
           materialType: material.materialType,
           properties: material.properties,
-          distance
+          distance,
         });
       }
     });
@@ -178,17 +178,17 @@ export class MaterialEmbeddingSpace {
   private performKMeansClustering(embeddings: MaterialEmbedding[], k: number): ClusterResult[] {
     const maxIterations = 100;
     const tolerance = 1e-4;
-    
+
     // Initialize centroids randomly
     let centroids = this.initializeRandomCentroids(k);
     let assignments = new Array(embeddings.length).fill(0);
-    
+
     for (let iter = 0; iter < maxIterations; iter++) {
       // Assign points to nearest centroids
       const newAssignments = embeddings.map((embedding, index) => {
         let bestCluster = 0;
         let bestDistance = Infinity;
-        
+
         centroids.forEach((centroid, clusterIndex) => {
           const distance = this.computeEuclideanDistance(embedding.embedding, centroid);
           if (distance < bestDistance) {
@@ -196,20 +196,20 @@ export class MaterialEmbeddingSpace {
             bestCluster = clusterIndex;
           }
         });
-        
+
         return bestCluster;
       });
-      
+
       // Check convergence
       if (this.arraysEqual(assignments, newAssignments)) {
         break;
       }
-      
+
       assignments = newAssignments;
-      
+
       // Update centroids
       const newCentroids = this.updateCentroids(embeddings, assignments, k);
-      
+
       // Check centroid convergence
       let converged = true;
       for (let i = 0; i < k; i++) {
@@ -219,11 +219,11 @@ export class MaterialEmbeddingSpace {
           break;
         }
       }
-      
+
       centroids = newCentroids;
       if (converged) break;
     }
-    
+
     // Build cluster results
     return this.buildClusterResults(embeddings, assignments, centroids, k);
   }
@@ -235,20 +235,20 @@ export class MaterialEmbeddingSpace {
     // Start with each point as its own cluster
     let clusters = embeddings.map((embedding, index) => ({
       points: [index],
-      centroid: new Float32Array(embedding.embedding)
+      centroid: new Float32Array(embedding.embedding),
     }));
-    
+
     // Merge closest clusters until we have k clusters
     while (clusters.length > k) {
       let minDistance = Infinity;
       let mergeIndices = [0, 1];
-      
+
       // Find closest pair of clusters
       for (let i = 0; i < clusters.length; i++) {
         for (let j = i + 1; j < clusters.length; j++) {
           const distance = this.computeEuclideanDistance(
             clusters[i].centroid,
-            clusters[j].centroid
+            clusters[j].centroid,
           );
           if (distance < minDistance) {
             minDistance = distance;
@@ -256,22 +256,22 @@ export class MaterialEmbeddingSpace {
           }
         }
       }
-      
+
       // Merge closest clusters
       const [i, j] = mergeIndices;
       const mergedPoints = [...clusters[i].points, ...clusters[j].points];
       const mergedCentroid = this.computeClusterCentroid(
-        mergedPoints.map(pointIndex => embeddings[pointIndex])
+        mergedPoints.map(pointIndex => embeddings[pointIndex]),
       );
-      
+
       clusters = [
         ...clusters.slice(0, i),
         ...clusters.slice(i + 1, j),
         ...clusters.slice(j + 1),
-        { points: mergedPoints, centroid: mergedCentroid }
+        { points: mergedPoints, centroid: mergedCentroid },
       ];
     }
-    
+
     // Convert to cluster results
     return clusters.map((cluster, index) => ({
       clusterId: index,
@@ -279,9 +279,9 @@ export class MaterialEmbeddingSpace {
       centroid: cluster.centroid,
       coherence: this.computeClusterCoherence(
         cluster.points.map(pointIndex => embeddings[pointIndex]),
-        cluster.centroid
+        cluster.centroid,
       ),
-      size: cluster.points.length
+      size: cluster.points.length,
     }));
   }
 
@@ -291,50 +291,50 @@ export class MaterialEmbeddingSpace {
   private performDBSCANClustering(embeddings: MaterialEmbedding[]): ClusterResult[] {
     const eps = 0.3; // Neighborhood radius
     const minPts = 3; // Minimum points for core point
-    
+
     const labels = new Array(embeddings.length).fill(-1); // -1 = noise
     let clusterId = 0;
-    
+
     for (let i = 0; i < embeddings.length; i++) {
       if (labels[i] !== -1) continue; // Already processed
-      
+
       const neighbors = this.findNeighbors(embeddings, i, eps);
-      
+
       if (neighbors.length < minPts) {
         labels[i] = -1; // Mark as noise
         continue;
       }
-      
+
       // Start new cluster
       labels[i] = clusterId;
       const seedSet = [...neighbors];
-      
+
       let j = 0;
       while (j < seedSet.length) {
         const q = seedSet[j];
-        
+
         if (labels[q] === -1) {
           labels[q] = clusterId; // Change noise to border point
         }
-        
+
         if (labels[q] !== -1) {
           j++;
           continue; // Already processed
         }
-        
+
         labels[q] = clusterId;
         const qNeighbors = this.findNeighbors(embeddings, q, eps);
-        
+
         if (qNeighbors.length >= minPts) {
           seedSet.push(...qNeighbors);
         }
-        
+
         j++;
       }
-      
+
       clusterId++;
     }
-    
+
     // Build cluster results
     const clusterMap = new Map<number, number[]>();
     labels.forEach((label, index) => {
@@ -345,17 +345,17 @@ export class MaterialEmbeddingSpace {
         clusterMap.get(label)!.push(index);
       }
     });
-    
+
     return Array.from(clusterMap.entries()).map(([id, indices]) => {
       const clusterEmbeddings = indices.map(i => embeddings[i]);
       const centroid = this.computeClusterCentroid(clusterEmbeddings);
-      
+
       return {
         clusterId: id,
         materials: indices.map(i => embeddings[i].id),
         centroid,
         coherence: this.computeClusterCoherence(clusterEmbeddings, centroid),
-        size: indices.length
+        size: indices.length,
       };
     });
   }
@@ -365,7 +365,7 @@ export class MaterialEmbeddingSpace {
     if (!this.materialTypeIndex.has(materialType)) {
       this.materialTypeIndex.set(materialType, []);
     }
-    
+
     const typeList = this.materialTypeIndex.get(materialType)!;
     if (!typeList.includes(materialId)) {
       typeList.push(materialId);
@@ -375,7 +375,7 @@ export class MaterialEmbeddingSpace {
   private updateEmbeddingMatrix(): void {
     const embeddings = Array.from(this.embeddings.values());
     this.embeddingMatrix = new Float32Array(embeddings.length * this.config.embeddingDim);
-    
+
     embeddings.forEach((embedding, index) => {
       const offset = index * this.config.embeddingDim;
       for (let i = 0; i < this.config.embeddingDim; i++) {
@@ -394,13 +394,13 @@ export class MaterialEmbeddingSpace {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
-    
+
     for (let i = 0; i < minLength; i++) {
       dotProduct += a[i] * b[i];
       normA += a[i] * a[i];
       normB += b[i] * b[i];
     }
-    
+
     const denominator = Math.sqrt(normA) * Math.sqrt(normB);
     return denominator > 0 ? dotProduct / denominator : 0;
   }
@@ -408,18 +408,18 @@ export class MaterialEmbeddingSpace {
   private computeEuclideanDistance(a: Float32Array, b: Float32Array): number {
     const minLength = Math.min(a.length, b.length);
     let sum = 0;
-    
+
     for (let i = 0; i < minLength; i++) {
       const diff = a[i] - b[i];
       sum += diff * diff;
     }
-    
+
     return Math.sqrt(sum);
   }
 
   private initializeRandomCentroids(k: number): Float32Array[] {
     const centroids: Float32Array[] = [];
-    
+
     for (let i = 0; i < k; i++) {
       const centroid = new Float32Array(this.config.embeddingDim);
       for (let j = 0; j < this.config.embeddingDim; j++) {
@@ -427,17 +427,17 @@ export class MaterialEmbeddingSpace {
       }
       centroids.push(this.normalizeEmbedding(centroid));
     }
-    
+
     return centroids;
   }
 
   private updateCentroids(
     embeddings: MaterialEmbedding[],
     assignments: number[],
-    k: number
+    k: number,
   ): Float32Array[] {
     const centroids: Float32Array[] = [];
-    
+
     for (let i = 0; i < k; i++) {
       const clusterPoints = embeddings.filter((_, index) => assignments[index] === i);
       if (clusterPoints.length > 0) {
@@ -447,7 +447,7 @@ export class MaterialEmbeddingSpace {
         centroids.push(this.initializeRandomCentroids(1)[0]);
       }
     }
-    
+
     return centroids;
   }
 
@@ -455,32 +455,32 @@ export class MaterialEmbeddingSpace {
     if (embeddings.length === 0) {
       return new Float32Array(this.config.embeddingDim);
     }
-    
+
     const centroid = new Float32Array(this.config.embeddingDim);
-    
+
     embeddings.forEach(embedding => {
       for (let i = 0; i < centroid.length; i++) {
         centroid[i] += embedding.embedding[i];
       }
     });
-    
+
     for (let i = 0; i < centroid.length; i++) {
       centroid[i] /= embeddings.length;
     }
-    
+
     return this.normalizeEmbedding(centroid);
   }
 
   private computeClusterCoherence(
     embeddings: MaterialEmbedding[],
-    centroid: Float32Array
+    centroid: Float32Array,
   ): number {
     if (embeddings.length === 0) return 0;
-    
+
     const distances = embeddings.map(embedding =>
-      this.computeEuclideanDistance(embedding.embedding, centroid)
+      this.computeEuclideanDistance(embedding.embedding, centroid),
     );
-    
+
     const avgDistance = distances.reduce((sum, dist) => sum + dist, 0) / distances.length;
     return Math.max(0, 1 - avgDistance); // Convert distance to coherence score
   }
@@ -488,11 +488,11 @@ export class MaterialEmbeddingSpace {
   private findNeighbors(
     embeddings: MaterialEmbedding[],
     pointIndex: number,
-    eps: number
+    eps: number,
   ): number[] {
     const neighbors: number[] = [];
     const point = embeddings[pointIndex];
-    
+
     embeddings.forEach((other, index) => {
       if (index !== pointIndex) {
         const distance = this.computeEuclideanDistance(point.embedding, other.embedding);
@@ -501,7 +501,7 @@ export class MaterialEmbeddingSpace {
         }
       }
     });
-    
+
     return neighbors;
   }
 
@@ -509,29 +509,29 @@ export class MaterialEmbeddingSpace {
     embeddings: MaterialEmbedding[],
     assignments: number[],
     centroids: Float32Array[],
-    k: number
+    k: number,
   ): ClusterResult[] {
     const results: ClusterResult[] = [];
-    
+
     for (let i = 0; i < k; i++) {
       const clusterMaterials = embeddings
         .filter((_, index) => assignments[index] === i)
         .map(embedding => embedding.id);
-      
+
       if (clusterMaterials.length > 0) {
         const clusterEmbeddings = embeddings.filter((_, index) => assignments[index] === i);
         const coherence = this.computeClusterCoherence(clusterEmbeddings, centroids[i]);
-        
+
         results.push({
           clusterId: i,
           materials: clusterMaterials,
           centroid: centroids[i],
           coherence,
-          size: clusterMaterials.length
+          size: clusterMaterials.length,
         });
       }
     }
-    
+
     return results;
   }
 
@@ -554,9 +554,9 @@ export class MaterialEmbeddingSpace {
       embeddingDimension: this.config.embeddingDim,
       materialTypes: Array.from(this.materialTypeIndex.keys()),
       clusters: this.clusters.length,
-      averageClusterSize: this.clusters.length > 0 
-        ? this.clusters.reduce((sum, cluster) => sum + cluster.size, 0) / this.clusters.length 
-        : 0
+      averageClusterSize: this.clusters.length > 0
+        ? this.clusters.reduce((sum, cluster) => sum + cluster.size, 0) / this.clusters.length
+        : 0,
     };
   }
 }

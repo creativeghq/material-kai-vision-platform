@@ -1,7 +1,8 @@
+import { BaseService, ServiceConfig } from '../base/BaseService';
+
 import { MLResult } from './types';
 import { MaterialAnalyzerService, MaterialAnalysisOptions, AdvancedMaterialAnalysisResult } from './materialAnalyzer';
 import { ServerMLService } from './serverMLService';
-import { BaseService, ServiceConfig } from '../base/BaseService';
 
 interface HybridMaterialPropertiesServiceConfig extends ServiceConfig {
   preferServerForComprehensive: boolean;
@@ -31,19 +32,19 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
     // Initialize client analyzer
     await this.executeOperation(
       () => this.initializeClientAnalyzer(),
-      'initialize-client-analyzer'
+      'initialize-client-analyzer',
     );
 
     // Initialize server ML service
     await this.executeOperation(
       () => this.initializeServerML(),
-      'initialize-server-ml'
+      'initialize-server-ml',
     );
 
     // Verify both services are functional
     await this.executeOperation(
       () => this.verifyServicesHealth(),
-      'verify-services-health'
+      'verify-services-health',
     );
   }
 
@@ -67,9 +68,9 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
       enableAdvancedAnalysis: true,
       knowledgeBaseSize: 1000,
       defaultAnalysisDepth: 'standard' as const,
-      enableVisualAnalysis: true
+      enableVisualAnalysis: true,
     };
-    
+
     this.clientAnalyzer = MaterialAnalyzerService.createInstance(analyzerConfig);
     await this.clientAnalyzer.initialize();
   }
@@ -90,7 +91,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
 
   async analyzeAdvancedProperties(
     imageFile: File,
-    options: MaterialAnalysisOptions = { analysisDepth: 'standard', focusAreas: [] }
+    options: MaterialAnalysisOptions = { analysisDepth: 'standard', focusAreas: [] },
   ): Promise<MLResult> {
     return this.executeOperation(async () => {
       const startTime = performance.now();
@@ -110,9 +111,9 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
       try {
         // Determine processing strategy
         const useServer = this.shouldUseServerAnalysis(options, imageFile);
-        
+
         let result: MLResult;
-        
+
         if (useServer) {
           if (this.config.enablePerformanceLogging) {
             console.log('HybridMaterialProperties: Using server-side advanced material properties analysis');
@@ -135,7 +136,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
           const cacheKey = this.generateCacheKey(imageFile, options);
           this.analysisCache.set(cacheKey, {
             result,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
         }
 
@@ -147,7 +148,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
 
       } catch (error) {
         console.error('HybridMaterialProperties: Analysis failed:', error);
-        
+
         // Fallback to basic client analysis if enabled
         if (this.config.enableFallbackToClient) {
           try {
@@ -156,9 +157,9 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
             }
             const fallbackResult = await this.performClientAnalysis(imageFile, {
               ...options,
-              analysisDepth: 'basic'
+              analysisDepth: 'basic',
             });
-            
+
             fallbackResult.processingTime = performance.now() - startTime;
             fallbackResult.provider = 'hybrid-fallback';
             return fallbackResult;
@@ -171,7 +172,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
           success: false,
           error: 'All material properties analysis methods failed',
           processingTime: performance.now() - startTime,
-          provider: 'hybrid-error'
+          provider: 'hybrid-error',
         };
       }
     }, 'analyze-advanced-properties');
@@ -200,8 +201,8 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
     }
 
     // Use server for specialized focus areas
-    if (options.focusAreas?.some(area => 
-      this.config.specializedFocusAreas.includes(area)
+    if (options.focusAreas?.some(area =>
+      this.config.specializedFocusAreas.includes(area),
     )) {
       return true;
     }
@@ -257,8 +258,8 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
         'Fallback Support',
         'Quality Assessment',
         'Performance Optimization',
-        'Result Caching'
-      ]
+        'Result Caching',
+      ],
     };
   }
 
@@ -274,7 +275,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
    */
   getCacheStats(): { size: number; hitRate?: number } {
     return {
-      size: this.analysisCache.size
+      size: this.analysisCache.size,
     };
   }
 
@@ -283,7 +284,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
    */
   async forceServerAnalysis(
     imageFile: File,
-    options: MaterialAnalysisOptions = { analysisDepth: 'comprehensive', focusAreas: [] }
+    options: MaterialAnalysisOptions = { analysisDepth: 'comprehensive', focusAreas: [] },
   ): Promise<MLResult> {
     return this.executeOperation(async () => {
       if (!this.serverML) {
@@ -299,7 +300,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
    */
   async forceClientAnalysis(
     imageFile: File,
-    options: MaterialAnalysisOptions = { analysisDepth: 'standard', focusAreas: [] }
+    options: MaterialAnalysisOptions = { analysisDepth: 'standard', focusAreas: [] },
   ): Promise<MLResult> {
     return this.executeOperation(async () => {
       if (!this.clientAnalyzer) {
@@ -331,8 +332,8 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
       specializedFocusAreas: [
         'chemical-composition',
         'compliance-standards',
-        'environmental-impact'
-      ]
+        'environmental-impact',
+      ],
     };
 
     const finalConfig = { ...defaultConfig, ...config };

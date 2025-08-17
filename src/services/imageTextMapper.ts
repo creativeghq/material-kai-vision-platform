@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+
 import type { ImageElement, TextBlock, DOMElement } from './htmlDOMAnalyzer';
 import type { DocumentChunk } from './layoutAwareChunker';
 import { HybridMLService } from './ml/hybridMLService';
@@ -97,13 +98,13 @@ export class ImageTextMapper {
     images: ImageElement[],
     textBlocks: TextBlock[],
     chunks: DocumentChunk[],
-    options: Partial<MappingOptions> = {}
+    options: Partial<MappingOptions> = {},
   ): Promise<MappingResult> {
     const startTime = Date.now();
-    
+
     try {
       console.log(`Starting image-text mapping for ${images.length} images and ${textBlocks.length} text blocks`);
-      
+
       // Set default options
       const mappingOptions: MappingOptions = {
         proximityThreshold: 200, // pixels
@@ -112,51 +113,51 @@ export class ImageTextMapper {
         analyzeMaterials: true,
         detectObjects: true,
         contextWindow: 3,
-        ...options
+        ...options,
       };
-      
+
       // Analyze images for content and features
       const imageAnalyses = await this.analyzeImages(images, mappingOptions);
-      
+
       // Create spatial proximity mappings
       const proximityAssociations = await this.createProximityMappings(
         images,
         textBlocks,
-        mappingOptions
+        mappingOptions,
       );
-      
+
       // Create semantic associations
       const semanticAssociations = await this.createSemanticMappings(
         images,
         textBlocks,
         imageAnalyses,
-        mappingOptions
+        mappingOptions,
       );
-      
+
       // Create caption and reference mappings
       const captionAssociations = await this.createCaptionMappings(
         images,
         textBlocks,
-        mappingOptions
+        mappingOptions,
       );
-      
+
       // Combine and deduplicate associations
       const allAssociations = [
         ...proximityAssociations,
         ...semanticAssociations,
-        ...captionAssociations
+        ...captionAssociations,
       ];
-      
+
       const associations = this.deduplicateAssociations(allAssociations);
-      
+
       // Associate with chunks
       await this.associateWithChunks(associations, chunks);
-      
+
       // Store associations in database
       await this.storeAssociations(associations);
-      
+
       const processingTime = Date.now() - startTime;
-      
+
       const result: MappingResult = {
         associations,
         imageAnalyses,
@@ -170,13 +171,13 @@ export class ImageTextMapper {
           materialAnalysisEnabled: mappingOptions.analyzeMaterials,
           proximityMappings: proximityAssociations.length,
           semanticMappings: semanticAssociations.length,
-          captionMappings: captionAssociations.length
-        }
+          captionMappings: captionAssociations.length,
+        },
       };
-      
+
       console.log(`Image-text mapping completed: ${associations.length} associations created in ${processingTime}ms`);
       return result;
-      
+
     } catch (error) {
       console.error('Image-text mapping error:', error);
       throw new Error(`Mapping failed: ${error.message}`);
@@ -188,10 +189,10 @@ export class ImageTextMapper {
    */
   private async analyzeImages(
     images: ImageElement[],
-    options: MappingOptions
+    options: MappingOptions,
   ): Promise<ImageAnalysisResult[]> {
     const analyses: ImageAnalysisResult[] = [];
-    
+
     for (const image of images) {
       try {
         const analysis: ImageAnalysisResult = {
@@ -202,41 +203,41 @@ export class ImageTextMapper {
           colorAnalysis: {
             dominantColors: [],
             colorScheme: 'neutral',
-            materialFinish: 'unknown'
+            materialFinish: 'unknown',
           },
           qualityMetrics: {
             resolution: { width: 200, height: 150 },
             clarity: 0.8,
             lighting: 0.7,
-            focus: 0.9
+            focus: 0.9,
           },
-          confidence: 0.8
+          confidence: 0.8,
         };
-        
+
         // Extract text from image using OCR
         if (options.includeOCR) {
           analysis.extractedText = await this.extractTextFromImage(image);
         }
-        
+
         // Analyze material properties
         if (options.analyzeMaterials) {
           const materialAnalysis = await this.analyzeMaterialProperties(image);
           analysis.materialTypes = materialAnalysis.materialTypes;
           analysis.colorAnalysis = materialAnalysis.colorAnalysis;
         }
-        
+
         // Detect objects and features
         if (options.detectObjects) {
           const objectAnalysis = await this.detectObjectsAndFeatures(image);
           analysis.detectedObjects = objectAnalysis.objects;
           analysis.technicalFeatures = objectAnalysis.features;
         }
-        
+
         analyses.push(analysis);
-        
+
       } catch (error) {
         console.warn(`Failed to analyze image ${image.id}:`, error);
-        
+
         // Create minimal analysis result
         analyses.push({
           imageId: image.id,
@@ -246,19 +247,19 @@ export class ImageTextMapper {
           colorAnalysis: {
             dominantColors: [],
             colorScheme: 'neutral',
-            materialFinish: 'unknown'
+            materialFinish: 'unknown',
           },
           qualityMetrics: {
             resolution: { width: 200, height: 150 },
             clarity: 0.5,
             lighting: 0.5,
-            focus: 0.5
+            focus: 0.5,
           },
-          confidence: 0.3
+          confidence: 0.3,
         });
       }
     }
-    
+
     return analyses;
   }
 
@@ -268,17 +269,17 @@ export class ImageTextMapper {
   private async createProximityMappings(
     images: ImageElement[],
     textBlocks: TextBlock[],
-    options: MappingOptions
+    options: MappingOptions,
   ): Promise<ImageTextAssociation[]> {
     const associations: ImageTextAssociation[] = [];
-    
+
     for (const image of images) {
       // Find nearby text blocks
       const nearbyBlocks = textBlocks.filter(block => {
         const distance = this.calculateSpatialDistance(image.bbox, block.bbox);
         return distance <= options.proximityThreshold;
       });
-      
+
       if (nearbyBlocks.length > 0) {
         // Sort by proximity
         nearbyBlocks.sort((a, b) => {
@@ -286,20 +287,20 @@ export class ImageTextMapper {
           const distB = this.calculateSpatialDistance(image.bbox, b.bbox);
           return distA - distB;
         });
-        
+
         // Create association with closest blocks
         const closestBlocks = nearbyBlocks.slice(0, options.contextWindow);
         const association = await this.createAssociation(
           image,
           closestBlocks,
           'proximity',
-          options
+          options,
         );
-        
+
         associations.push(association);
       }
     }
-    
+
     return associations;
   }
 
@@ -310,34 +311,34 @@ export class ImageTextMapper {
     images: ImageElement[],
     textBlocks: TextBlock[],
     imageAnalyses: ImageAnalysisResult[],
-    options: MappingOptions
+    options: MappingOptions,
   ): Promise<ImageTextAssociation[]> {
     const associations: ImageTextAssociation[] = [];
-    
+
     for (const image of images) {
       const imageAnalysis = imageAnalyses.find(a => a.imageId === image.id);
       if (!imageAnalysis) continue;
-      
+
       // Find semantically related text blocks
       const relatedBlocks = await this.findSemanticMatches(
         image,
         imageAnalysis,
         textBlocks,
-        options
+        options,
       );
-      
+
       if (relatedBlocks.length > 0) {
         const association = await this.createAssociation(
           image,
           relatedBlocks,
           'contextual',
-          options
+          options,
         );
-        
+
         associations.push(association);
       }
     }
-    
+
     return associations;
   }
 
@@ -347,47 +348,47 @@ export class ImageTextMapper {
   private async createCaptionMappings(
     images: ImageElement[],
     textBlocks: TextBlock[],
-    options: MappingOptions
+    options: MappingOptions,
   ): Promise<ImageTextAssociation[]> {
     const associations: ImageTextAssociation[] = [];
-    
+
     for (const image of images) {
       // Look for explicit captions
       if (image.caption) {
         const captionBlocks = textBlocks.filter(block =>
           block.text.toLowerCase().includes(image.caption!.toLowerCase()) ||
-          this.calculateTextSimilarity(block.text, image.caption!) > 0.8
+          this.calculateTextSimilarity(block.text, image.caption!) > 0.8,
         );
-        
+
         if (captionBlocks.length > 0) {
           const association = await this.createAssociation(
             image,
             captionBlocks,
             'caption',
-            options
+            options,
           );
-          
+
           associations.push(association);
         }
       }
-      
+
       // Look for figure references
       const figureReferences = textBlocks.filter(block =>
-        this.containsFigureReference(block.text, image)
+        this.containsFigureReference(block.text, image),
       );
-      
+
       if (figureReferences.length > 0) {
         const association = await this.createAssociation(
           image,
           figureReferences,
           'reference',
-          options
+          options,
         );
-        
+
         associations.push(association);
       }
     }
-    
+
     return associations;
   }
 
@@ -398,10 +399,10 @@ export class ImageTextMapper {
     image: ImageElement,
     textBlocks: TextBlock[],
     type: ImageTextAssociation['associationType'],
-    options: MappingOptions
+    options: MappingOptions,
   ): Promise<ImageTextAssociation> {
     const associationId = this.generateAssociationId();
-    
+
     // Calculate confidence based on association type and quality
     let confidence = 0.5;
     switch (type) {
@@ -411,28 +412,28 @@ export class ImageTextMapper {
       case 'contextual': confidence = 0.8; break;
       case 'embedded': confidence = 0.6; break;
     }
-    
+
     // Calculate proximity score
-    const proximityScore = textBlocks.length > 0 
-      ? 1 / (1 + Math.min(...textBlocks.map(block => 
-          this.calculateSpatialDistance(image.bbox, block.bbox)
+    const proximityScore = textBlocks.length > 0
+      ? 1 / (1 + Math.min(...textBlocks.map(block =>
+          this.calculateSpatialDistance(image.bbox, block.bbox),
         )) / 100)
       : 0;
-    
+
     // Calculate semantic score
     const semanticScore = await this.calculateSemanticScore(image, textBlocks);
-    
+
     // Determine spatial relationship
     const spatialRelationship = textBlocks.length > 0
       ? this.determineSpatialRelationship(image.bbox, textBlocks[0].bbox)
       : { direction: 'overlapping' as const, distance: 0, alignment: 'contained' as const };
-    
+
     // Extract metadata
     const combinedText = textBlocks.map(b => b.text).join(' ');
     const keywords = this.extractKeywords(combinedText);
     const materialReferences = this.extractMaterialReferences(combinedText);
     const technicalTerms = this.extractTechnicalTerms(combinedText);
-    
+
     return {
       id: associationId,
       imageId: image.id,
@@ -448,9 +449,9 @@ export class ImageTextMapper {
         textContext: combinedText.substring(0, 200),
         keywords,
         materialReferences,
-        technicalTerms
+        technicalTerms,
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
   }
 
@@ -463,8 +464,8 @@ export class ImageTextMapper {
       const response = await fetch(image.src);
       const blob = await response.blob();
       const file = new File([blob], 'image.jpg', { type: blob.type });
-      
-      return "OCR temporarily disabled"; // Temporarily return placeholder
+
+      return 'OCR temporarily disabled'; // Temporarily return placeholder
     } catch (error) {
       console.warn(`OCR failed for image ${image.id}:`, error);
       return undefined;
@@ -483,16 +484,16 @@ export class ImageTextMapper {
       const response = await fetch(image.src);
       const blob = await response.blob();
       const file = new File([blob], 'image.jpg', { type: blob.type });
-      
+
       const analysisResult = await this.mlService.analyzeMaterials([file]);
-      
+
       return {
         materialTypes: (analysisResult as any).results?.map((r: any) => r.label) || [],
         colorAnalysis: {
           dominantColors: ['#8B4513', '#D2B48C'], // Mock colors
           colorScheme: 'warm',
-          materialFinish: 'matte'
-        }
+          materialFinish: 'matte',
+        },
       };
     } catch (error) {
       console.warn(`Material analysis failed for image ${image.id}:`, error);
@@ -501,8 +502,8 @@ export class ImageTextMapper {
         colorAnalysis: {
           dominantColors: [],
           colorScheme: 'neutral',
-          materialFinish: 'unknown'
-        }
+          materialFinish: 'unknown',
+        },
       };
     }
   }
@@ -517,10 +518,10 @@ export class ImageTextMapper {
     // Mock implementation - in production would use computer vision API
     const mockObjects = ['tile', 'surface', 'texture', 'pattern'];
     const mockFeatures = ['smooth', 'textured', 'glossy', 'geometric'];
-    
+
     return {
       objects: mockObjects.slice(0, Math.floor(Math.random() * 3) + 1),
-      features: mockFeatures.slice(0, Math.floor(Math.random() * 2) + 1)
+      features: mockFeatures.slice(0, Math.floor(Math.random() * 2) + 1),
     };
   }
 
@@ -531,47 +532,47 @@ export class ImageTextMapper {
     image: ImageElement,
     imageAnalysis: ImageAnalysisResult,
     textBlocks: TextBlock[],
-    options: MappingOptions
+    options: MappingOptions,
   ): Promise<TextBlock[]> {
     const matches: Array<{ block: TextBlock; score: number }> = [];
-    
+
     // Create search terms from image analysis
     const searchTerms = [
       ...imageAnalysis.materialTypes,
       ...imageAnalysis.detectedObjects,
       ...imageAnalysis.technicalFeatures,
       image.alt,
-      image.caption
+      image.caption,
     ].filter(Boolean);
-    
+
     for (const block of textBlocks) {
       let score = 0;
       const blockText = block.text.toLowerCase();
-      
+
       // Check for term matches
       for (const term of searchTerms) {
         if (blockText.includes(term!.toLowerCase())) {
           score += 0.3;
         }
       }
-      
+
       // Check semantic tags
       for (const tag of block.semanticTags) {
         if (searchTerms.some(term => term?.toLowerCase().includes(tag.toLowerCase()))) {
           score += 0.2;
         }
       }
-      
+
       // Check for material-related content
       if (this.containsMaterialContent(blockText)) {
         score += 0.1;
       }
-      
+
       if (score >= options.semanticThreshold) {
         matches.push({ block, score });
       }
     }
-    
+
     // Sort by score and return top matches
     return matches
       .sort((a, b) => b.score - a.score)
@@ -584,20 +585,20 @@ export class ImageTextMapper {
    */
   private calculateSpatialDistance(
     bbox1: { x: number; y: number; width: number; height: number },
-    bbox2: { x: number; y: number; width: number; height: number }
+    bbox2: { x: number; y: number; width: number; height: number },
   ): number {
     const center1 = {
       x: bbox1.x + bbox1.width / 2,
-      y: bbox1.y + bbox1.height / 2
+      y: bbox1.y + bbox1.height / 2,
     };
     const center2 = {
       x: bbox2.x + bbox2.width / 2,
-      y: bbox2.y + bbox2.height / 2
+      y: bbox2.y + bbox2.height / 2,
     };
-    
+
     return Math.sqrt(
-      Math.pow(center2.x - center1.x, 2) + 
-      Math.pow(center2.y - center1.y, 2)
+      Math.pow(center2.x - center1.x, 2) +
+      Math.pow(center2.y - center1.y, 2),
     );
   }
 
@@ -607,10 +608,10 @@ export class ImageTextMapper {
   private calculateTextSimilarity(text1: string, text2: string): number {
     const words1 = new Set(text1.toLowerCase().split(/\s+/));
     const words2 = new Set(text2.toLowerCase().split(/\s+/));
-    
+
     const intersection = new Set([...words1].filter(x => words2.has(x)));
     const union = new Set([...words1, ...words2]);
-    
+
     return intersection.size / union.size;
   }
 
@@ -623,9 +624,9 @@ export class ImageTextMapper {
       /fig\.\s*\d+/i,
       /image\s+\d+/i,
       /photo\s+\d+/i,
-      /diagram\s+\d+/i
+      /diagram\s+\d+/i,
     ];
-    
+
     return figurePatterns.some(pattern => pattern.test(text));
   }
 
@@ -634,12 +635,12 @@ export class ImageTextMapper {
    */
   private async calculateSemanticScore(
     image: ImageElement,
-    textBlocks: TextBlock[]
+    textBlocks: TextBlock[],
   ): Promise<number> {
     // Simplified semantic scoring
     const combinedText = textBlocks.map(b => b.text).join(' ').toLowerCase();
     const imageTerms = [image.alt, image.caption].filter(Boolean).join(' ').toLowerCase();
-    
+
     return this.calculateTextSimilarity(combinedText, imageTerms);
   }
 
@@ -648,32 +649,32 @@ export class ImageTextMapper {
    */
   private determineSpatialRelationship(
     imageBbox: { x: number; y: number; width: number; height: number },
-    textBbox: { x: number; y: number; width: number; height: number }
+    textBbox: { x: number; y: number; width: number; height: number },
   ): ImageTextAssociation['spatialRelationship'] {
     const imageCenter = {
       x: imageBbox.x + imageBbox.width / 2,
-      y: imageBbox.y + imageBbox.height / 2
+      y: imageBbox.y + imageBbox.height / 2,
     };
     const textCenter = {
       x: textBbox.x + textBbox.width / 2,
-      y: textBbox.y + textBbox.height / 2
+      y: textBbox.y + textBbox.height / 2,
     };
-    
+
     const distance = Math.sqrt(
-      Math.pow(textCenter.x - imageCenter.x, 2) + 
-      Math.pow(textCenter.y - imageCenter.y, 2)
+      Math.pow(textCenter.x - imageCenter.x, 2) +
+      Math.pow(textCenter.y - imageCenter.y, 2),
     );
-    
+
     let direction: ImageTextAssociation['spatialRelationship']['direction'];
-    
+
     if (Math.abs(textCenter.y - imageCenter.y) > Math.abs(textCenter.x - imageCenter.x)) {
       direction = textCenter.y > imageCenter.y ? 'below' : 'above';
     } else {
       direction = textCenter.x > imageCenter.x ? 'right' : 'left';
     }
-    
+
     const alignment = Math.abs(textCenter.x - imageCenter.x) < 50 ? 'aligned' : 'offset';
-    
+
     return { direction, distance, alignment };
   }
 
@@ -683,7 +684,7 @@ export class ImageTextMapper {
   private extractKeywords(text: string): string[] {
     const words = text.toLowerCase().split(/\s+/);
     const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']);
-    
+
     return words
       .filter(word => word.length > 3 && !stopWords.has(word))
       .slice(0, 10);
@@ -695,9 +696,9 @@ export class ImageTextMapper {
   private extractMaterialReferences(text: string): string[] {
     const materialTerms = [
       'ceramic', 'porcelain', 'stone', 'marble', 'granite', 'wood', 'metal',
-      'glass', 'concrete', 'tile', 'brick', 'steel', 'aluminum', 'copper'
+      'glass', 'concrete', 'tile', 'brick', 'steel', 'aluminum', 'copper',
     ];
-    
+
     const lowerText = text.toLowerCase();
     return materialTerms.filter(term => lowerText.includes(term));
   }
@@ -708,9 +709,9 @@ export class ImageTextMapper {
   private extractTechnicalTerms(text: string): string[] {
     const technicalTerms = [
       'specification', 'property', 'strength', 'resistance', 'durability',
-      'thermal', 'mechanical', 'chemical', 'standard', 'compliance'
+      'thermal', 'mechanical', 'chemical', 'standard', 'compliance',
     ];
-    
+
     const lowerText = text.toLowerCase();
     return technicalTerms.filter(term => lowerText.includes(term));
   }
@@ -721,9 +722,9 @@ export class ImageTextMapper {
   private containsMaterialContent(text: string): boolean {
     const materialKeywords = [
       'material', 'surface', 'finish', 'texture', 'color', 'property',
-      'specification', 'standard', 'quality', 'performance'
+      'specification', 'standard', 'quality', 'performance',
     ];
-    
+
     const lowerText = text.toLowerCase();
     return materialKeywords.some(keyword => lowerText.includes(keyword));
   }
@@ -734,7 +735,7 @@ export class ImageTextMapper {
   private deduplicateAssociations(associations: ImageTextAssociation[]): ImageTextAssociation[] {
     const seen = new Set<string>();
     const deduplicated: ImageTextAssociation[] = [];
-    
+
     for (const association of associations) {
       const key = `${association.imageId}-${association.textBlockIds.sort().join(',')}`;
       if (!seen.has(key)) {
@@ -742,7 +743,7 @@ export class ImageTextMapper {
         deduplicated.push(association);
       }
     }
-    
+
     return deduplicated;
   }
 
@@ -751,18 +752,18 @@ export class ImageTextMapper {
    */
   private async associateWithChunks(
     associations: ImageTextAssociation[],
-    chunks: DocumentChunk[]
+    chunks: DocumentChunk[],
   ): Promise<void> {
     for (const association of associations) {
       // Find chunks that contain the associated text blocks
       const relatedChunks = chunks.filter(chunk =>
         association.textBlockIds.some(textId =>
-          chunk.metadata.elementIds.includes(textId)
-        )
+          chunk.metadata.elementIds.includes(textId),
+        ),
       );
-      
+
       association.chunkIds = relatedChunks.map(chunk => chunk.id);
-      
+
       // Update chunk metadata to include image references
       for (const chunk of relatedChunks) {
         if (!chunk.metadata.imageIds.includes(association.imageId)) {
@@ -791,7 +792,7 @@ export class ImageTextMapper {
             association: association.confidence,
             proximity: association.proximityScore,
             semantic: association.semanticScore,
-            overall: (association.confidence + association.proximityScore + association.semanticScore) / 3
+            overall: (association.confidence + association.proximityScore + association.semanticScore) / 3,
           },
           search_keywords: association.metadata.keywords,
           metadata: {
@@ -803,9 +804,9 @@ export class ImageTextMapper {
             association_type: association.associationType,
             spatial_relationship: association.spatialRelationship,
             material_references: association.metadata.materialReferences,
-            technical_terms: association.metadata.technicalTerms
+            technical_terms: association.metadata.technicalTerms,
           },
-          status: 'published'
+          status: 'published',
         };
 
         const { error } = await supabase
@@ -816,7 +817,7 @@ export class ImageTextMapper {
           console.warn(`Failed to store association ${association.id}:`, error);
         }
       }
-      
+
       console.log(`Successfully stored ${associations.length} image-text associations`);
     } catch (error) {
       console.error('Error storing image-text associations:', error);
@@ -842,11 +843,11 @@ export class ImageTextMapper {
         .eq('content_type', 'image_text_association')
         .contains('metadata', { document_id: documentId })
         .order('created_at');
-      
+
       if (error) {
         throw error;
       }
-      
+
       return data.map(row => this.convertKnowledgeEntryToAssociation(row));
     } catch (error) {
       console.error('Error retrieving document associations:', error);
@@ -859,7 +860,7 @@ export class ImageTextMapper {
    */
   private convertKnowledgeEntryToAssociation(row: any): ImageTextAssociation {
     const metadata = row.metadata || {};
-    
+
     return {
       id: metadata.association_id || row.id,
       imageId: metadata.image_id || '',
@@ -872,16 +873,16 @@ export class ImageTextMapper {
       spatialRelationship: metadata.spatial_relationship || {
         direction: 'overlapping',
         distance: 0,
-        alignment: 'contained'
+        alignment: 'contained',
       },
       metadata: {
         imageType: 'material_sample',
         textContext: row.content.substring(0, 200),
         keywords: row.search_keywords || [],
         materialReferences: metadata.material_references || [],
-        technicalTerms: metadata.technical_terms || []
+        technicalTerms: metadata.technical_terms || [],
       },
-      createdAt: row.created_at
+      createdAt: row.created_at,
     };
   }
 }

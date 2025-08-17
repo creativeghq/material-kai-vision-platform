@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Play, Pause, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +9,8 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
-import { ArrowLeft, Play, Pause, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Json } from '@/integrations/supabase/types';
+
 import { PageQueueViewer } from './PageQueueViewer';
 import { LiveProcessingMonitor } from './LiveProcessingMonitor';
 
@@ -19,24 +22,22 @@ interface SessionDetailViewProps {
 interface ScrapingSession {
   id: string;
   session_id: string;
+  user_id: string | null;
   source_url: string;
   status: string;
-  total_pages: number;
-  completed_pages: number;
-  failed_pages: number;
-  pending_pages: number;
-  total_materials_found: number;
-  progress_percentage: number;
+  scraping_config: Json | null;
+  progress_percentage: number | null;
+  total_pages: number | null;
+  completed_pages: number | null;
+  failed_pages: number | null;
+  materials_processed: number | null;
   created_at: string;
   updated_at: string;
-  session_type: string;
-  current_page_url: string;
-  scraping_config: any;
 }
 
 export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
   sessionId,
-  onBack
+  onBack,
 }) => {
   const { toast } = useToast();
   const [session, setSession] = useState<ScrapingSession | null>(null);
@@ -45,7 +46,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
 
   useEffect(() => {
     loadSession();
-    
+
     // Set up real-time subscription
     const channel = supabase
       .channel(`session_${sessionId}`)
@@ -55,11 +56,11 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
           event: '*',
           schema: 'public',
           table: 'scraping_sessions',
-          filter: `id=eq.${sessionId}`
+          filter: `id=eq.${sessionId}`,
         },
         () => {
           loadSession();
-        }
+        },
       )
       .subscribe();
 
@@ -81,9 +82,9 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     } catch (error) {
       console.error('Error loading session:', error);
       toast({
-        title: "Error",
-        description: "Failed to load session details",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load session details',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -92,7 +93,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
 
   const startProcessing = async () => {
     if (!session) return;
-    
+
     setProcessing(true);
     try {
       // Update session status to processing
@@ -105,7 +106,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       const apiService = ApiIntegrationService.getInstance();
       const result = await apiService.executeSupabaseFunction('scrape-session-manager', {
         sessionId: sessionId,
-        action: 'start'
+        action: 'start',
       });
 
       if (!result.success) {
@@ -113,15 +114,15 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       }
 
       toast({
-        title: "Success",
-        description: "Scraping started successfully",
+        title: 'Success',
+        description: 'Scraping started successfully',
       });
     } catch (error) {
       console.error('Error starting processing:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to start scraping",
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to start scraping',
+        variant: 'destructive',
       });
     } finally {
       setProcessing(false);
@@ -137,15 +138,15 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
         .eq('id', sessionId);
 
       toast({
-        title: "Success",
-        description: "Scraping paused",
+        title: 'Success',
+        description: 'Scraping paused',
       });
     } catch (error) {
       console.error('Error pausing processing:', error);
       toast({
-        title: "Error",
-        description: "Failed to pause scraping",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to pause scraping',
+        variant: 'destructive',
       });
     } finally {
       setProcessing(false);
@@ -168,7 +169,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       <div className="text-center p-8">
         <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold mb-2">Session not found</h3>
-        <Button onClick={onBack} variant="outline">
+        <Button onClick={onBack} className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
           Go Back
         </Button>
       </div>
@@ -197,7 +198,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={onBack}>
+        <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Sessions
         </Button>
@@ -216,7 +217,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
             </Button>
           )}
           {canPause && (
-            <Button variant="outline" onClick={pauseProcessing} disabled={processing}>
+            <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={pauseProcessing} disabled={processing}>
               <Pause className="h-4 w-4 mr-2" />
               Pause
             </Button>
@@ -243,12 +244,12 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Session Type</p>
-              <p className="font-semibold capitalize">{session.session_type}</p>
+              <p className="font-semibold capitalize">{session.status}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Current Page</p>
               <p className="font-semibold text-sm truncate">
-                {session.current_page_url || 'None'}
+                {session.source_url || 'None'}
               </p>
             </div>
           </div>
@@ -275,7 +276,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
               <p className="text-sm text-red-600">Failed</p>
             </div>
             <div className="text-center p-3 bg-purple-50 rounded-lg">
-              <p className="text-2xl font-bold text-purple-600">{session.total_materials_found}</p>
+              <p className="text-2xl font-bold text-purple-600">{session.materials_processed || 0}</p>
               <p className="text-sm text-purple-600">Materials Found</p>
             </div>
           </div>

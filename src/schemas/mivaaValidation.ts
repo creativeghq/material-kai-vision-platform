@@ -22,7 +22,7 @@ const TableDataSchema = z.object({
   position: PositionSchema,
   confidence: z.number().min(0, 'Confidence must be non-negative').max(1, 'Confidence must not exceed 1'),
   format: z.enum(['csv', 'json', 'markdown'], {
-    errorMap: () => ({ message: 'Format must be csv, json, or markdown' })
+    errorMap: () => ({ message: 'Format must be csv, json, or markdown' }),
   }),
   rawData: z.string().optional(),
 });
@@ -94,21 +94,21 @@ export const MivaaDocumentSchema = z.object({
   },
   {
     message: 'All table rows must have the same number of columns as headers',
-    path: ['tables']
-  }
+    path: ['tables'],
+  },
 ).refine(
   (data) => {
     // Custom validation: ensure filename has valid extension
     const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
-    const hasValidExtension = validExtensions.some(ext => 
-      data.filename.toLowerCase().endsWith(ext)
+    const hasValidExtension = validExtensions.some(ext =>
+      data.filename.toLowerCase().endsWith(ext),
     );
     return hasValidExtension;
   },
   {
     message: 'Filename must have a valid extension (.pdf, .docx, .doc, .txt)',
-    path: ['filename']
-  }
+    path: ['filename'],
+  },
 ).refine(
   (data) => {
     // Custom validation: ensure markdown content doesn't contain dangerous scripts
@@ -120,13 +120,13 @@ export const MivaaDocumentSchema = z.object({
       /<object\b/gi,
       /<embed\b/gi,
     ];
-    
+
     return !dangerousPatterns.some(pattern => pattern.test(data.markdown));
   },
   {
     message: 'Markdown content contains potentially dangerous scripts or HTML elements',
-    path: ['markdown']
-  }
+    path: ['markdown'],
+  },
 );
 
 /**
@@ -147,20 +147,20 @@ export function validateMivaaDocument(data: unknown): {
   }>;
 } {
   const result = MivaaDocumentSchema.safeParse(data);
-  
+
   if (result.success) {
     return {
       success: true,
       data: result.data,
     };
   }
-  
+
   const errors = result.error.errors.map(error => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
   }));
-  
+
   return {
     success: false,
     errors,
@@ -199,20 +199,20 @@ export function validatePartialMivaaDocument(data: unknown): {
   }>;
 } {
   const result = PartialMivaaDocumentSchema.safeParse(data);
-  
+
   if (result.success) {
     return {
       success: true,
       data: result.data,
     };
   }
-  
+
   const errors = result.error.errors.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
   }));
-  
+
   return {
     success: false,
     errors,

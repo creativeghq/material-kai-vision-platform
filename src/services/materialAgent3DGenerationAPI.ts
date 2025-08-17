@@ -34,24 +34,33 @@ export interface Generation3DResult {
 
 export interface Generation3DRecord {
   id: string;
-  user_id: string;
-  prompt: string;
-  room_type: string | null;
-  style: string | null;
-  materials_used: string[];
-  material_ids: string[];
+  user_id: string | null;
+  workspace_id: string | null;
+  generation_name: string;
+  generation_type: string;
   generation_status: string;
-  result_data: any;
-  image_urls: string[];
-  model_used: string;
-  processing_time_ms: number | null;
+  input_data: any;
+  output_data: any;
+  generation_config: any;
+  progress_percentage: number;
   error_message: string | null;
-  created_at: string;
-  updated_at: string;
+  processing_time_ms: number | null;
+  estimated_completion_time: string | null;
+  file_urls: any;
+  preview_url: string | null;
+  download_url: string | null;
+  file_size_bytes: number | null;
+  quality_score: number | null;
+  tags: any;
+  metadata: any;
+  created_at: string | null;
+  updated_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
 }
 
-export class CrewAI3DGenerationAPI {
-  // Generate 3D interior design using CrewAI agents
+export class MaterialAgent3DGenerationAPI {
+  // Generate 3D interior design using Material Agent Orchestrator
   static async generate3D(request: Generation3DRequest): Promise<Generation3DResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -64,17 +73,17 @@ export class CrewAI3DGenerationAPI {
         prompt: request.prompt,
         room_type: request.room_type,
         style: request.style,
-        specific_materials: request.specific_materials
+        specific_materials: request.specific_materials,
       });
 
-      const { data, error } = await supabase.functions.invoke('crewai-3d-generation', {
+      const { data, error } = await supabase.functions.invoke('material-agent-3d-generation', {
         body: {
           user_id: user.id,
           prompt: request.prompt,
           room_type: request.room_type,
           style: request.style,
-          specific_materials: request.specific_materials
-        }
+          specific_materials: request.specific_materials,
+        },
       });
 
       console.log('Edge function response:', { data, error });
@@ -166,7 +175,7 @@ export class CrewAI3DGenerationAPI {
         avg_quality_score: 0,
         popular_room_types: {} as Record<string, number>,
         popular_styles: {} as Record<string, number>,
-        material_usage: {} as Record<string, number>
+        material_usage: {} as Record<string, number>,
       };
 
       let totalProcessingTime = 0;
@@ -175,7 +184,7 @@ export class CrewAI3DGenerationAPI {
 
       data?.forEach(event => {
         const eventData = event.event_data as any;
-        
+
         // Processing time
         if (eventData.processing_time_ms) {
           totalProcessingTime += eventData.processing_time_ms;
@@ -189,20 +198,20 @@ export class CrewAI3DGenerationAPI {
 
         // Room types
         if (eventData.room_type) {
-          analytics.popular_room_types[eventData.room_type] = 
+          analytics.popular_room_types[eventData.room_type] =
             (analytics.popular_room_types[eventData.room_type] || 0) + 1;
         }
 
         // Styles
         if (eventData.style) {
-          analytics.popular_styles[eventData.style] = 
+          analytics.popular_styles[eventData.style] =
             (analytics.popular_styles[eventData.style] || 0) + 1;
         }
       });
 
-      analytics.avg_processing_time = analytics.total_generations > 0 ? 
+      analytics.avg_processing_time = analytics.total_generations > 0 ?
         totalProcessingTime / analytics.total_generations : 0;
-      analytics.avg_quality_score = qualityCount > 0 ? 
+      analytics.avg_quality_score = qualityCount > 0 ?
         totalQualityScore / qualityCount : 0;
 
       return analytics;

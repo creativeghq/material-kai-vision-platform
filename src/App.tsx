@@ -1,41 +1,41 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { AuthGuard } from "@/components/Layout/AuthGuard";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+import { Toaster } from '@/components/ui/toaster';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthGuard } from '@/components/Layout/AuthGuard';
 
 // Import configuration to ensure initialization
-import "@/config";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import AdminDashboard from "./components/Admin/AdminDashboard";
-import KnowledgeBaseManagement from "./components/Admin/KnowledgeBaseManagement";
-import AgentMLCoordination from "./components/Admin/AgentMLCoordination";
-import { AdminPanel } from "./components/Admin/AdminPanel";
-import { ApiGatewayAdmin } from "./components/Admin/ApiGatewayAdmin";
-import { MetadataFieldsManagement } from "./components/Admin/MetadataFieldsManagement";
-import { AITestingPanel } from "./components/Admin/AITestingPanel";
-import { AnalyticsDashboard } from "./components/Admin/AnalyticsDashboard";
-import { SystemPerformance } from "./components/Admin/SystemPerformance";
-import { MaterialRecognition } from "./components/Recognition/MaterialRecognition";
-
-import { MoodBoardPage } from "./components/MoodBoard/MoodBoardPage";
-import { Designer3DPage } from "./components/3D/Designer3DPage";
-import { AIStudioPage } from "./components/AI/AIStudioPage";
-import { Layout } from "./components/Layout/Layout";
-import { SVBRDFExtractionPage } from "./components/SVBRDF/SVBRDFExtractionPage";
-import { NeRFReconstructionPage } from "./components/NeRF/NeRFReconstructionPage";
-import { OCRProcessor } from "./components/OCR/OCRProcessor";
-import { IntegratedRAGManagement } from "./components/Admin/IntegratedRAGManagement";
-import PDFProcessing from "./pages/PDFProcessing";
-import SearchHub from "./pages/SearchHub";
-import { MaterialSuggestionsPanel } from "./components/Admin/MaterialSuggestionsPanel";
-import ModelDebuggingPanel from "./components/Admin/ModelDebuggingPanel";
-import { MaterialScraperPage } from "./components/Scraper/MaterialScraperPage";
-import { PDFKnowledgeDemo } from "./pages/PDFKnowledgeDemo";
+import '@/config';
+import Index from './pages/Index';
+import Auth from './pages/Auth';
+import NotFound from './pages/NotFound';
+import AdminDashboard from './components/Admin/AdminDashboard';
+import KnowledgeBaseManagement from './components/Admin/KnowledgeBaseManagement';
+import AgentMLCoordination from './components/Admin/AgentMLCoordination';
+import { AdminPanel } from './components/Admin/AdminPanel';
+import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
+import { MetadataFieldsManagement } from './components/Admin/MetadataFieldsManagement';
+import { AITestingPanel } from './components/Admin/AITestingPanel';
+import { AnalyticsDashboard } from './components/Admin/AnalyticsDashboard';
+import { SystemPerformance } from './components/Admin/SystemPerformance';
+import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
+import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
+import { Designer3DPage } from './components/3D/Designer3DPage';
+import { AIStudioPage } from './components/AI/AIStudioPage';
+import { Layout } from './components/Layout/Layout';
+import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
+import { NeRFReconstructionPage } from './components/NeRF/NeRFReconstructionPage';
+import { OCRProcessor } from './components/OCR/OCRProcessor';
+import { IntegratedRAGManagement } from './components/Admin/IntegratedRAGManagement';
+import PDFProcessing from './pages/PDFProcessing';
+import SearchHub from './pages/SearchHub';
+import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
+import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
+import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
+import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 
 const queryClient = new QueryClient();
 

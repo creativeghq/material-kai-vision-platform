@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import 'https://deno.land/x/xhr@0.1.0/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -15,20 +15,20 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { 
-      modelType, 
-      trainingConfig, 
-      datasetInfo, 
-      userId 
+    const {
+      modelType,
+      trainingConfig,
+      datasetInfo,
+      userId,
     } = await req.json();
 
     if (!modelType || !trainingConfig || !userId) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: modelType, trainingConfig, userId' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -44,8 +44,8 @@ serve(async (req) => {
         status: 'training',
         metadata: {
           framework: 'huggingface',
-          created_by: userId
-        }
+          created_by: userId,
+        },
       })
       .select()
       .single();
@@ -63,7 +63,7 @@ serve(async (req) => {
         dataset_info: datasetInfo || {},
         status: 'running',
         created_by: userId,
-        started_at: new Date().toISOString()
+        started_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -82,7 +82,7 @@ serve(async (req) => {
       validation_accuracy: 0.8765,
       f1_score: 0.8543,
       precision: 0.8678,
-      recall: 0.8432
+      recall: 0.8432,
     };
 
     await supabase
@@ -91,7 +91,7 @@ serve(async (req) => {
         status: 'completed',
         completed_at: new Date().toISOString(),
         metrics: finalMetrics,
-        progress_percentage: 100
+        progress_percentage: 100,
       })
       .eq('id', trainingJob.id);
 
@@ -101,7 +101,7 @@ serve(async (req) => {
       .update({
         status: 'active',
         performance_metrics: finalMetrics,
-        model_path: `huggingface-models/${model.id}/model.bin`
+        model_path: `huggingface-models/${model.id}/model.bin`,
       })
       .eq('id', model.id);
 
@@ -113,16 +113,16 @@ serve(async (req) => {
         modelId: model.id,
         trainingJobId: trainingJob.id,
         metrics: finalMetrics,
-        modelPath: `huggingface-models/${model.id}/model.bin`
+        modelPath: `huggingface-models/${model.id}/model.bin`,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
 
   } catch (error) {
     console.error('Error in HuggingFace model training:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

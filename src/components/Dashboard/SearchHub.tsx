@@ -1,7 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   TrendingUp,
   Clock,
@@ -9,8 +6,12 @@ import {
   ArrowRight,
   Package,
   BookOpen,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { UnifiedSearchInterface } from '@/components/Search/UnifiedSearchInterface';
 
 interface SearchHubProps {
@@ -22,20 +23,20 @@ interface SearchHubProps {
 export const SearchHub: React.FC<SearchHubProps> = ({
   onMaterialSelect,
   onNavigateToMoodboard,
-  onNavigateTo3D
+  onNavigateTo3D,
 }) => {
   const [recentSearches] = useState([
     'Fire resistant tiles',
     'Waterproof laminate',
     'Sustainable concrete',
-    'Anti-slip flooring'
+    'Anti-slip flooring',
   ]);
 
   const [popularMaterials] = useState([
     { id: '1', name: 'Porcelain Tiles', searches: 156, category: 'ceramic' },
     { id: '2', name: 'Hardwood Flooring', searches: 142, category: 'wood' },
     { id: '3', name: 'Quartz Countertops', searches: 138, category: 'stone' },
-    { id: '4', name: 'Vinyl Plank', searches: 124, category: 'synthetic' }
+    { id: '4', name: 'Vinyl Plank', searches: 124, category: 'synthetic' },
   ]);
 
   const [trendingQueries] = useState([
@@ -43,7 +44,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
     'Indoor air quality',
     'Antimicrobial surfaces',
     'Smart materials',
-    'Recycled content'
+    'Recycled content',
   ]);
 
   const handleQuickAction = useCallback((action: string, data?: any) => {
@@ -82,7 +83,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
           </CardHeader>
           <CardContent className="space-y-2">
             {recentSearches.map((search, index) => (
-              <div 
+              <div
                 key={index}
                 className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer group"
                 onClick={() => {
@@ -111,7 +112,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
           </CardHeader>
           <CardContent className="space-y-2">
             {popularMaterials.map((material) => (
-              <div 
+              <div
                 key={material.id}
                 className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer"
                 onClick={() => handleQuickAction('material', material.id)}
@@ -138,7 +139,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
           </CardHeader>
           <CardContent className="space-y-2">
             {trendingQueries.map((query, index) => (
-              <div 
+              <div
                 key={index}
                 className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer group"
                 onClick={() => {
@@ -172,7 +173,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
               <Sparkles className="h-6 w-6" />
               <span className="text-sm">Generate 3D</span>
             </Button>
-            
+
             <Button
               className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleQuickAction('moodboard')}
@@ -180,7 +181,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
               <Star className="h-6 w-6" />
               <span className="text-sm">Create Moodboard</span>
             </Button>
-            
+
             <Button
               className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => {
@@ -191,7 +192,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
               <Package className="h-6 w-6" />
               <span className="text-sm">Browse Catalog</span>
             </Button>
-            
+
             <Button
               className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => {

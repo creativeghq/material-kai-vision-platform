@@ -174,7 +174,7 @@ export const AdvancedSearchFilters: React.FC<AdvancedSearchFiltersProps> = ({
   ) => (
     <Collapsible
       open={activeSection === sectionKey}
-      onOpenChange={(open) => setActiveSection(open ? sectionKey : null)}
+      onOpenChange={(open: boolean) => setActiveSection(open ? sectionKey : null)}
     >
       <CollapsibleTrigger asChild>
         <Button

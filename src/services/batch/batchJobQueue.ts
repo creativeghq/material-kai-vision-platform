@@ -10,13 +10,13 @@ export type JobPriority = 'low' | 'normal' | 'high' | 'critical';
 /**
  * Job status enumeration
  */
-export type JobStatus = 
-  | 'pending' 
-  | 'queued' 
-  | 'processing' 
-  | 'completed' 
-  | 'failed' 
-  | 'retrying' 
+export type JobStatus =
+  | 'pending'
+  | 'queued'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'retrying'
   | 'cancelled'
   | 'dead_letter';
 
@@ -130,7 +130,7 @@ export class BatchJobQueue extends EventEmitter {
   private readonly deadLetterQueue: BatchJob[] = [];
   private readonly metrics: QueueMetrics;
   private readonly jobHistory: Array<{ timestamp: number; event: string; jobId: string }> = [];
-  
+
   private isProcessing = false;
   private processingInterval: NodeJS.Timeout | null = null;
   private persistenceInterval: NodeJS.Timeout | null = null;
@@ -138,7 +138,7 @@ export class BatchJobQueue extends EventEmitter {
 
   constructor(config: Partial<QueueConfig> = {}) {
     super();
-    
+
     this.config = {
       maxSize: 10000,
       maxConcurrency: 10,
@@ -148,21 +148,21 @@ export class BatchJobQueue extends EventEmitter {
         baseDelay: 1000,
         maxDelay: 30000,
         backoffMultiplier: 2,
-        jitterEnabled: true
+        jitterEnabled: true,
       },
       deadLetterQueue: {
         enabled: true,
-        maxSize: 1000
+        maxSize: 1000,
       },
       persistence: {
         enabled: false,
-        interval: 30000
+        interval: 30000,
       },
       metrics: {
         enabled: true,
-        retentionPeriod: 3600000 // 1 hour
+        retentionPeriod: 3600000, // 1 hour
       },
-      ...config
+      ...config,
     };
 
     // Initialize priority queues
@@ -185,7 +185,7 @@ export class BatchJobQueue extends EventEmitter {
       memoryUsage: 0,
       queueSize: 0,
       concurrentJobs: 0,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     };
 
     this.startProcessing();
@@ -207,7 +207,7 @@ export class BatchJobQueue extends EventEmitter {
       scheduledAt?: Date;
       dependencies?: string[];
       tags?: string[];
-    }
+    },
   ): Promise<string> {
     if (this.jobs.size >= this.config.maxSize) {
       throw new Error(`Queue is full. Maximum size: ${this.config.maxSize}`);
@@ -215,7 +215,7 @@ export class BatchJobQueue extends EventEmitter {
 
     const jobId = this.generateJobId(type, payload);
     const now = new Date();
-    
+
     const job: BatchJob = {
       id: jobId,
       type,
@@ -230,14 +230,14 @@ export class BatchJobQueue extends EventEmitter {
         updatedAt: now,
         ...(options.scheduledAt && { scheduledAt: options.scheduledAt }),
         attempts: 0,
-        maxAttempts: options.maxAttempts || this.config.retryPolicy.maxAttempts
+        maxAttempts: options.maxAttempts || this.config.retryPolicy.maxAttempts,
       },
       ...(options.dependencies && { dependencies: options.dependencies }),
-      ...(options.tags && { tags: options.tags })
+      ...(options.tags && { tags: options.tags }),
     };
 
     this.jobs.set(jobId, job);
-    
+
     if (job.status === 'queued') {
       this.addToQueue(jobId, job.priority);
     }
@@ -276,7 +276,7 @@ export class BatchJobQueue extends EventEmitter {
    */
   getJobsByWorkspace(workspaceId: string): BatchJob[] {
     return Array.from(this.jobs.values()).filter(
-      job => job.metadata.workspaceId === workspaceId
+      job => job.metadata.workspaceId === workspaceId,
     );
   }
 
@@ -334,11 +334,11 @@ export class BatchJobQueue extends EventEmitter {
         critical: this.priorityQueues.get('critical')?.length || 0,
         high: this.priorityQueues.get('high')?.length || 0,
         normal: this.priorityQueues.get('normal')?.length || 0,
-        low: this.priorityQueues.get('low')?.length || 0
+        low: this.priorityQueues.get('low')?.length || 0,
       },
       totalJobs: this.jobs.size,
       processingJobs: this.processingJobs.size,
-      deadLetterJobs: this.deadLetterQueue.length
+      deadLetterJobs: this.deadLetterQueue.length,
     };
   }
 
@@ -361,7 +361,7 @@ export class BatchJobQueue extends EventEmitter {
 
     // Clean job history
     const historyIndex = this.jobHistory.findIndex(
-      entry => entry.timestamp > Date.now() - olderThanMs
+      entry => entry.timestamp > Date.now() - olderThanMs,
     );
     if (historyIndex > 0) {
       this.jobHistory.splice(0, historyIndex);
@@ -369,7 +369,7 @@ export class BatchJobQueue extends EventEmitter {
 
     this.updateMetrics();
     this.emit('cleanup', { cleaned, remaining: this.jobs.size });
-    
+
     return cleaned;
   }
 
@@ -378,7 +378,7 @@ export class BatchJobQueue extends EventEmitter {
    */
   async shutdown(): Promise<void> {
     this.isProcessing = false;
-    
+
     if (this.processingInterval) {
       clearInterval(this.processingInterval);
     }
@@ -392,14 +392,14 @@ export class BatchJobQueue extends EventEmitter {
     // Wait for current jobs to complete
     const timeout = 30000; // 30 seconds
     const start = Date.now();
-    
+
     while (this.processingJobs.size > 0 && Date.now() - start < timeout) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    this.emit('shutdown', { 
+    this.emit('shutdown', {
       remainingJobs: this.processingJobs.size,
-      forcedShutdown: this.processingJobs.size > 0 
+      forcedShutdown: this.processingJobs.size > 0,
     });
   }
 
@@ -473,8 +473,8 @@ export class BatchJobQueue extends EventEmitter {
         result,
         metrics: {
           processingTime,
-          memoryUsage: memoryAfter - memoryBefore
-        }
+          memoryUsage: memoryAfter - memoryBefore,
+        },
       };
 
       this.processingJobs.delete(jobId);
@@ -499,7 +499,7 @@ export class BatchJobQueue extends EventEmitter {
       // Retry the job
       job.status = 'retrying';
       const delay = this.calculateRetryDelay(job.metadata.attempts);
-      
+
       setTimeout(() => {
         if (this.jobs.has(job.id) && job.status === 'retrying') {
           job.status = 'queued';
@@ -515,10 +515,10 @@ export class BatchJobQueue extends EventEmitter {
     } else {
       // Move to dead letter queue
       job.status = 'dead_letter';
-      
+
       if (this.config.deadLetterQueue.enabled) {
         this.deadLetterQueue.push(job);
-        
+
         // Limit dead letter queue size
         while (this.deadLetterQueue.length > this.config.deadLetterQueue.maxSize) {
           this.deadLetterQueue.shift();
@@ -536,8 +536,8 @@ export class BatchJobQueue extends EventEmitter {
       error: error.message,
       metrics: {
         processingTime: 0,
-        memoryUsage: 0
-      }
+        memoryUsage: 0,
+      },
     };
 
     this.emit('jobFailed', job, jobResult);
@@ -548,13 +548,13 @@ export class BatchJobQueue extends EventEmitter {
    */
   private calculateRetryDelay(attempt: number): number {
     const { baseDelay, maxDelay, backoffMultiplier, jitterEnabled } = this.config.retryPolicy;
-    
+
     let delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt - 1), maxDelay);
-    
+
     if (jitterEnabled) {
       delay = delay * (0.5 + Math.random() * 0.5); // Add 0-50% jitter
     }
-    
+
     return Math.floor(delay);
   }
 
@@ -567,7 +567,7 @@ export class BatchJobQueue extends EventEmitter {
 
     // Process by priority order
     const priorities: JobPriority[] = ['critical', 'high', 'normal', 'low'];
-    
+
     for (const priority of priorities) {
       const queue = this.priorityQueues.get(priority);
       if (queue && queue.length > 0) {
@@ -583,11 +583,11 @@ export class BatchJobQueue extends EventEmitter {
    */
   private promoteScheduledJobs(): void {
     const now = new Date();
-    
+
     for (const job of this.jobs.values()) {
       if (
-        job.status === 'pending' && 
-        job.metadata.scheduledAt && 
+        job.status === 'pending' &&
+        job.metadata.scheduledAt &&
         job.metadata.scheduledAt <= now
       ) {
         job.status = 'queued';
@@ -641,7 +641,7 @@ export class BatchJobQueue extends EventEmitter {
       .update(JSON.stringify({ type, payload, timestamp }))
       .digest('hex')
       .substring(0, 8);
-    
+
     return `${type}_${timestamp}_${hash}`;
   }
 
@@ -650,7 +650,7 @@ export class BatchJobQueue extends EventEmitter {
    */
   private updateMetrics(): void {
     const jobs = Array.from(this.jobs.values());
-    
+
     this.metrics.totalJobs = jobs.length;
     this.metrics.pendingJobs = jobs.filter(j => j.status === 'pending').length;
     this.metrics.processingJobs = this.processingJobs.size;
@@ -666,7 +666,7 @@ export class BatchJobQueue extends EventEmitter {
     const completedJobs = jobs.filter(j => j.status === 'completed' && j.metadata.actualDuration);
     if (completedJobs.length > 0) {
       this.metrics.averageProcessingTime = completedJobs.reduce(
-        (sum, job) => sum + (job.metadata.actualDuration || 0), 0
+        (sum, job) => sum + (job.metadata.actualDuration || 0), 0,
       ) / completedJobs.length;
     }
 
@@ -675,10 +675,10 @@ export class BatchJobQueue extends EventEmitter {
     const recentEvents = this.jobHistory.filter(e => e.timestamp > oneMinuteAgo);
     const completedInLastMinute = recentEvents.filter(e => e.event === 'job_completed').length;
     const failedInLastMinute = recentEvents.filter(e => e.event === 'job_dead_letter').length;
-    
+
     this.metrics.throughputPerMinute = completedInLastMinute;
-    this.metrics.errorRate = completedInLastMinute + failedInLastMinute > 0 
-      ? failedInLastMinute / (completedInLastMinute + failedInLastMinute) 
+    this.metrics.errorRate = completedInLastMinute + failedInLastMinute > 0
+      ? failedInLastMinute / (completedInLastMinute + failedInLastMinute)
       : 0;
   }
 
@@ -687,7 +687,7 @@ export class BatchJobQueue extends EventEmitter {
    */
   private getTotalQueueSize(): number {
     return Array.from(this.priorityQueues.values()).reduce(
-      (total, queue) => total + queue.length, 0
+      (total, queue) => total + queue.length, 0,
     );
   }
 
@@ -698,7 +698,7 @@ export class BatchJobQueue extends EventEmitter {
     this.jobHistory.push({
       timestamp: Date.now(),
       event,
-      jobId
+      jobId,
     });
 
     // Limit history size
@@ -737,7 +737,7 @@ export class BatchJobQueue extends EventEmitter {
     // TODO: Implement state persistence to file or database
     this.emit('statePersisted', {
       jobCount: this.jobs.size,
-      queueSizes: this.getStatus().queueSizes
+      queueSizes: this.getStatus().queueSizes,
     });
   }
 }

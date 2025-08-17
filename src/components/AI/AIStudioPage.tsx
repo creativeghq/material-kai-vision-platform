@@ -1,4 +1,10 @@
 import React, { useState, useCallback } from 'react';
+import {
+  Upload, Camera, Brain, Zap, Target, CheckCircle, Clock,
+  Layers, Users, BarChart3, Lightbulb, Home, Ruler, Palette,
+} from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,11 +15,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ThreeJsViewer } from '@/components/3D/ThreeJsViewer';
 import { IntegratedAIService } from '@/services/integratedAIService';
-import { 
-  Upload, Camera, Brain, Zap, Target, CheckCircle, Clock,
-  Layers, Users, BarChart3, Lightbulb, Home, Ruler, Palette
-} from 'lucide-react';
-import { useDropzone } from 'react-dropzone';
 
 interface AIStudioPageProps {}
 
@@ -28,19 +29,19 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
   const [activeTab, setActiveTab] = useState('upload');
 
   const roomTypes = [
-    'bedroom', 'living_room', 'kitchen', 'bathroom', 'office', 'dining_room'
+    'bedroom', 'living_room', 'kitchen', 'bathroom', 'office', 'dining_room',
   ];
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const imageFiles = acceptedFiles.filter(file => 
-      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024
+    const imageFiles = acceptedFiles.filter(file =>
+      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024,
     );
-    
+
     if (imageFiles.length !== acceptedFiles.length) {
       toast({
-        title: "Some files rejected",
-        description: "Only images under 10MB are allowed.",
-        variant: "destructive"
+        title: 'Some files rejected',
+        description: 'Only images under 10MB are allowed.',
+        variant: 'destructive',
       });
     }
 
@@ -50,15 +51,15 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] },
-    multiple: true
+    multiple: true,
   });
 
   const handleCompleteDesign = async () => {
     if (uploadedFiles.length === 0 || !roomType) {
       toast({
-        title: "Missing requirements",
-        description: "Please upload images and select a room type.",
-        variant: "destructive"
+        title: 'Missing requirements',
+        description: 'Please upload images and select a room type.',
+        variant: 'destructive',
       });
       return;
     }
@@ -80,14 +81,14 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
       }, 2000);
 
       toast({
-        title: "Starting AI Studio",
-        description: "Coordinating all AI systems for comprehensive design analysis..."
+        title: 'Starting AI Studio',
+        description: 'Coordinating all AI systems for comprehensive design analysis...',
       });
 
       const designResults = await IntegratedAIService.generateCompleteDesign(
         uploadedFiles,
         roomType,
-        userPreferences
+        userPreferences,
       );
 
       clearInterval(progressInterval);
@@ -96,16 +97,16 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
       setActiveTab('results');
 
       toast({
-        title: "AI Studio Complete!",
-        description: "All AI systems have analyzed your space and generated recommendations."
+        title: 'AI Studio Complete!',
+        description: 'All AI systems have analyzed your space and generated recommendations.',
       });
 
     } catch (error) {
       console.error('AI Studio error:', error);
       toast({
-        title: "Processing failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive"
+        title: 'Processing failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
       });
       setActiveTab('upload');
     } finally {
@@ -123,7 +124,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
       { name: 'NeRF Reconstruction', icon: Layers, status: progress > 20 ? 'completed' : progress > 0 ? 'processing' : 'pending' },
       { name: 'SVBRDF Extraction', icon: Palette, status: progress > 40 ? 'completed' : progress > 20 ? 'processing' : 'pending' },
       { name: 'Spatial Analysis', icon: Ruler, status: progress > 70 ? 'completed' : progress > 40 ? 'processing' : 'pending' },
-      { name: 'CrewAI Coordination', icon: Users, status: progress > 90 ? 'completed' : progress > 70 ? 'processing' : 'pending' }
+      { name: 'CrewAI Coordination', icon: Users, status: progress > 90 ? 'completed' : progress > 70 ? 'processing' : 'pending' },
     ];
 
     return (
@@ -134,7 +135,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
         </div>
 
         <Progress value={progress} className="w-full h-3" />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {stages.map((stage) => (
             <Card key={stage.name} className={`transition-all ${
@@ -196,7 +197,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ThreeJsViewer 
+              <ThreeJsViewer
                 imageUrl={uploadedFiles[0] ? URL.createObjectURL(uploadedFiles[0]) : undefined}
                 modelUrl={nerfReconstruction?.model_file_url}
                 className="h-64 w-full mb-4"
@@ -234,8 +235,8 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                     {svbrdfExtractions.slice(0, 3).map((extraction: any, index: number) => (
                       <div key={index} className="aspect-square bg-muted rounded overflow-hidden">
                         {extraction.albedo_map_url && (
-                          <img 
-                            src={extraction.albedo_map_url} 
+                          <img
+                            src={extraction.albedo_map_url}
                             alt="Material preview"
                             className="w-full h-full object-cover"
                           />
@@ -243,7 +244,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                       </div>
                     ))}
                   </div>
-                  
+
                   {spatialAnalysis?.material_placements && (
                     <div>
                       <h4 className="font-medium mb-2">Recommended Materials</h4>
@@ -283,7 +284,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                     {(crewaiCoordination.overall_confidence * 100).toFixed(0)}%
                   </Badge>
                 </div>
-                
+
                 <div>
                   <h4 className="font-medium mb-2">Agent Recommendations</h4>
                   <p className="text-sm text-muted-foreground">
@@ -387,8 +388,8 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
           AI Design Studio
         </h1>
         <p className="text-muted-foreground max-w-3xl mx-auto">
-          Experience the future of interior design with our integrated AI systems. 
-          Upload images to get comprehensive analysis using NeRF 3D reconstruction, 
+          Experience the future of interior design with our integrated AI systems.
+          Upload images to get comprehensive analysis using NeRF 3D reconstruction,
           SVBRDF material extraction, SpaceFormer spatial reasoning, and CrewAI agent coordination.
         </p>
       </div>
@@ -499,8 +500,8 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                             ...prev,
                             priorities: {
                               ...prev.priorities,
-                              [priority.toLowerCase()]: !prev.priorities?.[priority.toLowerCase()]
-                            }
+                              [priority.toLowerCase()]: !prev.priorities?.[priority.toLowerCase()],
+                            },
                           }));
                         }}
                       >
@@ -514,7 +515,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                   <Alert>
                     <Lightbulb className="h-4 w-4" />
                     <AlertDescription>
-                      Ready for AI Studio analysis! Our systems will coordinate to provide 
+                      Ready for AI Studio analysis! Our systems will coordinate to provide
                       comprehensive design insights.
                     </AlertDescription>
                   </Alert>

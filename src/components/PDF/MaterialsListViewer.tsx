@@ -1,11 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Package,
   Edit3,
@@ -14,8 +7,16 @@ import {
   Plus,
   Image as ImageIcon,
   AlertCircle,
-  Palette
+  Palette,
 } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
 interface MaterialTile {
@@ -60,7 +61,7 @@ interface DetectedMaterial {
 
 const MATERIAL_CATEGORIES = [
   'wood',
-  'stone & marble', 
+  'stone & marble',
   'concrete',
   'brick',
   'metal',
@@ -75,12 +76,12 @@ const MATERIAL_CATEGORIES = [
   'crackle glaze',
   'ceramics',
   'glass',
-  'other'
+  'other',
 ];
 
-export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({ 
-  processingId, 
-  tiles 
+export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
+  processingId,
+  tiles,
 }) => {
   const { toast } = useToast();
   const [materials, setMaterials] = useState<DetectedMaterial[]>([]);
@@ -96,7 +97,7 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
   const loadMaterials = () => {
     // Group tiles by material type to create consolidated materials
     const materialGroups: Record<string, MaterialTile[]> = {};
-    
+
     tiles.filter(t => t.material_detected).forEach(tile => {
       const key = tile.material_type;
       if (!materialGroups[key]) {
@@ -107,11 +108,11 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
 
     const detectedMaterials: DetectedMaterial[] = Object.entries(materialGroups).map(([type, groupTiles]) => {
       const avgConfidence = groupTiles.reduce((sum, t) => sum + (t.material_confidence || 0), 0) / groupTiles.length;
-      
+
       // Extract properties and effects from structured data
       const properties: Record<string, any> = {};
       const effects: string[] = [];
-      
+
       groupTiles.forEach(tile => {
         if (tile.structured_data) {
           Object.assign(properties, tile.structured_data);
@@ -133,13 +134,13 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
           page: tile.page_number,
           tile: tile.tile_index,
           text: tile.extracted_text,
-          ...(tile.image_url && { image_url: tile.image_url })
+          ...(tile.image_url && { image_url: tile.image_url }),
         })),
         metadata: {
           processing_id: processingId,
           extraction_method: 'pdf_analysis',
-          total_occurrences: groupTiles.length
-        }
+          total_occurrences: groupTiles.length,
+        },
       };
     });
 
@@ -166,29 +167,29 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
       console.log('Saving material to catalog - feature not yet implemented', material);
 
       toast({
-        title: "Feature Not Available",
-        description: "Material catalog saving is not yet implemented.",
+        title: 'Feature Not Available',
+        description: 'Material catalog saving is not yet implemented.',
       });
 
     } catch (error) {
       toast({
-        title: "Save Failed",
+        title: 'Save Failed',
         description: error instanceof Error ? error.message : 'Unknown error',
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
 
   const updateMaterial = (materialId: string, updates: Partial<DetectedMaterial>) => {
-    setMaterials(prev => prev.map(m => 
-      m.id === materialId ? { ...m, ...updates } : m
+    setMaterials(prev => prev.map(m =>
+      m.id === materialId ? { ...m, ...updates } : m,
     ));
   };
 
   const filteredMaterials = materials.filter(material =>
     material.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     material.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    material.effects.some(effect => effect.toLowerCase().includes(searchQuery.toLowerCase()))
+    material.effects.some(effect => effect.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   if (loading) {
@@ -286,15 +287,15 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="space-y-4">
                 {/* Category and Type */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium">Category</Label>
                     {editingMaterial === material.id ? (
-                      <Select 
-                        value={material.category} 
+                      <Select
+                        value={material.category}
                         onValueChange={(value: string) => updateMaterial(material.id, { category: value })}
                       >
                         <SelectTrigger>

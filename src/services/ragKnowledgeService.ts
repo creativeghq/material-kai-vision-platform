@@ -1,9 +1,9 @@
 /**
- * RAG Knowledge Service  
+ * RAG Knowledge Service
  * Integrates with rag-knowledge-search edge function for intelligent search
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
 
 export interface RAGSearchRequest {
   query: string;
@@ -32,7 +32,7 @@ export interface RAGResponse {
 }
 
 class RAGKnowledgeService {
-  
+
   /**
    * Perform intelligent RAG search
    */
@@ -41,7 +41,7 @@ class RAGKnowledgeService {
       console.log('Starting RAG knowledge search:', request.query);
 
       const { data, error } = await supabase.functions.invoke('rag-knowledge-search', {
-        body: request
+        body: request,
       });
 
       if (error) {
@@ -66,7 +66,7 @@ class RAGKnowledgeService {
       search_type: 'material',
       include_context: includeContext,
       match_count: 10,
-      match_threshold: 0.7
+      match_threshold: 0.7,
     });
   }
 
@@ -79,7 +79,7 @@ class RAGKnowledgeService {
       search_type: 'knowledge',
       include_context: includeContext,
       match_count: 10,
-      match_threshold: 0.7
+      match_threshold: 0.7,
     });
   }
 
@@ -92,7 +92,7 @@ class RAGKnowledgeService {
       search_type: 'hybrid',
       include_context: includeContext,
       match_count: 15,
-      match_threshold: 0.6
+      match_threshold: 0.6,
     });
   }
 
@@ -107,7 +107,7 @@ class RAGKnowledgeService {
       threshold?: number;
       count?: number;
       includeContext?: boolean;
-    }
+    },
   ): Promise<RAGResponse> {
     return this.search({
       query,
@@ -115,7 +115,7 @@ class RAGKnowledgeService {
       embedding_types: options.embeddingTypes || ['clip'],
       match_threshold: options.threshold || 0.7,
       match_count: options.count || 10,
-      include_context: options.includeContext !== false
+      include_context: options.includeContext !== false,
     });
   }
 
@@ -153,7 +153,7 @@ class RAGKnowledgeService {
     query: string,
     results: RAGSearchResult[],
     processingTime: number,
-    sessionId?: string
+    sessionId?: string,
   ): Promise<void> {
     try {
       const { error } = await supabase
@@ -163,11 +163,11 @@ class RAGKnowledgeService {
           total_results: results.length,
           results_shown: Math.min(results.length, 10),
           response_time_ms: processingTime,
-          avg_relevance_score: results.length > 0 
-            ? results.reduce((sum, r) => sum + r.similarity_score, 0) / results.length 
+          avg_relevance_score: results.length > 0
+            ? results.reduce((sum, r) => sum + r.similarity_score, 0) / results.length
             : 0,
           session_id: sessionId,
-          user_id: (await supabase.auth.getUser()).data.user?.id
+          user_id: (await supabase.auth.getUser()).data.user?.id,
         });
 
       if (error) {
@@ -185,14 +185,14 @@ class RAGKnowledgeService {
   async rateSearchResults(
     queryText: string,
     satisfactionRating: number,
-    clickedResults: string[] = []
+    clickedResults: string[] = [],
   ): Promise<void> {
     try {
       const { error } = await supabase
         .from('search_analytics')
         .update({
           satisfaction_rating: satisfactionRating,
-          clicks_count: clickedResults.length
+          clicks_count: clickedResults.length,
         })
         .eq('query_text', queryText)
         .eq('user_id', (await supabase.auth.getUser()).data.user?.id)

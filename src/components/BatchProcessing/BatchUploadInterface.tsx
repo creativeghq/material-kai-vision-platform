@@ -1,4 +1,20 @@
 import React, { useState, useCallback, useRef } from 'react';
+import {
+  Upload,
+  X,
+  FileText,
+  Image,
+  File,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Loader2,
+  Settings,
+  Play,
+  Trash2,
+  Download,
+} from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -8,21 +24,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { 
-  Upload, 
-  X, 
-  FileText, 
-  Image, 
-  File, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock,
-  Loader2,
-  Settings,
-  Play,
-  Trash2,
-  Download
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Utility function for formatting bytes
@@ -86,7 +87,7 @@ const getStatusConfig = (status: BatchFile['status']) => {
         color: 'text-blue-600',
         bgColor: 'bg-blue-100',
         label: 'Uploading',
-        animate: true
+        animate: true,
       };
     case 'processing':
       return {
@@ -94,21 +95,21 @@ const getStatusConfig = (status: BatchFile['status']) => {
         color: 'text-yellow-600',
         bgColor: 'bg-yellow-100',
         label: 'Processing',
-        animate: true
+        animate: true,
       };
     case 'completed':
       return {
         icon: CheckCircle,
         color: 'text-green-600',
         bgColor: 'bg-green-100',
-        label: 'Completed'
+        label: 'Completed',
       };
     case 'failed':
       return {
         icon: AlertCircle,
         color: 'text-red-600',
         bgColor: 'bg-red-100',
-        label: 'Failed'
+        label: 'Failed',
       };
     case 'pending':
     default:
@@ -116,7 +117,7 @@ const getStatusConfig = (status: BatchFile['status']) => {
         icon: Clock,
         color: 'text-gray-600',
         bgColor: 'bg-gray-100',
-        label: 'Pending'
+        label: 'Pending',
       };
   }
 };
@@ -130,7 +131,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
   onBatchStart,
   onBatchComplete,
   onFileComplete,
-  onError
+  onError,
 }) => {
   const [files, setFiles] = useState<BatchFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -149,19 +150,19 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
       languageDetection: true,
       outputFormat: 'json',
       batchSize: 5,
-      priority: 'normal'
-    }
+      priority: 'normal',
+    },
   });
 
   const { send, isConnected } = useWebSocket(websocketUrl, {
     onMessage: (message) => {
       if (message.type === 'batch_file_update' && message.payload.batchId === batchId) {
         const { fileId, status, progress, error, result } = message.payload;
-        
-        setFiles(prev => prev.map(file => 
-          file.id === fileId 
+
+        setFiles(prev => prev.map(file =>
+          file.id === fileId
             ? { ...file, status, progress, error, result }
-            : file
+            : file,
         ));
 
         const updatedFile = files.find(f => f.id === fileId);
@@ -183,7 +184,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
           onError(message.payload.error);
         }
       }
-    }
+    },
   });
 
   const validateFile = (file: File): string | null => {
@@ -220,7 +221,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         file,
         status: 'pending',
-        progress: 0
+        progress: 0,
       });
     });
 
@@ -236,7 +237,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const droppedFiles = e.dataTransfer.files;
     addFiles(droppedFiles);
   }, [addFiles]);
@@ -280,10 +281,10 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
           id: f.id,
           name: f.file.name,
           size: f.file.size,
-          type: f.file.type
+          type: f.file.type,
         })),
-        config
-      }
+        config,
+      },
     });
 
     // Upload files
@@ -298,19 +299,19 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
         // For now, simulate upload progress
         for (let progress = 0; progress <= 100; progress += 10) {
           await new Promise(resolve => setTimeout(resolve, 100));
-          setFiles(prev => prev.map(f => 
-            f.id === file.id ? { ...f, progress } : f
+          setFiles(prev => prev.map(f =>
+            f.id === file.id ? { ...f, progress } : f,
           ));
         }
 
-        setFiles(prev => prev.map(f => 
-          f.id === file.id ? { ...f, status: 'processing' } : f
+        setFiles(prev => prev.map(f =>
+          f.id === file.id ? { ...f, status: 'processing' } : f,
         ));
       } catch (error) {
-        setFiles(prev => prev.map(f => 
-          f.id === file.id 
+        setFiles(prev => prev.map(f =>
+          f.id === file.id
             ? { ...f, status: 'failed', error: 'Upload failed' }
-            : f
+            : f,
         ));
       }
     }
@@ -320,11 +321,11 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
     const completedFiles = files.filter(f => f.status === 'completed' && f.result);
     const results = completedFiles.map(f => ({
       filename: f.file.name,
-      result: f.result
+      result: f.result,
     }));
 
     const blob = new Blob([JSON.stringify(results, null, 2)], {
-      type: 'application/json'
+      type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -350,7 +351,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
             <div className="flex items-center gap-2">
               <Button
                 className="border border-border bg-background text-foreground"
-                
+
                 onClick={() => setShowConfig(!showConfig)}
               >
                 <Settings className="h-4 w-4 mr-1" />
@@ -359,7 +360,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
               {files.length > 0 && (
                 <Button
                   className="border border-border bg-background text-foreground"
-                  
+
                   onClick={clearAll}
                   disabled={isProcessing}
                 >
@@ -375,13 +376,13 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
           {showConfig && (
             <div className="p-4 border rounded-lg bg-gray-50 space-y-4">
               <h4 className="font-medium">Processing Configuration</h4>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="processing-type">Processing Type</Label>
                   <Select
                     value={config.processingType}
-                    onValueChange={(value: BatchProcessingConfig['processingType']) => 
+                    onValueChange={(value: BatchProcessingConfig['processingType']) =>
                       setConfig(prev => ({ ...prev, processingType: value }))
                     }
                   >
@@ -401,10 +402,10 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                   <Label htmlFor="output-format">Output Format</Label>
                   <Select
                     value={config.options.outputFormat || 'json'}
-                    onValueChange={(value: 'json' | 'markdown' | 'text') => 
-                      setConfig(prev => ({ 
-                        ...prev, 
-                        options: { ...prev.options, outputFormat: value }
+                    onValueChange={(value: 'json' | 'markdown' | 'text') =>
+                      setConfig(prev => ({
+                        ...prev,
+                        options: { ...prev.options, outputFormat: value },
                       }))
                     }
                   >
@@ -428,7 +429,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                     onCheckedChange={(checked: boolean) =>
                       setConfig(prev => ({
                         ...prev,
-                        options: { ...prev.options, extractText: !!checked }
+                        options: { ...prev.options, extractText: !!checked },
                       }))
                     }
                   />
@@ -442,7 +443,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                     onCheckedChange={(checked: boolean) =>
                       setConfig(prev => ({
                         ...prev,
-                        options: { ...prev.options, extractImages: !!checked }
+                        options: { ...prev.options, extractImages: !!checked },
                       }))
                     }
                   />
@@ -456,7 +457,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                     onCheckedChange={(checked: boolean) =>
                       setConfig(prev => ({
                         ...prev,
-                        options: { ...prev.options, ocrEnabled: !!checked }
+                        options: { ...prev.options, ocrEnabled: !!checked },
                       }))
                     }
                   />
@@ -474,7 +475,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                     onChange={(e) =>
                       setConfig(prev => ({
                         ...prev,
-                        options: { ...prev.options, customPrompt: e.target.value }
+                        options: { ...prev.options, customPrompt: e.target.value },
                       }))
                     }
                   />
@@ -488,7 +489,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
             className={cn(
               'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
               isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300',
-              files.length === 0 ? 'py-12' : 'py-6'
+              files.length === 0 ? 'py-12' : 'py-6',
             )}
             onDrop={handleDrop}
             onDragOver={(e) => {
@@ -567,7 +568,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                       className="flex items-center gap-3 p-3 border rounded-lg"
                     >
                       <FileIcon className="h-8 w-8 text-gray-400" />
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium truncate">
@@ -579,13 +580,13 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                             </Badge>
                             <div className={cn(
                               'flex items-center gap-1 px-2 py-1 rounded text-xs',
-                              statusConfig.bgColor
+                              statusConfig.bgColor,
                             )}>
-                              <StatusIcon 
+                              <StatusIcon
                                 className={cn(
                                   'h-3 w-3',
                                   statusConfig.color,
-                                  statusConfig.animate && 'animate-spin'
+                                  statusConfig.animate && 'animate-spin',
                                 )}
                               />
                               <span className={statusConfig.color}>
@@ -594,13 +595,13 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                             </div>
                           </div>
                         </div>
-                        
+
                         {(file.status === 'uploading' || file.status === 'processing') && (
                           <div className="mt-2">
                             <Progress value={file.progress} className="h-1" />
                           </div>
                         )}
-                        
+
                         {file.error && (
                           <p className="text-xs text-red-600 mt-1">{file.error}</p>
                         )}
@@ -609,7 +610,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                       {!isProcessing && file.status === 'pending' && (
                         <Button
                           className="bg-transparent hover:bg-accent hover:text-accent-foreground"
-                          
+
                           onClick={() => removeFile(file.id)}
                         >
                           <X className="h-4 w-4" />

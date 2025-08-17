@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+
 import { agentMLCoordinator } from './agentMLCoordinator';
 import { agentLearningSystem } from './agentLearningSystem';
 
@@ -49,16 +50,16 @@ export class AgentSpecializationManager {
           primarySkills: ['material_identification', 'property_analysis', 'composition_analysis'],
           mlOperations: ['material-analysis', 'material-properties', 'image-classification'],
           knowledgeDomains: ['metallurgy', 'polymers', 'ceramics', 'composites'],
-          collaborationStrengths: ['data_sharing', 'technical_consultation']
+          collaborationStrengths: ['data_sharing', 'technical_consultation'],
         },
         performanceProfile: {
           accuracy: 0.9,
           speed: 0.7,
           consistency: 0.85,
-          adaptability: 0.8
+          adaptability: 0.8,
         },
         preferredTasks: ['material_analysis', 'property_extraction', 'compliance_checking'],
-        workloadCapacity: 10
+        workloadCapacity: 10,
       },
       {
         name: 'Style & Aesthetic Analyst',
@@ -67,16 +68,16 @@ export class AgentSpecializationManager {
           primarySkills: ['style_analysis', 'trend_identification', 'aesthetic_evaluation'],
           mlOperations: ['style-analysis', 'image-classification'],
           knowledgeDomains: ['design_trends', 'color_theory', 'spatial_aesthetics'],
-          collaborationStrengths: ['creative_consultation', 'trend_reporting']
+          collaborationStrengths: ['creative_consultation', 'trend_reporting'],
         },
         performanceProfile: {
           accuracy: 0.85,
           speed: 0.9,
           consistency: 0.8,
-          adaptability: 0.9
+          adaptability: 0.9,
         },
         preferredTasks: ['style_analysis', 'trend_research', 'aesthetic_scoring'],
-        workloadCapacity: 15
+        workloadCapacity: 15,
       },
       {
         name: 'Quality Control Specialist',
@@ -85,16 +86,16 @@ export class AgentSpecializationManager {
           primarySkills: ['quality_assessment', 'defect_detection', 'standard_compliance'],
           mlOperations: ['image-classification', 'material-analysis'],
           knowledgeDomains: ['quality_standards', 'manufacturing_processes', 'testing_protocols'],
-          collaborationStrengths: ['validation', 'audit_trails']
+          collaborationStrengths: ['validation', 'audit_trails'],
         },
         performanceProfile: {
           accuracy: 0.95,
           speed: 0.6,
           consistency: 0.95,
-          adaptability: 0.7
+          adaptability: 0.7,
         },
         preferredTasks: ['quality_inspection', 'compliance_verification', 'audit_support'],
-        workloadCapacity: 8
+        workloadCapacity: 8,
       },
       {
         name: 'Research & Innovation Specialist',
@@ -103,16 +104,16 @@ export class AgentSpecializationManager {
           primarySkills: ['research_synthesis', 'innovation_analysis', 'knowledge_discovery'],
           mlOperations: ['material-analysis', 'style-analysis', 'material-properties'],
           knowledgeDomains: ['emerging_materials', 'research_methodologies', 'patent_analysis'],
-          collaborationStrengths: ['knowledge_synthesis', 'innovation_guidance']
+          collaborationStrengths: ['knowledge_synthesis', 'innovation_guidance'],
         },
         performanceProfile: {
           accuracy: 0.8,
           speed: 0.5,
           consistency: 0.75,
-          adaptability: 0.95
+          adaptability: 0.95,
         },
         preferredTasks: ['research_analysis', 'innovation_scouting', 'knowledge_curation'],
-        workloadCapacity: 5
+        workloadCapacity: 5,
       },
       {
         name: 'Task Coordinator',
@@ -121,23 +122,23 @@ export class AgentSpecializationManager {
           primarySkills: ['task_orchestration', 'resource_allocation', 'workflow_optimization'],
           mlOperations: ['material-analysis', 'style-analysis'],
           knowledgeDomains: ['project_management', 'workflow_design', 'resource_optimization'],
-          collaborationStrengths: ['coordination', 'communication', 'delegation']
+          collaborationStrengths: ['coordination', 'communication', 'delegation'],
         },
         performanceProfile: {
           accuracy: 0.75,
           speed: 0.95,
           consistency: 0.9,
-          adaptability: 0.85
+          adaptability: 0.85,
         },
         preferredTasks: ['task_coordination', 'workflow_management', 'resource_planning'],
-        workloadCapacity: 20
-      }
+        workloadCapacity: 20,
+      },
     ];
 
     defaultSpecs.forEach((spec, index) => {
       this.agentSpecializations.set(`default_${index}`, {
         ...spec,
-        id: `default_${index}`
+        id: `default_${index}`,
       });
     });
   }
@@ -152,14 +153,19 @@ export class AgentSpecializationManager {
       knowledgeDomains: string[];
       priority: 'speed' | 'accuracy' | 'consistency';
       maxAgents: number;
-    }
+    },
   ): Promise<TaskAssignment[]> {
     try {
       // Get all available agents
-      const { data: agents, error } = await supabase
-        .from('crewai_agents')
-        .select('*')
-        .eq('status', 'active');
+      // TODO: Update to use 'material_agents' table when it's created
+      // For now, commenting out this functionality as the table doesn't exist
+      const agents: any[] = [];
+      const error = null;
+
+      // const { data: agents, error } = await supabase
+      //   .from('material_agents')
+      //   .select('*')
+      //   .eq('status', 'active');
 
       if (error || !agents) {
         console.error('Failed to fetch agents:', error);
@@ -168,7 +174,7 @@ export class AgentSpecializationManager {
 
       // Score each agent for this task
       const agentScores = await Promise.all(
-        agents.map(agent => this.scoreAgentForTask(agent, taskType, requirements))
+        agents.map(agent => this.scoreAgentForTask(agent, taskType, requirements)),
       );
 
       // Sort by score and take top agents
@@ -177,7 +183,7 @@ export class AgentSpecializationManager {
         .slice(0, requirements.maxAgents);
 
       console.log('AgentSpecialization: Assigned agents:', topAssignments.map(a => a.agentId));
-      
+
       return topAssignments;
 
     } catch (error) {
@@ -196,18 +202,18 @@ export class AgentSpecializationManager {
       mlOperations: string[];
       knowledgeDomains: string[];
       priority: 'speed' | 'accuracy' | 'consistency';
-    }
+    },
   ): Promise<TaskAssignment> {
     let score = 0;
     const reasoning: string[] = [];
 
     // Get agent specialization
     const specialization = this.getAgentSpecialization(agent);
-    
+
     // Score based on ML operations compatibility
     const mlCompatibility = this.calculateMLCompatibility(
       specialization.capabilities.mlOperations,
-      requirements.mlOperations
+      requirements.mlOperations,
     );
     score += mlCompatibility * 0.3;
     reasoning.push(`ML compatibility: ${(mlCompatibility * 100).toFixed(0)}%`);
@@ -215,7 +221,7 @@ export class AgentSpecializationManager {
     // Score based on knowledge domain overlap
     const domainOverlap = this.calculateDomainOverlap(
       specialization.capabilities.knowledgeDomains,
-      requirements.knowledgeDomains
+      requirements.knowledgeDomains,
     );
     score += domainOverlap * 0.3;
     reasoning.push(`Domain expertise: ${(domainOverlap * 100).toFixed(0)}%`);
@@ -223,7 +229,7 @@ export class AgentSpecializationManager {
     // Score based on performance profile and priority
     const performanceScore = this.calculatePerformanceScore(
       specialization.performanceProfile,
-      requirements.priority
+      requirements.priority,
     );
     score += performanceScore * 0.2;
     reasoning.push(`Performance fit: ${(performanceScore * 100).toFixed(0)}%`);
@@ -241,7 +247,7 @@ export class AgentSpecializationManager {
     // Estimate processing time
     const estimatedTime = this.estimateProcessingTime(
       specialization.performanceProfile.speed,
-      requirements.mlOperations.length
+      requirements.mlOperations.length,
     );
 
     return {
@@ -249,7 +255,7 @@ export class AgentSpecializationManager {
       agentId: agent.id,
       confidence: Math.min(1, Math.max(0, score)),
       estimatedTime,
-      reasoningChain: reasoning
+      reasoningChain: reasoning,
     };
   }
 
@@ -284,16 +290,16 @@ export class AgentSpecializationManager {
         primarySkills: capabilities.skills || [],
         mlOperations: capabilities.ml_operations || [],
         knowledgeDomains: capabilities.knowledge_domains || [],
-        collaborationStrengths: capabilities.collaboration_strengths || []
+        collaborationStrengths: capabilities.collaboration_strengths || [],
       },
       performanceProfile: {
         accuracy: performance.ml_task_accuracy || 0.7,
         speed: this.normalizeSpeed(performance.average_processing_time || 5000),
         consistency: performance.task_completion_rate || 0.7,
-        adaptability: this.calculateAdaptability(learning)
+        adaptability: this.calculateAdaptability(learning),
       },
       preferredTasks: this.extractPreferredTasks(learning),
-      workloadCapacity: capabilities.max_concurrent_tasks || 10
+      workloadCapacity: capabilities.max_concurrent_tasks || 10,
     };
   }
 
@@ -306,7 +312,7 @@ export class AgentSpecializationManager {
       'style_expert': 'default_1',
       'quality_inspector': 'default_2',
       'researcher': 'default_3',
-      'coordinator': 'default_4'
+      'coordinator': 'default_4',
     };
 
     return typeMap[agentType] || typeMap[specialization] || 'default_0';
@@ -317,7 +323,7 @@ export class AgentSpecializationManager {
    */
   private calculateMLCompatibility(agentOps: string[], requiredOps: string[]): number {
     if (requiredOps.length === 0) return 1;
-    
+
     const matches = requiredOps.filter(op => agentOps.includes(op)).length;
     return matches / requiredOps.length;
   }
@@ -327,14 +333,14 @@ export class AgentSpecializationManager {
    */
   private calculateDomainOverlap(agentDomains: string[], requiredDomains: string[]): number {
     if (requiredDomains.length === 0) return 1;
-    
-    const matches = requiredDomains.filter(domain => 
-      agentDomains.some(agentDomain => 
+
+    const matches = requiredDomains.filter(domain =>
+      agentDomains.some(agentDomain =>
         agentDomain.toLowerCase().includes(domain.toLowerCase()) ||
-        domain.toLowerCase().includes(agentDomain.toLowerCase())
-      )
+        domain.toLowerCase().includes(agentDomain.toLowerCase()),
+      ),
     ).length;
-    
+
     return matches / requiredDomains.length;
   }
 
@@ -343,12 +349,12 @@ export class AgentSpecializationManager {
    */
   private calculatePerformanceScore(
     profile: AgentSpecialization['performanceProfile'],
-    priority: 'speed' | 'accuracy' | 'consistency'
+    priority: 'speed' | 'accuracy' | 'consistency',
   ): number {
     const weights = {
       speed: { speed: 0.6, accuracy: 0.2, consistency: 0.1, adaptability: 0.1 },
       accuracy: { speed: 0.1, accuracy: 0.6, consistency: 0.2, adaptability: 0.1 },
-      consistency: { speed: 0.1, accuracy: 0.2, consistency: 0.6, adaptability: 0.1 }
+      consistency: { speed: 0.1, accuracy: 0.2, consistency: 0.6, adaptability: 0.1 },
     };
 
     const weight = weights[priority];
@@ -390,7 +396,7 @@ export class AgentSpecializationManager {
     try {
       // Get recent ML tasks for this agent
       const recentTasks = await agentMLCoordinator.getAgentMLTasks(agentId);
-      
+
       if (recentTasks.length === 0) return 0.7; // Default for new agents
 
       // Calculate average confidence from recent tasks
@@ -417,7 +423,7 @@ export class AgentSpecializationManager {
     const baseTime = 3000; // 3 seconds base
     const operationTime = 2000; // 2 seconds per operation
     const speedMultiplier = (2 - speedProfile); // Higher speed = lower multiplier
-    
+
     return Math.round((baseTime + operationTime * numOperations) * speedMultiplier);
   }
 
@@ -448,7 +454,7 @@ export class AgentSpecializationManager {
     // Assume 1 second is fastest (1.0), 10 seconds is slowest (0.0)
     const maxTime = 10000; // 10 seconds
     const minTime = 1000;  // 1 second
-    
+
     const normalizedTime = Math.max(minTime, Math.min(maxTime, avgProcessingTime));
     return (maxTime - normalizedTime) / (maxTime - minTime);
   }
@@ -458,14 +464,14 @@ export class AgentSpecializationManager {
    */
   private calculateAdaptability(learning: any): number {
     if (!learning) return 0.5;
-    
+
     const recentInsights = learning.recent_insights || [];
     const skillImprovements = learning.skill_improvements || {};
-    
+
     // More recent insights and skill improvements = higher adaptability
     const insightScore = Math.min(1, recentInsights.length / 10);
     const improvementScore = Object.keys(skillImprovements).length / 5;
-    
+
     return (insightScore + improvementScore) / 2;
   }
 
@@ -474,9 +480,9 @@ export class AgentSpecializationManager {
    */
   private extractPreferredTasks(learning: any): string[] {
     if (!learning) return [];
-    
+
     const skillImprovements = learning.skill_improvements || {};
-    
+
     return Object.entries(skillImprovements)
       .filter(([_, improvement]: [string, any]) => improvement.improvement_rate > 0.6)
       .map(([skill, _]) => skill);

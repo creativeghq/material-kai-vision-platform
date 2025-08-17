@@ -1,6 +1,6 @@
 /**
  * Dependency Injection Container Types
- * 
+ *
  * Core type definitions for the DI container system, including service lifetimes,
  * descriptors, and container interfaces.
  */
@@ -242,7 +242,7 @@ export interface IServiceContainerFactory {
 export class CircularDependencyError extends Error {
   constructor(
     public readonly dependencyChain: ServiceIdentifier[],
-    message?: string
+    message?: string,
   ) {
     super(message || `Circular dependency detected: ${dependencyChain.map(d => d.toString()).join(' -> ')}`);
     this.name = 'CircularDependencyError';
@@ -255,7 +255,7 @@ export class CircularDependencyError extends Error {
 export class ServiceNotFoundError extends Error {
   constructor(
     public readonly identifier: ServiceIdentifier,
-    message?: string
+    message?: string,
   ) {
     super(message || `Service not found: ${identifier.toString()}`);
     this.name = 'ServiceNotFoundError';
@@ -269,7 +269,7 @@ export class ServiceResolutionError extends Error {
   constructor(
     public readonly identifier: ServiceIdentifier,
     public readonly cause: Error,
-    message?: string
+    message?: string,
   ) {
     super(message || `Failed to resolve service: ${identifier.toString()}`);
     this.name = 'ServiceResolutionError';

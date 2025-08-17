@@ -73,11 +73,11 @@ export interface ConsolidatedProcessingResult {
 
 /**
  * Consolidated PDF Workflow Service
- * 
+ *
  * This service consolidates the functionality of pdfWorkflowService.ts and hybridPDFPipeline.ts
  * into a single, efficient service that can delegate to MIVAA for advanced processing
  * while maintaining workflow tracking and fallback to legacy processing.
- * 
+ *
  * Key Features:
  * - Unified workflow orchestration with step-by-step tracking
  * - MIVAA integration for advanced PDF processing
@@ -114,7 +114,7 @@ export class ConsolidatedPDFWorkflowService {
     if (!currentStep) {
       throw new Error(`Step at index ${stepIndex} not found`);
     }
-    
+
     job.steps[stepIndex] = {
       ...currentStep,
       status: updates.status ?? currentStep.status,
@@ -124,9 +124,9 @@ export class ConsolidatedPDFWorkflowService {
       details: updates.details ?? currentStep.details,
       error: updates.error ?? currentStep.error,
       logs: updates.logs ?? currentStep.logs,
-      metadata: updates.metadata ?? currentStep.metadata
+      metadata: updates.metadata ?? currentStep.metadata,
     } as WorkflowStep;
-    
+
     // Update job status based on step statuses
     if (updates.status === 'failed') {
       job.status = 'failed';
@@ -147,14 +147,14 @@ export class ConsolidatedPDFWorkflowService {
    * Supports both MIVAA and legacy processing paths
    */
   async startPDFProcessing(
-    file: File, 
-    options: ConsolidatedProcessingOptions = {}
+    file: File,
+    options: ConsolidatedProcessingOptions = {},
   ): Promise<string> {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Determine processing path based on options
     const useMivaa = options.useMivaaProcessing !== false; // Default to MIVAA
-    
+
     // Create workflow steps based on processing path
     const steps = this.createWorkflowSteps(useMivaa);
 
@@ -166,7 +166,7 @@ export class ConsolidatedPDFWorkflowService {
       startTime: new Date(),
       steps,
       currentStepIndex: 0,
-      metadata: {}
+      metadata: {},
     };
 
     this.jobs.set(jobId, job);
@@ -192,25 +192,25 @@ export class ConsolidatedPDFWorkflowService {
         name: 'Authentication',
         description: 'Verify user authentication and permissions',
         status: 'pending',
-        
-        details: []
+
+        details: [],
       },
       {
         id: 'upload',
         name: 'File Upload',
         description: 'Upload PDF to secure storage bucket',
         status: 'pending',
-        
-        details: []
+
+        details: [],
       },
       {
         id: 'validation',
         name: 'File Validation',
         description: 'Validate PDF structure and content accessibility',
         status: 'pending',
-        
-        details: []
-      }
+
+        details: [],
+      },
     ];
 
     if (useMivaa) {
@@ -221,41 +221,41 @@ export class ConsolidatedPDFWorkflowService {
           name: 'MIVAA Advanced Processing',
           description: 'Process PDF using MIVAA microservice with LlamaIndex RAG',
           status: 'pending',
-          
-          details: []
+
+          details: [],
         },
         {
           id: 'layout-analysis',
           name: 'Layout Analysis',
           description: 'Analyze document structure and extract layout elements',
           status: 'pending',
-          
-          details: []
+
+          details: [],
         },
         {
           id: 'embedding-generation',
           name: 'Embedding Generation',
           description: 'Generate 1536-dimension embeddings using MIVAA integration',
           status: 'pending',
-          
-          details: []
+
+          details: [],
         },
         {
           id: 'knowledge-storage',
           name: 'Knowledge Base Storage',
           description: 'Store document in enhanced knowledge base with metadata',
           status: 'pending',
-          
-          details: []
+
+          details: [],
         },
         {
           id: 'quality-assessment',
           name: 'Quality Assessment',
           description: 'Calculate processing quality and confidence metrics',
           status: 'pending',
-          
-          details: []
-        }
+
+          details: [],
+        },
       ];
     } else {
       return [
@@ -265,16 +265,16 @@ export class ConsolidatedPDFWorkflowService {
           name: 'PDF to HTML Conversion',
           description: 'Convert PDF to HTML using ConvertAPI with embedded CSS',
           status: 'pending',
-          
-          details: []
+
+          details: [],
         },
         {
           id: 'html-extraction',
           name: 'HTML Content Extraction',
           description: 'Extract and decode HTML content from ConvertAPI response',
           status: 'pending',
-          
-          details: []
+
+          details: [],
         },
         {
           id: 'image-processing',
@@ -282,24 +282,24 @@ export class ConsolidatedPDFWorkflowService {
           description: 'Extract and process document images with metadata',
           status: 'pending',
           icon: Image,
-          details: []
+          details: [],
         },
         {
           id: 'embedding-generation',
           name: 'Embedding Generation',
           description: 'Generate vector embeddings using legacy OpenAI integration',
           status: 'pending',
-          
-          details: []
+
+          details: [],
         },
         {
           id: 'knowledge-storage',
           name: 'Knowledge Base Storage',
           description: 'Store document in knowledge base with metadata',
           status: 'pending',
-          
-          details: []
-        }
+
+          details: [],
+        },
       ];
     }
   }
@@ -308,9 +308,9 @@ export class ConsolidatedPDFWorkflowService {
    * Execute MIVAA-based processing workflow
    */
   private async executeMivaaWorkflow(
-    jobId: string, 
-    file: File, 
-    options: ConsolidatedProcessingOptions
+    jobId: string,
+    file: File,
+    options: ConsolidatedProcessingOptions,
   ) {
     try {
       const job = this.jobs.get(jobId);
@@ -322,7 +322,7 @@ export class ConsolidatedPDFWorkflowService {
         if (error || !user) throw new Error('User not authenticated');
         return {
           details: [`Authenticated user: ${user.email}`, `User ID: ${user.id}`],
-          metadata: { userId: user.id, email: user.email }
+          metadata: { userId: user.id, email: user.email },
         };
       });
 
@@ -332,7 +332,7 @@ export class ConsolidatedPDFWorkflowService {
         const fileName = `${Date.now()}-${file.name}`;
         const { data: { user } } = await supabase.auth.getUser();
         const fullPath = `${user!.id}/${fileName}`;
-        
+
         const { error } = await supabase.storage
           .from('pdf-documents')
           .upload(fullPath, file);
@@ -347,14 +347,14 @@ export class ConsolidatedPDFWorkflowService {
           details: [
             `File uploaded: ${fullPath}`,
             `File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
-            `Public URL generated`
+            'Public URL generated',
           ],
-          metadata: { 
-            fileName: fullPath, 
+          metadata: {
+            fileName: fullPath,
             fileSize: file.size,
-            publicUrl 
+            publicUrl,
           },
-          result: { publicUrl, fileName: fullPath }
+          result: { publicUrl, fileName: fullPath },
         };
       });
 
@@ -365,13 +365,13 @@ export class ConsolidatedPDFWorkflowService {
           details: [
             'PDF structure validated',
             'Content accessibility confirmed',
-            'No encryption detected'
+            'No encryption detected',
           ],
-          metadata: { 
+          metadata: {
             isValidPDF: true,
             pageCount: 'estimated',
-            hasText: true 
-          }
+            hasText: true,
+          },
         };
       });
 
@@ -390,8 +390,8 @@ export class ConsolidatedPDFWorkflowService {
             preserveLayout: options.preserveLayout !== false,
             extractMaterials: options.extractMaterials !== false,
             language: options.language || 'en',
-            workspaceAware: options.workspaceAware || false
-          }
+            workspaceAware: options.workspaceAware || false,
+          },
         };
 
         // Use MIVAA gateway for RAG processing
@@ -405,9 +405,9 @@ export class ConsolidatedPDFWorkflowService {
             payload: {
               fileUrl: processingRequest.fileUrl,
               filename: processingRequest.filename,
-              options: processingRequest.options
-            }
-          })
+              options: processingRequest.options,
+            },
+          }),
         });
 
         if (!response.ok) {
@@ -419,17 +419,17 @@ export class ConsolidatedPDFWorkflowService {
         return {
           details: [
             'MIVAA microservice processing initiated',
-            `Advanced PDF extraction using LlamaIndex RAG`,
+            'Advanced PDF extraction using LlamaIndex RAG',
             `Processing completed with ${result.sources?.length || 0} sources`,
-            `Generated 1536-dimension embeddings`,
-            `Quality score: ${Math.round((result.confidence || 0) * 100)}%`
+            'Generated 1536-dimension embeddings',
+            `Quality score: ${Math.round((result.confidence || 0) * 100)}%`,
           ],
           metadata: {
             service: 'MIVAA',
             sourcesGenerated: result.sources?.length || 0,
-            confidence: result.confidence || 0
+            confidence: result.confidence || 0,
           },
-          result
+          result,
         };
       });
 
@@ -437,16 +437,16 @@ export class ConsolidatedPDFWorkflowService {
       await this.executeStep(jobId, 'layout-analysis', async () => {
         return {
           details: [
-            `Layout analysis completed using MIVAA`,
-            `Document structure preserved with advanced algorithms`,
-            `Reading order optimized for RAG processing`,
-            `Element hierarchy established`
+            'Layout analysis completed using MIVAA',
+            'Document structure preserved with advanced algorithms',
+            'Reading order optimized for RAG processing',
+            'Element hierarchy established',
           ],
           metadata: {
             layoutAnalysisCompleted: true,
             mivaaProcessed: true,
-            structurePreserved: true
-          }
+            structurePreserved: true,
+          },
         };
       });
 
@@ -457,13 +457,13 @@ export class ConsolidatedPDFWorkflowService {
             'Embeddings generated using MIVAA integration',
             '1536-dimension embeddings (MIVAA standard)',
             'Optimized for semantic search and RAG',
-            'Batch processing completed efficiently'
+            'Batch processing completed efficiently',
           ],
           metadata: {
             embeddingDimensions: 1536,
             embeddingModel: 'MIVAA-integrated',
-            batchProcessed: true
-          }
+            batchProcessed: true,
+          },
         };
       });
 
@@ -474,31 +474,31 @@ export class ConsolidatedPDFWorkflowService {
             'Document stored in enhanced knowledge base',
             'MIVAA processing results integrated',
             'Metadata and relationships preserved',
-            'Search indexing completed'
+            'Search indexing completed',
           ],
           metadata: {
             knowledgeEntryId: mivaaResult.result?.knowledgeEntryId,
             documentId: mivaaResult.result?.documentId,
-            storageCompleted: true
-          }
+            storageCompleted: true,
+          },
         };
       });
 
       // Step 8: Quality Assessment
       await this.executeStep(jobId, 'quality-assessment', async () => {
         const confidence = mivaaResult.result?.confidence || 0;
-        
+
         return {
           details: [
             `Overall processing quality: ${Math.round(confidence * 100)}%`,
             'MIVAA advanced algorithms used',
             'Quality metrics calculated',
-            'Processing completed successfully'
+            'Processing completed successfully',
           ],
           metadata: {
             overallQuality: confidence,
-            qualityAssessmentCompleted: true
-          }
+            qualityAssessmentCompleted: true,
+          },
         };
       });
 
@@ -508,7 +508,7 @@ export class ConsolidatedPDFWorkflowService {
       console.error('MIVAA PDF workflow error:', error);
       await this.updateJobStep(jobId, 'mivaa-processing', {
         status: 'failed',
-        details: [`Processing failed: ${error instanceof Error ? error.message : String(error)}`]
+        details: [`Processing failed: ${error instanceof Error ? error.message : String(error)}`],
       });
       throw error;
     }
@@ -520,7 +520,7 @@ export class ConsolidatedPDFWorkflowService {
   private async executeLegacyWorkflow(
     jobId: string,
     file: File,
-    _options: ConsolidatedProcessingOptions
+    _options: ConsolidatedProcessingOptions,
   ) {
     try {
       const job = this.jobs.get(jobId);
@@ -532,7 +532,7 @@ export class ConsolidatedPDFWorkflowService {
         if (error || !user) throw new Error('User not authenticated');
         return {
           details: [`Authenticated user: ${user.email}`, `User ID: ${user.id}`],
-          metadata: { userId: user.id, email: user.email }
+          metadata: { userId: user.id, email: user.email },
         };
       });
 
@@ -541,7 +541,7 @@ export class ConsolidatedPDFWorkflowService {
         const fileName = `${Date.now()}-${file.name}`;
         const { data: { user } } = await supabase.auth.getUser();
         const fullPath = `${user!.id}/${fileName}`;
-        
+
         const { error } = await supabase.storage
           .from('pdf-documents')
           .upload(fullPath, file);
@@ -556,14 +556,14 @@ export class ConsolidatedPDFWorkflowService {
           details: [
             `File uploaded: ${fullPath}`,
             `File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
-            `Public URL generated`
+            'Public URL generated',
           ],
           metadata: {
             fileName: fullPath,
             fileSize: file.size,
-            publicUrl
+            publicUrl,
           },
-          result: { publicUrl, fileName: fullPath }
+          result: { publicUrl, fileName: fullPath },
         };
       });
 
@@ -574,13 +574,13 @@ export class ConsolidatedPDFWorkflowService {
           details: [
             'PDF structure validated',
             'Content accessibility confirmed',
-            'No encryption detected'
+            'No encryption detected',
           ],
-          metadata: { 
+          metadata: {
             isValidPDF: true,
             pageCount: 'estimated',
-            hasText: true 
-          }
+            hasText: true,
+          },
         };
       });
 
@@ -592,14 +592,14 @@ export class ConsolidatedPDFWorkflowService {
             'Calling ConvertAPI PDF to HTML conversion service',
             'Parameters: EmbedCss=true, EmbedImages=false, PageRange=1-10',
             'Processing document with layout preservation',
-            'Conversion request completed successfully'
+            'Conversion request completed successfully',
           ],
           metadata: {
             service: 'ConvertAPI',
             conversion: 'PDF to HTML',
             embedCss: true,
-            embedImages: false
-          }
+            embedImages: false,
+          },
         };
       });
 
@@ -611,13 +611,13 @@ export class ConsolidatedPDFWorkflowService {
             'Prioritizing URL download for clean HTML content',
             'Detected HTML content source type',
             'Successfully extracted clean HTML content',
-            'HTML content length: Estimated 15,000+ characters'
+            'HTML content length: Estimated 15,000+ characters',
           ],
           metadata: {
             extractionMethod: 'url_download_preferred',
             htmlContentLength: 15000,
-            contentClean: true
-          }
+            contentClean: true,
+          },
         };
       });
 
@@ -642,7 +642,7 @@ export class ConsolidatedPDFWorkflowService {
       details: string[];
       metadata?: any;
       result?: any;
-    }>
+    }>,
   ): Promise<{ details: string[]; metadata?: any; result?: any }> {
     try {
       // Mark step as running
@@ -654,7 +654,7 @@ export class ConsolidatedPDFWorkflowService {
       // Mark step as completed
       this.updateJobStep(jobId, stepId, {
         status: 'completed',
-        details: result.details
+        details: result.details,
       });
 
       return result;
@@ -663,7 +663,7 @@ export class ConsolidatedPDFWorkflowService {
       // Mark step as failed
       this.updateJobStep(jobId, stepId, {
         status: 'failed',
-        details: [`Step failed: ${error instanceof Error ? error.message : String(error)}`]
+        details: [`Step failed: ${error instanceof Error ? error.message : String(error)}`],
       });
       throw error;
     }
@@ -680,8 +680,8 @@ export class ConsolidatedPDFWorkflowService {
    * Get all jobs
    */
   getAllJobs(): WorkflowJob[] {
-    return Array.from(this.jobs.values()).sort((a, b) => 
-      new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    return Array.from(this.jobs.values()).sort((a, b) =>
+      new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
     );
   }
 
@@ -695,7 +695,7 @@ export class ConsolidatedPDFWorkflowService {
     // Reset job status
     job.status = 'running';
     delete job.endTime;
-    
+
     // Reset all failed steps to pending
     job.steps.forEach(step => {
       if (step.status === 'failed') {

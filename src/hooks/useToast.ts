@@ -26,17 +26,17 @@ const addToast = (toast: Omit<Toast, 'id'>) => {
     duration: 5000,
     ...toast,
   };
-  
+
   toastState.toasts.push(newToast);
   notify();
-  
+
   // Auto remove after duration
   if (newToast.duration && newToast.duration > 0) {
     setTimeout(() => {
       removeToast(id);
     }, newToast.duration);
   }
-  
+
   return id;
 };
 
@@ -47,28 +47,28 @@ const removeToast = (id: string) => {
 
 export const useToast = () => {
   const [state, setState] = useState<ToastState>(toastState);
-  
+
   const subscribe = useCallback((listener: (state: ToastState) => void) => {
     listeners.push(listener);
     return () => {
       listeners = listeners.filter(l => l !== listener);
     };
   }, []);
-  
+
   // Subscribe to state changes
   React.useEffect(() => {
     const unsubscribe = subscribe(setState);
     return unsubscribe;
   }, [subscribe]);
-  
+
   const toast = useCallback((props: Omit<Toast, 'id'>) => {
     return addToast(props);
   }, []);
-  
+
   const dismiss = useCallback((id: string) => {
     removeToast(id);
   }, []);
-  
+
   return {
     toast,
     dismiss,

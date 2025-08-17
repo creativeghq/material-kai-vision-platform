@@ -8,7 +8,7 @@ import {
   ICircuitBreakerState,
   IPerformanceMetrics,
   IBaseService,
-  IHealthCheckResult
+  IHealthCheckResult,
 } from '../di/interfaces';
 import { AppConfig } from '../config/types';
 
@@ -37,13 +37,13 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
   private processingStatuses: Map<string, IDocumentProcessingStatus> = new Map();
   private circuitBreaker: ICircuitBreakerState = {
     state: 'closed',
-    failureCount: 0
+    failureCount: 0,
   };
   private performanceMetrics: IPerformanceMetrics = {
     requestCount: 0,
     averageResponseTime: 0,
     errorRate: 0,
-    lastUpdated: new Date()
+    lastUpdated: new Date(),
   };
 
   // Circuit breaker configuration - now configurable via DI
@@ -52,7 +52,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
 
   constructor(
     _ragService: IBaseService,
-    _config: AppConfig
+    _config: AppConfig,
   ) {
     // Initialize circuit breaker configuration from centralized config
     this.FAILURE_THRESHOLD = _config.externalDependencies.apis.circuitBreaker.failureThreshold;
@@ -70,8 +70,8 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       details: {
         circuitBreaker: healthStatus.circuitBreaker,
         performanceMetrics: healthStatus.performanceMetrics,
-        activeProcessing: healthStatus.activeProcessing
-      }
+        activeProcessing: healthStatus.activeProcessing,
+      },
     };
   }
 
@@ -95,15 +95,15 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
         totalSteps: 5,
         completedSteps: 0,
         workspaceId: request.workspaceContext.workspaceId,
-        userId: request.workspaceContext.userId
-      }
+        userId: request.workspaceContext.userId,
+      },
     };
 
     this.processingStatuses.set(processingId, status);
 
     try {
       console.log(`Starting document integration processing for: ${request.file.name}`);
-      
+
       // Step 1: Validate workspace permissions
       this.updateStatus(processingId, 'processing', 20, 'Validating workspace permissions');
       await this.validateWorkspacePermissions(request.workspaceContext);
@@ -125,10 +125,10 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       const documentId = await this.storeProcessingResults(processingId, mivaaResponse, ragIntegration, request.workspaceContext);
 
       const processingTime = Date.now() - startTime;
-      
+
       // Calculate quality metrics
       const qualityMetrics = this.calculateQualityMetrics(mivaaResponse);
-      
+
       // Calculate statistics
       const statistics = this.calculateStatistics(mivaaResponse, ragIntegration);
 
@@ -140,7 +140,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
         ragIntegration,
         processingTime,
         statistics,
-        qualityMetrics
+        qualityMetrics,
       };
 
       this.updateStatus(processingId, 'completed', 100, 'Processing completed successfully');
@@ -152,11 +152,11 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
 
     } catch (error) {
       console.error('Document integration processing failed:', error);
-      
+
       this.updateStatus(processingId, 'failed', status.progress, 'Processing failed', {
         code: error instanceof Error ? error.constructor.name : 'UnknownError',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: error
+        details: error,
       });
 
       this.updatePerformanceMetrics(Date.now() - startTime, true);
@@ -199,7 +199,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       .filter(status => status.status === 'processing').length;
 
     let healthStatus: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-    
+
     if (this.circuitBreaker.state === 'open') {
       healthStatus = 'unhealthy';
     } else if (this.performanceMetrics.errorRate > 0.1) {
@@ -210,7 +210,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       status: healthStatus,
       circuitBreaker: this.circuitBreaker,
       performanceMetrics: this.performanceMetrics,
-      activeProcessing
+      activeProcessing,
     };
   }
 
@@ -223,11 +223,11 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
   }
 
   private updateStatus(
-    processingId: string, 
-    status: DocumentProcessingStatus['status'], 
-    progress: number, 
+    processingId: string,
+    status: DocumentProcessingStatus['status'],
+    progress: number,
     currentStep: string,
-    error?: DocumentProcessingStatus['error']
+    error?: DocumentProcessingStatus['error'],
   ): void {
     const existingStatus = this.processingStatuses.get(processingId);
     if (!existingStatus) return;
@@ -240,8 +240,8 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       ...(error !== undefined && { error }),
       metadata: {
         ...existingStatus.metadata,
-        completedSteps: Math.floor((progress / 100) * existingStatus.metadata.totalSteps)
-      }
+        completedSteps: Math.floor((progress / 100) * existingStatus.metadata.totalSteps),
+      },
     };
 
     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
@@ -278,11 +278,11 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
           throw this.createStandardError('SERVICE_UNAVAILABLE', 'Mivaa service is currently unavailable (circuit breaker open)');
         }
         break;
-      
+
       case 'half-open':
         // Allow limited requests in half-open state
         break;
-      
+
       case 'closed':
         // Normal operation
         break;
@@ -292,14 +292,14 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
   private async callMivaaService(request: DocumentProcessingRequest): Promise<any> {
     // Route through the MIVAA gateway instead of direct service calls
     console.log('Calling MIVAA service through gateway for document processing...');
-    
+
     try {
       // Prepare the gateway request payload
       const gatewayPayload = {
         endpoint: '/extract/pdf',
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: {
           file: request.file,
@@ -307,18 +307,18 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
             extractMarkdown: true,
             extractTables: true,
             extractImages: true,
-            workspaceContext: request.workspaceContext
-          }
-        }
+            workspaceContext: request.workspaceContext,
+          },
+        },
       };
 
       // Make request to the gateway endpoint
       const response = await fetch('/api/mivaa/gateway', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(gatewayPayload)
+        body: JSON.stringify(gatewayPayload),
       });
 
       if (!response.ok) {
@@ -326,15 +326,15 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       }
 
       const result = await response.json();
-      
+
       // Return the MIVAA response data
       return result.data || result;
     } catch (error) {
       console.error('Error calling MIVAA service through gateway:', error);
-      
+
       // Type-safe error message extraction
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // Fallback to basic structure if gateway fails
       return {
         markdownContent: `# ${request.file.name}\n\nError processing document: ${errorMessage}`,
@@ -344,18 +344,18 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
           pages: 1,
           processingTime: 0,
           extractionQuality: 0,
-          error: errorMessage
-        }
+          error: errorMessage,
+        },
       };
     }
   }
 
   private async integrateWithRAG(mivaaResponse: any, request: DocumentProcessingRequest): Promise<any> {
     console.log('Integrating with RAG system...');
-    
+
     // Use the existing RAG service for integration
     // This would involve chunking, embedding generation, and knowledge base storage
-    
+
     return {
       knowledgeEntries: [`knowledge_entry_${Date.now()}`],
       embeddings: [],
@@ -364,10 +364,10 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
           content: mivaaResponse.markdownContent,
           metadata: {
             source: request.file.name,
-            workspaceId: request.workspaceContext.workspaceId
-          }
-        }
-      ]
+            workspaceId: request.workspaceContext.workspaceId,
+          },
+        },
+      ],
     };
   }
 
@@ -375,16 +375,16 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
     _processingId: string,
     _mivaaResponse: any,
     _ragIntegration: any,
-    _workspaceContext: WorkspaceContext
+    _workspaceContext: WorkspaceContext,
   ): Promise<string> {
     // Store processing results in Supabase
     const documentId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     console.log(`Storing processing results for document ${documentId}`);
-    
+
     // Implementation would store to Supabase tables
     // For now, just return the generated document ID
-    
+
     return documentId;
   }
 
@@ -392,7 +392,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
     return {
       extractionQuality: mivaaResponse.metadata?.extractionQuality || 0.8,
       chunkingQuality: 0.85, // Would be calculated based on chunk analysis
-      overallQuality: 0.82 // Weighted average of all quality metrics
+      overallQuality: 0.82, // Weighted average of all quality metrics
     };
   }
 
@@ -402,17 +402,17 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       totalChunks: ragIntegration.chunks?.length || 0,
       totalTables: mivaaResponse.extractedTables?.length || 0,
       totalImages: mivaaResponse.extractedImages?.length || 0,
-      averageChunkSize: ragIntegration.chunks?.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / (ragIntegration.chunks?.length || 1) || 0
+      averageChunkSize: ragIntegration.chunks?.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / (ragIntegration.chunks?.length || 1) || 0,
     };
   }
 
   private updatePerformanceMetrics(responseTime: number, isError: boolean): void {
     this.performanceMetrics.requestCount++;
-    
+
     // Update average response time
     const totalTime = this.performanceMetrics.averageResponseTime * (this.performanceMetrics.requestCount - 1) + responseTime;
     this.performanceMetrics.averageResponseTime = totalTime / this.performanceMetrics.requestCount;
-    
+
     // Update error rate
     if (isError) {
       const errorCount = Math.floor(this.performanceMetrics.errorRate * (this.performanceMetrics.requestCount - 1)) + 1;
@@ -421,7 +421,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       const errorCount = Math.floor(this.performanceMetrics.errorRate * (this.performanceMetrics.requestCount - 1));
       this.performanceMetrics.errorRate = errorCount / this.performanceMetrics.requestCount;
     }
-    
+
     this.performanceMetrics.lastUpdated = new Date();
   }
 

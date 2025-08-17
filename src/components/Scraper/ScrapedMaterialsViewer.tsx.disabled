@@ -8,18 +8,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Search, 
-  Save, 
-  ExternalLink, 
-  Image as ImageIcon, 
-  Package, 
+import {
+  Search,
+  Save,
+  ExternalLink,
+  Image as ImageIcon,
+  Package,
   Tag,
   DollarSign,
   Building,
   Edit,
-  Check,
-  X
+  Check
 } from 'lucide-react';
 
 interface ScrapedMaterial {
@@ -45,11 +44,6 @@ const materialCategories = [
 
 type MaterialCategory = typeof materialCategories[number];
 
-const effects = [
-  'Wood', 'Stone & marble', 'Concrete', 'Brick', 'Metal',
-  'Mother-of-pearl', 'Terracotta', 'Fabric', 'Leather', 'Encaustic',
-  'Resin', 'Gold and precious metals', 'Terrazzo', 'Crackle glaze'
-];
 
 export const ScrapedMaterialsViewer: React.FC<ScrapedMaterialsViewerProps> = ({
   materials,

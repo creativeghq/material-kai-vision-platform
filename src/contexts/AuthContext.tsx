@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -32,11 +33,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-      }
+      },
     );
 
     // THEN check for existing session
@@ -52,27 +53,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, displayName?: string) => {
     try {
       const redirectUrl = `${window.location.origin}/`;
-      
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            display_name: displayName
-          }
-        }
+            display_name: displayName,
+          },
+        },
       });
 
       if (error) {
         toast({
-          title: "Sign up failed",
+          title: 'Sign up failed',
           description: error.message,
-          variant: "destructive",
+          variant: 'destructive',
         });
       } else {
         toast({
-          title: "Check your email",
+          title: 'Check your email',
           description: "We've sent you a confirmation link.",
         });
       }
@@ -80,9 +81,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error };
     } catch (error: any) {
       toast({
-        title: "An error occurred",
+        title: 'An error occurred',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return { error };
     }
@@ -97,13 +98,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         toast({
-          title: "Sign in failed",
+          title: 'Sign in failed',
           description: error.message,
-          variant: "destructive",
+          variant: 'destructive',
         });
       } else {
         toast({
-          title: "Welcome back!",
+          title: 'Welcome back!',
           description: "You've been signed in successfully.",
         });
       }
@@ -111,9 +112,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error };
     } catch (error: any) {
       toast({
-        title: "An error occurred",
+        title: 'An error occurred',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return { error };
     }
@@ -124,21 +125,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast({
-          title: "Sign out failed",
+          title: 'Sign out failed',
           description: error.message,
-          variant: "destructive",
+          variant: 'destructive',
         });
       } else {
         toast({
-          title: "Signed out",
+          title: 'Signed out',
           description: "You've been signed out successfully.",
         });
       }
     } catch (error: any) {
       toast({
-        title: "An error occurred",
+        title: 'An error occurred',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -146,30 +147,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPassword = async (email: string) => {
     try {
       const redirectUrl = `${window.location.origin}/auth?reset=true`;
-      
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl,
       });
 
       if (error) {
         toast({
-          title: "Password reset failed",
+          title: 'Password reset failed',
           description: error.message,
-          variant: "destructive",
+          variant: 'destructive',
         });
       } else {
         toast({
-          title: "Password reset email sent",
-          description: "Check your email for a password reset link.",
+          title: 'Password reset email sent',
+          description: 'Check your email for a password reset link.',
         });
       }
 
       return { error };
     } catch (error: any) {
       toast({
-        title: "An error occurred",
+        title: 'An error occurred',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
       return { error };
     }

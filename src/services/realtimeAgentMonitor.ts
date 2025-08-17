@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+
 import { AgentPerformanceOptimizer } from './agentPerformanceOptimizer';
 
 interface RealtimeEvent {
@@ -47,18 +48,18 @@ export class RealtimeAgentMonitor {
         {
           event: '*',
           schema: 'public',
-          table: 'agent_tasks'
+          table: 'agent_tasks',
         },
-        (payload) => this.handleTaskChange(payload)
+        (payload) => this.handleTaskChange(payload),
       )
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'crewai_agents'
+          table: 'agent_tasks', // TODO: Update to 'material_agents' when table is created
         },
-        (payload) => this.handleAgentChange(payload)
+        (payload) => this.handleAgentChange(payload),
       )
       .subscribe();
 
@@ -67,7 +68,7 @@ export class RealtimeAgentMonitor {
 
   private async handleTaskChange(payload: any): Promise<void> {
     const { eventType, new: newRecord, old: oldRecord } = payload;
-    
+
     try {
       if (eventType === 'INSERT') {
         await this.handleTaskStarted(newRecord);
@@ -88,8 +89,8 @@ export class RealtimeAgentMonitor {
       data: {
         taskType: task.task_type,
         assignedAgents: task.assigned_agents,
-        priority: task.priority
-      }
+        priority: task.priority,
+      },
     };
 
     this.emitEvent(event);
@@ -125,8 +126,8 @@ export class RealtimeAgentMonitor {
       timestamp: new Date().toISOString(),
       data: {
         processingTime: task.processing_time_ms,
-        assignedAgents: task.assigned_agents
-      }
+        assignedAgents: task.assigned_agents,
+      },
     };
 
     this.emitEvent(event);
@@ -135,7 +136,7 @@ export class RealtimeAgentMonitor {
     for (const agentId of task.assigned_agents) {
       await this.performanceOptimizer.updateAgentPerformance(agentId, {
         success: true,
-        processing_time_ms: task.processing_time_ms
+        processing_time_ms: task.processing_time_ms,
       });
 
       await this.updateAgentStatus(agentId, 'idle', []);
@@ -151,8 +152,8 @@ export class RealtimeAgentMonitor {
       timestamp: new Date().toISOString(),
       data: {
         errorMessage: task.error_message,
-        assignedAgents: task.assigned_agents
-      }
+        assignedAgents: task.assigned_agents,
+      },
     };
 
     this.emitEvent(event);
@@ -161,7 +162,7 @@ export class RealtimeAgentMonitor {
     for (const agentId of task.assigned_agents) {
       await this.performanceOptimizer.updateAgentPerformance(agentId, {
         success: false,
-        error_message: task.error_message
+        error_message: task.error_message,
       });
 
       await this.updateAgentStatus(agentId, 'error', []);
@@ -175,10 +176,10 @@ export class RealtimeAgentMonitor {
 
   private async handleAgentReassignment(newTask: any, oldTask: any): Promise<void> {
     const removedAgents = oldTask.assigned_agents.filter(
-      (agentId: string) => !newTask.assigned_agents.includes(agentId)
+      (agentId: string) => !newTask.assigned_agents.includes(agentId),
     );
     const addedAgents = newTask.assigned_agents.filter(
-      (agentId: string) => !oldTask.assigned_agents.includes(agentId)
+      (agentId: string) => !oldTask.assigned_agents.includes(agentId),
     );
 
     // Update statuses for removed agents
@@ -196,7 +197,7 @@ export class RealtimeAgentMonitor {
 
   private async handleAgentChange(payload: any): Promise<void> {
     const { eventType, new: newRecord } = payload;
-    
+
     if (eventType === 'UPDATE') {
       const event: RealtimeEvent = {
         eventType: 'agent_status_change',
@@ -204,8 +205,8 @@ export class RealtimeAgentMonitor {
         timestamp: new Date().toISOString(),
         data: {
           status: newRecord.status,
-          performance: newRecord.performance_metrics
-        }
+          performance: newRecord.performance_metrics,
+        },
       };
 
       this.emitEvent(event);
@@ -218,7 +219,7 @@ export class RealtimeAgentMonitor {
       status,
       currentTasks,
       lastHeartbeat: new Date().toISOString(),
-      performance: await this.performanceOptimizer.getAgentPerformanceMetrics(agentId)
+      performance: await this.performanceOptimizer.getAgentPerformanceMetrics(agentId),
     };
 
     this.agentStatuses.set(agentId, agentStatus);
@@ -228,7 +229,7 @@ export class RealtimeAgentMonitor {
       eventType: 'agent_status_change',
       agentId,
       timestamp: new Date().toISOString(),
-      data: agentStatus
+      data: agentStatus,
     };
 
     this.emitEvent(event);
@@ -247,13 +248,13 @@ export class RealtimeAgentMonitor {
   private async performSystemHealthCheck(): Promise<void> {
     try {
       const systemMetrics = await this.performanceOptimizer.getSystemLoadMetrics();
-      
+
       // Check for system overload
       if (systemMetrics.systemHealth === 'critical') {
-        this.emitSystemAlert('critical', 
+        this.emitSystemAlert('critical',
           `System overloaded: ${(systemMetrics.averageLoad * 100).toFixed(1)}% capacity`);
       } else if (systemMetrics.systemHealth === 'warning') {
-        this.emitSystemAlert('warning', 
+        this.emitSystemAlert('warning',
           `High system load: ${(systemMetrics.averageLoad * 100).toFixed(1)}% capacity`);
       }
 
@@ -270,7 +271,7 @@ export class RealtimeAgentMonitor {
         for (const agent of agents) {
           const lastUpdate = new Date(agent.updated_at).getTime();
           if (now - lastUpdate > staleThreshold) {
-            this.emitSystemAlert('warning', 
+            this.emitSystemAlert('warning',
               `Agent ${agent.id} appears inactive (last update: ${new Date(agent.updated_at).toLocaleString()})`,
               agent.id);
           }
@@ -292,9 +293,9 @@ export class RealtimeAgentMonitor {
     const alert: SystemAlert = {
       level,
       message,
-      agentId,
-      taskId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      ...(agentId && { agentId }),
+      ...(taskId && { taskId }),
     };
 
     this.systemAlerts.push(alert);
@@ -304,7 +305,7 @@ export class RealtimeAgentMonitor {
       agentId,
       taskId,
       timestamp: alert.timestamp,
-      data: alert
+      data: alert,
     };
 
     this.emitEvent(event);
@@ -372,13 +373,13 @@ export class RealtimeAgentMonitor {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
     }
-    
+
     this.listeners.clear();
     this.agentStatuses.clear();
-    
+
     // Unsubscribe from realtime channels
     supabase.removeAllChannels();
-    
+
     console.log('Realtime agent monitor destroyed');
   }
 }

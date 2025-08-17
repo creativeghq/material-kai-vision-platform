@@ -1,11 +1,12 @@
 /**
  * Supabase API Configuration
- * 
+ *
  * Centralized configuration for all Supabase functions and their parameter schemas.
  * Each function maintains its own specific input/output requirements.
  */
 
 import { z } from 'zod';
+
 import { SupabaseApiConfig } from '../apiConfig';
 
 // Common schemas for Supabase functions
@@ -16,20 +17,15 @@ const commonErrorSchema = z.object({
   code: z.string().optional(),
 });
 
-const successResponseSchema = z.object({
-  success: z.boolean(),
-  message: z.string().optional(),
-});
-
 // CrewAI 3D Generation function schema - UX validation only
 // Schema matches the actual data structure sent by ApiIntegrationService
 const crewai3DGenerationInputSchema = z.object({
   functionName: z.string(),
   data: z.object({
-    prompt: z.string().min(1, "Prompt is required"),
-    models: z.array(z.string()).min(1, "At least one model is required"), // Updated to accept array of models
+    prompt: z.string().min(1, 'Prompt is required'),
+    models: z.array(z.string()).min(1, 'At least one model is required'), // Updated to accept array of models
     user_id: z.string().optional(), // Added user_id field
-    image_url: z.string().url("Please enter a valid URL").optional(),
+    image_url: z.string().url('Please enter a valid URL').optional(),
     room_type: z.string().optional(),
     style: z.string().optional(),
     num_inference_steps: z.number().optional(),
@@ -49,7 +45,7 @@ const crewai3DGenerationOutputSchema = z.union([
     metadata: z.object({
       model: z.string(),
       prompt: z.string(),
-      parameters: z.record(z.any()),
+      parameters: z.record(z.string(), z.any()),
       generation_time: z.number().optional(),
     }),
   }),
@@ -62,12 +58,12 @@ const crewai3DGenerationOutputSchema = z.union([
 
 // Enhanced RAG Search function schema - UX validation only
 const enhancedRAGSearchInputSchema = z.object({
-  query: z.string().min(1, "Query is required"),
+  query: z.string().min(1, 'Query is required'),
   collection_name: z.string().optional(),
   limit: z.number().optional(),
   threshold: z.number().optional(),
   include_metadata: z.boolean().optional(),
-  filters: z.record(z.any()).optional(),
+  filters: z.record(z.string(), z.any()).optional(),
 });
 
 const enhancedRAGSearchOutputSchema = z.union([
@@ -75,7 +71,7 @@ const enhancedRAGSearchOutputSchema = z.union([
     success: z.literal(true),
     results: z.array(z.object({
       content: z.string(),
-      metadata: z.record(z.any()),
+      metadata: z.record(z.string(), z.any()),
       score: z.number(),
       id: z.string(),
     })),
@@ -95,7 +91,7 @@ const enhancedRAGSearchOutputSchema = z.union([
 
 // Material Scraper function schema - UX validation only
 const materialScraperInputSchema = z.object({
-  url: z.string().url("Please enter a valid URL"),
+  url: z.string().url('Please enter a valid URL'),
   extract_images: z.boolean().optional(),
   extract_text: z.boolean().optional(),
   max_images: z.number().optional(),
@@ -117,7 +113,7 @@ const materialScraperOutputSchema = z.union([
         height: z.number().optional(),
       })),
       text_content: z.string().optional(),
-      metadata: z.record(z.any()),
+      metadata: z.record(z.string(), z.any()),
     }),
     processing_time: z.number(),
   }),
@@ -130,7 +126,7 @@ const materialScraperOutputSchema = z.union([
 
 // OCR Processing function schema - UX validation only
 const ocrProcessingInputSchema = z.object({
-  image_url: z.string().url("Please enter a valid image URL"),
+  image_url: z.string().url('Please enter a valid image URL'),
   language: z.string().optional(),
   output_format: z.string().optional(),
   preprocessing: z.object({
@@ -164,7 +160,7 @@ const ocrProcessingOutputSchema = z.union([
 
 // SVBRDF Extractor function schema - UX validation only
 const svbrdfExtractorInputSchema = z.object({
-  image_url: z.string().url("Please enter a valid image URL"),
+  image_url: z.string().url('Please enter a valid image URL'),
   output_format: z.string().optional(),
   resolution: z.number().optional(),
   enhance_quality: z.boolean().optional(),
@@ -198,9 +194,9 @@ const svbrdfExtractorOutputSchema = z.union([
 export const supabaseConfig: SupabaseApiConfig = {
   name: 'supabase',
   type: 'supabase',
-  baseUrl: "https://bgbavxtjlbvgplozizxu.supabase.co",
-  projectUrl: "https://bgbavxtjlbvgplozizxu.supabase.co",
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg",
+  baseUrl: 'https://bgbavxtjlbvgplozizxu.supabase.co',
+  projectUrl: 'https://bgbavxtjlbvgplozizxu.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg',
   timeout: 60000, // 1 minute default
   retryAttempts: 3,
   rateLimit: {
@@ -214,34 +210,34 @@ export const supabaseConfig: SupabaseApiConfig = {
       outputSchema: crewai3DGenerationOutputSchema,
       timeout: 300000, // 5 minutes for AI generation
     },
-    
+
     'enhanced-rag-search': {
       inputSchema: enhancedRAGSearchInputSchema,
       outputSchema: enhancedRAGSearchOutputSchema,
       timeout: 30000, // 30 seconds for search
     },
-    
+
     'material-scraper': {
       inputSchema: materialScraperInputSchema,
       outputSchema: materialScraperOutputSchema,
       timeout: 60000, // 1 minute for scraping
     },
-    
+
     'ocr-processing': {
       inputSchema: ocrProcessingInputSchema,
       outputSchema: ocrProcessingOutputSchema,
       timeout: 45000, // 45 seconds for OCR
     },
-    
+
     'svbrdf-extractor': {
       inputSchema: svbrdfExtractorInputSchema,
       outputSchema: svbrdfExtractorOutputSchema,
       timeout: 120000, // 2 minutes for SVBRDF extraction
     },
-    
+
     'nerf-processor': {
       inputSchema: z.object({
-        images: z.array(z.string().url()).min(1, "At least 1 image required"),
+        images: z.array(z.string().url()).min(1, 'At least 1 image required'),
         output_format: z.string().optional(),
         quality: z.string().optional(),
       }),
@@ -260,10 +256,10 @@ export const supabaseConfig: SupabaseApiConfig = {
       ]),
       timeout: 600000, // 10 minutes for NeRF processing
     },
-    
+
     'spaceformer-analysis': {
       inputSchema: z.object({
-        image_url: z.string().url("Please enter a valid image URL"),
+        image_url: z.string().url('Please enter a valid image URL'),
         analysis_type: z.string().optional(),
         include_suggestions: z.boolean().optional(),
       }),
@@ -323,9 +319,9 @@ export class SupabaseConfigUtils {
       return { success: true, data: validatedData };
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return { 
-          success: false, 
-          error: `Validation error: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}` 
+        return {
+          success: false,
+          error: `Validation error: ${error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         };
       }
       return { success: false, error: 'Unknown validation error' };

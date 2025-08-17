@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Grid3X3, List, Palette } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -23,7 +24,7 @@ export const MoodBoardPage = () => {
     title: '',
     description: '',
     is_public: false,
-    view_preference: 'grid'
+    view_preference: 'grid',
   });
 
   useEffect(() => {
@@ -37,9 +38,9 @@ export const MoodBoardPage = () => {
     } catch (error) {
       console.error('Error loading moodboards:', error);
       toast({
-        title: "Error",
-        description: "Failed to load your moodboards",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load your moodboards',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -49,9 +50,9 @@ export const MoodBoardPage = () => {
   const handleCreateMoodBoard = async () => {
     if (!newMoodBoard.title.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a title for your moodboard",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Please enter a title for your moodboard',
+        variant: 'destructive',
       });
       return;
     }
@@ -65,18 +66,18 @@ export const MoodBoardPage = () => {
         title: '',
         description: '',
         is_public: false,
-        view_preference: 'grid'
+        view_preference: 'grid',
       });
       toast({
-        title: "Success",
-        description: `MoodBoard "${board.title}" created successfully`
+        title: 'Success',
+        description: `MoodBoard "${board.title}" created successfully`,
       });
     } catch (error) {
       console.error('Error creating moodboard:', error);
       toast({
-        title: "Error",
-        description: "Failed to create moodboard",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to create moodboard',
+        variant: 'destructive',
       });
     } finally {
       setCreating(false);
@@ -90,15 +91,15 @@ export const MoodBoardPage = () => {
       await moodboardAPI.deleteMoodBoard(id);
       setMoodboards(prev => prev.filter(board => board.id !== id));
       toast({
-        title: "Success",
-        description: `MoodBoard "${title}" deleted successfully`
+        title: 'Success',
+        description: `MoodBoard "${title}" deleted successfully`,
       });
     } catch (error) {
       console.error('Error deleting moodboard:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete moodboard",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to delete moodboard',
+        variant: 'destructive',
       });
     }
   };
@@ -127,7 +128,7 @@ export const MoodBoardPage = () => {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
             <Button
@@ -141,7 +142,7 @@ export const MoodBoardPage = () => {
               <List className="h-4 w-4" />
             </Button>
           </div>
-          
+
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New MoodBoard
@@ -166,13 +167,13 @@ export const MoodBoardPage = () => {
         </Card>
       ) : (
         <div className={
-          viewMode === 'grid' 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-            : "space-y-4"
+          viewMode === 'grid'
+            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+            : 'space-y-4'
         }>
           {moodboards.map((board) => (
-            <Card 
-              key={board.id} 
+            <Card
+              key={board.id}
               className={`group hover:shadow-lg transition-all cursor-pointer ${
                 viewMode === 'list' ? 'flex flex-row' : ''
               }`}
@@ -203,7 +204,7 @@ export const MoodBoardPage = () => {
                     <span>{board.items?.length || 0} materials</span>
                     <span>{new Date(board.createdAt).toLocaleDateString()}</span>
                   </div>
-                  
+
                   <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button className="flex-1">
                       Open
@@ -230,16 +231,16 @@ export const MoodBoardPage = () => {
           <DialogHeader>
             <DialogTitle>Create New MoodBoard</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
                 value={newMoodBoard.title}
-                onChange={(e) => setNewMoodBoard(prev => ({ 
-                  ...prev, 
-                  title: e.target.value 
+                onChange={(e) => setNewMoodBoard(prev => ({
+                  ...prev,
+                  title: e.target.value,
                 }))}
                 placeholder="Enter moodboard title..."
               />
@@ -250,9 +251,9 @@ export const MoodBoardPage = () => {
               <Textarea
                 id="description"
                 value={newMoodBoard.description}
-                onChange={(e) => setNewMoodBoard(prev => ({ 
-                  ...prev, 
-                  description: e.target.value 
+                onChange={(e) => setNewMoodBoard(prev => ({
+                  ...prev,
+                  description: e.target.value,
                 }))}
                 placeholder="Describe your moodboard..."
                 rows={3}
@@ -265,7 +266,7 @@ export const MoodBoardPage = () => {
                 checked={newMoodBoard.is_public}
                 onCheckedChange={(checked: boolean) => setNewMoodBoard(prev => ({
                   ...prev,
-                  is_public: checked
+                  is_public: checked,
                 }))}
               />
               <Label htmlFor="public">Make this moodboard public</Label>

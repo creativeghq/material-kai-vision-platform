@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Loader2, ExternalLink, Download } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, ExternalLink, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+
 
 interface HTMLDocumentViewerProps {
   isOpen: boolean;
@@ -16,7 +18,7 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
   isOpen,
   onClose,
   knowledgeEntryId,
-  documentTitle = 'HTML Document'
+  documentTitle = 'HTML Document',
 }) => {
   const [htmlContent, setHtmlContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -31,21 +33,32 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
   const fetchHTMLContent = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       // Fetch the knowledge entry which contains the HTML content
       const { data: knowledgeEntry, error: fetchError } = await supabase
-        .from('enhanced_knowledge_base')
-        .select('content, source_url, title')
+        .from('materials_catalog')
+        .select('description, name, properties')
         .eq('id', knowledgeEntryId)
-        .eq('content_type', 'enhanced_pdf_html')
         .maybeSingle();
 
       if (fetchError || !knowledgeEntry) {
         throw new Error('HTML document not found');
       }
 
-      setHtmlContent(knowledgeEntry.content || '');
+      // Use description as content, and extract HTML content from properties if available
+      let htmlContent = knowledgeEntry.description || '';
+
+      // Check if properties is an object and has html_content
+      if (knowledgeEntry.properties &&
+          typeof knowledgeEntry.properties === 'object' &&
+          !Array.isArray(knowledgeEntry.properties) &&
+          knowledgeEntry.properties !== null) {
+        const props = knowledgeEntry.properties as Record<string, any>;
+        htmlContent = props.html_content || htmlContent;
+      }
+
+      setHtmlContent(htmlContent);
     } catch (err) {
       console.error('Error fetching HTML content:', err);
       setError(err instanceof Error ? err.message : 'Failed to load HTML document');
@@ -57,7 +70,7 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
 
   const downloadHTML = () => {
     if (!htmlContent) return;
-    
+
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -72,7 +85,7 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
 
   const openInNewTab = () => {
     if (!htmlContent) return;
-    
+
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
