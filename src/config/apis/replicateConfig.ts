@@ -92,7 +92,7 @@ export const replicateConfig: ReplicateApiConfig = {
   name: 'replicate',
   type: 'replicate',
   baseUrl: 'https://api.replicate.com/v1',
-  apiKey: typeof window === 'undefined' ? process.env.REPLICATE_API_TOKEN : undefined,
+  apiKey: (typeof window === 'undefined' ? process.env.REPLICATE_API_TOKEN : undefined) || '',
   timeout: 300000, // 5 minutes for image generation
   retryAttempts: 3,
   rateLimit: {
@@ -290,7 +290,7 @@ export class ReplicateConfigUtils {
   /**
    * Validate input parameters for a specific model
    */
-  public static validateModelInput(modelId: string, input: any): { success: boolean; error?: string; data?: any } {
+  public static validateModelInput(modelId: string, input: unknown): { success: boolean; error?: string; data?: unknown } {
     const modelConfig = this.getModelConfig(modelId);
     if (!modelConfig) {
       return { success: false, error: `Model ${modelId} not found` };
@@ -321,7 +321,7 @@ export class ReplicateConfigUtils {
   /**
    * Merge user input with default parameters
    */
-  public static mergeWithDefaults(modelId: string, userInput: any) {
+  public static mergeWithDefaults(modelId: string, userInput: Record<string, unknown>) {
     const defaults = this.getModelDefaults(modelId);
     return {
       ...defaults,
@@ -334,7 +334,7 @@ export class ReplicateConfigUtils {
    */
   public static getModelsByCategory(category: string) {
     return Object.entries(replicateConfig.models)
-      .filter(([_, config]) => config.category === category)
+      .filter(([, config]) => config.category === category)
       .map(([id, config]) => ({ id, ...config }));
   }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Check } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -31,13 +31,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
   const [creating, setCreating] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (open) {
-      loadMoodBoards();
-    }
-  }, [open]);
-
-  const loadMoodBoards = async () => {
+  const loadMoodBoards = useCallback(async () => {
     setLoading(true);
     try {
       const boards = await moodboardAPI.getUserMoodBoards();
@@ -52,7 +46,13 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (open) {
+      loadMoodBoards();
+    }
+  }, [open, loadMoodBoards]);
 
   const handleAddToExistingBoard = async () => {
     if (!material || !selectedBoardId) return;
@@ -71,9 +71,9 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
       });
       onOpenChange(false);
       resetState();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding to board:', error);
-      const errorMessage = error.message?.includes('duplicate')
+      const errorMessage = error instanceof Error && error.message?.includes('duplicate')
         ? 'This material is already in the selected moodboard'
         : 'Failed to add material to moodboard';
 

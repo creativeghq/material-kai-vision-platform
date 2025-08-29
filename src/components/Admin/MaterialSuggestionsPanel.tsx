@@ -26,7 +26,7 @@ interface MaterialSuggestion {
   category: string;
   confidence: number;
   source: 'pdf_knowledge' | 'catalog' | 'ai_generated';
-  properties?: any;
+  properties?: Record<string, unknown>;
 }
 
 interface SuggestionConfig {
@@ -50,7 +50,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
 
   const [suggestions, setSuggestions] = useState<MaterialSuggestion[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [testResults, setTestResults] = useState<any[]>([]);
+  const [testResults, setTestResults] = useState<Record<string, unknown>[]>([]);
   const { toast } = useToast();
 
   const generateSuggestions = useCallback(async () => {
@@ -90,7 +90,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
 
       // From PDF knowledge base
       if (data.results?.knowledgeBase) {
-        data.results.knowledgeBase.forEach((item: any) => {
+        data.results.knowledgeBase.forEach((item: Record<string, unknown>) => {
           if (item.metadata?.material_categories) {
             item.metadata.material_categories.forEach((category: string) => {
               formattedSuggestions.push({
@@ -107,7 +107,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
 
       // From materials catalog
       if (data.results?.materials) {
-        data.results.materials.forEach((item: any) => {
+        data.results.materials.forEach((item: Record<string, unknown>) => {
           formattedSuggestions.push({
             name: item.title,
             category: item.category || 'material',
@@ -335,7 +335,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
             <CardContent>
               {suggestions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No suggestions generated yet. Configure settings and click "Generate Suggestions".
+                  No suggestions generated yet. Configure settings and click &quot;Generate Suggestions&quot;.
                 </div>
               ) : (
                 <div className="grid gap-3">
@@ -371,7 +371,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
             <CardContent>
               {testResults.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No integration tests run yet. Generate suggestions and click "Test 3D Integration".
+                  No integration tests run yet. Generate suggestions and click &quot;Test 3D Integration&quot;.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -387,8 +387,8 @@ export const MaterialSuggestionsPanel: React.FC = () => {
                             Test {index + 1} - {result.success ? 'Success' : 'Failed'}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {new Date(result.timestamp).toLocaleString()} •
-                            {result.materials_suggested} materials suggested
+                            {new Date((result.timestamp as string) || Date.now()).toLocaleString()} •
+                            {(result.materials_suggested as number) || 0} materials suggested
                           </div>
                         </div>
                       </div>

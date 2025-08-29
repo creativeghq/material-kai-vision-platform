@@ -16,10 +16,10 @@ import { EventEmitter } from 'events';
  * Common logger interface used across all services
  */
 export interface ILogger {
-  debug(message: string, meta?: any): void;
-  info(message: string, meta?: any): void;
-  warn(message: string, meta?: any): void;
-  error(message: string, meta?: any): void;
+  debug(message: string, meta?: Record<string, unknown>): void;
+  info(message: string, meta?: Record<string, unknown>): void;
+  warn(message: string, meta?: Record<string, unknown>): void;
+  error(message: string, meta?: Record<string, unknown>): void;
 }
 
 /**
@@ -28,7 +28,7 @@ export interface ILogger {
 export interface IHealthCheckResult {
   status: 'healthy' | 'unhealthy' | 'degraded';
   message?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   timestamp: Date;
 }
 
@@ -92,8 +92,8 @@ export interface IChunkMetadata {
   language?: string;
   contentType: 'text' | 'table' | 'image' | 'mixed';
   headers?: string[];
-  tableData?: any;
-  imageMetadata?: any;
+  tableData?: Record<string, unknown>;
+  imageMetadata?: Record<string, unknown>;
   quality: {
     completeness: number;
     coherence: number;
@@ -123,8 +123,8 @@ export interface IDocumentInput {
     workspaceId: string;
     documentId?: string;
     language?: string;
-    extractedTables?: any[];
-    extractedImages?: any[];
+    extractedTables?: Record<string, unknown>[];
+    extractedImages?: Record<string, unknown>[];
     structure?: {
       headers: string[];
       sections: Array<{
@@ -192,7 +192,7 @@ export interface IDocumentChunkingService extends IBaseService {
 export interface IEmbeddingInput {
   id: string;
   text: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   priority?: 'low' | 'normal' | 'high';
 }
 
@@ -208,7 +208,7 @@ export interface IEmbeddingOutput {
     promptTokens: number;
     totalTokens: number;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   processingTime: number;
   cached: boolean;
 }
@@ -414,7 +414,7 @@ export interface IProcessedTableData {
   originalTable: ITableData;
   searchableText: string;
   summary?: string;
-  structuredData: any;
+  structuredData: Record<string, unknown>;
   includeInChunks: boolean;
 }
 
@@ -569,7 +569,7 @@ export interface IBatchDocumentInput {
     priority?: 'low' | 'normal' | 'high';
     chunkingStrategy?: 'fixed-size' | 'semantic' | 'hybrid';
     skipValidation?: boolean;
-    customMetadata?: Record<string, any>;
+    customMetadata?: Record<string, unknown>;
   };
 }
 
@@ -585,7 +585,7 @@ export interface IBatchProcessingResult {
   results: Array<{
     documentId: string;
     status: 'success' | 'failed';
-    result?: any;
+    result?: unknown;
     error?: string;
     processingTime: number;
   }>;
@@ -703,7 +703,7 @@ export interface IWorkspaceContext {
   workspaceId: string;
   userId: string;
   permissions: string[];
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 }
 
 /**
@@ -729,7 +729,7 @@ export interface IDocumentProcessingRequest {
     chunkSize?: number;
     overlap?: number;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -745,7 +745,7 @@ export interface IDocumentProcessingStatus {
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   metadata: {
     filename: string;
@@ -766,14 +766,14 @@ export interface IDocumentProcessingResult {
   documentId: string;
   mivaaResponse: {
     markdownContent: string;
-    extractedTables: any[];
-    extractedImages: any[];
-    metadata: Record<string, any>;
+    extractedTables: Record<string, unknown>[];
+    extractedImages: Record<string, unknown>[];
+    metadata: Record<string, unknown>;
   };
   ragIntegration: {
     knowledgeEntries: string[];
     embeddings?: number[][];
-    chunks: any[];
+    chunks: Record<string, unknown>[];
   };
   processingTime: number;
   statistics: {

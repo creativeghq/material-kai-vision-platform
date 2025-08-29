@@ -42,8 +42,8 @@ export interface BatchFile {
   status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed';
   progress: number;
   error?: string;
-  result?: any;
-  metadata?: Record<string, any>;
+  result?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface BatchProcessingConfig {
@@ -68,7 +68,7 @@ export interface BatchUploadInterfaceProps {
   acceptedFileTypes?: string[];
   className?: string;
   onBatchStart?: (batchId: string, files: BatchFile[]) => void;
-  onBatchComplete?: (batchId: string, results: any[]) => void;
+  onBatchComplete?: (batchId: string, results: Record<string, unknown>[]) => void;
   onFileComplete?: (file: BatchFile) => void;
   onError?: (error: string) => void;
 }
@@ -157,37 +157,56 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
   const { send, isConnected } = useWebSocket(websocketUrl, {
     onMessage: (message) => {
       if (message.type === 'batch_file_update' && message.payload.batchId === batchId) {
-        const { fileId, status, progress, error, result } = message.payload;
+        const { fileId, status, progress, error, result } = message.payload as {
+          fileId: string;
+          status: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed';
+          progress: number;
+          error?: string;
+          result?: Record<string, unknown>;
+          batchId: string;
+        };
 
         setFiles(prev => prev.map(file =>
           file.id === fileId
-            ? { ...file, status, progress, error, result }
+            ? {
+                ...file,
+                status,
+                progress,
+                ...(error !== undefined && { error }),
+                ...(result !== undefined && { result })
+              }
             : file,
         ));
 
         const updatedFile = files.find(f => f.id === fileId);
         if (updatedFile && status === 'completed' && onFileComplete) {
-          onFileComplete({ ...updatedFile, status, progress, error, result });
+          onFileComplete({
+            ...updatedFile,
+            status,
+            progress,
+            ...(error !== undefined && { error }),
+            ...(result !== undefined && { result })
+          });
         }
       }
 
       if (message.type === 'batch_complete' && message.payload.batchId === batchId) {
         setIsProcessing(false);
         if (onBatchComplete && batchId) {
-          onBatchComplete(batchId, message.payload.results);
+          onBatchComplete(batchId, message.payload.results as Record<string, unknown>[]);
         }
       }
 
       if (message.type === 'batch_error' && message.payload.batchId === batchId) {
         setIsProcessing(false);
         if (onError) {
-          onError(message.payload.error);
+          onError(message.payload.error as string);
         }
       }
     },
   });
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = useCallback((file: File): string | null => {
     if (file.size > maxFileSize) {
       return `File size exceeds ${formatBytes(maxFileSize)} limit`;
     }
@@ -198,7 +217,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
     }
 
     return null;
-  };
+  }, [maxFileSize, acceptedFileTypes]);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const fileArray = Array.from(newFiles);
@@ -232,7 +251,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
     if (validFiles.length > 0) {
       setFiles(prev => [...prev, ...validFiles]);
     }
-  }, [files.length, maxFiles, maxFileSize, acceptedFileTypes, onError]);
+  }, [files.length, maxFiles, validateFile, onError]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -307,7 +326,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
         setFiles(prev => prev.map(f =>
           f.id === file.id ? { ...f, status: 'processing' } : f,
         ));
-      } catch (error) {
+      } catch {
         setFiles(prev => prev.map(f =>
           f.id === file.id
             ? { ...f, status: 'failed', error: 'Upload failed' }

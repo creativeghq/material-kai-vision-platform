@@ -27,7 +27,7 @@ export interface ProgressStep {
   startTime?: Date;
   endTime?: Date;
   error?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ProgressData {
@@ -42,7 +42,7 @@ export interface ProgressData {
   endTime?: Date;
   estimatedDuration?: number;
   actualDuration?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ProgressIndicatorProps {

@@ -197,7 +197,7 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to cancel "{job.name}"? This action cannot be undone.
+                    Are you sure you want to cancel &quot;{job.name}&quot;? This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -245,7 +245,7 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete "{job.name}"? This will remove all job data and cannot be undone.
+                    Are you sure you want to delete &quot;{job.name}&quot;? This will remove all job data and cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -314,7 +314,7 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to cancel "{job.name}"? This action cannot be undone and any progress will be lost.
+                    Are you sure you want to cancel &quot;{job.name}&quot;? This action cannot be undone and any progress will be lost.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -356,7 +356,7 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete "{job.name}"? This will permanently remove all job data, logs, and results. This action cannot be undone.
+                    Are you sure you want to delete &quot;{job.name}&quot;? This will permanently remove all job data, logs, and results. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

@@ -416,7 +416,7 @@ class ApiGatewayService {
     for (const endpoint of defaultEndpoints) {
       try {
         await this.createEndpoint(endpoint);
-      } catch (error) {
+      } catch (_error) {
         // Skip if endpoint already exists
         console.log(`Endpoint ${endpoint.path} already exists or failed to create`);
       }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
@@ -34,7 +34,7 @@ import { AITestingPanel } from './AITestingPanel';
 interface AnalyticsEvent {
   id: string;
   event_type: string;
-  event_data: any;
+  event_data: unknown;
   created_at: string;
   user_id: string;
 }
@@ -52,11 +52,7 @@ export const AdminPanel: React.FC = () => {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, []);
-
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -74,9 +70,14 @@ export const AdminPanel: React.FC = () => {
       // }
 
       // Mock response until analytics_events table is created
-      const data: any = null;
+      const data: unknown = null;
 
-      const filteredData = (data || []).filter((item: any) => item.created_at !== null) as AnalyticsEvent[];
+      const filteredData = Array.isArray(data)
+        ? data.filter((item: unknown) =>
+            item && typeof item === 'object' && 'created_at' in item &&
+            (item as Record<string, unknown>).created_at !== null
+          ) as AnalyticsEvent[]
+        : [] as AnalyticsEvent[];
       setAnalyticsData(filteredData);
       calculateStats(filteredData);
     } catch (error) {
@@ -89,7 +90,11 @@ export const AdminPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [fetchAnalyticsData]);
 
   const calculateStats = (data: AnalyticsEvent[]) => {
     const hybridEvents = data.filter(e => e.event_type.includes('hybrid'));
@@ -101,9 +106,9 @@ export const AdminPanel: React.FC = () => {
     let totalProcessingTime = 0;
 
     hybridEvents.forEach(event => {
-      const eventData = event.event_data;
+      const eventData = event.event_data as Record<string, unknown>;
 
-      if (eventData.final_score) {
+      if (typeof eventData.final_score === 'number') {
         totalScore += eventData.final_score;
         scoreCount++;
       }
@@ -111,7 +116,7 @@ export const AdminPanel: React.FC = () => {
       if (eventData.final_provider === 'openai') openaiCount++;
       if (eventData.final_provider === 'claude') claudeCount++;
 
-      if (eventData.processing_time_ms) {
+      if (typeof eventData.processing_time_ms === 'number') {
         totalProcessingTime += eventData.processing_time_ms;
       }
     });
@@ -145,7 +150,7 @@ export const AdminPanel: React.FC = () => {
   const StatCard = ({ title, value, icon: Icon, description }: {
     title: string;
     value: string | number;
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     description: string;
   }) => (
     <Card>
@@ -337,25 +342,37 @@ export const AdminPanel: React.FC = () => {
                 <div className="grid grid-cols-4 gap-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {analyticsData.filter(e => e.event_data.final_score >= 0.9).length}
+                      {analyticsData.filter(e => {
+                        const eventData = e.event_data as Record<string, unknown>;
+                        return typeof eventData.final_score === 'number' && eventData.final_score >= 0.9;
+                      }).length}
                     </div>
                     <div className="text-sm text-muted-foreground">Excellent (≥0.9)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      {analyticsData.filter(e => e.event_data.final_score >= 0.7 && e.event_data.final_score < 0.9).length}
+                      {analyticsData.filter(e => {
+                        const score = (e.event_data as Record<string, unknown>).final_score;
+                        return typeof score === 'number' && score >= 0.7 && score < 0.9;
+                      }).length}
                     </div>
                     <div className="text-sm text-muted-foreground">Good (0.7-0.9)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-yellow-600">
-                      {analyticsData.filter(e => e.event_data.final_score >= 0.5 && e.event_data.final_score < 0.7).length}
+                      {analyticsData.filter(e => {
+                        const score = (e.event_data as Record<string, unknown>).final_score;
+                        return typeof score === 'number' && score >= 0.5 && score < 0.7;
+                      }).length}
                     </div>
                     <div className="text-sm text-muted-foreground">Fair (0.5-0.7)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-red-600">
-                      {analyticsData.filter(e => e.event_data.final_score < 0.5).length}
+                      {analyticsData.filter(e => {
+                        const score = (e.event_data as Record<string, unknown>).final_score;
+                        return typeof score === 'number' && score < 0.5;
+                      }).length}
                     </div>
                     <div className="text-sm text-muted-foreground">Poor (&lt;0.5)</div>
                   </div>

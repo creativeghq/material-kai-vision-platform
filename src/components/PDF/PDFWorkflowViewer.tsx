@@ -28,11 +28,17 @@ export interface WorkflowStep {
   startTime?: Date;
   endTime?: Date;
   duration?: number;
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<{ className?: string }>;
   details?: string[];
   error?: string;
   logs?: string[];
-  metadata?: Record<string, any>;
+  metadata?: WorkflowStepMetadata;
+}
+
+interface WorkflowStepMetadata {
+  knowledgeEntryId?: string;
+  title?: string;
+  [key: string]: unknown;
 }
 
 export interface WorkflowJob {
@@ -318,7 +324,7 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                        </button>
                                     </div>
                                     <div className="text-xs text-green-600 mt-1">
-                                      Document ID: {step.metadata.knowledgeEntryId}
+                                      Document ID: {step.metadata?.knowledgeEntryId}
                                     </div>
                                   </div>
                                 )}

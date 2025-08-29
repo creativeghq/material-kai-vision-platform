@@ -7,7 +7,20 @@ interface RealtimeEvent {
   agentId?: string;
   taskId?: string;
   timestamp: string;
-  data: any;
+  data: RealtimeEventData;
+}
+
+interface RealtimeEventData {
+  taskType?: string;
+  assignedAgents?: string[];
+  priority?: number;
+  processingTime?: number;
+  errorMessage?: string;
+  status?: string;
+  performance?: AgentPerformanceMetrics;
+  level?: 'info' | 'warning' | 'error' | 'critical';
+  message?: string;
+  [key: string]: unknown;
 }
 
 interface SystemAlert {
@@ -18,12 +31,47 @@ interface SystemAlert {
   timestamp: string;
 }
 
+interface AgentPerformanceMetrics {
+  successRate: number;
+  averageProcessingTime: number;
+  taskCount: number;
+  errorRate: number;
+  lastUpdated: string;
+  [key: string]: unknown;
+}
+
 interface AgentStatus {
   agentId: string;
   status: 'active' | 'busy' | 'idle' | 'error' | 'offline';
   currentTasks: string[];
   lastHeartbeat: string;
-  performance: any;
+  performance: AgentPerformanceMetrics;
+  [key: string]: unknown;
+}
+
+interface DatabaseAgent {
+  id: string;
+  status: string;
+  updated_at: string;
+}
+
+interface TaskRecord {
+  id: string;
+  task_type: string;
+  assigned_agents: string[];
+  priority: number;
+  status: string;
+  processing_time_ms?: number;
+  error_message?: string;
+}
+
+interface SystemAlert {
+  level: 'info' | 'warning' | 'error' | 'critical';
+  message: string;
+  agentId?: string;
+  taskId?: string;
+  timestamp: string;
+  [key: string]: unknown;
 }
 
 export class RealtimeAgentMonitor {
@@ -66,22 +114,59 @@ export class RealtimeAgentMonitor {
     console.log('Realtime agent monitoring initialized');
   }
 
-  private async handleTaskChange(payload: any): Promise<void> {
+  // Type guard functions
+  private isTaskRecord(record: unknown): record is TaskRecord {
+    return (
+      record !== null &&
+      typeof record === 'object' &&
+      'id' in record &&
+      'task_type' in record &&
+      'assigned_agents' in record &&
+      'priority' in record &&
+      'status' in record &&
+      typeof (record as Record<string, unknown>).id === 'string' &&
+      typeof (record as Record<string, unknown>).task_type === 'string' &&
+      Array.isArray((record as Record<string, unknown>).assigned_agents) &&
+      typeof (record as Record<string, unknown>).priority === 'string' &&
+      typeof (record as Record<string, unknown>).status === 'string'
+    );
+  }
+
+  private isDatabaseAgent(record: unknown): record is DatabaseAgent {
+    return (
+      record !== null &&
+      typeof record === 'object' &&
+      'id' in record &&
+      'name' in record &&
+      'status' in record &&
+      typeof (record as Record<string, unknown>).id === 'string' &&
+      typeof (record as Record<string, unknown>).name === 'string' &&
+      typeof (record as Record<string, unknown>).status === 'string'
+    );
+  }
+
+  private async handleTaskChange(payload: Record<string, unknown>): Promise<void> {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
     try {
-      if (eventType === 'INSERT') {
+      if (eventType === 'INSERT' && newRecord && this.isTaskRecord(newRecord)) {
         await this.handleTaskStarted(newRecord);
-      } else if (eventType === 'UPDATE') {
+      } else if (eventType === 'UPDATE' && newRecord && oldRecord &&
+                 this.isTaskRecord(newRecord) && this.isTaskRecord(oldRecord)) {
         await this.handleTaskUpdated(newRecord, oldRecord);
+      } else if (eventType === 'DELETE' && oldRecord && this.isTaskRecord(oldRecord)) {
+        await this.handleTaskCompleted(oldRecord);
       }
     } catch (error) {
       console.error('Error handling task change:', error);
-      this.emitSystemAlert('error', `Failed to process task change: ${error}`, undefined, newRecord?.id);
+      const taskId = (newRecord && typeof newRecord === 'object' && 'id' in newRecord && typeof newRecord.id === 'string')
+        ? newRecord.id
+        : undefined;
+      this.emitSystemAlert('error', `Failed to process task change: ${error}`, undefined, taskId);
     }
   }
 
-  private async handleTaskStarted(task: any): Promise<void> {
+  private async handleTaskStarted(task: TaskRecord): Promise<void> {
     const event: RealtimeEvent = {
       eventType: 'task_started',
       taskId: task.id,
@@ -214,12 +299,32 @@ export class RealtimeAgentMonitor {
   }
 
   private async updateAgentStatus(agentId: string, status: AgentStatus['status'], currentTasks: string[]): Promise<void> {
+    const performanceMetrics = await this.performanceOptimizer.getAgentPerformanceMetrics(agentId);
+    
+    // Create a default performance metrics object that matches the interface
+    const defaultMetrics: AgentPerformanceMetrics = {
+      responseTime: 0,
+      throughput: 0,
+      errorRate: 0,
+      memoryUsage: 0,
+      cpuUsage: 0,
+      averageProcessingTime: 0,
+      successRate: 0,
+      taskCount: 0,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    // Ensure all required fields are present by merging with defaults
+    const completeMetrics: AgentPerformanceMetrics = performanceMetrics
+      ? { ...defaultMetrics, ...performanceMetrics }
+      : defaultMetrics;
+    
     const agentStatus: AgentStatus = {
       agentId,
       status,
-      currentTasks,
       lastHeartbeat: new Date().toISOString(),
-      performance: await this.performanceOptimizer.getAgentPerformanceMetrics(agentId),
+      performance: completeMetrics,
+      currentTasks,
     };
 
     this.agentStatuses.set(agentId, agentStatus);
@@ -258,22 +363,23 @@ export class RealtimeAgentMonitor {
           `High system load: ${(systemMetrics.averageLoad * 100).toFixed(1)}% capacity`);
       }
 
-      // Check for inactive agents
-      const { data: agents, error } = await supabase
-        .from('crewai_agents')
-        .select('id, status, updated_at')
-        .eq('status', 'active');
+      // Use agent_tasks table as fallback since crewai_agents doesn't exist yet
+      const { data: tasks, error } = await supabase
+        .from('agent_tasks')
+        .select('id, created_at');
 
-      if (!error && agents) {
+      if (!error && tasks) {
         const now = Date.now();
         const staleThreshold = 10 * 60 * 1000; // 10 minutes
 
-        for (const agent of agents) {
-          const lastUpdate = new Date(agent.updated_at).getTime();
-          if (now - lastUpdate > staleThreshold) {
-            this.emitSystemAlert('warning',
-              `Agent ${agent.id} appears inactive (last update: ${new Date(agent.updated_at).toLocaleString()})`,
-              agent.id);
+        // Check for old tasks as a proxy for system health
+        for (const task of tasks) {
+          const taskAge = now - new Date(task.created_at || '').getTime();
+          if (taskAge > staleThreshold) {
+            this.emitSystemAlert('info',
+              `Task ${task.id} has been running for ${Math.round(taskAge / 60000)} minutes`,
+              undefined,
+              task.id);
           }
         }
       }
@@ -302,8 +408,8 @@ export class RealtimeAgentMonitor {
 
     const event: RealtimeEvent = {
       eventType: 'system_alert',
-      agentId,
-      taskId,
+      agentId: agentId || '',
+      taskId: taskId || '',
       timestamp: alert.timestamp,
       data: alert,
     };

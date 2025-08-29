@@ -15,7 +15,7 @@ export interface SVBRDFExtractionResult {
   roughness_map_url?: string;
   metallic_map_url?: string;
   height_map_url?: string;
-  extracted_properties?: any;
+  extracted_properties?: Record<string, unknown>;
   confidence_score?: number;
   processing_time_ms?: number;
   error_message?: string;
@@ -32,11 +32,11 @@ export interface SVBRDFExtractionRecord {
   roughness_map_url?: string;
   metallic_map_url?: string;
   height_map_url?: string;
-  extracted_properties: any;
+  extracted_properties: Record<string, unknown>;
   confidence_score?: number;
   processing_time_ms?: number;
   error_message?: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -262,23 +262,27 @@ export class SVBRDFExtractionAPI {
     }
   }
 
-  private static analyzeMaterialTypes(data: any[]): Record<string, number> {
+  private static analyzeMaterialTypes(data: SVBRDFExtractionRecord[]): Record<string, number> {
     const types: Record<string, number> = {};
     data.forEach(extraction => {
       if (extraction.extracted_properties?.material_type) {
         const type = extraction.extracted_properties.material_type;
-        types[type] = (types[type] || 0) + 1;
+        if (typeof type === 'string') {
+          types[type] = (types[type] || 0) + 1;
+        }
       }
     });
     return types;
   }
 
-  private static analyzeSurfaceCategories(data: any[]): Record<string, number> {
+  private static analyzeSurfaceCategories(data: SVBRDFExtractionRecord[]): Record<string, number> {
     const categories: Record<string, number> = {};
     data.forEach(extraction => {
       if (extraction.extracted_properties?.surface_category) {
         const category = extraction.extracted_properties.surface_category;
-        categories[category] = (categories[category] || 0) + 1;
+        if (typeof category === 'string') {
+          categories[category] = (categories[category] || 0) + 1;
+        }
       }
     });
     return categories;

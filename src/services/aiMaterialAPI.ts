@@ -6,19 +6,51 @@ export interface AIAnalysisRequest {
   includeSimilar: boolean;
 }
 
+export interface MaterialProperties {
+  density?: number;
+  hardness?: number;
+  melting_point?: number;
+  thermal_conductivity?: number;
+  electrical_conductivity?: number;
+  color?: string;
+  texture?: string;
+  [key: string]: unknown;
+}
+
+export interface ChemicalComposition {
+  elements: Record<string, number>;
+  formula?: string;
+  molecular_weight?: number;
+  [key: string]: unknown;
+}
+
+export interface SimilarMaterial {
+  id: string;
+  name: string;
+  category: string;
+  confidence: number;
+  similarity_score: number;
+  properties?: MaterialProperties;
+}
+
 export interface AIAnalysisResult {
   success: boolean;
-  result: any;
+  result: {
+    material_id?: string;
+    analysis_id?: string;
+    status: string;
+    [key: string]: unknown;
+  };
   analysis: {
     material_name: string;
     category: string;
     confidence: number;
-    properties: Record<string, any>;
-    chemical_composition: Record<string, any>;
+    properties: MaterialProperties;
+    chemical_composition: ChemicalComposition;
     safety_considerations: string[];
     standards: string[];
   };
-  similar_materials: any[];
+  similar_materials: SimilarMaterial[];
   processing_time_ms: number;
 }
 
@@ -31,10 +63,29 @@ export interface VectorSearchRequest {
   searchType: 'text' | 'image' | 'hybrid';
 }
 
+export interface SearchResult {
+  id: string;
+  name: string;
+  category: string;
+  confidence: number;
+  similarity_score: number;
+  properties?: MaterialProperties;
+  metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeResult {
+  id: string;
+  title: string;
+  content: string;
+  source: string;
+  relevance_score: number;
+  metadata?: Record<string, unknown>;
+}
+
 export interface VectorSearchResult {
   success: boolean;
-  results: any[];
-  knowledge_results: any[];
+  results: SearchResult[];
+  knowledge_results: KnowledgeResult[];
   search_metadata: {
     query: string;
     search_type: string;
@@ -59,11 +110,11 @@ export interface VoiceInputResult {
   transcription: string;
   enhanced_result?: {
     enhanced_description: string;
-    extracted_properties: Record<string, any>;
+    extracted_properties: MaterialProperties;
     suggested_category: string;
     confidence_score: number;
   };
-  similar_materials: any[];
+  similar_materials: SimilarMaterial[];
   processing_time_ms: number;
   record_id?: string;
 }
@@ -164,7 +215,7 @@ export class AIMaterialAPI {
         voice_inputs: 0,
         vector_searches: 0,
         avg_confidence: 0,
-        most_recognized_categories: {},
+        most_recognized_categories: {} as Record<string, number>,
         recent_activities: data?.slice(0, 10) || [],
       };
 
@@ -172,7 +223,7 @@ export class AIMaterialAPI {
       let confidenceCount = 0;
 
         data?.forEach(event => {
-        const eventData = event.event_data as any;
+        const eventData = event.event_data as Record<string, unknown>;
 
         switch (event.event_type) {
           case 'material_identified':
@@ -180,7 +231,7 @@ export class AIMaterialAPI {
             break;
           case 'ai_material_analysis':
             analytics.ai_analyses++;
-            if (eventData?.confidence) {
+            if (eventData?.confidence && typeof eventData.confidence === 'number') {
               totalConfidence += eventData.confidence;
               confidenceCount++;
             }
@@ -194,7 +245,7 @@ export class AIMaterialAPI {
         }
 
         // Track categories
-        if (eventData?.material_category) {
+        if (eventData?.material_category && typeof eventData.material_category === 'string') {
           const category = eventData.material_category;
           analytics.most_recognized_categories[category] =
             (analytics.most_recognized_categories[category] || 0) + 1;
@@ -246,9 +297,14 @@ export class AIMaterialAPI {
   // Real-time confidence tracking for ongoing recognition
   static async updateConfidenceScore(resultId: string, newConfidence: number, userId: string) {
     try {
+      // Note: 'recognition_results' table doesn't exist in current schema
+      // Using 'processing_results' as the closest available table
       const { error } = await supabase
-        .from('recognition_results')
-        .update({ confidence_score: newConfidence })
+        .from('processing_results')
+        .update({
+          result_data: { confidence_score: newConfidence },
+          updated_at: new Date().toISOString()
+        })
         .eq('id', resultId);
 
       if (error) {

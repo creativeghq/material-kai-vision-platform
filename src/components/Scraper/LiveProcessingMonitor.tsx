@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, Clock, Globe, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -35,43 +35,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
   const [elapsedTime, setElapsedTime] = useState(0);
   const [startTime] = useState(Date.now());
 
-  useEffect(() => {
-    // Update elapsed time every second
-    const timer = setInterval(() => {
-      setElapsedTime(Date.now() - startTime);
-    }, 1000);
-
-    // Load processing stats
-    loadProcessingStats();
-
-    // Set up real-time subscription for page updates
-    const channel = supabase
-      .channel(`live_processing_${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'scraping_pages',
-          filter: `session_id=eq.${sessionId}`,
-        },
-        () => {
-          loadProcessingStats();
-        },
-      )
-      .subscribe();
-
-    // Refresh stats every 30 seconds
-    const statsRefresh = setInterval(loadProcessingStats, 30000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(statsRefresh);
-      supabase.removeChannel(channel);
-    };
-  }, [sessionId, startTime]);
-
-  const loadProcessingStats = async () => {
+  const loadProcessingStats = useCallback(async () => {
     try {
       // Load session data
       const { data: sessionData, error: sessionError } = await supabase
@@ -164,7 +128,43 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
         recentActivity: [],
       });
     }
-  };
+  }, [sessionId]); // Dependencies for useCallback
+
+  useEffect(() => {
+    // Update elapsed time every second
+    const timer = setInterval(() => {
+      setElapsedTime(Date.now() - startTime);
+    }, 1000);
+
+    // Load processing stats
+    loadProcessingStats();
+
+    // Set up real-time subscription for page updates
+    const channel = supabase
+      .channel(`live_processing_${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scraping_pages',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          loadProcessingStats();
+        },
+      )
+      .subscribe();
+
+    // Refresh stats every 30 seconds
+    const statsRefresh = setInterval(loadProcessingStats, 30000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(statsRefresh);
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, startTime, loadProcessingStats]); // Added loadProcessingStats dependency
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);

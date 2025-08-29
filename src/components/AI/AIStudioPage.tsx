@@ -16,16 +16,64 @@ import { useToast } from '@/hooks/use-toast';
 import { ThreeJsViewer } from '@/components/3D/ThreeJsViewer';
 import { IntegratedAIService } from '@/services/integratedAIService';
 
-interface AIStudioPageProps {}
+interface UserPreferences {
+  priorities?: Record<string, boolean>;
+}
 
-export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
+interface LayoutSuggestion {
+  item_type: string;
+  confidence: number;
+}
+
+interface SVBRDFExtraction {
+  albedo_map_url?: string;
+}
+
+interface MaterialPlacement {
+  zone: string;
+  cost_range: string;
+  reasoning: string;
+}
+
+interface AgentExecution {
+  agent_name: string;
+  confidence: number;
+  reasoning: string;
+}
+
+interface SpatialAnalysis {
+  layout_suggestions?: LayoutSuggestion[];
+  material_placements?: MaterialPlacement[];
+  spatial_features?: unknown[];
+  confidence_score: number;
+  reasoning_explanation?: string;
+}
+
+interface CrewAICoordination {
+  overall_confidence: number;
+  coordination_summary: string;
+  agent_executions?: AgentExecution[];
+}
+
+interface NeRFReconstruction {
+  model_file_url?: string;
+}
+
+interface AIStudioResults {
+  nerfReconstruction?: NeRFReconstruction | null;
+  svbrdfExtractions: SVBRDFExtraction[];
+  spatialAnalysis?: SpatialAnalysis | null;
+  crewaiCoordination?: CrewAICoordination | null;
+}
+
+export const AIStudioPage: React.FC = () => {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [roomType, setRoomType] = useState<string>('');
-  const [userPreferences, setUserPreferences] = useState<any>({});
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>({});
   const [progress, setProgress] = useState(0);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<AIStudioResults | null>(null);
   const [activeTab, setActiveTab] = useState('upload');
 
   const roomTypes = [
@@ -206,7 +254,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                 <div className="space-y-2">
                   <h4 className="font-medium">Layout Suggestions</h4>
                   <div className="space-y-1">
-                    {spatialAnalysis.layout_suggestions.slice(0, 3).map((suggestion: any, index: number) => (
+                    {spatialAnalysis.layout_suggestions.slice(0, 3).map((suggestion: LayoutSuggestion, index: number) => (
                       <div key={index} className="text-sm p-2 bg-muted rounded">
                         <span className="font-medium">{suggestion.item_type}</span>
                         <span className="text-muted-foreground ml-2">
@@ -232,7 +280,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
               {svbrdfExtractions.length > 0 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-2">
-                    {svbrdfExtractions.slice(0, 3).map((extraction: any, index: number) => (
+                    {svbrdfExtractions.slice(0, 3).map((extraction: SVBRDFExtraction, index: number) => (
                       <div key={index} className="aspect-square bg-muted rounded overflow-hidden">
                         {extraction.albedo_map_url && (
                           <img
@@ -249,7 +297,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                     <div>
                       <h4 className="font-medium mb-2">Recommended Materials</h4>
                       <div className="space-y-2">
-                        {spatialAnalysis.material_placements.slice(0, 3).map((placement: any, index: number) => (
+                        {spatialAnalysis.material_placements.slice(0, 3).map((placement: MaterialPlacement, index: number) => (
                           <div key={index} className="p-3 border rounded">
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-medium">{placement.zone}</span>
@@ -295,7 +343,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                 {crewaiCoordination.agent_executions && (
                   <div className="space-y-2">
                     <h4 className="font-medium">Agent Contributions</h4>
-                    {crewaiCoordination.agent_executions.map((execution: any, index: number) => (
+                    {crewaiCoordination.agent_executions.map((execution: AgentExecution, index: number) => (
                       <div key={index} className="p-2 border rounded">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{execution.agent_name}</span>
@@ -496,7 +544,7 @@ export const AIStudioPage: React.FC<AIStudioPageProps> = () => {
                         key={priority}
                         className={`border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm ${userPreferences.priorities?.[priority.toLowerCase()] ? 'bg-primary text-primary-foreground' : ''}`}
                         onClick={() => {
-                          setUserPreferences((prev: any) => ({
+                          setUserPreferences((prev: UserPreferences) => ({
                             ...prev,
                             priorities: {
                               ...prev.priorities,

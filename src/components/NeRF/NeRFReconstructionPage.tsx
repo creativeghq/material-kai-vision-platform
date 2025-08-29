@@ -10,9 +10,7 @@ import { ThreeJsViewer } from '@/components/3D/ThreeJsViewer';
 import { useToast } from '@/hooks/use-toast';
 import { NeRFProcessingAPI, NeRFReconstructionRecord } from '@/services/nerfProcessingAPI';
 
-interface NeRFReconstructionPageProps {}
-
-export const NeRFReconstructionPage: React.FC<NeRFReconstructionPageProps> = () => {
+export const NeRFReconstructionPage: React.FC = () => {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);

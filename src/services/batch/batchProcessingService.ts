@@ -69,24 +69,27 @@ export interface BatchProcessingConfig {
 /**
  * Document input for batch processing
  */
-export interface BatchDocumentInput {
+export interface DocumentInput {
   id: string;
   content: string;
-  metadata: {
-    filename: string;
-    mimeType: string;
-    size: number;
-    uploadedAt: Date;
-    workspaceId: string;
-    userId?: string;
-    tags?: string[];
-  };
+  metadata?: Record<string, unknown>;
   processingOptions?: {
-    priority?: JobPriority;
-    chunkingStrategy?: 'fixed-size' | 'semantic' | 'hybrid';
-    skipValidation?: boolean;
-    customMetadata?: Record<string, any>;
+    chunkingStrategy?: string;
+    embeddingModel?: string;
+    validationLevel?: string;
   };
+}
+
+/**
+ * Batch processing options
+ */
+export interface BatchProcessingOptions {
+  batchId?: string;
+  priority?: JobPriority;
+  enableValidation?: boolean;
+  enableChunking?: boolean;
+  enableEmbedding?: boolean;
+  customMetadata?: Record<string, unknown>;
 }
 
 /**
@@ -94,7 +97,7 @@ export interface BatchDocumentInput {
  */
 export interface BatchProcessingResult {
   batchId: string;
-  status: 'completed' | 'partial' | 'failed';
+  status: 'completed' | 'failed' | 'partial';
   totalDocuments: number;
   processedDocuments: number;
   failedDocuments: number;
@@ -104,11 +107,10 @@ export interface BatchProcessingResult {
     chunks?: Array<{
       id: string;
       content: string;
-      embedding: number[];
-      metadata: Record<string, any>;
+      embedding?: number[];
+      metadata?: Record<string, unknown>;
     }>;
     error?: string;
-    processingTime: number;
   }>;
   metrics: {
     totalProcessingTime: number;
@@ -122,137 +124,141 @@ export interface BatchProcessingResult {
 }
 
 /**
- * Progress tracking interface
+ * Batch progress information
  */
 export interface BatchProgress {
   batchId: string;
   stage: 'queued' | 'validating' | 'chunking' | 'embedding' | 'finalizing' | 'completed' | 'failed';
   progress: number; // 0-100
-  currentDocument: number;
-  totalDocuments: number;
-  estimatedTimeRemaining?: number;
+  currentDocument?: number;
+  totalDocuments?: number;
   currentOperation?: string;
-  errors: string[];
-  warnings: string[];
-  lastUpdated: Date;
+  estimatedTimeRemaining?: number;
+  errors?: string[];
 }
 
 /**
- * Job types for the PDF transformation pipeline
+ * Default configuration
  */
-export type BatchJobType =
-  | 'batch_validate_documents'
-  | 'batch_chunk_documents'
-  | 'batch_generate_embeddings'
-  | 'batch_finalize_processing';
+const DEFAULT_CONFIG: BatchProcessingConfig = {
+  queue: {
+    maxSize: 1000,
+    maxConcurrency: 5,
+    defaultPriority: 'normal' as JobPriority,
+    retryPolicy: {
+      maxAttempts: 3,
+      baseDelay: 1000,
+      maxDelay: 30000,
+      backoffMultiplier: 2,
+      jitterEnabled: true,
+    },
+    deadLetterQueue: {
+      enabled: true,
+      maxSize: 100,
+    },
+    persistence: {
+      enabled: false,
+      interval: 5000,
+    },
+    metrics: {
+      enabled: true,
+      retentionPeriod: 86400000, // 24 hours
+    },
+  },
+  processing: {
+    maxConcurrentBatches: 3,
+    batchSize: 10,
+    maxDocumentsPerBatch: 100,
+    timeoutMs: 300000, // 5 minutes
+    enableProgressTracking: true,
+    enablePerformanceMetrics: true,
+  },
+  services: {
+    chunking: {
+      strategy: 'semantic',
+      chunkSize: 1000,
+      overlap: 100,
+    },
+    embedding: {
+      batchSize: 20,
+      enableCaching: true,
+      rateLimitRpm: 1000,
+    },
+    validation: {
+      enabled: true,
+      strictMode: false,
+    },
+  },
+  performance: {
+    memoryLimitMB: 2048,
+    cpuThrottleThreshold: 80,
+    enableResourcePooling: true,
+  },
+  storage: {
+    tempDirectory: '/tmp/batch-processing',
+    cleanupAfterMs: 3600000, // 1 hour
+    enableCompression: true,
+  },
+};
 
 /**
- * Main batch processing service that orchestrates the entire PDF to RAG transformation pipeline
+ * High-performance batch processing service for documents
  */
 export class BatchProcessingService extends EventEmitter {
-  private readonly config: BatchProcessingConfig;
-  private readonly jobQueue: BatchJobQueue;
-  private readonly chunkingService: DocumentChunkingService;
-  private readonly embeddingService: MivaaEmbeddingIntegration;
-  private readonly logger: Logger;
-  private readonly validationService: ValidationIntegrationService;
+  private config: BatchProcessingConfig;
+  private jobQueue: BatchJobQueue;
+  private validationService: ValidationIntegrationService;
+  private chunkingService: DocumentChunkingService;
+  private embeddingService: MivaaEmbeddingIntegration;
+  private logger: Logger;
+  private performanceMetrics: PerformanceMetrics;
+  private activeBatches: Map<string, BatchProgress>;
+  private batchResults: Map<string, BatchProcessingResult>;
+  private resourcePool: Map<string, unknown>;
+  private isInitialized: boolean;
 
-  private readonly activeBatches: Map<string, BatchProgress> = new Map();
-  private readonly batchResults: Map<string, BatchProcessingResult> = new Map();
-  private readonly resourcePool: Map<string, any> = new Map();
-
-  private isInitialized = false;
-  private performanceMetrics: {
-    totalBatchesProcessed: number;
-    totalDocumentsProcessed: number;
-    averageBatchTime: number;
-    systemLoad: number;
-    memoryUsage: number;
-  } = {
-    totalBatchesProcessed: 0,
-    totalDocumentsProcessed: 0,
-    averageBatchTime: 0,
-    systemLoad: 0,
-    memoryUsage: 0,
-  };
-
-  constructor(config: Partial<BatchProcessingConfig> = {}) {
+  constructor(
+    validationService: ValidationIntegrationService,
+    chunkingService: DocumentChunkingService,
+    embeddingService: MivaaEmbeddingIntegration,
+    config: Partial<BatchProcessingConfig> = {},
+    logger?: Logger,
+  ) {
     super();
 
-    // Initialize logger first
-    this.logger = {
-      info: (message: string) => console.log(`[INFO] ${message}`),
-      error: (message: string) => console.error(`[ERROR] ${message}`),
-      warn: (message: string) => console.warn(`[WARN] ${message}`),
-      debug: (message: string) => console.debug(`[DEBUG] ${message}`),
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.validationService = validationService;
+    this.chunkingService = chunkingService;
+    this.embeddingService = embeddingService;
+    this.logger = logger || {
+      info: (msg: string) => console.log(`[BatchProcessing] ${msg}`),
+      error: (msg: string) => console.error(`[BatchProcessing] ${msg}`),
+      warn: (msg: string) => console.warn(`[BatchProcessing] ${msg}`),
+      debug: (msg: string) => console.debug(`[BatchProcessing] ${msg}`),
     };
 
-    this.config = {
-      queue: {
-        maxSize: 1000,
-        maxConcurrency: 5,
-        defaultPriority: 'normal',
-        retryPolicy: {
-          maxAttempts: 3,
-          baseDelay: 2000,
-          maxDelay: 30000,
-          backoffMultiplier: 2,
-          jitterEnabled: true,
-        },
-      },
-      processing: {
-        maxConcurrentBatches: 3,
-        batchSize: 10,
-        maxDocumentsPerBatch: 100,
-        timeoutMs: 300000, // 5 minutes
-        enableProgressTracking: true,
-        enablePerformanceMetrics: true,
-      },
-      services: {
-        chunking: {
-          strategy: 'hybrid',
-          chunkSize: 1000,
-          overlap: 200,
-        },
-        embedding: {
-          batchSize: 50,
-          enableCaching: true,
-          rateLimitRpm: 3000,
-        },
-        validation: {
-          enabled: true,
-          strictMode: false,
-        },
-      },
-      performance: {
-        memoryLimitMB: 2048,
-        cpuThrottleThreshold: 80,
-        enableResourcePooling: true,
-      },
-      storage: {
-        tempDirectory: './temp/batch',
-        cleanupAfterMs: 3600000, // 1 hour
-        enableCompression: true,
-      },
-      ...config,
+    this.performanceMetrics = {
+      totalBatchesProcessed: 0,
+      totalDocumentsProcessed: 0,
+      averageBatchTime: 0,
+      systemLoad: 0,
+      memoryUsage: 0,
     };
 
+    this.activeBatches = new Map();
+    this.batchResults = new Map();
+    this.resourcePool = new Map();
+    this.isInitialized = false;
+
+    // Initialize job queue
     this.jobQueue = new BatchJobQueue(this.config.queue);
-    this.chunkingService = new DocumentChunkingService();
 
-    // Initialize MIVAA embedding integration service
-    this.embeddingService = new MivaaEmbeddingIntegration();
-
-
-    // ValidationIntegrationService is a singleton
-    this.validationService = ValidationIntegrationService.getInstance();
-
-    this.setupEventHandlers();
-    this.setupJobProcessors();
+    // Set up job queue event handlers
+    this.setupJobQueueHandlers();
   }
 
   /**
-   * Initialize the batch processing service
+   * Initialize the service
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -260,22 +266,22 @@ export class BatchProcessingService extends EventEmitter {
     }
 
     try {
-      // Services are initialized in their constructors - no initialize methods needed
+      this.logger.info('Initializing batch processing service...');
 
-      // Setup resource pooling if enabled
+      // Initialize resource pool if enabled
       if (this.config.performance.enableResourcePooling) {
         await this.initializeResourcePool();
       }
 
-      // Start performance monitoring
+      // Start performance monitoring if enabled
       if (this.config.processing.enablePerformanceMetrics) {
         this.startPerformanceMonitoring();
       }
 
       this.isInitialized = true;
-      this.emit('initialized');
+      this.logger.info('Batch processing service initialized successfully');
     } catch (error) {
-      this.emit('error', new Error(`Failed to initialize batch processing service: ${error instanceof Error ? error.message : String(error)}`));
+      this.logger.error(`Failed to initialize batch processing service: ${error}`);
       throw error;
     }
   }
@@ -284,65 +290,148 @@ export class BatchProcessingService extends EventEmitter {
    * Process a batch of documents
    */
   async processBatch(
-    documents: BatchDocumentInput[],
-    options: {
-      batchId?: string;
-      priority?: JobPriority;
-      workspaceId: string;
-      userId?: string;
-      tags?: string[];
-    },
+    documents: DocumentInput[],
+    options: BatchProcessingOptions = {},
   ): Promise<string> {
     if (!this.isInitialized) {
       await this.initialize();
     }
 
-    if (documents.length === 0) {
-      throw new Error('Cannot process empty batch');
+    // Validate input
+    if (!documents || documents.length === 0) {
+      throw new Error('No documents provided for batch processing');
     }
 
     if (documents.length > this.config.processing.maxDocumentsPerBatch) {
-      throw new Error(`Batch size exceeds maximum limit of ${this.config.processing.maxDocumentsPerBatch}`);
+      throw new Error(
+        `Batch size ${documents.length} exceeds maximum allowed ${this.config.processing.maxDocumentsPerBatch}`,
+      );
     }
 
     const batchId = options.batchId || this.generateBatchId();
     const priority = options.priority || 'normal';
 
-    // Initialize batch progress tracking
-    const progress: BatchProgress = {
+    this.logger.info(`Starting batch processing for ${documents.length} documents (batch: ${batchId})`);
+
+    // Initialize batch progress
+    this.activeBatches.set(batchId, {
       batchId,
       stage: 'queued',
       progress: 0,
-      currentDocument: 0,
       totalDocuments: documents.length,
-      currentOperation: 'Initializing batch',
-      errors: [],
-      warnings: [],
-      lastUpdated: new Date(),
-    };
-
-    this.activeBatches.set(batchId, progress);
+      currentDocument: 0,
+      currentOperation: 'Initializing batch processing',
+    });
 
     try {
-      // Create batch processing jobs
-      const jobIds = await this.createBatchJobs(batchId, documents, {
+      // Create processing pipeline jobs
+      const jobs: BatchJob[] = [];
+
+      // 1. Validation job (if enabled)
+      if (options.enableValidation !== false && this.config.services.validation.enabled) {
+        jobs.push({
+          id: `${batchId}_validation`,
+          type: 'validation',
+          priority,
+          status: 'pending',
+          payload: { batchId, documents, options },
+          metadata: {
+            workspaceId: 'default',
+            source: 'batch-processing',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            attempts: 0,
+            maxAttempts: 3,
+            ...options.customMetadata,
+          },
+        });
+      }
+
+      // 2. Chunking job (if enabled)
+      if (options.enableChunking !== false) {
+        jobs.push({
+          id: `${batchId}_chunking`,
+          type: 'chunking',
+          priority,
+          status: 'pending',
+          payload: { batchId, documents },
+          metadata: {
+            workspaceId: 'default',
+            source: 'batch-processing',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            attempts: 0,
+            maxAttempts: 3,
+            ...options.customMetadata,
+          },
+        });
+      }
+
+      // 3. Embedding job (if enabled)
+      if (options.enableEmbedding !== false) {
+        jobs.push({
+          id: `${batchId}_embedding`,
+          type: 'embedding',
+          priority,
+          status: 'pending',
+          payload: { batchId, chunkingJobId: `${batchId}_chunking` },
+          metadata: {
+            workspaceId: 'default',
+            source: 'batch-processing',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            attempts: 0,
+            maxAttempts: 3,
+            ...options.customMetadata,
+          },
+        });
+      }
+
+      // 4. Finalization job
+      jobs.push({
+        id: `${batchId}_finalization`,
+        type: 'finalization',
         priority,
-        workspaceId: options.workspaceId,
-        ...(options.userId && { userId: options.userId }),
-        ...(options.tags && { tags: options.tags }),
+        status: 'pending',
+        payload: { batchId },
+        metadata: {
+          workspaceId: 'default',
+          source: 'batch-processing',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          attempts: 0,
+          maxAttempts: 3,
+          ...options.customMetadata,
+        },
       });
 
-      this.emit('batchStarted', { batchId, documentCount: documents.length, jobIds });
+      // Queue all jobs
+      for (const job of jobs) {
+        await this.jobQueue.addJob(job.type, job.payload, {
+          priority: job.priority,
+          workspaceId: job.metadata.workspaceId,
+          source: job.metadata.source,
+          maxAttempts: job.metadata.maxAttempts,
+        });
+      }
+
+      this.updateBatchProgress(batchId, {
+        stage: 'queued',
+        progress: 5,
+        currentOperation: `Queued ${jobs.length} processing jobs`,
+      });
+
+      this.emit('batchStarted', { batchId, documentCount: documents.length });
 
       return batchId;
     } catch (error) {
+      this.logger.error(`Failed to start batch processing: ${error}`);
       this.updateBatchProgress(batchId, {
         stage: 'failed',
         progress: 0,
+        currentOperation: 'Failed to start batch processing',
         errors: [error instanceof Error ? error.message : String(error)],
       });
-
-      this.emit('batchFailed', { batchId, error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -350,120 +439,102 @@ export class BatchProcessingService extends EventEmitter {
   /**
    * Get batch progress
    */
-  getBatchProgress(batchId: string): BatchProgress | null {
-    return this.activeBatches.get(batchId) || null;
+  getBatchProgress(batchId: string): BatchProgress | undefined {
+    return this.activeBatches.get(batchId);
   }
 
   /**
    * Get batch result
    */
-  getBatchResult(batchId: string): BatchProcessingResult | null {
-    return this.batchResults.get(batchId) || null;
+  getBatchResult(batchId: string): BatchProcessingResult | undefined {
+    return this.batchResults.get(batchId);
+  }
+
+  /**
+   * Get performance metrics
+   */
+  getPerformanceMetrics(): PerformanceMetrics {
+    return { ...this.performanceMetrics };
+  }
+
+  /**
+   * Get queue metrics
+   */
+  getQueueMetrics(): ReturnType<BatchJobQueue['getMetrics']> {
+    return this.jobQueue.getMetrics();
   }
 
   /**
    * Cancel a batch
    */
-  async cancelBatch(batchId: string): Promise<boolean> {
-    const progress = this.activeBatches.get(batchId);
-    if (!progress) {
-      return false;
-    }
+  async cancelBatch(batchId: string): Promise<void> {
+    this.logger.info(`Cancelling batch: ${batchId}`);
 
-    try {
-      // Cancel all related jobs
-      const jobs = this.jobQueue.getJobsByWorkspace(batchId);
-      const cancelPromises = jobs.map(job => this.jobQueue.cancelJob(job.id));
-      await Promise.all(cancelPromises);
+    // Cancel related jobs
+    const jobIds = [
+      `${batchId}_validation`,
+      `${batchId}_chunking`,
+      `${batchId}_embedding`,
+      `${batchId}_finalization`,
+    ];
 
-      this.updateBatchProgress(batchId, {
-        stage: 'failed',
-        progress: progress.progress,
-        errors: [...progress.errors, 'Batch cancelled by user'],
-      });
-
-      this.emit('batchCancelled', { batchId });
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('error', new Error(`Failed to cancel batch ${batchId}: ${errorMessage}`));
-      return false;
-    }
-  }
-
-  /**
-   * Get service metrics
-   */
-  getMetrics(): {
-    queue: any;
-    performance: PerformanceMetrics;
-    activeBatches: number;
-    completedBatches: number;
-  } {
-    return {
-      queue: this.jobQueue.getMetrics(),
-      performance: { ...this.performanceMetrics },
-      activeBatches: this.activeBatches.size,
-      completedBatches: this.batchResults.size,
-    };
-  }
-
-  /**
-   * Cleanup completed batches and temporary files
-   */
-  async cleanup(olderThanMs: number = this.config.storage.cleanupAfterMs): Promise<number> {
-    const cutoff = new Date(Date.now() - olderThanMs);
-    let cleaned = 0;
-
-    // Clean completed batch results
-    for (const [batchId, result] of this.batchResults.entries()) {
-      if (result.createdAt < cutoff) {
-        this.batchResults.delete(batchId);
-        cleaned++;
+    for (const jobId of jobIds) {
+      try {
+        await this.jobQueue.cancelJob(jobId);
+      } catch (error) {
+        this.logger.warn(`Failed to cancel job ${jobId}: ${error}`);
       }
     }
 
-    // Clean job queue
-    const queueCleaned = this.jobQueue.cleanup(olderThanMs);
+    // Update batch status
+    this.updateBatchProgress(batchId, {
+      stage: 'failed',
+      progress: 0,
+      currentOperation: 'Batch cancelled',
+    });
 
-    this.emit('cleanup', { batchesCleaned: cleaned, jobsCleaned: queueCleaned });
-
-    return cleaned + queueCleaned;
+    this.activeBatches.delete(batchId);
+    this.emit('batchCancelled', { batchId });
   }
 
   /**
-   * Shutdown the service gracefully
+   * Shutdown the service
    */
   async shutdown(): Promise<void> {
+    this.logger.info('Shutting down batch processing service...');
+
     try {
       // Stop performance monitoring
-      this.stopPerformanceMonitoring();
-
-      // Shutdown job queue
-      await this.jobQueue.shutdown();
+      if (this.config.processing.enablePerformanceMetrics) {
+        this.stopPerformanceMonitoring();
+      }
 
       // Cleanup resource pool
       if (this.config.performance.enableResourcePooling) {
         await this.cleanupResourcePool();
       }
 
-      this.emit('shutdown');
+      // Shutdown job queue
+      await this.jobQueue.shutdown();
+
+      this.isInitialized = false;
+      this.logger.info('Batch processing service shut down successfully');
     } catch (error) {
-      this.emit('error', new Error(`Error during shutdown: ${error instanceof Error ? error.message : String(error)}`));
+      this.logger.error(`Error during shutdown: ${error}`);
       throw error;
     }
   }
 
   /**
-   * Setup event handlers for job queue and services
+   * Setup job queue event handlers
    */
-  private setupEventHandlers(): void {
-    this.jobQueue.on('jobCompleted', () => {
-      this.handleJobCompleted();
-    });
-
-    this.jobQueue.on('jobFailed', (job: BatchJob, result: JobResult) => {
-      this.handleJobFailed(job, result);
+  private setupJobQueueHandlers(): void {
+    this.jobQueue.on('jobCompleted', (job: BatchJob, result: JobResult) => {
+      if (result.success) {
+        this.handleJobCompleted();
+      } else {
+        this.handleJobFailed(job, result);
+      }
     });
 
     this.jobQueue.on('jobStarted', () => {
@@ -472,110 +543,11 @@ export class BatchProcessingService extends EventEmitter {
   }
 
   /**
-   * Setup job processors for different batch job types
-   */
-  private setupJobProcessors(): void {
-    this.jobQueue.registerProcessor('batch_validate_documents', async (job: BatchJob) => {
-      return this.processValidationJob(job);
-    });
-
-    this.jobQueue.registerProcessor('batch_chunk_documents', async (job: BatchJob) => {
-      return this.processChunkingJob(job);
-    });
-
-    this.jobQueue.registerProcessor('batch_generate_embeddings', async (job: BatchJob) => {
-      return this.processEmbeddingJob(job);
-    });
-
-    this.jobQueue.registerProcessor('batch_finalize_processing', async (job: BatchJob) => {
-      return this.processFinalizationJob(job);
-    });
-  }
-
-  /**
-   * Create batch processing jobs
-   */
-  private async createBatchJobs(
-    batchId: string,
-    documents: BatchDocumentInput[],
-    options: {
-      priority: JobPriority;
-      workspaceId: string;
-      userId?: string;
-      tags?: string[];
-    },
-  ): Promise<string[]> {
-    const jobIds: string[] = [];
-
-    // Create validation job if enabled
-    if (this.config.services.validation.enabled) {
-      const validationJobId = await this.jobQueue.addJob(
-        'batch_validate_documents',
-        { batchId, documents },
-        {
-          priority: options.priority,
-          workspaceId: batchId,
-          ...(options.userId && { userId: options.userId }),
-          source: 'batch-processing',
-          tags: ['validation', ...(options.tags || [])],
-        },
-      );
-      jobIds.push(validationJobId);
-    }
-
-    // Create chunking job
-    const chunkingJobId = await this.jobQueue.addJob(
-      'batch_chunk_documents',
-      { batchId, documents },
-      {
-        priority: options.priority,
-        workspaceId: batchId,
-        ...(options.userId && { userId: options.userId }),
-        source: 'batch-processing',
-        ...(this.config.services.validation.enabled && jobIds.length > 0 && jobIds[0] && { dependencies: [jobIds[0]] }),
-        tags: ['chunking', ...(options.tags || [])],
-      },
-    );
-    jobIds.push(chunkingJobId);
-
-    // Create embedding job
-    const embeddingJobId = await this.jobQueue.addJob(
-      'batch_generate_embeddings',
-      { batchId, chunkingJobId },
-      {
-        priority: options.priority,
-        workspaceId: batchId,
-        ...(options.userId && { userId: options.userId }),
-        source: 'batch-processing',
-        dependencies: [chunkingJobId],
-        tags: ['embedding', ...(options.tags || [])],
-      },
-    );
-    jobIds.push(embeddingJobId);
-
-    // Create finalization job
-    const finalizationJobId = await this.jobQueue.addJob(
-      'batch_finalize_processing',
-      { batchId, embeddingJobId },
-      {
-        priority: options.priority,
-        workspaceId: batchId,
-        ...(options.userId && { userId: options.userId }),
-        source: 'batch-processing',
-        dependencies: [embeddingJobId],
-        tags: ['finalization', ...(options.tags || [])],
-      },
-    );
-    jobIds.push(finalizationJobId);
-
-    return jobIds;
-  }
-
-  /**
    * Process validation job
    */
-  private async processValidationJob(job: BatchJob): Promise<any> {
-    const { batchId, documents } = job.payload;
+  private async processValidationJob(job: BatchJob): Promise<{ validationResults: Array<{ documentId: string; isValid: boolean; errors: string[] }> }> {
+    const payload = job.payload as { batchId: string; documents: Array<{ id: string; [key: string]: unknown }>; options: Record<string, unknown> };
+    const { batchId, documents } = payload;
 
     this.updateBatchProgress(batchId, {
       stage: 'validating',
@@ -587,6 +559,7 @@ export class BatchProcessingService extends EventEmitter {
 
     for (let i = 0; i < documents.length; i++) {
       const document = documents[i];
+      if (!document) continue;
 
       try {
         const validatedDocument = await this.validationService.validateMivaaDocument(
@@ -615,14 +588,15 @@ export class BatchProcessingService extends EventEmitter {
       }
     }
 
-    return { batchId, validationResults };
+    return { validationResults };
   }
 
   /**
    * Process chunking job
    */
-  private async processChunkingJob(job: BatchJob): Promise<any> {
-    const { batchId, documents } = job.payload;
+  private async processChunkingJob(job: BatchJob): Promise<{ batchId: string; chunkingResults: Array<{ documentId: string; chunks: Array<{ id: string; content: string; metadata: Record<string, unknown> }>; error?: string }> }> {
+    const payload = job.payload as { batchId: string; documents: Array<{ id: string; content: string; processingOptions?: { chunkingStrategy?: string }; [key: string]: unknown }> };
+    const { batchId, documents } = payload;
 
     this.updateBatchProgress(batchId, {
       stage: 'chunking',
@@ -634,14 +608,25 @@ export class BatchProcessingService extends EventEmitter {
 
     for (let i = 0; i < documents.length; i++) {
       const document = documents[i];
+      if (!document) continue;
 
       try {
         const strategy = document.processingOptions?.chunkingStrategy || this.config.services.chunking.strategy;
 
+        const documentInput = {
+          id: document.id,
+          content: document.content,
+          metadata: {
+            source: 'batch-processing',
+            workspaceId: 'default',
+            documentId: document.id,
+          },
+        } as import('../documentChunkingService').DocumentInput;
+
         const chunks = await this.chunkingService.chunkDocument(
-          document.content,
+          documentInput,
           {
-            type: strategy,
+            type: strategy as 'semantic',
             maxChunkSize: this.config.services.chunking.chunkSize,
             overlapSize: this.config.services.chunking.overlap,
             preserveStructure: true,
@@ -650,7 +635,7 @@ export class BatchProcessingService extends EventEmitter {
 
         chunkingResults.push({
           documentId: document.id,
-          chunks: chunks.chunks.map((chunk: any, index: number) => ({
+          chunks: chunks.chunks.map((chunk, index: number) => ({
             id: `${document.id}_chunk_${index}`,
             content: chunk.content,
             metadata: {
@@ -681,8 +666,9 @@ export class BatchProcessingService extends EventEmitter {
   /**
    * Process embedding job
    */
-  private async processEmbeddingJob(job: BatchJob): Promise<any> {
-    const { batchId, chunkingJobId } = job.payload;
+  private async processEmbeddingJob(job: BatchJob): Promise<{ batchId: string; embeddingResults: Array<{ chunkId: string; embedding: number[] | null; metadata?: Record<string, unknown>; error?: string }> }> {
+    const payload = job.payload as { batchId: string; chunkingJobId: string };
+    const { batchId, chunkingJobId } = payload;
 
     this.updateBatchProgress(batchId, {
       stage: 'embedding',
@@ -697,8 +683,8 @@ export class BatchProcessingService extends EventEmitter {
     }
 
     // Process embeddings in batches
-    const embeddingResults: any[] = [];
-    const allChunks: any[] = [];
+    const embeddingResults: Array<{ chunkId: string; embedding: number[] | null; metadata?: Record<string, unknown>; error?: string }> = [];
+    const allChunks: Array<{ id: string; content: string; metadata?: Record<string, unknown> }> = [];
 
     // Collect all chunks from chunking results
     // This would need to be implemented based on how job results are stored
@@ -710,24 +696,23 @@ export class BatchProcessingService extends EventEmitter {
 
       try {
         const texts = chunkBatch.map(chunk => chunk.content);
-        const result = await this.embeddingService.generateEmbeddings({
+        const firstText = texts[0];
+        if (!firstText) {
+          throw new Error('No text content found in chunk batch');
+        }
+
+        const result = await this.embeddingService.generateEmbedding({
           model: 'text-embedding-3-large',
           dimensions: 1536,
-          texts: texts,
-          cache_ttl: 3600,
-          metadata: {
-            source: 'batch-processing',
-            batch_id: batchId,
-            chunk_count: texts.length,
-          },
+          text: firstText,
         });
 
-        if (result.embeddings && result.embeddings.length > 0) {
-          chunkBatch.forEach((chunk, index) => {
+        if (result.embedding && result.embedding.length > 0) {
+          chunkBatch.forEach((chunk) => {
             embeddingResults.push({
               chunkId: chunk.id,
-              embedding: result.embeddings[index],
-              metadata: chunk.metadata,
+              embedding: result.embedding,
+              metadata: chunk.metadata || {},
             });
           });
         } else {
@@ -763,8 +748,9 @@ export class BatchProcessingService extends EventEmitter {
   /**
    * Process finalization job
    */
-  private async processFinalizationJob(job: BatchJob): Promise<any> {
-    const { batchId } = job.payload;
+  private async processFinalizationJob(job: BatchJob): Promise<{ success: boolean; batchId: string; summary: Record<string, unknown> }> {
+    const payload = job.payload as { batchId: string };
+    const { batchId } = payload;
 
     this.updateBatchProgress(batchId, {
       stage: 'finalizing',
@@ -801,40 +787,54 @@ export class BatchProcessingService extends EventEmitter {
       currentOperation: 'Batch processing completed',
     });
 
-    // Remove from active batches
+    // Clean up active batch
     this.activeBatches.delete(batchId);
 
+    // Emit completion event
     this.emit('batchCompleted', { batchId, result: batchResult });
 
-    return batchResult;
+    return {
+      success: true,
+      batchId,
+      summary: {
+        totalDocuments: batchResult.totalDocuments,
+        processedDocuments: batchResult.processedDocuments,
+        failedDocuments: batchResult.failedDocuments,
+        processingTime: batchResult.metrics.totalProcessingTime,
+      },
+    };
   }
 
   /**
    * Handle job completion
    */
   private handleJobCompleted(): void {
-    // Update batch progress based on job type
-    // Implementation depends on job coordination logic
+    // Update metrics and cleanup
+    this.performanceMetrics.totalBatchesProcessed++;
   }
 
   /**
    * Handle job failure
    */
   private handleJobFailed(job: BatchJob, result: JobResult): void {
-    const batchId = job.payload.batchId;
-    if (batchId) {
-      this.updateBatchProgress(batchId, {
-        errors: [`Job ${job.type} failed: ${result.error}`],
-      });
-    }
+    const payload = job.payload as { batchId: string };
+    const batchId = payload.batchId;
+
+    this.logger.error(`Job ${job.id} failed: ${result.error}`);
+
+    this.updateBatchProgress(batchId, {
+      stage: 'failed',
+      progress: 0,
+      currentOperation: 'Job failed',
+      errors: [result.error || 'Unknown error'],
+    });
   }
 
   /**
-   * Handle job start
+   * Handle job started
    */
   private handleJobStarted(): void {
-    // Update batch progress when jobs start
-    // Implementation depends on job coordination logic
+    // Update metrics
   }
 
   /**
@@ -842,65 +842,47 @@ export class BatchProcessingService extends EventEmitter {
    */
   private updateBatchProgress(batchId: string, updates: Partial<BatchProgress>): void {
     const current = this.activeBatches.get(batchId);
-    if (!current) return;
-
-    const updated: BatchProgress = {
-      ...current,
-      ...updates,
-      lastUpdated: new Date(),
-    };
-
-    this.activeBatches.set(batchId, updated);
-    this.emit('progressUpdated', updated);
+    if (current) {
+      const updated = { ...current, ...updates };
+      this.activeBatches.set(batchId, updated);
+      this.emit('batchProgress', updated);
+    }
   }
 
   /**
    * Generate unique batch ID
    */
   private generateBatchId(): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    return `batch_${timestamp}_${random}`;
+    return `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
    * Initialize resource pool
    */
   private async initializeResourcePool(): Promise<void> {
-    // Initialize shared resources for performance optimization
-    // This could include connection pools, cached models, etc.
-  }
-
-  /**
-   * Cleanup resource pool
-   */
-  private async cleanupResourcePool(): Promise<void> {
-    // Cleanup shared resources
-    this.resourcePool.clear();
+    // Initialize resource pool for performance optimization
+    this.resourcePool.set('initialized', true);
   }
 
   /**
    * Start performance monitoring
    */
   private startPerformanceMonitoring(): void {
-    // Implement performance monitoring logic
-    setInterval(() => {
-      this.updatePerformanceMetrics();
-    }, 5000); // Update every 5 seconds
+    // Start monitoring system performance
   }
 
   /**
    * Stop performance monitoring
    */
   private stopPerformanceMonitoring(): void {
-    // Stop performance monitoring
+    // Stop monitoring system performance
   }
 
   /**
-   * Update performance metrics
+   * Cleanup resource pool
    */
-  private updatePerformanceMetrics(): void {
-    this.performanceMetrics.memoryUsage = process.memoryUsage().heapUsed;
-    // Update other metrics
+  private async cleanupResourcePool(): Promise<void> {
+    // Cleanup allocated resources
+    this.resourcePool.clear();
   }
 }

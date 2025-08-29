@@ -27,7 +27,7 @@ export interface DocumentChunk {
     title?: string;
     source?: string;
     processingStage?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -41,7 +41,7 @@ export interface VectorStoreEntry {
   chunkId: string;
   embedding: number[];
   content: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -93,7 +93,7 @@ export interface DocumentSearchRequest {
   documentIds?: string[];
   limit?: number;
   threshold?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -105,7 +105,7 @@ export interface DocumentSearchResult {
   chunkId: string;
   content: string;
   similarity: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   embedding?: number[];
 }
 
@@ -256,7 +256,7 @@ export class DocumentVectorStoreService {
 
           // Store vectors in database
           const storageStart = performance.now();
-          const vectorEntries = embeddingResponses.map((embeddingResponse: any, index: number) => {
+          const vectorEntries = embeddingResponses.map((embeddingResponse: { embedding: number[]; model?: string; dimensions?: number }, index: number) => {
             const chunk = batch[index];
             if (!chunk) {
               throw new Error(`Missing chunk at index ${index} for embedding batch`);
@@ -284,8 +284,8 @@ export class DocumentVectorStoreService {
 
           // Insert into Supabase
           const { data: insertedData, error: insertError } = await supabase
-            .from(this.config.storage.tableName as any)
-            .insert(vectorEntries)
+            .from(this.config.storage.tableName as never)
+            .insert(vectorEntries as never)
             .select('id, chunk_id, embedding');
 
           storageTime += performance.now() - storageStart;
@@ -308,18 +308,20 @@ export class DocumentVectorStoreService {
             });
           } else {
             // Add successful items
-            insertedData?.forEach(item => {
-              successful.push({
-                chunkId: (item as any).chunk_id,
-                vectorId: (item as any).id,
-                embedding: (item as any).embedding,
-              });
+            insertedData?.forEach((item: Record<string, unknown>) => {
+              if (item && typeof item === 'object' && 'chunk_id' in item && 'id' in item && 'embedding' in item) {
+                successful.push({
+                  chunkId: item.chunk_id as string,
+                  vectorId: item.id as string,
+                  embedding: item.embedding as number[],
+                });
+              }
             });
 
             // Add failed embedding generations
             // Handle any failed embeddings if needed
             // Check if any embeddings failed to generate
-            const failedEmbeddings = embeddingResponses.filter((response: any) => !response || !response.embedding);
+            const failedEmbeddings = embeddingResponses.filter((response: { embedding?: number[] }) => !response || !response.embedding);
             if (failedEmbeddings.length > 0) {
               // Log warning about empty embedding response
               console.warn('Empty embedding response received', {
@@ -440,7 +442,15 @@ export class DocumentVectorStoreService {
       }
 
       // Transform results
-      const results: DocumentSearchResult[] = data.matches?.map((match: any) => ({
+      const results: DocumentSearchResult[] = data.matches?.map((match: {
+        id: string;
+        document_id: string;
+        chunk_id: string;
+        content: string;
+        similarity: number;
+        metadata?: Record<string, unknown>;
+        embedding?: number[];
+      }) => ({
         id: match.id,
         documentId: match.document_id,
         chunkId: match.chunk_id,

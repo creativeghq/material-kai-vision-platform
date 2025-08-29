@@ -20,7 +20,7 @@ export interface TextToImageParams {
   guidance_scale?: number;
   negative_prompt?: string;
   seed?: number;
-  [key: string]: any; // Allow additional API-specific parameters
+  [key: string]: unknown; // Allow additional API-specific parameters
 }
 
 export interface ImageToImageParams {
@@ -31,7 +31,7 @@ export interface ImageToImageParams {
   num_inference_steps?: number;
   negative_prompt?: string;
   seed?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface TextGenerationParams {
@@ -39,7 +39,7 @@ export interface TextGenerationParams {
   max_tokens?: number;
   temperature?: number;
   top_p?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -65,7 +65,7 @@ export class ApiIntegrationService {
   public async generateImage(
     modelId: string,
     params: TextToImageParams,
-  ): Promise<StandardizedApiResponse<any>> {
+  ): Promise<StandardizedApiResponse<unknown>> {
     // Determine API type from model ID or use a mapping
     const apiType = this.getApiTypeFromModelId(modelId);
 
@@ -78,7 +78,7 @@ export class ApiIntegrationService {
   public async transformImage(
     modelId: string,
     params: ImageToImageParams,
-  ): Promise<StandardizedApiResponse<any>> {
+  ): Promise<StandardizedApiResponse<unknown>> {
     const apiType = this.getApiTypeFromModelId(modelId);
 
     return await apiClientFactory.executeApiCall(apiType, modelId, params);
@@ -90,7 +90,7 @@ export class ApiIntegrationService {
   public async generateText(
     modelId: string,
     params: TextGenerationParams,
-  ): Promise<StandardizedApiResponse<any>> {
+  ): Promise<StandardizedApiResponse<unknown>> {
     const apiType = this.getApiTypeFromModelId(modelId);
 
     return await apiClientFactory.executeApiCall(apiType, modelId, params);
@@ -101,8 +101,8 @@ export class ApiIntegrationService {
    */
   public async executeSupabaseFunction(
     functionName: string,
-    params: any,
-  ): Promise<StandardizedApiResponse<any>> {
+    params: unknown,
+  ): Promise<StandardizedApiResponse<unknown>> {
     // Format parameters correctly for SupabaseApiClient
     const supabaseParams = {
       functionName: functionName,

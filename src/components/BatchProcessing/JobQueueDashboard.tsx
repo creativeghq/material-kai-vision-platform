@@ -68,6 +68,22 @@ export interface QueueStats {
   queueWaitTime: number;
 }
 
+// WebSocket message types for job queue updates
+interface WebSocketJobUpdateData {
+  type: 'job_updated' | 'job_added' | 'job_removed' | 'stats_updated';
+  job?: JobItem;
+  jobId?: string;
+  stats?: QueueStats;
+}
+
+// WebSocket message types for job queue updates
+interface WebSocketJobUpdateData {
+  type: 'job_updated' | 'job_added' | 'job_removed' | 'stats_updated';
+  job?: JobItem;
+  jobId?: string;
+  stats?: QueueStats;
+}
+
 interface JobQueueDashboardProps {
   className?: string;
   maxHeight?: string;
@@ -106,17 +122,17 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
   useWebSocketSubscription(
     process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080',
     'job_queue_update',
-    (data: any) => {
+    (data: WebSocketJobUpdateData) => {
       if (data.type === 'job_updated') {
         setJobs(prev => prev.map(job =>
-          job.id === data.job.id ? { ...job, ...data.job } : job,
+          job.id === data.job?.id ? { ...job, ...data.job } : job,
         ));
       } else if (data.type === 'job_added') {
-        setJobs(prev => [data.job, ...prev]);
+        setJobs(prev => data.job ? [data.job, ...prev] : prev);
       } else if (data.type === 'job_removed') {
         setJobs(prev => prev.filter(job => job.id !== data.jobId));
       } else if (data.type === 'stats_updated') {
-        setStats(data.stats);
+        setStats(data.stats || null);
       }
     },
   );
@@ -209,16 +225,20 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
 
     // Sort jobs
     filtered.sort((a, b) => {
-      let aValue: any = a[sortBy as keyof JobItem];
-      let bValue: any = b[sortBy as keyof JobItem];
+      let aValue: unknown = a[sortBy as keyof JobItem];
+      let bValue: unknown = b[sortBy as keyof JobItem];
 
       if (aValue instanceof Date) aValue = aValue.getTime();
       if (bValue instanceof Date) bValue = bValue.getTime();
 
+      // Convert to comparable values for sorting
+      const aComparable = typeof aValue === 'string' || typeof aValue === 'number' ? aValue : String(aValue);
+      const bComparable = typeof bValue === 'string' || typeof bValue === 'number' ? bValue : String(bValue);
+
       if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        return aComparable < bComparable ? -1 : aComparable > bComparable ? 1 : 0;
       } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        return aComparable > bComparable ? -1 : aComparable < bComparable ? 1 : 0;
       }
     });
 

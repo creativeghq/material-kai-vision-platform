@@ -83,12 +83,12 @@ export const AITestingPanel: React.FC = () => {
       const testResults: TestResult[] = [];
 
       if (data.attempts) {
-        data.attempts.forEach((attempt: any) => {
+        data.attempts.forEach((attempt: { provider: string; score?: number; success: boolean; error?: string; response?: string; processing_time_ms?: number }) => {
           testResults.push({
             provider: attempt.provider,
             score: attempt.score || 0,
             success: attempt.success,
-            processing_time_ms: attempt.processing_time_ms,
+            processing_time_ms: attempt.processing_time_ms || 0,
             error: attempt.error,
           });
         });

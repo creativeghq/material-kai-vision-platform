@@ -24,6 +24,59 @@ import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationServi
 
 import { PDFExportOptions } from './PDFExportOptions';
 
+// Define structured data interface for PDF tiles
+interface TileStructuredData {
+  material_properties?: Record<string, unknown>;
+  technical_specs?: Record<string, unknown>;
+  dimensions?: {
+    length?: number;
+    width?: number;
+    thickness?: number;
+    unit?: string;
+  };
+  color?: string;
+  finish?: string;
+  grade?: string;
+  manufacturer?: string;
+  model?: string;
+  [key: string]: unknown;
+}
+
+// Define metadata interface for PDF tiles
+interface TileMetadataExtracted {
+  extraction_method?: string;
+  confidence_score?: number;
+  processing_time?: number;
+  source_region?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  ocr_engine?: string;
+  language_detected?: string;
+  [key: string]: unknown;
+}
+
+// Define workflow results interface
+interface WorkflowResults {
+  ai_analysis?: {
+    success: boolean;
+    data?: unknown;
+    error?: string;
+  };
+  image_generation?: {
+    success: boolean;
+    generated: number;
+    images: Array<{
+      tile_id: string;
+      image_url: string;
+    }>;
+    error?: string;
+  };
+  [key: string]: unknown;
+}
+
 interface PDFTile {
   id: string;
   page_number: number;
@@ -33,8 +86,8 @@ interface PDFTile {
   material_detected: boolean;
   material_type: string;
   material_confidence: number;
-  structured_data: any;
-  metadata_extracted: any;
+  structured_data: TileStructuredData;
+  metadata_extracted: TileMetadataExtracted;
   x_coordinate: number;
   y_coordinate: number;
   width: number;
@@ -61,7 +114,7 @@ interface WorkflowAction {
 interface PDFReviewWorkflowProps {
   processingId: string;
   tiles: PDFTile[];
-  onWorkflowComplete?: (results: any) => void;
+  onWorkflowComplete?: (results: WorkflowResults) => void;
 }
 
 export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
@@ -149,7 +202,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
     try {
       const selectedTileData = reviewedTiles.filter(tile => selectedTiles.has(tile.id));
-      const workflowResults: any = {};
+      const workflowResults: WorkflowResults = {};
 
       let completed = 0;
       const totalSteps = workflowActions.size;
@@ -220,12 +273,12 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
 
   const generateMaterialImages = async (tiles: ReviewedTile[]) => {
-    const images = [];
+    const images: Array<{ tile_id: string; image_url: string }> = [];
 
     for (const tile of tiles) {
       try {
-        const prompt = `High-quality technical illustration of ${tile.corrected_material_type || tile.material_type} material. 
-        Properties: ${JSON.stringify(tile.structured_data || {})}. 
+        const prompt = `High-quality technical illustration of ${tile.corrected_material_type || tile.material_type} material.
+        Properties: ${JSON.stringify(tile.structured_data || {})}.
         Clean, professional material sample visualization, white background, detailed texture.`;
 
         const apiService = ApiIntegrationService.getInstance();
@@ -236,13 +289,21 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         });
 
         if (!result.success) throw new Error(result.error?.message || 'Image generation failed');
-        images.push({ tile_id: tile.id, image_url: result.data?.image_url });
+        
+        const imageUrl = result.data?.image_url;
+        if (typeof imageUrl === 'string') {
+          images.push({ tile_id: tile.id, image_url: imageUrl });
+        }
       } catch (error) {
         console.error(`Image generation failed for tile ${tile.id}:`, error);
       }
     }
 
-    return { generated: images.length, images };
+    return {
+      success: true,
+      generated: images.length,
+      images
+    };
   };
 
   const getReviewStats = () => {

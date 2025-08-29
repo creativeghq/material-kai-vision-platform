@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, ExternalLink, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,13 +24,7 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
-  useEffect(() => {
-    if (isOpen && knowledgeEntryId) {
-      fetchHTMLContent();
-    }
-  }, [isOpen, knowledgeEntryId]);
-
-  const fetchHTMLContent = async () => {
+  const fetchHTMLContent = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -54,8 +48,8 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
           typeof knowledgeEntry.properties === 'object' &&
           !Array.isArray(knowledgeEntry.properties) &&
           knowledgeEntry.properties !== null) {
-        const props = knowledgeEntry.properties as Record<string, any>;
-        htmlContent = props.html_content || htmlContent;
+        const props = knowledgeEntry.properties as Record<string, unknown>;
+        htmlContent = (typeof props.html_content === 'string' ? props.html_content : htmlContent);
       }
 
       setHtmlContent(htmlContent);
@@ -66,7 +60,13 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [knowledgeEntryId]);
+  useEffect(() => {
+    if (isOpen && knowledgeEntryId) {
+      fetchHTMLContent();
+    }
+  }, [isOpen, knowledgeEntryId, fetchHTMLContent]);
+
 
   const downloadHTML = () => {
     if (!htmlContent) return;

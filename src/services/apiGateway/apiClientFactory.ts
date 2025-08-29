@@ -13,7 +13,7 @@ import { SupabaseApiClient } from './supabaseApiClient';
  */
 class CentralizedApiClientFactory {
   private static instance: CentralizedApiClientFactory;
-  private clients: Map<string, StandardizedApiClient<any, any>> = new Map();
+  private clients: Map<string, StandardizedApiClient<unknown, unknown>> = new Map();
 
   private constructor() {
     this.initializeClients();
@@ -83,7 +83,7 @@ class CentralizedApiClientFactory {
   /**
    * Register a client for a specific API and model/function
    */
-  public registerClient(apiType: string, modelId: string, client: StandardizedApiClient<any, any>): void {
+  public registerClient(apiType: string, modelId: string, client: StandardizedApiClient<unknown, unknown>): void {
     const key = `${apiType}:${modelId}`;
     this.clients.set(key, client);
   }
@@ -91,7 +91,7 @@ class CentralizedApiClientFactory {
   /**
    * Get a client for a specific API and model/function
    */
-  public getClient(apiType: string, modelId: string): StandardizedApiClient<any, any> | null {
+  public getClient(apiType: string, modelId: string): StandardizedApiClient<unknown, unknown> | null {
     const key = `${apiType}:${modelId}`;
     const client = this.clients.get(key);
     if (!client) {
@@ -219,7 +219,7 @@ class CentralizedApiClientFactory {
       // Execute the API call
       const validatedParams = client.validateParams(params);
 
-      return await client.execute(validatedParams);
+      return await client.execute(validatedParams) as StandardizedApiResponse<TResponse>;
     } catch (error) {
       return {
         success: false,

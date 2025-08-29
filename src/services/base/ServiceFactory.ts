@@ -124,8 +124,8 @@ export class ServiceFactory {
   /**
    * Get health status of all services
    */
-  public async getServicesHealth(): Promise<Record<string, any>> {
-    const health: Record<string, any> = {};
+  public async getServicesHealth(): Promise<Record<string, unknown>> {
+    const health: Record<string, unknown> = {};
 
     for (const [name, entry] of this.registry.entries()) {
       if (entry.instance) {
@@ -151,8 +151,8 @@ export class ServiceFactory {
   /**
    * Get metrics for all services
    */
-  public getServicesMetrics(): Record<string, any> {
-    const metrics: Record<string, any> = {};
+  public getServicesMetrics(): Record<string, unknown> {
+    const metrics: Record<string, unknown> = {};
 
     for (const [name, entry] of this.registry.entries()) {
       if (entry.instance) {

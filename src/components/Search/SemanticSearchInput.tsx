@@ -16,7 +16,7 @@ export interface SearchSuggestion {
   type: 'semantic' | 'recent' | 'trending' | 'completion';
   confidence?: number;
   category?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SearchHistory {
@@ -50,7 +50,7 @@ export interface SemanticSearchInputProps {
 export interface SearchOptions {
   semantic?: boolean;
   category?: string | undefined;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 // Database-driven search suggestions and history
@@ -66,7 +66,7 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
       .limit(5);
 
     if (processingData) {
-      processingData.forEach((item: any) => {
+      processingData.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         suggestions.push({
           id: `processing_${item.id}`,
           text: `${item.extraction_type} analysis`,
@@ -89,7 +89,7 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
       .limit(3);
 
     if (materialsData) {
-      materialsData.forEach((item: any) => {
+      materialsData.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         suggestions.push({
           id: `material_${item.id}`,
           text: `${item.name} materials`,

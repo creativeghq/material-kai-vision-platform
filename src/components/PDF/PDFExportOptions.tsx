@@ -9,6 +9,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
+interface StructuredData {
+  [key: string]: unknown;
+}
+
+interface MetadataExtracted {
+  [key: string]: unknown;
+}
+
+interface ResultSummary {
+  total_tiles?: number;
+  materials_detected?: number;
+  processing_time?: number;
+  confidence_scores?: {
+    average?: number;
+    min?: number;
+    max?: number;
+  };
+  material_types?: string[];
+  [key: string]: unknown;
+}
+
 interface PDFTile {
   id: string;
   page_number: number;
@@ -18,8 +39,8 @@ interface PDFTile {
   material_detected: boolean;
   material_type: string;
   material_confidence: number;
-  structured_data: any;
-  metadata_extracted: any;
+  structured_data: StructuredData;
+  metadata_extracted: MetadataExtracted;
   x_coordinate: number;
   y_coordinate: number;
   width: number;
@@ -30,7 +51,7 @@ interface PDFTile {
 interface PDFExportOptionsProps {
   processingId: string;
   tiles: PDFTile[];
-  resultSummary: any;
+  resultSummary: ResultSummary;
 }
 
 export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({

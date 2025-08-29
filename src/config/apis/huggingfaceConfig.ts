@@ -21,7 +21,7 @@ export interface HuggingFaceApiConfig extends BaseApiConfig {
     [modelId: string]: {
       inputSchema: z.ZodSchema;
       outputSchema: z.ZodSchema;
-      defaultParams?: Record<string, any>;
+      defaultParams?: Record<string, unknown>;
       description?: string;
       category?: string;
       status?: 'working' | 'failing' | 'unknown';

@@ -35,7 +35,7 @@ import {
 } from '@/services/enhancedRAGService';
 
 interface EnhancedRAGInterfaceProps {
-  onResultsFound?: (results: any[]) => void;
+  onResultsFound?: (results: Record<string, unknown>[]) => void;
 }
 
 export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onResultsFound }) => {
@@ -50,7 +50,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
     stylePreferences: [] as string[],
     materialCategories: [] as string[],
   });
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<{
+    totalSearches?: number;
+    avgSatisfaction?: number;
+    avgResponseTime?: number;
+  } | null>(null);
 
   const { toast } = useToast();
 
@@ -110,7 +114,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
         ...results.results.materialKnowledge,
         ...results.results.recommendations,
       ];
-      onResultsFound?.(allResults);
+      onResultsFound?.(allResults as unknown as Record<string, unknown>[]);
 
       toast({
         title: 'Enhanced Search Completed',
@@ -201,7 +205,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="searchType">Search Type</Label>
-              <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+              <Select value={searchType} onValueChange={(value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity') => setSearchType(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -619,7 +623,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Searches</p>
-                  <p className="text-2xl font-bold">{analytics.totalSearches}</p>
+                  <p className="text-2xl font-bold">{analytics.totalSearches ?? 0}</p>
                 </div>
                 <Search className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -631,7 +635,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Satisfaction</p>
-                  <p className="text-2xl font-bold">{analytics.avgSatisfaction}/5</p>
+                  <p className="text-2xl font-bold">{analytics.avgSatisfaction ?? 0}/5</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -643,7 +647,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Response</p>
-                  <p className="text-2xl font-bold">{analytics.avgResponseTime}ms</p>
+                  <p className="text-2xl font-bold">{analytics.avgResponseTime ?? 0}ms</p>
                 </div>
                 <Clock className="h-8 w-8 text-muted-foreground" />
               </div>

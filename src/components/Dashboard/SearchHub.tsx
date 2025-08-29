@@ -47,7 +47,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
     'Recycled content',
   ]);
 
-  const handleQuickAction = useCallback((action: string, data?: any) => {
+  const handleQuickAction = useCallback((action: string, data?: string) => {
     switch (action) {
       case 'moodboard':
         onNavigateToMoodboard?.();
@@ -56,7 +56,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
         onNavigateTo3D?.();
         break;
       case 'material':
-        onMaterialSelect?.(data);
+        onMaterialSelect?.(data || '');
         break;
     }
   }, [onMaterialSelect, onNavigateToMoodboard, onNavigateTo3D]);

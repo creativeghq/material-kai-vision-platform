@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Brain,
   Activity,
@@ -35,11 +35,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
   const [regenerating, setRegenerating] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchEmbeddingStats();
-  }, []);
-
-  const fetchEmbeddingStats = async () => {
+  const fetchEmbeddingStats = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -63,7 +59,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
 
       // Process embedding types - simulate different embedding types for materials
       const embeddingTypeCounts: Record<string, { count: number; dimension: number }> = {};
-      materialData?.forEach(_item => {
+      materialData?.forEach(() => {
         const embeddingType = 'pgvector'; // Default embedding type for pgvector
         if (!embeddingTypeCounts[embeddingType]) {
           embeddingTypeCounts[embeddingType] = {
@@ -103,7 +99,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleRegenerateEmbeddings = async () => {
     setRegenerating(true);

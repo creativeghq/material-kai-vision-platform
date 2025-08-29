@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Clock, Image, AlertCircle, ChevronDown, ChevronRight, Play, Pause, RotateCcw } from 'lucide-react';
+import NextImage from 'next/image';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
@@ -25,7 +26,7 @@ interface GenerationWorkflowModalProps {
   isOpen: boolean;
   onClose: () => void;
   generationId: string;
-  onComplete: (images: any[]) => void;
+  onComplete: (images: unknown[]) => void;
 }
 
 export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = ({
@@ -37,7 +38,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
   const [currentStep, setCurrentStep] = useState<string>('');
   const [overallProgress, setOverallProgress] = useState(0);
-  const [generationData, setGenerationData] = useState<any>(null);
+  const [generationData] = useState<unknown>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [hasReferenceImage, setHasReferenceImage] = useState(false);
 
@@ -47,16 +48,21 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     'models': true,
   });
-  const [_showCompletionDialog, setShowCompletionDialog] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
 
   // Initialize workflow steps based on actual edge function implementation
   useEffect(() => {
     if (!generationData) return;
 
     // Check if reference image is provided
-    const hasRefImage = generationData.prompt &&
-      !generationData.prompt.includes('[NO_IMAGE]') &&
-      generationData.prompt !== '[NO_IMAGE]';
+    const dataWithPrompt = generationData as Record<string, unknown>;
+    const hasRefImage = Boolean(
+      dataWithPrompt.prompt &&
+      typeof dataWithPrompt.prompt === 'string' &&
+      !dataWithPrompt.prompt.includes('[NO_IMAGE]') &&
+      dataWithPrompt.prompt !== '[NO_IMAGE]'
+    );
 
     setHasReferenceImage(hasRefImage);
 
@@ -150,7 +156,12 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         //   .single();
 
         // Mock response for now to prevent build errors
-        const data: any = null;
+        // const data: {
+        //   result_data?: { workflow_steps?: Record<string, unknown>[] };
+        //   generation_status?: string;
+        //   image_urls?: string[];
+        //   error_message?: string;
+        // } | null = null;
         const error = { message: 'generation_3d table not implemented' };
 
         if (error) {
@@ -158,30 +169,31 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           return;
         }
 
-        if (data) {
-          setGenerationData(data);
+        // TODO: Uncomment and implement when generation_3d table is available
+        // if (data) {
+        //   setGenerationData(data);
 
-          // Parse workflow data from result_data
-          if (data.result_data && typeof data.result_data === 'object' && 'workflow_steps' in data.result_data) {
-            const workflowData = data.result_data as { workflow_steps?: any[] };
-            if (workflowData.workflow_steps) {
-              updateStepsFromData(workflowData.workflow_steps);
-            }
-          }
+        //   // Parse workflow data from result_data
+        //   if (data.result_data && typeof data.result_data === 'object' && 'workflow_steps' in data.result_data) {
+        //     const workflowData = data.result_data as { workflow_steps?: Record<string, unknown>[] };
+        //     if (workflowData.workflow_steps) {
+        //       updateStepsFromData(workflowData.workflow_steps);
+        //     }
+        //   }
 
-          // Check if generation is complete
-          if (data.generation_status === 'completed') {
-            setIsComplete(true);
-            setShowCompletionDialog(true);
-            if (data.image_urls && data.image_urls.length > 0) {
-              onComplete(data.image_urls);
-              // Don't auto-close - show completion dialog instead
-            }
-          } else if (data.generation_status === 'failed') {
-            console.error('Generation failed:', data.error_message);
-            setIsComplete(true);
-          }
-        }
+        //   // Check if generation is complete
+        //   if (data.generation_status === 'completed') {
+        //     setIsComplete(true);
+        //     setShowCompletionDialog(true);
+        //     if (data.image_urls && data.image_urls.length > 0) {
+        //       onComplete(data.image_urls);
+        //       // Don't auto-close - show completion dialog instead
+        //     }
+        //   } else if (data.generation_status === 'failed') {
+        //     console.error('Generation failed:', data.error_message);
+        //     setIsComplete(true);
+        //   }
+        // }
 
       } catch (error) {
         console.error('Polling error:', error);
@@ -197,22 +209,35 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     return () => clearInterval(interval);
   }, [generationId, isOpen, onComplete, onClose]);
 
-  const updateStepsFromData = (workflowSteps: any[]) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const updateStepsFromData = (workflowSteps: unknown[]) => {
     setSteps(prevSteps => {
       const updatedSteps = [...prevSteps];
 
       workflowSteps.forEach(workflowStep => {
-        const stepIndex = updatedSteps.findIndex(s => s.modelName === workflowStep.modelName);
+        const step = workflowStep as Record<string, unknown>;
+        const stepIndex = updatedSteps.findIndex(s => s.modelName === step.modelName);
         if (stepIndex !== -1) {
-          updatedSteps[stepIndex] = {
-            ...updatedSteps[stepIndex],
-            status: workflowStep.status,
-            ...(workflowStep.startTime && { startTime: workflowStep.startTime }),
-            ...(workflowStep.endTime && { endTime: workflowStep.endTime }),
-            ...(workflowStep.imageUrl && { imageUrl: workflowStep.imageUrl }),
-            ...(workflowStep.errorMessage && { errorMessage: workflowStep.errorMessage }),
-            ...(workflowStep.processingTimeMs && { processingTimeMs: workflowStep.processingTimeMs }),
-          };
+          // Map 'completed' to 'success' to match the expected status type
+          let mappedStatus = step.status as string;
+          if (mappedStatus === 'completed') {
+            mappedStatus = 'success';
+          }
+          
+          const currentStep = updatedSteps[stepIndex];
+          if (currentStep) {
+            updatedSteps[stepIndex] = {
+              id: currentStep.id,
+              name: currentStep.name,
+              status: mappedStatus as 'pending' | 'running' | 'success' | 'failed' | 'skipped',
+              modelName: currentStep.modelName,
+              ...(step.startTime ? { startTime: step.startTime as string } : currentStep.startTime ? { startTime: currentStep.startTime } : {}),
+              ...(step.endTime ? { endTime: step.endTime as string } : currentStep.endTime ? { endTime: currentStep.endTime } : {}),
+              ...(step.imageUrl ? { imageUrl: step.imageUrl as string } : currentStep.imageUrl ? { imageUrl: currentStep.imageUrl } : {}),
+              ...(step.errorMessage ? { errorMessage: step.errorMessage as string } : currentStep.errorMessage ? { errorMessage: currentStep.errorMessage } : {}),
+              ...(step.processingTimeMs ? { processingTimeMs: step.processingTimeMs as number } : currentStep.processingTimeMs ? { processingTimeMs: currentStep.processingTimeMs } : {}),
+            };
+          }
         }
       });
 
@@ -277,6 +302,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     // Reset all steps to pending
     setSteps(prevSteps =>
       prevSteps.map(step => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { startTime, endTime, imageUrl, errorMessage, processingTimeMs, ...baseStep } = step;
         return {
           ...baseStep,
@@ -312,6 +338,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
       <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
             <Image className="h-5 w-5" />
             AI Generation Workflow
           </DialogTitle>
@@ -371,7 +398,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             <div className="space-y-3">
               {/* Unified Models Section */}
               <Collapsible
-                open={expandedSections['models']}
+                open={expandedSections['models'] ?? false}
                 onOpenChange={() => toggleSection('models')}
               >
                 <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded border">
@@ -388,7 +415,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
                   <div className="space-y-2">
-                    {steps.map((step, _index) => (
+                    {steps.map((step) => (
                       <Card key={step.id} className="ml-4">
                         <CardContent className="p-3">
                           <div className="flex items-center justify-between">
@@ -411,9 +438,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
 
                           {step.imageUrl && (
                             <div className="mt-2">
-                              <img
+                              <NextImage
                                 src={step.imageUrl}
                                 alt={`Generated by ${step.name}`}
+                                width={400}
+                                height={128}
                                 className="w-full h-32 object-cover rounded border"
                               />
                             </div>

@@ -5,12 +5,20 @@
  * transient failures in external service calls.
  */
 
+// Define error types that can be retried
+interface RetryableError extends Error {
+  code?: string;
+  response?: {
+    status: number;
+  };
+}
+
 export interface RetryOptions {
   maxAttempts: number;
   delay: number;
   backoffMultiplier?: number;
   maxDelay?: number;
-  retryCondition?: (error: any) => boolean;
+  retryCondition?: (error: unknown) => boolean;
 }
 
 export class RetryHelper {
@@ -29,7 +37,7 @@ export class RetryHelper {
       retryCondition = RetryHelper.defaultRetryCondition,
     } = options;
 
-    let lastError: any;
+    let lastError: unknown;
     let currentDelay = delay;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -62,22 +70,25 @@ export class RetryHelper {
   /**
    * Default retry condition - retries on network errors and 5xx status codes
    */
-  private static defaultRetryCondition(error: any): boolean {
+  private static defaultRetryCondition(error: unknown): boolean {
+    // Type guard to check if error has the expected properties
+    const retryableError = error as RetryableError;
+    
     // Network errors
-    if (error.code === 'ECONNRESET' ||
-        error.code === 'ENOTFOUND' ||
-        error.code === 'ECONNREFUSED' ||
-        error.code === 'ETIMEDOUT') {
+    if (retryableError.code === 'ECONNRESET' ||
+        retryableError.code === 'ENOTFOUND' ||
+        retryableError.code === 'ECONNREFUSED' ||
+        retryableError.code === 'ETIMEDOUT') {
       return true;
     }
 
     // HTTP 5xx errors
-    if (error.response && error.response.status >= 500) {
+    if (retryableError.response && retryableError.response.status >= 500) {
       return true;
     }
 
     // HTTP 429 (Too Many Requests)
-    if (error.response && error.response.status === 429) {
+    if (retryableError.response && retryableError.response.status === 429) {
       return true;
     }
 

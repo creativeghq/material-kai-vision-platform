@@ -6,14 +6,14 @@ import { JWTAuthMiddleware, AuthenticatedRequest, AuthenticationResult } from '.
 // Express types (would be imported from @types/express in real implementation)
 interface Request {
   headers: Record<string, string | string[] | undefined>;
-  body: any;
+  body: unknown;
   params: Record<string, string>;
-  query: Record<string, any>;
+  query: Record<string, unknown>;
 }
 
 interface Response {
   status(code: number): Response;
-  json(data: any): void;
+  json(data: unknown): void;
   headersSent: boolean;
 }
 
@@ -45,7 +45,7 @@ class RateLimitHelper {
     return true;
   }
 
-  static async logUsage(userId: string, workspaceId: string, endpoint: string, metadata?: any): Promise<void> {
+  static async logUsage(userId: string, workspaceId: string, endpoint: string, metadata?: unknown): Promise<void> {
     // Log usage for analytics and monitoring
     console.log(`Usage logged: ${userId} in ${workspaceId} accessed ${endpoint}`, metadata);
   }
@@ -156,13 +156,13 @@ const JobIdSchema = z.object({
 });
 
 // Response Interfaces
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   metadata?: {
     timestamp: string;
@@ -190,7 +190,7 @@ interface JobStatusResponse {
     totalStages: number;
     percentage: number;
   };
-  result?: any;
+  result?: unknown;
   error?: string | undefined;
   createdAt: string;
   updatedAt: string;
@@ -208,7 +208,7 @@ interface JobProgressResponse {
     endTime?: string | undefined;
     duration?: number | undefined;
     error?: string | undefined;
-    metrics?: Record<string, any> | undefined;
+    metrics?: Record<string, unknown> | undefined;
   }>;
   metrics: {
     totalProcessingTime: number;
@@ -287,7 +287,7 @@ export class DocumentIntegrationController {
       }
 
       // Attach auth context to request
-      (req as any).authContext = authResult.authContext;
+      (req as unknown as { authContext: typeof authResult.authContext }).authContext = authResult.authContext;
       next();
     } catch (error) {
       const errorResponse: ApiResponse = {
@@ -313,7 +313,7 @@ export class DocumentIntegrationController {
    */
   private async rateLimitMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const authContext = (req as any).authContext;
+      const authContext = (req as unknown as { authContext?: { userId: string; workspaceId: string } }).authContext;
       if (!authContext) {
         next();
         return;
@@ -340,7 +340,7 @@ export class DocumentIntegrationController {
       }
 
       next();
-    } catch (error) {
+    } catch {
       next(); // Continue on rate limit errors
     }
   }
@@ -351,10 +351,12 @@ export class DocumentIntegrationController {
    */
   private async authorizeWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const authContext = (req as any).authContext;
-      const requestedWorkspaceId = req.body.workspaceId || req.params.workspaceId || req.query.workspaceId;
+      const authContext = (req as unknown as { authContext?: { workspaceId: string } }).authContext;
+      const requestedWorkspaceId = (req.body as { workspaceId?: string }).workspaceId ||
+                                   req.params.workspaceId ||
+                                   (req.query as { workspaceId?: string }).workspaceId;
 
-      if (requestedWorkspaceId && requestedWorkspaceId !== authContext.workspaceId) {
+      if (requestedWorkspaceId && authContext && requestedWorkspaceId !== authContext.workspaceId) {
         const errorResponse: ApiResponse = {
           success: false,
           error: {
@@ -372,7 +374,7 @@ export class DocumentIntegrationController {
       }
 
       next();
-    } catch (error) {
+    } catch {
       next();
     }
   }
@@ -416,7 +418,7 @@ export class DocumentIntegrationController {
         return;
       }
 
-      const authContext = (req as any).authContext;
+      const authContext = (req as unknown as { authContext: { userId: string; workspaceId: string } }).authContext;
       const { mivaaDocument, config, priority, metadata } = validationResult.data;
 
       // Create processing request with proper type handling
@@ -440,7 +442,7 @@ export class DocumentIntegrationController {
             rawData: JSON.stringify(table),
           })),
           images: (mivaaDocument.images || []).map(image => {
-            const imageMetadata: any = {
+            const imageMetadata: Record<string, unknown> = {
               id: image.id,
               filename: image.id || 'unknown',
               position: {
@@ -484,7 +486,7 @@ export class DocumentIntegrationController {
 
       // Add config only if it exists to handle exactOptionalPropertyTypes
       if (config) {
-        processingRequest.config = config as any; // Type assertion to bypass exactOptionalPropertyTypes issue
+        processingRequest.config = config as Record<string, unknown>; // Type assertion to bypass exactOptionalPropertyTypes issue
       }
 
       // Start workflow processing
@@ -502,7 +504,7 @@ export class DocumentIntegrationController {
       const responseData: ProcessDocumentResponse = {
         jobId: workflowJob.id,
         status: workflowJob.status,
-        estimatedCompletionTime: this.calculateEstimatedCompletion(workflowJob),
+        estimatedCompletionTime: this.calculateEstimatedCompletion(),
         stages: workflowJob.stages.map(stage => ({
           name: stage.name,
           status: stage.status,
@@ -573,7 +575,7 @@ export class DocumentIntegrationController {
       }
 
       const { jobId } = validationResult.data;
-      const authContext = (req as any).authContext;
+      const authContext = (req as unknown as { authContext: { userId: string; workspaceId: string } }).authContext;
 
       // Get workflow status
       const status = await this.orchestrator.getWorkflowStatus(jobId);
@@ -703,7 +705,7 @@ export class DocumentIntegrationController {
       }
 
       const { jobId } = validationResult.data;
-      const authContext = (req as any).authContext;
+      const authContext = (req as unknown as { authContext: { userId: string; workspaceId: string } }).authContext;
 
       // Get job details
       const jobDetails = await this.getJobDetails(jobId);
@@ -827,7 +829,7 @@ export class DocumentIntegrationController {
     };
   }
 
-  private calculateEstimatedCompletion(_job: WorkflowJob): string {
+  private calculateEstimatedCompletion(): string {
     // Simple estimation based on average processing time
     const estimatedMinutes = 5; // Default estimation
     const completionTime = new Date(Date.now() + estimatedMinutes * 60 * 1000);

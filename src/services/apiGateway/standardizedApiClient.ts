@@ -11,12 +11,11 @@
  * - Keep response formats unchanged
  */
 
-import { z } from 'zod';
 
 import { ApiConfig, ApiConfigManager } from '../../config';
 
 // Standardized response wrapper (preserves original data structure)
-export interface StandardizedApiResponse<T = any> {
+export interface StandardizedApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: StandardizedError;
@@ -33,18 +32,18 @@ export interface StandardizedApiResponse<T = any> {
 export interface StandardizedError {
   code: string;
   message: string;
-  details?: any; // Preserves API-specific error details
-  originalError?: any; // Keeps the raw error for debugging
+  details?: unknown; // Preserves API-specific error details
+  originalError?: unknown; // Keeps the raw error for debugging
   retryable: boolean;
   apiSpecific?: {
     statusCode?: number;
     headers?: Record<string, string>;
-    body?: any;
+    body?: unknown;
   };
 }
 
 // Base interface for all API clients (preserves unique implementations)
-export interface StandardizedApiClient<TParams = any, TResponse = any> {
+export interface StandardizedApiClient<TParams = unknown, TResponse = unknown> {
   readonly apiType: string;
   readonly modelId?: string;
 
@@ -101,7 +100,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
   }
 
   // Hook for API-specific error enhancement
-  protected enhanceError(baseError: StandardizedError, originalError: unknown): StandardizedError {
+  protected enhanceError(baseError: StandardizedError, _originalError: unknown): StandardizedError {
     return baseError;
   }
 
@@ -116,7 +115,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
       data,
       metadata: {
         apiType: this.apiType,
-        modelId: this.modelId,
+        modelId: this.modelId || undefined,
         timestamp: new Date().toISOString(),
         requestId,
         duration: Date.now() - startTime,
@@ -135,7 +134,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
       error,
       metadata: {
         apiType: this.apiType,
-        modelId: this.modelId,
+        modelId: this.modelId || undefined,
         timestamp: new Date().toISOString(),
         requestId,
         duration: Date.now() - startTime,
@@ -168,7 +167,7 @@ export async function withRetry<T>(
   config: Partial<RetryConfig> = {},
 ): Promise<T> {
   const retryConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
-  let lastError: any;
+  let lastError: unknown;
 
   for (let attempt = 1; attempt <= retryConfig.maxAttempts; attempt++) {
     try {
@@ -226,9 +225,9 @@ export class ApiClientFactory {
 }
 
 // Utility types for better TypeScript support
-export type ApiClientFor<T extends ApiConfig> = T extends { type: infer U }
-  ? StandardizedApiClient<any, any>
+export type ApiClientFor<T extends ApiConfig> = T extends { type: infer _U }
+  ? StandardizedApiClient<unknown, unknown>
   : never;
 
-export type ExtractParams<T> = T extends StandardizedApiClient<infer P, any> ? P : never;
-export type ExtractResponse<T> = T extends StandardizedApiClient<any, infer R> ? R : never;
+export type ExtractParams<T> = T extends StandardizedApiClient<infer P, unknown> ? P : never;
+export type ExtractResponse<T> = T extends StandardizedApiClient<unknown, infer R> ? R : never;

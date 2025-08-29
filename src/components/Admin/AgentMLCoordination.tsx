@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Brain,
@@ -36,7 +36,7 @@ interface MLTask {
   ml_operation_type: string;
   agent_task_id: string;
   processing_time_ms: number | null;
-  confidence_scores: any;
+  confidence_scores: Record<string, unknown>;
   created_at: string;
 }
 
@@ -53,11 +53,7 @@ const AgentMLCoordination: React.FC = () => {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       // TODO: Create agent_tasks table in database schema
       // const [agentTasksResult, mlTasksResult] = await Promise.all([
@@ -72,7 +68,7 @@ const AgentMLCoordination: React.FC = () => {
       //     .order('created_at', { ascending: false })
 
       // Mock response for agent_tasks until table is created
-      const agentTasksResult: any = { data: null, error: null };
+      const agentTasksResult: { data: null; error: null } = { data: null, error: null };
 
       const [mlTasksResult] = await Promise.all([
         supabase
@@ -85,7 +81,7 @@ const AgentMLCoordination: React.FC = () => {
       if (agentTasksResult.error) throw agentTasksResult.error;
       if (mlTasksResult.error) throw mlTasksResult.error;
 
-      const agentData = (agentTasksResult.data || []).filter((task: any) => task.status !== null) as AgentTask[];
+      const agentData = (agentTasksResult.data || []).filter((task: Record<string, unknown>) => task.status !== null) as AgentTask[];
       const mlData = (mlTasksResult.data || []).filter(task => task.agent_task_id !== null && task.created_at !== null) as MLTask[];
 
       setAgentTasks(agentData);
@@ -116,7 +112,11 @@ const AgentMLCoordination: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

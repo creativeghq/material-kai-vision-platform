@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -11,7 +11,7 @@ import {
   Filter,
   RefreshCw,
   ExternalLink,
-  Image,
+  Image as ImageIcon,
   Zap,
 } from 'lucide-react';
 
@@ -43,7 +43,7 @@ interface KnowledgeEntry {
   relevance_score: number;
   source_url?: string;
   pdf_url?: string; // PDF link for additional details
-  metadata?: any; // Use any for now to handle Json type from database
+  metadata?: Record<string, unknown>; // Use Record for generic object type from database
 }
 
 const KnowledgeBaseManagement: React.FC = () => {
@@ -58,15 +58,7 @@ const KnowledgeBaseManagement: React.FC = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchEntries();
-  }, []);
-
-  useEffect(() => {
-    filterEntries();
-  }, [entries, searchTerm, statusFilter, contentTypeFilter]);
-
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('materials_catalog')
@@ -101,9 +93,9 @@ const KnowledgeBaseManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  const filterEntries = () => {
+  const filterEntries = useCallback(() => {
     let filtered = entries;
 
     if (searchTerm) {
@@ -123,7 +115,15 @@ const KnowledgeBaseManagement: React.FC = () => {
     }
 
     setFilteredEntries(filtered);
-  };
+  }, [entries, searchTerm, statusFilter, contentTypeFilter]);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  useEffect(() => {
+    filterEntries();
+  }, [filterEntries]);
 
   const handleDeleteEntry = async (id: string) => {
     try {
@@ -142,7 +142,7 @@ const KnowledgeBaseManagement: React.FC = () => {
         filesToDelete.push(entry.thumbnail_url);
       }
       if (entry?.properties && typeof entry.properties === 'object') {
-        const properties = entry.properties as any;
+        const properties = entry.properties as Record<string, unknown>;
 
         // Check for processed images
         if (properties.processed_images && Array.isArray(properties.processed_images)) {
@@ -533,7 +533,7 @@ const KnowledgeBaseManagement: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Image className="h-5 w-5" />
+                  <ImageIcon className="h-5 w-5" />
                   Extracted Images Library
                 </CardTitle>
                 <CardDescription>
@@ -544,8 +544,8 @@ const KnowledgeBaseManagement: React.FC = () => {
                 {(() => {
                   // Extract all images from entries with processed images
                   const allImages = entries.flatMap(entry => {
-                    if (!entry.metadata?.processed_images) return [];
-                    return entry.metadata.processed_images.map((img: any) => ({
+                    if (!entry.metadata?.processed_images || !Array.isArray(entry.metadata.processed_images)) return [];
+                    return entry.metadata.processed_images.map((img: ProcessedImage) => ({
                       ...img,
                       sourceTitle: entry.title,
                       sourceId: entry.id,
@@ -557,7 +557,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                   if (allImages.length === 0) {
                     return (
                       <div className="text-center py-12">
-                        <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                         <h3 className="text-lg font-medium mb-2">No Images Found</h3>
                         <p className="text-muted-foreground mb-4">
                           Process some PDF documents first to see extracted images here.
@@ -579,7 +579,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                         <Card>
                           <CardContent className="p-4">
                             <div className="flex items-center gap-2">
-                              <Image className="h-4 w-4 text-blue-600" />
+                              <ImageIcon className="h-4 w-4 text-blue-600" />
                               <div>
                                 <p className="text-sm text-muted-foreground">Total Images</p>
                                 <p className="text-2xl font-bold">{allImages.length}</p>
@@ -624,12 +624,12 @@ const KnowledgeBaseManagement: React.FC = () => {
 
                       {/* Images Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {allImages.map((image: any, index: number) => (
+                        {allImages.map((image, index: number) => (
                           <Card key={`${image.sourceId}-${index}`} className="overflow-hidden">
                             <div className="aspect-square bg-muted relative">
                               <img
                                 src={image.supabase_url}
-                                alt={image.filename}
+                                alt={image.filename || 'Processed image'}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
@@ -638,24 +638,24 @@ const KnowledgeBaseManagement: React.FC = () => {
                               />
                               <div className="absolute top-2 right-2">
                                 <Badge className="bg-secondary text-secondary-foreground text-xs">
-                                  {image.size ? `${(image.size / 1024).toFixed(1)}KB` : 'Unknown'}
+                                  {image.size ? `${(Number(image.size) / 1024).toFixed(1)}KB` : 'Unknown'}
                                 </Badge>
                               </div>
                             </div>
                             <CardContent className="p-3">
                               <div className="space-y-2">
                                 <div>
-                                  <p className="font-medium text-sm truncate" title={image.filename}>
-                                    {image.filename}
+                                  <p className="font-medium text-sm truncate" title={image.filename || ''}>
+                                    {image.filename || 'Unknown'}
                                   </p>
-                                  <p className="text-xs text-muted-foreground truncate" title={image.sourceTitle}>
-                                    From: {image.sourceTitle}
+                                  <p className="text-xs text-muted-foreground truncate" title={image.sourceTitle || ''}>
+                                    From: {image.sourceTitle || 'Unknown'}
                                   </p>
                                 </div>
                                 <div className="flex gap-1">
                                   <Button
                                     className="border border-border bg-background text-foreground h-7 text-xs flex-1"
-                                    onClick={() => window.open(image.supabase_url, '_blank')}
+                                    onClick={() => window.open(image.supabase_url || '', '_blank')}
                                   >
                                     <ExternalLink className="h-3 w-3 mr-1" />
                                     View
@@ -663,7 +663,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                                   <Button
                                     className="border border-border bg-background text-foreground h-7 text-xs flex-1"
                                     onClick={() => {
-                                      navigator.clipboard.writeText(image.supabase_url);
+                                      navigator.clipboard.writeText(image.supabase_url || '');
                                       toast({
                                         title: 'Copied!',
                                         description: 'Image URL copied to clipboard',
@@ -674,8 +674,8 @@ const KnowledgeBaseManagement: React.FC = () => {
                                   </Button>
                                 </div>
                                 <div className="text-xs text-muted-foreground space-y-1">
-                                  <div>Source Type: <Badge className="text-xs border border-border bg-background text-foreground">{image.sourceType}</Badge></div>
-                                  <div>Extracted: {new Date(image.createdAt).toLocaleDateString()}</div>
+                                  <div>Source Type: <Badge className="text-xs border border-border bg-background text-foreground">{image.sourceType || 'Unknown'}</Badge></div>
+                                  <div>Extracted: {image.createdAt ? new Date(image.createdAt).toLocaleDateString() : 'Unknown'}</div>
                                 </div>
                               </div>
                             </CardContent>

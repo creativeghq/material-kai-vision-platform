@@ -20,7 +20,7 @@ export interface RAGSearchResult {
   similarity_score: number;
   title: string;
   content: string;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 export interface RAGResponse {

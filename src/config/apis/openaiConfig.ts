@@ -44,7 +44,7 @@ export interface OpenAIApiConfig extends BaseApiConfig {
       inputSchema: z.ZodSchema;
       outputSchema: z.ZodSchema;
       costPerToken?: number;
-      defaultParams?: Record<string, any>;
+      defaultParams?: Record<string, unknown>;
       description?: string;
       category?: string;
       status?: 'working' | 'failing' | 'unknown';

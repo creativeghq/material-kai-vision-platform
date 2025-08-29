@@ -29,7 +29,7 @@ export interface ErrorContext {
   userId?: string;
   sessionId?: string;
   requestId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -84,7 +84,7 @@ export class AppError extends Error {
   /**
    * Convert error to structured log format
    */
-  toLogFormat(): Record<string, any> {
+  toLogFormat(): Record<string, unknown> {
     return {
       correlationId: this.correlationId,
       timestamp: this.timestamp,

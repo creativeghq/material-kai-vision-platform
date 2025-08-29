@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 interface SpatialPoint {
   x: number;
@@ -24,6 +25,17 @@ interface MaterialMapping {
     pattern: string;
   };
 }
+
+interface RoomDimensions {
+  width: number;
+  height: number;
+  depth: number;
+  bounds: {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  };
+}
+
 
 interface SpatialAnalysisResult {
   id: string;
@@ -56,15 +68,19 @@ export class SpatialMaterialMapper {
     userId: string,
   ): Promise<string> {
     try {
-      // Start spatial analysis job
+      // Use generation_3d table for spatial analysis tracking
       const { data: analysisJob, error } = await supabase
-        .from('spatial_analysis')
+        .from('generation_3d')
         .insert({
           user_id: userId,
-          room_type: roomType,
-          status: 'processing',
-          room_dimensions: this.calculateRoomDimensions(pointCloudData),
-          spatial_features: this.extractSpatialFeatures(pointCloudData),
+          generation_name: `spatial_analysis_${Date.now()}`,
+          generation_type: 'spatial_analysis',
+          generation_status: 'processing',
+          input_data: JSON.stringify({
+            room_type: roomType,
+            room_dimensions: this.calculateRoomDimensions(pointCloudData),
+            spatial_features: this.extractSpatialFeatures(pointCloudData),
+          }),
         })
         .select()
         .single();
@@ -106,15 +122,17 @@ export class SpatialMaterialMapper {
         }
       }
 
-      // Update analysis with results
+      // Update analysis with results using generation_3d table
       await supabase
-        .from('spatial_analysis')
+        .from('generation_3d')
         .update({
-          status: 'completed',
-          material_placements: { mappings: materialMappings } as any,
-          confidence_score: this.calculateOverallConfidence(materialMappings),
-          processing_time_ms: Date.now() - new Date().getTime(),
-          updated_at: new Date().toISOString(),
+          generation_status: 'completed',
+          output_data: JSON.stringify({
+            material_placements: { mappings: materialMappings },
+            confidence_score: this.calculateOverallConfidence(materialMappings),
+            processing_time_ms: Date.now() - new Date().getTime(),
+          }),
+          completed_at: new Date().toISOString(),
         })
         .eq('id', analysisId);
 
@@ -124,17 +142,17 @@ export class SpatialMaterialMapper {
       console.error('Error processing point cloud:', error);
 
       await supabase
-        .from('spatial_analysis')
+        .from('generation_3d')
         .update({
-          status: 'failed',
-          error_message: `Processing failed: ${error}`,
-          updated_at: new Date().toISOString(),
+          generation_status: 'failed',
+          error_details: `Processing failed: ${String(error)}`,
+          completed_at: new Date().toISOString(),
         })
         .eq('id', analysisId);
     }
   }
 
-  private calculateRoomDimensions(pointCloudData: SpatialPoint[]): any {
+  private calculateRoomDimensions(pointCloudData: SpatialPoint[]): RoomDimensions {
     const minX = Math.min(...pointCloudData.map(p => p.x));
     const maxX = Math.max(...pointCloudData.map(p => p.x));
     const minY = Math.min(...pointCloudData.map(p => p.y));
@@ -153,7 +171,12 @@ export class SpatialMaterialMapper {
     };
   }
 
-  private extractSpatialFeatures(pointCloudData: SpatialPoint[]): any {
+  private extractSpatialFeatures(pointCloudData: SpatialPoint[]): {
+    pointCount: number;
+    density: number;
+    colorVariance: number;
+    geometricComplexity: number;
+  } {
     // Extract key spatial features from point cloud
     const density = pointCloudData.length / this.calculateVolume(pointCloudData);
 
@@ -174,7 +197,14 @@ export class SpatialMaterialMapper {
     normal: [number, number, number];
   }>> {
     // Implement surface segmentation algorithm
-    const surfaces: any[] = [];
+    const surfaces: Array<{
+      id: string;
+      type: 'wall' | 'floor' | 'ceiling' | 'furniture';
+      points: SpatialPoint[];
+      area: number;
+      bounds: { min: SpatialPoint; max: SpatialPoint };
+      normal: [number, number, number];
+    }> = [];
 
     // Group points by height for floor/ceiling detection
     const floorPoints = pointCloudData.filter(p => p.y < -1.5);
@@ -250,7 +280,14 @@ export class SpatialMaterialMapper {
     };
   }
 
-  private async matchMaterialFromFeatures(features: any): Promise<{ id: string; confidence: number } | null> {
+  private async matchMaterialFromFeatures(features: {
+    averageColor: [number, number, number];
+    textureFeatures: {
+      roughness: number;
+      reflectance: number;
+      pattern: string;
+    };
+  }): Promise<{ id: string; confidence: number } | null> {
     try {
       // Get materials from database for matching
       const { data: materials, error } = await supabase
@@ -277,26 +314,44 @@ export class SpatialMaterialMapper {
     }
   }
 
-  private calculateMaterialMatchConfidence(features: any, material: any): number {
+  private calculateMaterialMatchConfidence(
+    features: {
+      averageColor: [number, number, number];
+      textureFeatures: {
+        roughness: number;
+        reflectance: number;
+        pattern: string;
+      };
+    },
+    material: {
+      id: string;
+      name: string;
+      properties: Json;
+      metadata?: Record<string, unknown>;
+    }
+  ): number {
     let confidence = 0;
     let factors = 0;
 
     // Color matching
-    if (material.metadata?.color && features.averageColor) {
+    if (material.metadata?.color && features.averageColor && typeof material.metadata.color === 'string') {
       const colorMatch = this.calculateColorSimilarity(features.averageColor, material.metadata.color);
       confidence += colorMatch * 0.4;
       factors += 0.4;
     }
 
     // Texture matching
-    if (material.properties?.roughness !== undefined && features.textureFeatures.roughness !== undefined) {
-      const roughnessMatch = 1 - Math.abs(material.properties.roughness - features.textureFeatures.roughness);
-      confidence += roughnessMatch * 0.3;
-      factors += 0.3;
+    if (material.properties && typeof material.properties === 'object' && material.properties !== null) {
+      const props = material.properties as Record<string, unknown>;
+      if (typeof props.roughness === 'number' && features.textureFeatures.roughness !== undefined) {
+        const roughnessMatch = 1 - Math.abs(props.roughness - features.textureFeatures.roughness);
+        confidence += roughnessMatch * 0.3;
+        factors += 0.3;
+      }
     }
 
     // Pattern matching
-    if (material.metadata?.pattern && features.textureFeatures.pattern) {
+    if (material.metadata?.pattern && features.textureFeatures.pattern && typeof material.metadata.pattern === 'string') {
       const patternMatch = material.metadata.pattern === features.textureFeatures.pattern ? 1 : 0;
       confidence += patternMatch * 0.3;
       factors += 0.3;
@@ -324,10 +379,11 @@ export class SpatialMaterialMapper {
     ];
 
     const variance = colors.reduce((sum, color) => {
+      if (!color || color.length < 3) return sum;
       const diff = Math.sqrt(
-        Math.pow(color[0] - avgColor[0], 2) +
-        Math.pow(color[1] - avgColor[1], 2) +
-        Math.pow(color[2] - avgColor[2], 2),
+        Math.pow((color[0] || 0) - (avgColor[0] || 0), 2) +
+        Math.pow((color[1] || 0) - (avgColor[1] || 0), 2) +
+        Math.pow((color[2] || 0) - (avgColor[2] || 0), 2),
       );
       return sum + diff;
     }, 0) / colors.length;
@@ -337,7 +393,6 @@ export class SpatialMaterialMapper {
 
   private calculateGeometricComplexity(points: SpatialPoint[]): number {
     // Simple complexity measure based on point distribution
-    const bounds = this.calculateBounds(points);
     const volume = this.calculateVolume(points);
     const density = points.length / volume;
 
@@ -379,19 +434,25 @@ export class SpatialMaterialMapper {
     for (let i = 0; i < points.length; i++) {
       if (visited.has(i)) continue;
 
-      const cluster: SpatialPoint[] = [points[i]];
+      const currentPoint = points[i];
+      if (!currentPoint) continue;
+
+      const cluster: SpatialPoint[] = [currentPoint];
       visited.add(i);
 
       for (let j = i + 1; j < points.length; j++) {
         if (visited.has(j)) continue;
 
+        const otherPoint = points[j];
+        if (!otherPoint) continue;
+
         const distance = Math.sqrt(
-          Math.pow(points[i].x - points[j].x, 2) +
-          Math.pow(points[i].z - points[j].z, 2),
+          Math.pow(currentPoint.x - otherPoint.x, 2) +
+          Math.pow(currentPoint.z - otherPoint.z, 2),
         );
 
         if (distance < 0.5) { // 50cm clustering threshold
-          cluster.push(points[j]);
+          cluster.push(otherPoint);
           visited.add(j);
         }
       }
@@ -411,6 +472,8 @@ export class SpatialMaterialMapper {
     const p1 = points[0];
     const p2 = points[1];
     const p3 = points[2];
+
+    if (!p1 || !p2 || !p3) return [0, 0, 1];
 
     const v1 = { x: p2.x - p1.x, y: p2.y - p1.y, z: p2.z - p1.z };
     const v2 = { x: p3.x - p1.x, y: p3.y - p1.y, z: p3.z - p1.z };
@@ -499,20 +562,55 @@ export class SpatialMaterialMapper {
   async getSpatialAnalysisResult(analysisId: string): Promise<SpatialAnalysisResult | null> {
     try {
       const { data, error } = await supabase
-        .from('spatial_analysis')
+        .from('generation_3d')
         .select('*')
         .eq('id', analysisId)
         .single();
 
       if (error) throw error;
 
+      // Parse the output_data JSON to extract spatial analysis information
+      let outputData: Record<string, unknown> = {};
+      try {
+        outputData = typeof data.output_data === 'string'
+          ? JSON.parse(data.output_data)
+          : (data.output_data as Record<string, unknown>) || {};
+      } catch (parseError) {
+        console.warn('Failed to parse output_data:', parseError);
+      }
+
+      // Parse input_data for room information
+      let inputData: Record<string, unknown> = {};
+      try {
+        inputData = typeof data.input_data === 'string'
+          ? JSON.parse(data.input_data)
+          : (data.input_data as Record<string, unknown>) || {};
+      } catch (parseError) {
+        console.warn('Failed to parse input_data:', parseError);
+      }
+
       return {
         id: data.id,
-        roomType: data.room_type,
-        roomDimensions: data.room_dimensions as any,
-        materialMappings: (data.material_placements as any)?.mappings || [],
-        spatialFeatures: data.spatial_features as any,
-        confidence: data.confidence_score || 0,
+        roomType: String(inputData.room_type || 'unknown'),
+        roomDimensions: {
+          width: Number((inputData.room_dimensions as Record<string, unknown>)?.width || 0),
+          height: Number((inputData.room_dimensions as Record<string, unknown>)?.height || 0),
+          depth: Number((inputData.room_dimensions as Record<string, unknown>)?.depth || 0),
+        },
+        materialMappings: ((outputData.material_placements as Record<string, unknown>)?.mappings as MaterialMapping[]) || [],
+        spatialFeatures: {
+          surfaces: ((outputData.spatial_features as Record<string, unknown>)?.surfaces as Array<{
+            id: string;
+            type: 'wall' | 'floor' | 'ceiling' | 'furniture';
+            area: number;
+            normal: [number, number, number];
+          }>) || [],
+          lighting: {
+            sources: ((outputData.spatial_features as Record<string, unknown>)?.lighting as Record<string, unknown>)?.sources as Array<{ position: SpatialPoint; intensity: number }> || [],
+            ambientLevel: Number(((outputData.spatial_features as Record<string, unknown>)?.lighting as Record<string, unknown>)?.ambientLevel || 0),
+          },
+        },
+        confidence: Number(outputData.confidence_score || 0),
       };
     } catch (error) {
       console.error('Error getting spatial analysis result:', error);

@@ -6,7 +6,14 @@
  */
 
 // Optional winston logger type - will be resolved at runtime
-export type Logger = any;
+export type Logger = {
+  error: (message: string, ...meta: unknown[]) => void;
+  warn: (message: string, ...meta: unknown[]) => void;
+  info: (message: string, ...meta: unknown[]) => void;
+  debug: (message: string, ...meta: unknown[]) => void;
+  verbose: (message: string, ...meta: unknown[]) => void;
+  silly: (message: string, ...meta: unknown[]) => void;
+} | undefined;
 
 /**
  * Service lifetime management options
@@ -23,27 +30,27 @@ export enum ServiceLifetime {
 /**
  * Service identifier - can be string, symbol, or constructor function
  */
-export type ServiceIdentifier<T = any> = string | symbol | (new (...args: any[]) => T);
+export type ServiceIdentifier<T = unknown> = string | symbol | (new (...args: unknown[]) => T);
 
 /**
  * Factory function for creating service instances
  */
-export type ServiceFactory<T = any> = (container: IServiceContainer) => T | Promise<T>;
+export type ServiceFactory<T = unknown> = (container: IServiceContainer) => T | Promise<T>;
 
 /**
  * Constructor type for services
  */
-export type ServiceConstructor<T = any> = new (...args: any[]) => T;
+export type ServiceConstructor<T = unknown> = new (...args: unknown[]) => T;
 
 /**
  * Service resolver function type
  */
-export type ServiceResolver<T = any> = (container: IServiceContainer) => T;
+export type ServiceResolver<T = unknown> = (container: IServiceContainer) => T;
 
 /**
  * Service descriptor defining how a service should be registered and resolved
  */
-export interface IServiceDescriptor<T = any> {
+export interface IServiceDescriptor<T = unknown> {
   /** Unique identifier for the service */
   identifier: ServiceIdentifier<T>;
   /** Service lifetime management */
@@ -73,7 +80,7 @@ export interface IServiceScope {
   /** Unique scope identifier */
   id: string;
   /** Scoped service instances */
-  instances: Map<ServiceIdentifier, any>;
+  instances: Map<ServiceIdentifier, unknown>;
   /** Scope creation timestamp */
   createdAt: Date;
   /** Dispose all scoped instances */

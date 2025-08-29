@@ -37,7 +37,7 @@ export interface SearchResult {
   relevanceScore: number;
   semanticScore?: number;
   highlights?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   isFavorite?: boolean;
   viewCount?: number;
   downloadCount?: number;
@@ -197,7 +197,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 <div className="mb-2">
                   {result.highlights.slice(0, 2).map((highlight, index) => (
                     <p key={index} className="text-xs text-gray-500 italic">
-                      "...{highlight}..."
+                      &ldquo;...{highlight}...&rdquo;
                     </p>
                   ))}
                 </div>
@@ -413,7 +413,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
           <div className="mb-3">
             {result.highlights.slice(0, 2).map((highlight, index) => (
               <p key={index} className="text-xs text-gray-500 italic mb-1">
-                "...{highlight}..."
+                &ldquo;...{highlight}...&rdquo;
               </p>
             ))}
           </div>

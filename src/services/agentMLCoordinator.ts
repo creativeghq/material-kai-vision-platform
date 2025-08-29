@@ -9,8 +9,8 @@ export interface AgentMLTask {
   id: string;
   agentTaskId: string;
   mlOperationType: 'material-analysis' | 'style-analysis' | 'material-properties' | 'image-classification';
-  inputData: any;
-  mlResults?: any;
+  inputData: Record<string, unknown>;
+  mlResults?: Record<string, unknown>;
   status: 'queued' | 'processing' | 'completed' | 'failed';
   confidenceScores?: Record<string, number>;
   processingTimeMs?: number;
@@ -38,7 +38,7 @@ export class AgentMLCoordinator {
   async createAgentMLTask(
     agentTaskId: string,
     mlOperationType: AgentMLTask['mlOperationType'],
-    inputData: any,
+    inputData: Record<string, unknown>,
   ): Promise<{ success: boolean; taskId?: string; error?: string }> {
     try {
       const { data, error } = await supabase
@@ -46,7 +46,10 @@ export class AgentMLCoordinator {
         .insert({
           agent_task_id: agentTaskId,
           ml_operation_type: mlOperationType,
-          input_data: inputData,
+          input_data: JSON.parse(JSON.stringify(inputData)),
+          confidence_scores: JSON.parse(JSON.stringify({})),
+          ml_results: JSON.parse(JSON.stringify({})),
+          model_versions: JSON.parse(JSON.stringify({})),
         })
         .select()
         .single();
@@ -90,16 +93,16 @@ export class AgentMLCoordinator {
       // Process based on ML operation type
       switch (task.ml_operation_type) {
         case 'material-analysis':
-          result = await this.processMaterialAnalysis(task.input_data);
+          result = await this.processMaterialAnalysis((task.input_data as Record<string, unknown>) || {});
           break;
         case 'material-properties':
-          result = await this.processMaterialProperties(task.input_data);
+          result = await this.processMaterialProperties((task.input_data as Record<string, unknown>) || {});
           break;
         case 'style-analysis':
-          result = await this.processStyleAnalysis(task.input_data);
+          result = await this.processStyleAnalysis((task.input_data as Record<string, unknown>) || {});
           break;
         case 'image-classification':
-          result = await this.processImageClassification(task.input_data);
+          result = await this.processImageClassification((task.input_data as Record<string, unknown>) || {});
           break;
         default:
           throw new Error(`Unsupported ML operation: ${task.ml_operation_type}`);
@@ -119,7 +122,9 @@ export class AgentMLCoordinator {
         .eq('id', taskId);
 
       // Update the parent agent task with ML results
-      await this.updateAgentTaskWithMLResults(task.agent_task_id, taskId, result);
+      if (task.agent_task_id) {
+        await this.updateAgentTaskWithMLResults(task.agent_task_id, taskId, result);
+      }
 
       console.log('AgentML: Completed task', taskId, 'in', Math.round(processingTime), 'ms');
 
@@ -139,7 +144,7 @@ export class AgentMLCoordinator {
   /**
    * Process material analysis task
    */
-  private async processMaterialAnalysis(inputData: any): Promise<MLResult> {
+  private async processMaterialAnalysis(inputData: Record<string, unknown>): Promise<MLResult> {
     const { imageFile, options } = inputData;
 
     if (!imageFile) {
@@ -149,15 +154,15 @@ export class AgentMLCoordinator {
     // Convert base64 to File if needed
     const file = typeof imageFile === 'string'
       ? this.base64ToFile(imageFile, 'material-image.jpg')
-      : imageFile;
+      : imageFile as File;
 
-    return await hybridMLService.analyzeImage(file, options);
+    return await hybridMLService.analyzeImage(file, (options as Record<string, unknown>) || {});
   }
 
   /**
    * Process material properties analysis task
    */
-  private async processMaterialProperties(inputData: any): Promise<MLResult> {
+  private async processMaterialProperties(inputData: Record<string, unknown>): Promise<MLResult> {
     const { imageFile, options } = inputData;
 
     if (!imageFile) {
@@ -166,12 +171,13 @@ export class AgentMLCoordinator {
 
     const file = typeof imageFile === 'string'
       ? this.base64ToFile(imageFile, 'material-properties.jpg')
-      : imageFile;
+      : imageFile as File;
 
-      const analysisOptions: MaterialAnalysisOptions = {
-        analysisDepth: options?.analysisDepth || 'standard',
-        focusAreas: options?.focusAreas || [],
-      };
+    const optionsObj = (options as Record<string, unknown>) || {};
+    const analysisOptions: MaterialAnalysisOptions = {
+      analysisDepth: (optionsObj.analysisDepth as 'standard' | 'basic' | 'comprehensive') || 'standard',
+      focusAreas: (optionsObj.focusAreas as string[]) || [],
+    };
 
     return await hybridMaterialPropertiesService.analyzeAdvancedProperties(file, analysisOptions);
   }
@@ -179,7 +185,7 @@ export class AgentMLCoordinator {
   /**
    * Process style analysis task
    */
-  private async processStyleAnalysis(inputData: any): Promise<MLResult> {
+  private async processStyleAnalysis(inputData: Record<string, unknown>): Promise<MLResult> {
     const { imageFile, analysisType } = inputData;
 
     if (!imageFile) {
@@ -188,15 +194,15 @@ export class AgentMLCoordinator {
 
     const file = typeof imageFile === 'string'
       ? this.base64ToFile(imageFile, 'style-analysis.jpg')
-      : imageFile;
+      : imageFile as File;
 
-    return await hybridMLService.analyzeImageStyle(file, { analysisType });
+    return await hybridMLService.analyzeImageStyle(file, { analysisType: analysisType as string });
   }
 
   /**
    * Process image classification task
    */
-  private async processImageClassification(inputData: any): Promise<MLResult> {
+  private async processImageClassification(inputData: Record<string, unknown>): Promise<MLResult> {
     const { imageFile, categories } = inputData;
 
     if (!imageFile) {
@@ -205,9 +211,9 @@ export class AgentMLCoordinator {
 
     const file = typeof imageFile === 'string'
       ? this.base64ToFile(imageFile, 'classification.jpg')
-      : imageFile;
+      : imageFile as File;
 
-    return await hybridMLService.classifyImage(file, { categories });
+    return await hybridMLService.classifyImage(file, { categories: categories as string[] });
   }
 
   /**
@@ -228,12 +234,12 @@ export class AgentMLCoordinator {
 
       if (error || !agentTask) return;
 
-      // Update result data with ML results
-      const currentResults = agentTask.result_data as any || {};
+      // Update task status with ML results
+      const currentResults = (agentTask.input_data as Record<string, unknown>) || {};
       const updatedResultData = {
         ...currentResults,
         mlResults: {
-          ...currentResults?.mlResults,
+          ...((currentResults.mlResults as Record<string, unknown>) || {}),
           [mlTaskId]: mlResult,
         },
       };
@@ -241,8 +247,8 @@ export class AgentMLCoordinator {
       await supabase
         .from('agent_tasks')
         .update({
-          result_data: updatedResultData,
-          status: mlResult.success ? 'completed' : 'failed',
+          input_data: JSON.parse(JSON.stringify(updatedResultData)),
+          task_status: mlResult.success ? 'completed' : 'failed',
         })
         .eq('id', agentTaskId);
 
@@ -267,11 +273,22 @@ export class AgentMLCoordinator {
       fallbackPlan: 'fallback-to-single-agent',
     };
 
-    // Store coordination plan
+    // Store coordination plan in input_data
+    const { data: currentTask } = await supabase
+      .from('agent_tasks')
+      .select('input_data')
+      .eq('id', taskId)
+      .single();
+
+    const currentInputData = (currentTask?.input_data as Record<string, unknown>) || {};
+    
     await supabase
       .from('agent_tasks')
       .update({
-        coordination_plan: plan as any,
+        input_data: JSON.parse(JSON.stringify({
+          ...currentInputData,
+          coordination_plan: plan,
+        })),
       })
       .eq('id', taskId);
 
@@ -311,15 +328,15 @@ export class AgentMLCoordinator {
 
       return {
         id: data.id,
-        agentTaskId: data.agent_task_id,
+        agentTaskId: String(data.agent_task_id || ''),
         mlOperationType: data.ml_operation_type as AgentMLTask['mlOperationType'],
-        inputData: data.input_data,
-        mlResults: data.ml_results,
+        inputData: (data.input_data as Record<string, unknown>) || {},
+        mlResults: (data.ml_results as Record<string, unknown>) || undefined,
         status: 'completed', // Infer status from presence of results
-        confidenceScores: data.confidence_scores as Record<string, number> || {},
+        confidenceScores: (data.confidence_scores as Record<string, number>) || {},
         processingTimeMs: data.processing_time_ms || 0,
-        modelVersions: data.model_versions as Record<string, string> || {},
-        createdAt: data.created_at,
+        modelVersions: (data.model_versions as Record<string, string>) || {},
+        createdAt: String(data.created_at || ''),
       };
     } catch (error) {
       console.error('AgentML: Failed to get task status:', error);
@@ -342,15 +359,15 @@ export class AgentMLCoordinator {
 
       return data.map(item => ({
         id: item.id,
-        agentTaskId: item.agent_task_id,
+        agentTaskId: String(item.agent_task_id || ''),
         mlOperationType: item.ml_operation_type as AgentMLTask['mlOperationType'],
-        inputData: item.input_data,
-        mlResults: item.ml_results,
-        status: 'completed', // Infer status
-        confidenceScores: item.confidence_scores as Record<string, number> || {},
+        inputData: (item.input_data as Record<string, unknown>) || {},
+        mlResults: (item.ml_results as Record<string, unknown>) || undefined,
+        status: 'completed' as const, // Infer status
+        confidenceScores: (item.confidence_scores as Record<string, number>) || {},
         processingTimeMs: item.processing_time_ms || 0,
-        modelVersions: item.model_versions as Record<string, string> || {},
-        createdAt: item.created_at,
+        modelVersions: (item.model_versions as Record<string, string>) || {},
+        createdAt: String(item.created_at || ''),
       }));
     } catch (error) {
       console.error('AgentML: Failed to get agent ML tasks:', error);
@@ -363,8 +380,9 @@ export class AgentMLCoordinator {
    */
   private base64ToFile(base64: string, filename: string): File {
     const arr = base64.split(',');
-    const mime = arr[0].match(/:(.*?);/)![1];
-    const bstr = atob(arr[1]);
+    const mimeMatch = arr[0]?.match(/:(.*?);/);
+    const mime = mimeMatch?.[1] || 'application/octet-stream';
+    const bstr = atob(arr[1] || '');
     let n = bstr.length;
     const u8arr = new Uint8Array(n);
 

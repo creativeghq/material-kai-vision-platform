@@ -23,6 +23,36 @@ export interface HybridStyleResult {
   error?: string;
 }
 
+// Database response interfaces for stored style analysis
+interface StoredStyleConfidence {
+  primary_style?: string;
+  confidence?: number;
+  modernity_score?: number;
+  luxury_level?: string;
+}
+
+interface StoredColorPalette {
+  dominant_colors?: string[];
+  color_harmony?: string;
+  warmth_score?: number;
+}
+
+interface StoredTextureAnalysis {
+  texture?: string;
+  finish?: string;
+  pattern?: string;
+}
+
+interface StoredStyleAnalysisData {
+  material_id: string;
+  style_confidence: StoredStyleConfidence;
+  color_palette: StoredColorPalette;
+  texture_analysis: StoredTextureAnalysis;
+  room_suitability: Record<string, unknown>;
+  trend_score: number;
+  style_tags: string[];
+}
+
 /**
  * Hybrid style analysis service that combines client-side processing with AI insights
  */
@@ -167,27 +197,29 @@ export class HybridStyleAnalysisService {
 
         if (styleResults.length > 0) {
           const topResult = styleResults[0];
-          const processingTime = performance.now() - startTime;
+          if (topResult) {
+            const processingTime = performance.now() - startTime;
 
-          return {
-            success: true,
-            analysis: {
-              primaryStyle: topResult.label,
-              styleConfidence: topResult.score,
-              colorPalette: { dominantColors: [], colorHarmony: 'unknown', warmthScore: 0 },
-              roomSuitability: {},
-              aestheticProperties: {
-                texture: 'smooth' as const,
-                finish: 'matte' as const,
-                pattern: 'solid' as const,
-                modernityScore: 0.5,
+            return {
+              success: true,
+              analysis: {
+                primaryStyle: topResult.label,
+                styleConfidence: topResult.score,
+                colorPalette: { dominantColors: [], colorHarmony: 'unknown', warmthScore: 0 },
+                roomSuitability: {},
+                aestheticProperties: {
+                  texture: 'smooth' as const,
+                  finish: 'matte' as const,
+                  pattern: 'solid' as const,
+                  modernityScore: 0.5,
+                },
+                trendScore: topResult.score,
+                designTags: [topResult.label],
               },
-              trendScore: topResult.score,
-              designTags: [topResult.label],
-            },
-            processingMethod: 'client',
-            processingTime: Math.round(processingTime),
-          };
+              processingMethod: 'client',
+              processingTime: Math.round(processingTime),
+            };
+          }
         }
       } catch (hfError) {
         console.log('HuggingFace style analysis failed:', hfError);
@@ -198,9 +230,9 @@ export class HybridStyleAnalysisService {
       return {
         success: result.success,
         analysis: result.data,
-        processingMethod: 'client',
+        processingMethod: 'client' as const,
         processingTime: Math.round(processingTime),
-        error: result.error,
+        ...(result.error && { error: result.error }),
       };
 
     } catch (error) {
@@ -258,40 +290,9 @@ export class HybridStyleAnalysisService {
         return null;
       }
 
-      // Transform stored data to expected format
-      const styleConfidence = data.style_confidence as any;
-      const colorPalette = data.color_palette as any;
-      const textureAnalysis = data.texture_analysis as any;
-
-      const analysis: StyleAnalysisResult = {
-        primaryStyle: styleConfidence?.primary_style || 'contemporary',
-        styleConfidence: styleConfidence?.confidence || 0.7,
-        colorPalette: {
-          dominantColors: colorPalette?.dominant_colors || [],
-          colorHarmony: colorPalette?.color_harmony || 'monochromatic',
-          warmthScore: colorPalette?.warmth_score || 0,
-        },
-        roomSuitability: (data.room_suitability as any) || {},
-        aestheticProperties: {
-          texture: textureAnalysis?.texture || 'smooth',
-          finish: textureAnalysis?.finish || 'matte',
-          pattern: textureAnalysis?.pattern || 'solid',
-          modernityScore: styleConfidence?.modernity_score || 0.5,
-        },
-        trendScore: data.trend_score as number || 0.5,
-        designTags: (data.style_tags as string[]) || [],
-      };
-
-      return {
-        success: true,
-        analysis: {
-          ...analysis,
-          aiInsights: {
-            luxuryLevel: styleConfidence?.luxury_level,
-          },
-        },
-        processingMethod: 'server',
-      };
+      // TODO: Implement when material_style_analysis table is available in the database schema
+      console.log('Stored style analysis not available for material:', materialId);
+      return null;
 
     } catch (error) {
       console.error('Error fetching stored style analysis:', error);
@@ -319,7 +320,7 @@ export class HybridStyleAnalysisService {
           result: {
             success: false,
             error: error instanceof Error ? error.message : 'Analysis failed',
-            processingMethod: 'client',
+            processingMethod: 'client' as const,
           },
         });
       }

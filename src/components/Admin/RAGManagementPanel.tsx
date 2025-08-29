@@ -15,7 +15,7 @@ import { ragService } from '@/services/ragService';
 export const RAGManagementPanel: React.FC = () => {
   const navigate = useNavigate();
   const [isTraining, setIsTraining] = useState(false);
-  const [trainingStatus, setTrainingStatus] = useState<any[]>([]);
+  const [trainingStatus, setTrainingStatus] = useState<Record<string, unknown>[]>([]);
   const [newKnowledgeEntry, setNewKnowledgeEntry] = useState({
     title: '',
     content: '',
@@ -108,7 +108,7 @@ export const RAGManagementPanel: React.FC = () => {
         content: newKnowledgeEntry.content,
         content_type: newKnowledgeEntry.content_type,
         tags: newKnowledgeEntry.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-        source_url: newKnowledgeEntry.source_url || undefined,
+        source_url: newKnowledgeEntry.source_url || '',
       });
 
       toast({
@@ -279,14 +279,14 @@ export const RAGManagementPanel: React.FC = () => {
                           {trainingStatus.slice(0, 5).map((job, index) => (
                             <div key={index} className="flex items-center justify-between p-3 border rounded">
                               <div>
-                                <p className="font-medium">{job.job_type}</p>
+                                <p className="font-medium">{String(job.job_type || 'Unknown')}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  {new Date(job.created_at).toLocaleString()}
+                                  {new Date(String(job.created_at || '')).toLocaleString()}
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${getStatusColor(job.status)}`} />
-                                <Badge className="border border-border bg-background text-foreground">{job.status}</Badge>
+                                <div className={`w-2 h-2 rounded-full ${getStatusColor(String(job.status || ''))}`} />
+                                <Badge className="border border-border bg-background text-foreground">{String(job.status || 'Unknown')}</Badge>
                               </div>
                             </div>
                           ))}
@@ -321,7 +321,7 @@ export const RAGManagementPanel: React.FC = () => {
                       <label className="text-sm font-medium">Content Type</label>
                       <Select
                         value={newKnowledgeEntry.content_type}
-                        onValueChange={(value: any) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value }))}
+                        onValueChange={(value: string) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value as 'expert_knowledge' }))}
                       >
                         <SelectTrigger>
                           <SelectValue />

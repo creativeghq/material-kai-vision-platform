@@ -9,35 +9,35 @@ import { ServiceContainer } from './container.js';
 
 // Simple logger interface for DI container
 interface ILogger {
-    debug(message: string, meta?: any): void;
-    info(message: string, meta?: any): void;
-    warn(message: string, meta?: any): void;
-    error(message: string, meta?: any): void;
+    debug(message: string, meta?: unknown): void;
+    info(message: string, meta?: unknown): void;
+    warn(message: string, meta?: unknown): void;
+    error(message: string, meta?: unknown): void;
 }
 
 // Basic logger implementation
 class SimpleLogger implements ILogger {
     constructor(private config: { level: string; enableConsole: boolean }) {}
 
-    debug(message: string, meta?: any): void {
+    debug(message: string, meta?: unknown): void {
         if (this.config.level === 'debug' && this.config.enableConsole) {
             console.debug(`[DEBUG] ${message}`, meta || '');
         }
     }
 
-    info(message: string, meta?: any): void {
+    info(message: string, meta?: unknown): void {
         if (['debug', 'info'].includes(this.config.level) && this.config.enableConsole) {
             console.info(`[INFO] ${message}`, meta || '');
         }
     }
 
-    warn(message: string, meta?: any): void {
+    warn(message: string, meta?: unknown): void {
         if (['debug', 'info', 'warn'].includes(this.config.level) && this.config.enableConsole) {
             console.warn(`[WARN] ${message}`, meta || '');
         }
     }
 
-    error(message: string, meta?: any): void {
+    error(message: string, meta?: unknown): void {
         if (this.config.enableConsole) {
             console.error(`[ERROR] ${message}`, meta || '');
         }
@@ -89,7 +89,7 @@ export class ContainerFactory {
         // Register DocumentChunkingService with health check
         container.register({
             identifier: 'IDocumentChunkingService',
-            factory: (_resolver) => {
+            factory: () => {
                 // Import and instantiate the actual service
                 // Note: This would need to be updated when the actual service classes are available
                 // For now, we're setting up the registration structure
@@ -97,7 +97,7 @@ export class ContainerFactory {
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['DocumentChunkingConfig', 'Logger'],
-            healthCheck: async (service: any) => {
+            healthCheck: async (service: unknown) => {
                 try {
                     // Basic health check - verify service is available and responsive
                     if (!service) {
@@ -105,13 +105,13 @@ export class ContainerFactory {
                     }
 
                     // If service implements healthCheck method, use it
-                    if (typeof service.healthCheck === 'function') {
-                        const result = await service.healthCheck();
+                    if (service && typeof service === 'object' && 'healthCheck' in service && typeof (service as { healthCheck: unknown }).healthCheck === 'function') {
+                        const result = await (service as { healthCheck: () => Promise<{ status: string }> }).healthCheck();
                         return result.status === 'healthy';
                     }
 
                     return true; // Service is available
-                } catch (error) {
+                } catch {
                     return false;
                 }
             },
@@ -120,26 +120,28 @@ export class ContainerFactory {
         // Register MivaaEmbeddingIntegration service with health check
         container.register({
             identifier: 'IEmbeddingGenerationService',
-            factory: (resolver) => {
-                const logger = resolver.resolve<ILogger>('Logger');
+            factory: () => {
+                // Dynamic import would require async factory, using require for now
+                // TODO: Consider refactoring to async factory pattern if needed
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
                 const { MivaaEmbeddingIntegration } = require('../services/mivaaEmbeddingIntegration');
                 return new MivaaEmbeddingIntegration();
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['Logger'],
-            healthCheck: async (service: any) => {
+            healthCheck: async (service: unknown) => {
                 try {
                     if (!service) {
                         return false;
                     }
 
-                    if (typeof service.healthCheck === 'function') {
-                        const result = await service.healthCheck();
+                    if (service && typeof service === 'object' && 'healthCheck' in service && typeof (service as { healthCheck: unknown }).healthCheck === 'function') {
+                        const result = await (service as { healthCheck: () => Promise<{ status: string }> }).healthCheck();
                         return result.status === 'healthy';
                     }
 
                     return true;
-                } catch (error) {
+                } catch {
                     return false;
                 }
             },
@@ -148,26 +150,28 @@ export class ContainerFactory {
         // Register MivaaSearchIntegration service with health check
         container.register({
             identifier: 'IMivaaSearchIntegration',
-            factory: (resolver) => {
-                const logger = resolver.resolve<ILogger>('Logger');
+            factory: () => {
+                // Dynamic import would require async factory, using require for now
+                // TODO: Consider refactoring to async factory pattern if needed
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
                 const { MivaaSearchIntegration } = require('../services/mivaaSearchIntegration');
                 return new MivaaSearchIntegration();
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['Logger'],
-            healthCheck: async (service: any) => {
+            healthCheck: async (service: unknown) => {
                 try {
                     if (!service) {
                         return false;
                     }
 
-                    if (typeof service.healthCheck === 'function') {
-                        const result = await service.healthCheck();
+                    if (service && typeof service === 'object' && 'healthCheck' in service && typeof (service as { healthCheck: unknown }).healthCheck === 'function') {
+                        const result = await (service as { healthCheck: () => Promise<{ status: string }> }).healthCheck();
                         return result.status === 'healthy';
                     }
 
                     return true;
-                } catch (error) {
+                } catch {
                     return false;
                 }
             },
@@ -176,24 +180,24 @@ export class ContainerFactory {
         // Register MivaaToRagTransformerService with health check
         container.register({
             identifier: 'IMivaaToRagTransformerService',
-            factory: (_resolver) => {
+            factory: () => {
                 throw new Error('MivaaToRagTransformerService implementation not yet available');
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['MivaaToRagTransformerConfig', 'Logger'],
-            healthCheck: async (service: any) => {
+            healthCheck: async (service: unknown) => {
                 try {
                     if (!service) {
                         return false;
                     }
 
-                    if (typeof service.healthCheck === 'function') {
-                        const result = await service.healthCheck();
+                    if (service && typeof service === 'object' && 'healthCheck' in service && typeof (service as { healthCheck: unknown }).healthCheck === 'function') {
+                        const result = await (service as { healthCheck: () => Promise<{ status: string }> }).healthCheck();
                         return result.status === 'healthy';
                     }
 
                     return true;
-                } catch (error) {
+                } catch {
                     return false;
                 }
             },
@@ -202,24 +206,24 @@ export class ContainerFactory {
         // Register BatchProcessingService with health check
         container.register({
             identifier: 'IBatchProcessingService',
-            factory: (_resolver) => {
+            factory: () => {
                 throw new Error('BatchProcessingService implementation not yet available');
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['BatchProcessingConfig', 'Logger'],
-            healthCheck: async (service: any) => {
+            healthCheck: async (service: unknown) => {
                 try {
                     if (!service) {
                         return false;
                     }
 
-                    if (typeof service.healthCheck === 'function') {
-                        const result = await service.healthCheck();
+                    if (service && typeof service === 'object' && 'healthCheck' in service && typeof (service as { healthCheck: unknown }).healthCheck === 'function') {
+                        const result = await (service as { healthCheck: () => Promise<{ status: string }> }).healthCheck();
                         return result.status === 'healthy';
                     }
 
                     return true;
-                } catch (error) {
+                } catch {
                     return false;
                 }
             },
@@ -228,24 +232,24 @@ export class ContainerFactory {
         // Register ValidationIntegrationService with health check
         container.register({
             identifier: 'IValidationIntegrationService',
-            factory: (_resolver) => {
+            factory: () => {
                 throw new Error('ValidationIntegrationService implementation not yet available');
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['ValidationIntegrationConfig', 'Logger'],
-            healthCheck: async (service: any) => {
+            healthCheck: async (service: unknown) => {
                 try {
                     if (!service) {
                         return false;
                     }
 
-                    if (typeof service.healthCheck === 'function') {
-                        const result = await service.healthCheck();
+                    if (service && typeof service === 'object' && 'healthCheck' in service && typeof (service as { healthCheck: unknown }).healthCheck === 'function') {
+                        const result = await (service as { healthCheck: () => Promise<{ status: string }> }).healthCheck();
                         return result.status === 'healthy';
                     }
 
                     return true;
-                } catch (error) {
+                } catch {
                     return false;
                 }
             },
@@ -256,25 +260,27 @@ export class ContainerFactory {
             identifier: 'IDocumentIntegrationService',
             factory: (resolver) => {
                 const config = resolver.resolve<AppConfig>('AppConfig');
-                const ragService = resolver.resolve<any>('IBaseService'); // Will be replaced with actual RAG service interface
+                const ragService = resolver.resolve('IBaseService'); // Will be replaced with actual RAG service interface
 
-                return new DocumentIntegrationService(ragService, config);
+                // TODO: Replace with proper RAG service interface when available
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return new DocumentIntegrationService(ragService as any, config);
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['AppConfig', 'IBaseService', 'Logger'],
-            healthCheck: async (service: any) => {
+            healthCheck: async (service: unknown) => {
                 try {
                     if (!service) {
                         return false;
                     }
 
-                    if (typeof service.getHealthStatus === 'function') {
-                        const result = await service.getHealthStatus();
+                    if (service && typeof service === 'object' && 'getHealthStatus' in service && typeof (service as { getHealthStatus: unknown }).getHealthStatus === 'function') {
+                        const result = await (service as { getHealthStatus: () => Promise<{ status: string }> }).getHealthStatus();
                         return result.status === 'healthy';
                     }
 
                     return true;
-                } catch (error) {
+                } catch {
                     return false;
                 }
             },
@@ -320,8 +326,8 @@ export class ContainerFactory {
         // Register Logger with configuration from ConfigFactory
         container.register({
             identifier: 'Logger',
-            factory: (_resolver) => {
-                const configFactory = _resolver.resolve<ConfigurationFactory>('ConfigurationFactory');
+            factory: (resolver) => {
+                const configFactory = resolver.resolve<ConfigurationFactory>('ConfigurationFactory');
                 const config = configFactory.getCurrentConfig();
                 if (!config) {
                     throw new Error('Configuration not available');
@@ -492,7 +498,7 @@ export class ContainerFactory {
         // Override Logger for development with more verbose logging
         container.register({
             identifier: 'Logger',
-            factory: (_resolver) => {
+            factory: () => {
                 return new SimpleLogger({
                     level: 'debug',
                     enableConsole: true,
@@ -506,7 +512,7 @@ export class ContainerFactory {
     /**
      * Configure services for production environment
      */
-    private configureProductionServices(_container: IServiceContainer): void {
+    private configureProductionServices(): void {
         // Production-specific optimizations
         // Could include connection pooling, caching, etc.
     }
@@ -514,7 +520,7 @@ export class ContainerFactory {
     /**
      * Configure services for test environment
      */
-    private configureTestServices(_container: IServiceContainer): void {
+    private configureTestServices(): void {
         // Test-specific configurations
         // Mock services, in-memory databases, etc.
     }

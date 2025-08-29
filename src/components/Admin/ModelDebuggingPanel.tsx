@@ -198,7 +198,7 @@ const ModelDebuggingPanel: React.FC = () => {
         title: 'Test Complete',
         description: `${modelName} test completed successfully!`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: 'Test Failed',
         description: `Failed to test ${modelName}`,

@@ -7,12 +7,12 @@ import { BaseApiClient, StandardizedApiResponse, withRetry } from './standardize
 // Define types for Supabase Edge Functions
 export type SupabaseParams = {
   functionName: string;
-  data?: any;
+  data?: unknown;
 };
 
 export type SupabaseResponse = {
   success: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 /**
@@ -30,8 +30,8 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
     // Expected format: "url|key" or just the key if URL is in env
     const parts = apiKey.split('|');
     if (parts.length === 2) {
-      this.supabaseUrl = parts[0];
-      this.supabaseKey = parts[1];
+      this.supabaseUrl = parts[0] || '';
+      this.supabaseKey = parts[1] || '';
     } else {
       // Fallback to environment variable for URL
       this.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseConfig.projectUrl;
@@ -49,7 +49,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
       throw new Error('Parameters must be an object');
     }
 
-    const typedParams = params as any;
+    const typedParams = params as Record<string, unknown>;
 
     if (!typedParams.functionName || typeof typedParams.functionName !== 'string') {
       throw new Error('Function name is required and must be a string');
@@ -70,9 +70,9 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
       } catch (error) {
         if (error instanceof z.ZodError) {
           // Only show user-friendly validation errors for UX
-          const userFriendlyErrors = error.errors
-            .filter(e => e.message.includes('required') || e.message.includes('valid'))
-            .map(e => e.message);
+          const userFriendlyErrors = error.issues
+            .filter((e: { message: string }) => e.message.includes('required') || e.message.includes('valid'))
+            .map((e: { message: string }) => e.message);
 
           if (userFriendlyErrors.length > 0) {
             throw new Error(`Please check: ${userFriendlyErrors.join(', ')}`);
@@ -127,7 +127,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
         const response = await fetch(url, requestOptions);
 
         // Clear timeout on successful response
-        const timeoutId = (requestOptions.signal as any)?._timeoutId;
+        const timeoutId = (requestOptions.signal as unknown as { _timeoutId?: NodeJS.Timeout })?._timeoutId;
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
@@ -151,7 +151,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
         };
       } catch (error) {
         // Clear timeout on error as well
-        const timeoutId = (requestOptions.signal as any)?._timeoutId;
+        const timeoutId = (requestOptions.signal as unknown as { _timeoutId?: NodeJS.Timeout })?._timeoutId;
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
@@ -167,7 +167,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     // Store timeout ID on the signal for cleanup
-    (controller.signal as any)._timeoutId = timeoutId;
+    (controller.signal as unknown as { _timeoutId: NodeJS.Timeout })._timeoutId = timeoutId;
 
     // FIXED: Send the data fields directly at the top level, not nested under 'data'
     // This ensures the server receives the prompt field at the expected location

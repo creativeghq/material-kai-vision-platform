@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import { ApiConfigManager } from '../../config';
 import type {
-  BaseApiConfig,
   ApiConfig,
   ReplicateApiConfig,
   SupabaseApiConfig,
@@ -39,8 +38,12 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
   /**
    * Get environment-specific settings
    */
-  public getEnvironmentConfig() {
-    return this.config.environment[this.environment];
+  public getEnvironmentConfig(): { baseUrl: string; apiKey?: string } {
+    const envConfig = this.config.environment[this.environment as keyof typeof this.config.environment];
+    if (!envConfig || typeof envConfig !== 'object') {
+      throw new Error(`Invalid environment configuration for ${this.environment}`);
+    }
+    return envConfig as { baseUrl: string; apiKey?: string };
   }
 
   /**
@@ -51,7 +54,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
       return schema.parse(params);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessages = error.errors.map(err =>
+        const errorMessages = error.issues.map((err: z.ZodIssue) =>
           `${err.path.join('.')}: ${err.message}`,
         ).join(', ');
         throw new Error(`Parameter validation failed for ${this.apiName}: ${errorMessages}`);
@@ -83,20 +86,19 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
   /**
    * Standard error handling for API responses
    */
-  protected handleApiError(error: any, context: string): never {
+  protected handleApiError(error: unknown, context: string): never {
     console.error(`API Error in ${this.apiName} (${context}):`, error);
 
     // Extract meaningful error information
     let errorMessage = `${this.apiName} API error`;
-    let statusCode = 500;
 
-    if (error.response) {
+    if (error && typeof error === 'object' && 'response' in error) {
       // HTTP error response
-      statusCode = error.response.status;
-      errorMessage = error.response.data?.message || error.response.statusText || errorMessage;
-    } else if (error.message) {
+      const errorResponse = error.response as { status: number; data?: { message?: string }; statusText?: string };
+      errorMessage = errorResponse.data?.message || errorResponse.statusText || errorMessage;
+    } else if (error && typeof error === 'object' && 'message' in error) {
       // Network or other error
-      errorMessage = error.message;
+      errorMessage = (error as { message: string }).message;
     }
 
     throw new Error(`${errorMessage} (${context})`);
@@ -113,7 +115,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
     };
 
     // Add API key if available
-    if (envConfig.apiKey) {
+    if (envConfig?.apiKey) {
       // Different APIs use different header formats
       if (this.apiName.includes('replicate')) {
         headers['Authorization'] = `Token ${envConfig.apiKey}`;
@@ -136,7 +138,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
    */
   protected buildUrl(endpoint: string): string {
     const envConfig = this.getEnvironmentConfig();
-    const baseUrl = envConfig.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    const baseUrl = envConfig?.baseUrl?.replace(/\/$/, '') || ''; // Remove trailing slash
     const cleanEndpoint = endpoint.replace(/^\//, ''); // Remove leading slash
     return `${baseUrl}/${cleanEndpoint}`;
   }
@@ -167,7 +169,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
       const envConfig = this.getEnvironmentConfig();
 
       // Simple ping to base URL
-      const response = await fetch(envConfig.baseUrl, {
+      const response = await fetch(envConfig?.baseUrl || '', {
         method: 'HEAD',
         headers: this.getHeaders(),
         signal: AbortSignal.timeout(5000), // 5 second timeout
@@ -208,7 +210,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
     return {
       apiName: this.apiName,
       environment: this.environment,
-      rateLimitingEnabled: hasRateLimit,
+      rateLimitingEnabled: hasRateLimit || false,
       lastCallTimes,
       configuredEndpoints: [], // Will be populated based on specific API type
     };
@@ -288,7 +290,7 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
   /**
    * Get prediction status for Replicate
    */
-  public async getPredictionStatus(predictionId: string): Promise<any> {
+  public async getPredictionStatus(predictionId: string): Promise<unknown> {
     const url = this.buildUrl(`/v1/predictions/${predictionId}`);
 
     try {

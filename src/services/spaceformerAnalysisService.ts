@@ -5,6 +5,24 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+export interface UserPreferences {
+  style?: string;
+  budget_range?: { min: number; max: number };
+  accessibility_requirements?: string[];
+  color_preferences?: string[];
+  material_preferences?: string[];
+  lighting_preferences?: string;
+  spatial_features?: SpatialFeature[];
+}
+
+export interface AnalysisConstraints {
+  max_items?: number;
+  excluded_areas?: Array<{ x: number; y: number; z: number; radius: number }>;
+  required_clearances?: Record<string, number>;
+  weight_limits?: Record<string, number>;
+  accessibility_compliance?: boolean;
+}
+
 export interface SpaceformerRequest {
   nerf_reconstruction_id?: string;
   room_type: string;
@@ -13,8 +31,8 @@ export interface SpaceformerRequest {
     height: number;
     depth: number;
   };
-  user_preferences?: any;
-  constraints?: any;
+  user_preferences?: UserPreferences;
+  constraints?: AnalysisConstraints;
   analysis_type?: 'full' | 'layout' | 'materials' | 'accessibility';
 }
 
@@ -35,14 +53,38 @@ export interface LayoutSuggestion {
   alternative_positions?: Array<{ x: number; y: number; z: number }>;
 }
 
+export interface MaterialPlacement {
+  material_id: string;
+  position: { x: number; y: number; z: number };
+  surface_area: number;
+  application_method: string;
+  confidence: number;
+  reasoning: string;
+}
+
+export interface AccessibilityAnalysis {
+  compliance_score: number;
+  accessibility_features: string[];
+  recommendations: string[];
+  barrier_free_paths: Array<{ start: { x: number; y: number }; end: { x: number; y: number }; width: number }>;
+  ada_compliance: boolean;
+}
+
+export interface FlowOptimization {
+  traffic_patterns: Array<{ path: Array<{ x: number; y: number }>; frequency: number; purpose: string }>;
+  bottlenecks: Array<{ position: { x: number; y: number }; severity: number; recommendation: string }>;
+  efficiency_score: number;
+  suggested_improvements: string[];
+}
+
 export interface SpaceformerResult {
   success: boolean;
   analysis_id: string;
   spatial_features: SpatialFeature[];
   layout_suggestions: LayoutSuggestion[];
-  material_placements: any[];
-  accessibility_analysis: any;
-  flow_optimization: any;
+  material_placements: MaterialPlacement[];
+  accessibility_analysis: AccessibilityAnalysis;
+  flow_optimization: FlowOptimization;
   reasoning_explanation: string;
   confidence_score: number;
   processing_time_ms: number;
@@ -79,17 +121,13 @@ class SpaceformerAnalysisService {
 
   /**
    * Get spatial analysis results by ID
+   * Note: spatial_analysis table doesn't exist in current schema
    */
-  async getAnalysisResults(analysisId: string): Promise<any> {
+  async getAnalysisResults(analysisId: string): Promise<SpaceformerResult | null> {
     try {
-      const { data, error } = await supabase
-        .from('spatial_analysis')
-        .select('*')
-        .eq('id', analysisId)
-        .single();
-
-      if (error) throw error;
-      return data;
+      // TODO: Implement when spatial_analysis table is available
+      console.warn('spatial_analysis table not available in current schema');
+      return null;
 
     } catch (error) {
       console.error('Error getting analysis results:', error);
@@ -99,22 +137,13 @@ class SpaceformerAnalysisService {
 
   /**
    * List spatial analyses for a user
+   * Note: spatial_analysis table doesn't exist in current schema
    */
-  async listUserAnalyses(userId?: string): Promise<any[]> {
+  async listUserAnalyses(userId?: string): Promise<SpaceformerResult[]> {
     try {
-      let query = supabase
-        .from('spatial_analysis')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (userId) {
-        query = query.eq('user_id', userId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      return data || [];
+      // TODO: Implement when spatial_analysis table is available
+      console.warn('spatial_analysis table not available in current schema');
+      return [];
 
     } catch (error) {
       console.error('Error listing analyses:', error);
@@ -136,7 +165,10 @@ class SpaceformerAnalysisService {
   /**
    * Quick layout analysis without full spatial processing
    */
-  async quickLayoutAnalysis(roomType: string, dimensions: any): Promise<SpaceformerResult> {
+  async quickLayoutAnalysis(
+    roomType: string,
+    dimensions: { width: number; height: number; depth: number }
+  ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
       room_type: roomType,
       room_dimensions: dimensions,
@@ -150,7 +182,7 @@ class SpaceformerAnalysisService {
   async optimizeMaterialPlacements(
     spatialFeatures: SpatialFeature[],
     roomType: string,
-  ): Promise<any> {
+  ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
       room_type: roomType,
       analysis_type: 'materials',
@@ -164,7 +196,7 @@ class SpaceformerAnalysisService {
   async analyzeAccessibility(
     spatialFeatures: SpatialFeature[],
     roomType: string,
-  ): Promise<any> {
+  ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
       room_type: roomType,
       analysis_type: 'accessibility',

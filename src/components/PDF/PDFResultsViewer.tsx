@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText,
   Grid3X3,
@@ -30,6 +30,31 @@ interface PDFProcessingResult {
   created_at: string;
 }
 
+interface StructuredData {
+  tile_index?: number;
+  extraction_type?: string;
+  page_number?: number;
+  effects?: string[];
+  category?: string;
+  [key: string]: unknown;
+}
+
+interface MetadataExtracted {
+  processing_id?: string;
+  file_size?: number | null;
+  processing_time?: number | null;
+  [key: string]: unknown;
+}
+
+interface ProcessingResults {
+  total_tiles_extracted?: number;
+  materials_identified_count?: number;
+  confidence_score_avg?: number;
+  document_title?: string;
+  document_author?: string;
+  [key: string]: unknown;
+}
+
 interface PDFTile {
   id: string;
   page_number: number;
@@ -39,8 +64,8 @@ interface PDFTile {
   material_detected: boolean;
   material_type: string;
   material_confidence: number;
-  structured_data: any;
-  metadata_extracted: any;
+  structured_data: StructuredData;
+  metadata_extracted: MetadataExtracted;
   x_coordinate: number;
   y_coordinate: number;
   width: number;
@@ -62,11 +87,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
   const [selectedTile, setSelectedTile] = useState<PDFTile | null>(null);
   const [materialFilter, setMaterialFilter] = useState<string>('all');
 
-  useEffect(() => {
-    loadProcessingResults();
-  }, [processingId]);
-
-  const loadProcessingResults = async () => {
+  const loadProcessingResults = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -102,17 +123,18 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
       }
 
       // Map the database result to our interface using actual column names
+      const results = processingResult.results as ProcessingResults | null;
       const mappedResult: PDFProcessingResult = {
         id: processingResult.id,
         original_filename: processingResult.document_id || 'Unknown Document',
         processing_status: processingResult.status || 'unknown',
         total_pages: processingResult.page_count || 0,
-        total_tiles_extracted: (processingResult.results as any)?.total_tiles_extracted || 0,
-        materials_identified_count: (processingResult.results as any)?.materials_identified_count || 0,
-        confidence_score_avg: (processingResult.results as any)?.confidence_score_avg || 0,
+        total_tiles_extracted: results?.total_tiles_extracted || 0,
+        materials_identified_count: results?.materials_identified_count || 0,
+        confidence_score_avg: results?.confidence_score_avg || 0,
         processing_time_ms: processingResult.processing_time_ms || 0,
-        document_title: (processingResult.results as any)?.document_title || 'Untitled Document',
-        document_author: (processingResult.results as any)?.document_author || 'Unknown Author',
+        document_title: results?.document_title || 'Untitled Document',
+        document_author: results?.document_author || 'Unknown Author',
         created_at: processingResult.created_at || new Date().toISOString(),
       };
 
@@ -160,7 +182,11 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
     } finally {
       setLoading(false);
     }
-  };
+  }, [processingId, toast]);
+
+  useEffect(() => {
+    loadProcessingResults();
+  }, [loadProcessingResults]);
 
   const getFilteredTiles = () => {
     let filtered = tiles.filter(tile => tile.page_number === selectedPage);
@@ -216,7 +242,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
     return (
       <Alert>
         <AlertDescription>
-          Processing result not found or you don't have permission to view it.
+          Processing result not found or you don&apos;t have permission to view it.
         </AlertDescription>
       </Alert>
     );

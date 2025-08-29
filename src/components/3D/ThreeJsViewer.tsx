@@ -12,7 +12,7 @@ interface ThreeJsViewerProps {
   className?: string;
 }
 
-const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => {
+const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
   // In a real implementation, this would load and render the NeRF model
   // For now, we'll show an enhanced cube representing the 3D reconstruction
   return (
@@ -43,7 +43,7 @@ const Scene: React.FC<{
   imageUrl?: string;
   modelUrl?: string;
   meshUrl?: string;
-}> = ({ imageUrl, modelUrl, meshUrl: _meshUrl }) => {
+}> = ({ imageUrl, modelUrl, meshUrl: _meshUrl }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
   return (
     <>
       <PerspectiveCamera makeDefault fov={75} position={[0, 0, 5]} />

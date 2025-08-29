@@ -9,6 +9,7 @@
 import {
   apiRegistry,
   ApiConfig,
+  SupabaseApiConfig,
 } from './apiConfig';
 import replicateConfig from './apis/replicateConfig';
 import supabaseConfig from './apis/supabaseConfig';
@@ -210,7 +211,7 @@ export class ApiConfigManager {
       }
 
       if (config.type === 'supabase') {
-        const supabaseConfig = config as any;
+        const supabaseConfig = config as SupabaseApiConfig;
         // Public environment variables should always be available
         if (!supabaseConfig.projectUrl) {
           missing.push('NEXT_PUBLIC_SUPABASE_URL');
@@ -288,7 +289,7 @@ export class ApiConfigManager {
         break;
 
       case 'supabase':
-        const supabaseConfig = config as any;
+        const supabaseConfig = config as SupabaseApiConfig;
         if (!supabaseConfig.projectUrl) {
           errors.push('Missing Supabase project URL');
           missingFields.push('projectUrl');
@@ -321,7 +322,7 @@ export class ApiConfigManager {
   public static getSafeApiConfigByType<T extends ApiConfig>(type: string): T | null {
     try {
       return this.getApiConfigByType<T>(type);
-    } catch (error) {
+    } catch {
       return null;
     }
   }

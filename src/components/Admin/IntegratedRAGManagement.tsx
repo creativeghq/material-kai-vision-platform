@@ -44,7 +44,7 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 export const IntegratedRAGManagement: React.FC = () => {
   // RAG Management Panel State
   const [isTraining, setIsTraining] = useState(false);
-  const [trainingStatus, setTrainingStatus] = useState<any[]>([]);
+  const [trainingStatus, setTrainingStatus] = useState<Record<string, unknown>[]>([]);
   const [newKnowledgeEntry, setNewKnowledgeEntry] = useState({
     title: '',
     content: '',
@@ -65,8 +65,13 @@ export const IntegratedRAGManagement: React.FC = () => {
     stylePreferences: [] as string[],
     materialCategories: [] as string[],
   });
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [queryHistory, setQueryHistory] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
+  const [queryHistory, setQueryHistory] = useState<Array<{
+    query: string;
+    timestamp: string;
+    searchType: string;
+    resultCount: number;
+  }>>([]);
 
   const { toast } = useToast();
 
@@ -194,7 +199,12 @@ export const IntegratedRAGManagement: React.FC = () => {
   const loadQueryHistory = async () => {
     try {
       const history = await EnhancedRAGService.getQueryHistory(10);
-      setQueryHistory(history);
+      setQueryHistory(history as unknown as Array<{
+        query: string;
+        timestamp: string;
+        searchType: string;
+        resultCount: number;
+      }>);
     } catch (error) {
       console.error('Error loading query history:', error);
     }
@@ -352,7 +362,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="searchType">Search Type</Label>
-                    <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+                    <Select value={searchType} onValueChange={(value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity') => setSearchType(value)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -732,7 +742,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                     <label className="text-sm font-medium">Content Type</label>
                     <Select
                       value={newKnowledgeEntry.content_type}
-                      onValueChange={(value: any) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value }))}
+                      onValueChange={(value: string) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -896,21 +906,21 @@ export const IntegratedRAGManagement: React.FC = () => {
                     <Card>
                       <CardContent className="p-4 text-center">
                         <h3 className="font-semibold">Total Searches</h3>
-                        <p className="text-2xl font-bold text-primary">{analytics.totalSearches || 0}</p>
+                        <p className="text-2xl font-bold text-primary">{analytics && typeof analytics === 'object' && 'totalSearches' in analytics ? (analytics as Record<string, unknown>).totalSearches as number || 0 : 0}</p>
                         <p className="text-sm text-muted-foreground">Last 30 days</p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="p-4 text-center">
                         <h3 className="font-semibold">Avg Response Time</h3>
-                        <p className="text-2xl font-bold text-primary">{analytics.avgResponseTime || 0}ms</p>
+                        <p className="text-2xl font-bold text-primary">{analytics && typeof analytics === 'object' && 'avgResponseTime' in analytics ? (analytics as Record<string, unknown>).avgResponseTime as number || 0 : 0}ms</p>
                         <p className="text-sm text-muted-foreground">Enhanced search</p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="p-4 text-center">
                         <h3 className="font-semibold">Satisfaction</h3>
-                        <p className="text-2xl font-bold text-primary">{analytics.satisfaction || 0}%</p>
+                        <p className="text-2xl font-bold text-primary">{analytics && typeof analytics === 'object' && 'satisfaction' in analytics ? (analytics as Record<string, unknown>).satisfaction as number || 0 : 0}%</p>
                         <p className="text-sm text-muted-foreground">User feedback</p>
                       </CardContent>
                     </Card>

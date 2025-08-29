@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EnhancedRAGService } from '@/services/enhancedRAGService';
 
 interface AddKnowledgeEntryProps {
-  onEntryAdded?: (entry: any) => void;
+  onEntryAdded?: (entry: Record<string, unknown>) => void;
 }
 
 export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdded }) => {
@@ -37,7 +37,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
     technicalComplexity: 3,
   });
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -75,8 +75,8 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
         title: formData.title,
         content: formData.content,
         contentType: formData.contentType,
-        sourceUrl: formData.sourceUrl || undefined,
-        pdfUrl: formData.pdfUrl || undefined, // Include PDF URL
+        ...(formData.sourceUrl && { sourceUrl: formData.sourceUrl }),
+        ...(formData.pdfUrl && { pdfUrl: formData.pdfUrl }),
         materialCategories: formData.materialCategories,
         semanticTags: formData.semanticTags,
         language: formData.language,
@@ -103,7 +103,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
         technicalComplexity: 3,
       });
 
-      onEntryAdded?.(entry);
+      onEntryAdded?.(entry as unknown as Record<string, unknown>);
     } catch (error) {
       console.error('Error adding knowledge entry:', error);
       toast({

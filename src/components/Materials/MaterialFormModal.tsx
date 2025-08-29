@@ -5,12 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
-import { DynamicMaterialForm } from './DynamicMaterialForm';
+import { DynamicMaterialForm, MaterialData } from './DynamicMaterialForm';
 
 interface MaterialFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (materialData: any) => void;
+  onSave?: (materialData: MaterialData) => void;
 }
 
 const materialCategories = [
@@ -33,7 +33,7 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('metals');
 
-  const handleSave = async (materialData: any) => {
+  const handleSave = async (materialData: MaterialData) => {
     if (onSave) {
       await onSave(materialData);
     }

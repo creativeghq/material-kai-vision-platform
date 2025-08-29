@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3,
   Users,
@@ -73,11 +73,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, []);
-
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -106,11 +102,11 @@ export const AnalyticsDashboard: React.FC = () => {
         item.id,
       ).map(item => ({
         id: item.id,
-        query_text: (item.event_data as any)?.query || 'Unknown query',
-        results_shown: (item.event_data as any)?.results_count || 0,
-        clicks_count: (item.event_data as any)?.clicks || 0,
-        satisfaction_rating: (item.event_data as any)?.rating || null,
-        response_time_ms: (item.event_data as any)?.response_time || 0,
+        query_text: (item.event_data as Record<string, unknown>)?.query as string || 'Unknown query',
+        results_shown: (item.event_data as Record<string, unknown>)?.results_count as number || 0,
+        clicks_count: (item.event_data as Record<string, unknown>)?.clicks as number || 0,
+        satisfaction_rating: (item.event_data as Record<string, unknown>)?.rating as number ?? 0,
+        response_time_ms: (item.event_data as Record<string, unknown>)?.response_time as number || 0,
         created_at: item.created_at || new Date().toISOString(),
         user_id: item.user_id,
         session_id: item.session_id,
@@ -158,7 +154,11 @@ export const AnalyticsDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [fetchAnalyticsData]);
 
   const getStatusColor = (status: number) => {
     if (status >= 200 && status < 300) return 'text-green-600';
@@ -170,7 +170,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const StatCard = ({ title, value, icon: Icon, description, trend }: {
     title: string;
     value: string | number;
-    icon: any;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     description: string;
     trend?: number;
   }) => (

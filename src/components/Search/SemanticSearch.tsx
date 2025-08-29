@@ -76,7 +76,7 @@ export interface SemanticSearchProps {
 }
 
 // Database search function
-const searchDatabase = async (query: string, _options?: SearchOptions): Promise<SearchResult[]> => {
+const searchDatabase = async (query: string): Promise<SearchResult[]> => {
   try {
     // Search across multiple tables for comprehensive results
     const searchPromises = [];
@@ -127,7 +127,7 @@ const searchDatabase = async (query: string, _options?: SearchOptions): Promise<
 
     // Process processing results
     if (processingResults?.data) {
-      processingResults.data.forEach((item: any) => {
+      processingResults.data.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const metadata = item.metadata || {};
         results.push({
           id: `processing_${item.id}`,
@@ -154,7 +154,7 @@ const searchDatabase = async (query: string, _options?: SearchOptions): Promise<
 
     // Process materials results
     if (materialsResults?.data) {
-      materialsResults.data.forEach((item: any) => {
+      materialsResults.data.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const metadata = item.metadata || {};
         results.push({
           id: `material_${item.id}`,
@@ -222,10 +222,10 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
 
     try {
       // Use the actual database search function
-      const searchResults = await searchDatabase(searchQuery, options);
+      const searchResults = await searchDatabase(searchQuery);
 
       // Apply filters to the database results
-      let filteredResults = searchResults.filter((result: SearchResult) => {
+      const filteredResults = searchResults.filter((result: SearchResult) => {
         const matchesCategory = !options?.category || result.category === options.category;
         const matchesFilters =
           (filters.types.length === 0 || filters.types.includes(result.type)) &&

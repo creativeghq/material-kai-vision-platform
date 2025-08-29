@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Package,
   Edit3,
@@ -27,8 +27,10 @@ interface MaterialTile {
   material_detected: boolean;
   material_type: string;
   material_confidence: number;
-  structured_data: any;
-  metadata_extracted: any;
+  structured_data: Record<string, unknown>;
+  metadata_extracted: Record<string, unknown> & {
+    effects?: string[];
+  };
   image_url?: string;
 }
 
@@ -43,7 +45,7 @@ interface DetectedMaterial {
   category: string;
   type: string;
   effects: string[];
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   confidence: number;
   sources: Array<{
     page: number;
@@ -56,7 +58,7 @@ interface DetectedMaterial {
     name: string;
     similarity: number;
   };
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 const MATERIAL_CATEGORIES = [
@@ -89,12 +91,7 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadMaterials();
-    loadCatalogMaterials();
-  }, [tiles]);
-
-  const loadMaterials = () => {
+  const loadMaterials = useCallback(() => {
     // Group tiles by material type to create consolidated materials
     const materialGroups: Record<string, MaterialTile[]> = {};
 
@@ -110,7 +107,7 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
       const avgConfidence = groupTiles.reduce((sum, t) => sum + (t.material_confidence || 0), 0) / groupTiles.length;
 
       // Extract properties and effects from structured data
-      const properties: Record<string, any> = {};
+      const properties: Record<string, unknown> = {};
       const effects: string[] = [];
 
       groupTiles.forEach(tile => {
@@ -146,9 +143,9 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
 
     setMaterials(detectedMaterials);
     setLoading(false);
-  };
+  }, [tiles, processingId]);
 
-  const loadCatalogMaterials = async () => {
+  const loadCatalogMaterials = useCallback(async () => {
     try {
       // Note: materials_catalog table doesn't exist in current schema
       // This is a placeholder for future implementation
@@ -158,7 +155,12 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
     } catch (error) {
       console.error('Error loading catalog materials:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadMaterials();
+    loadCatalogMaterials();
+  }, [loadMaterials, loadCatalogMaterials]);
 
   const saveMaterialToCatalog = async (material: DetectedMaterial) => {
     try {
@@ -352,7 +354,10 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                         <div key={key} className="text-sm">
                           <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>
                           <span className="text-muted-foreground ml-1">
-                            {typeof value === 'object' ? JSON.stringify(value) : value}
+                            {typeof value === 'object' && value !== null
+                              ? JSON.stringify(value)
+                              : String(value ?? '')
+                            }
                           </span>
                         </div>
                       ))}

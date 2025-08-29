@@ -38,15 +38,15 @@ import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey,
 export const ApiGatewayAdmin: React.FC = () => {
   const navigate = useNavigate();
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
-  const [_internalNetworks, setInternalNetworks] = useState<InternalNetwork[]>([]);
+  const [, setInternalNetworks] = useState<InternalNetwork[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [_rateLimitRules, setRateLimitRules] = useState<RateLimitRule[]>([]);
+  const [, setRateLimitRules] = useState<RateLimitRule[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
   const [endpointDetailsOpen, setEndpointDetailsOpen] = useState(false);
-  const [_selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
+  const [, setSelectedApiKey] = useState<ApiKey | null>(null);
 
   // Global rate limits state
   const [globalRateLimits, setGlobalRateLimits] = useState({
@@ -394,7 +394,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <Settings className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-semibold">No API Endpoints Found</h3>
                     <p className="text-muted-foreground mb-4">
-                      Click "Seed Default Endpoints" to populate with default API endpoints
+                      Click &quot;Seed Default Endpoints&quot; to populate with default API endpoints
                     </p>
                     <Button onClick={seedDefaultEndpoints} className="border border-gray-300 px-4 py-2">
                       <Plus className="mr-2 h-4 w-4" />
@@ -727,7 +727,7 @@ export const ApiGatewayAdmin: React.FC = () => {
 
         {/* Endpoint Details Modal */}
         <Sheet open={endpointDetailsOpen} onOpenChange={setEndpointDetailsOpen}>
-          <SheetContent className="w-[700px] sm:w-[800px]" side="right" {...({} as any)}>
+          <SheetContent className="w-[700px] sm:w-[800px]" side="right">
             <SheetHeader>
               <SheetTitle>API Endpoint Details</SheetTitle>
               <SheetDescription>

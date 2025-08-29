@@ -34,9 +34,32 @@ export interface DocumentProcessingRequest {
   };
 }
 
+interface DocumentWorkflowJob {
+  id: string;
+  status: 'pending' | 'processing' | 'extracting' | 'transforming' | 'rag-integrating' | 'completed' | 'failed';
+  workspaceId: string;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  updatedAt: Date;
+  results?: {
+    extractedContent?: unknown;
+    ragIntegration?: {
+      documentsStored: number;
+      embeddingsGenerated: number;
+      vectorsIndexed: number;
+    };
+  };
+  error?: {
+    stage: string;
+    message: string;
+    code: string;
+  };
+}
+
 export interface WorkflowStatusResponse {
   jobId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'extracting' | 'transforming' | 'rag-integrating' | 'completed' | 'failed';
   progress: {
     currentStage: string;
     completedStages: string[];
@@ -44,7 +67,7 @@ export interface WorkflowStatusResponse {
     percentage: number;
   };
   results?: {
-    extractedContent?: any;
+    extractedContent?: unknown;
     ragIntegration?: {
       documentsStored: number;
       embeddingsGenerated: number;
@@ -147,7 +170,7 @@ const DocumentSearchRequestSchema = z.object({
  * full service integration as the backend services mature.
  */
 export class DocumentWorkflowController {
-  private activeJobs: Map<string, any> = new Map();
+  private activeJobs: Map<string, DocumentWorkflowJob> = new Map();
 
   constructor() {
     console.log('DocumentWorkflowController initialized');
@@ -367,12 +390,12 @@ export class DocumentWorkflowController {
           totalStages: allStages.length,
           percentage,
         },
-        results: job.results,
-        error: job.error,
+        ...(job.results && { results: job.results }),
+        ...(job.error && { error: job.error }),
         timestamps: {
           created: job.createdAt.toISOString(),
-          started: job.startedAt?.toISOString(),
-          completed: job.completedAt?.toISOString(),
+          ...(job.startedAt && { started: job.startedAt.toISOString() }),
+          ...(job.completedAt && { completed: job.completedAt.toISOString() }),
         },
       };
 
@@ -685,12 +708,15 @@ export class DocumentWorkflowController {
     const job = this.activeJobs.get(jobId);
     if (!job) return;
 
-    const stages = ['processing', 'extracting', 'transforming', 'rag-integrating', 'completed'];
+    const stages: DocumentWorkflowJob['status'][] = ['processing', 'extracting', 'transforming', 'rag-integrating', 'completed'];
     let currentStageIndex = 0;
 
     const progressInterval = setInterval(() => {
       if (currentStageIndex < stages.length) {
-        job.status = stages[currentStageIndex];
+        const nextStatus = stages[currentStageIndex];
+        if (nextStatus) {
+          job.status = nextStatus;
+        }
         job.updatedAt = new Date();
 
         if (currentStageIndex === 0) {

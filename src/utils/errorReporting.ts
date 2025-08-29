@@ -214,90 +214,71 @@ export class ErrorReporter {
     let code: string;
     let severity: ErrorSeverity;
     let message: string;
+    let receivedValue: unknown = undefined;
+
+    // Use type assertion to access properties safely
+    const issueAny = issue as any;
 
     switch (issue.code) {
       case 'invalid_type':
         code = ERROR_CODES.INVALID_TYPE;
         severity = ErrorSeverity.HIGH;
+        receivedValue = issueAny.received;
         message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid type error', {
           field,
-          expectedType: issue.expected,
-          actualType: issue.received,
+          expectedType: issueAny.expected || 'unknown',
+          actualType: issueAny.received || 'unknown',
         });
-        break;
-
-      case 'invalid_string':
-        if (issue.validation === 'email') {
-          code = ERROR_CODES.INVALID_EMAIL;
-          message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid email error', { field });
-        } else if (issue.validation === 'url') {
-          code = ERROR_CODES.INVALID_URL;
-          message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid URL error', { field });
-        } else {
-          code = ERROR_CODES.INVALID_FORMAT;
-          message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid format error', {
-            field,
-            expectedFormat: issue.validation,
-          });
-        }
-        severity = ErrorSeverity.MEDIUM;
         break;
 
       case 'too_small':
-        if (issue.type === 'array') {
+        severity = ErrorSeverity.MEDIUM;
+        if (issueAny.type === 'array') {
           code = ERROR_CODES.ARRAY_TOO_SHORT;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Array too short error', {
             field,
-            minLength: issue.minimum,
+            minLength: issueAny.minimum || 0,
           });
-        } else if (issue.type === 'string') {
+        } else if (issueAny.type === 'string') {
           code = ERROR_CODES.STRING_TOO_SHORT;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'String too short error', {
             field,
-            minLength: issue.minimum,
+            minLength: issueAny.minimum || 0,
           });
         } else {
           code = ERROR_CODES.VALUE_OUT_OF_RANGE;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Value out of range error', {
             field,
-            value: (issue as any).received,
-            range: `>= ${issue.minimum}`,
+            value: issueAny.received || 'unknown',
+            range: `>= ${issueAny.minimum || 0}`,
           });
+          receivedValue = issueAny.received;
         }
-        severity = ErrorSeverity.MEDIUM;
         break;
 
       case 'too_big':
-        if (issue.type === 'array') {
+        severity = ErrorSeverity.MEDIUM;
+        if (issueAny.type === 'array') {
           code = ERROR_CODES.ARRAY_TOO_LONG;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Array too long error', {
             field,
-            maxLength: issue.maximum,
+            maxLength: issueAny.maximum || 0,
           });
-        } else if (issue.type === 'string') {
+        } else if (issueAny.type === 'string') {
           code = ERROR_CODES.STRING_TOO_LONG;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'String too long error', {
             field,
-            maxLength: issue.maximum,
+            maxLength: issueAny.maximum || 0,
           });
         } else {
           code = ERROR_CODES.VALUE_OUT_OF_RANGE;
           message = this.formatMessage(ERROR_MESSAGES[code] || 'Value out of range error', {
             field,
-            value: (issue as any).received,
-            range: `<= ${issue.maximum}`,
+            value: issueAny.received || 'unknown',
+            range: `<= ${issueAny.maximum || 0}`,
           });
+          receivedValue = issueAny.received;
         }
-        severity = ErrorSeverity.MEDIUM;
-        break;
-
-      case 'invalid_enum_value':
-        code = ERROR_CODES.INVALID_ENUM_VALUE;
-        severity = ErrorSeverity.MEDIUM;
-        message = this.formatMessage(ERROR_MESSAGES[code] || 'Invalid enum value error', {
-          field,
-          allowedValues: issue.options?.join(', ') || 'unknown',
-        });
         break;
 
       case 'custom':
@@ -310,16 +291,29 @@ export class ErrorReporter {
         break;
 
       default:
+        // Handle other cases including invalid_string, invalid_enum_value, etc.
         code = ERROR_CODES.CUSTOM_VALIDATION_FAILED;
         severity = ErrorSeverity.MEDIUM;
         message = issue.message;
+        receivedValue = issueAny.received;
+
+        // Try to provide more specific error codes for common cases
+        if (issue.message.includes('email')) {
+          code = ERROR_CODES.INVALID_EMAIL;
+        } else if (issue.message.includes('url')) {
+          code = ERROR_CODES.INVALID_URL;
+        } else if (issue.message.includes('enum')) {
+          code = ERROR_CODES.INVALID_ENUM_VALUE;
+        } else if (issue.message.includes('format')) {
+          code = ERROR_CODES.INVALID_FORMAT;
+        }
     }
 
     return {
       code,
       message,
       field,
-      value: (issue as any).received,
+      value: receivedValue,
       severity,
       category,
       suggestions: ERROR_SUGGESTIONS[code] || [],
@@ -421,13 +415,8 @@ export class ErrorReporter {
   }
 }
 
-/**
- * Create a formatted error response for API endpoints
- */
-export function createErrorResponse(
-  errorReport: ErrorReport,
-  includeDetails: boolean = true,
-): {
+// Define the error response interface
+interface ErrorResponse {
   success: false;
   error: {
     message: string;
@@ -437,13 +426,21 @@ export function createErrorResponse(
     details?: ErrorDetails[];
     summary?: ErrorReport['summary'];
   };
-} {
+}
+
+/**
+ * Create a formatted error response for API endpoints
+ */
+export function createErrorResponse(
+  errorReport: ErrorReport,
+  includeDetails: boolean = true,
+): ErrorResponse {
   const primaryError = errorReport.errors[0];
   const message = errorReport.errors.length === 1
     ? primaryError?.message || 'Validation failed'
     : `Validation failed with ${errorReport.errors.length} errors`;
 
-  const response: any = {
+  const response: ErrorResponse = {
     success: false,
     error: {
       message,

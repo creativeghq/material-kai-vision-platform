@@ -11,9 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { SVBRDFExtractionAPI, SVBRDFExtractionRecord } from '@/services/svbrdfExtractionAPI';
 
-interface SVBRDFExtractionPageProps {}
-
-export const SVBRDFExtractionPage: React.FC<SVBRDFExtractionPageProps> = () => {
+export const SVBRDFExtractionPage: React.FC = () => {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);

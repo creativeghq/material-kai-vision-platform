@@ -38,6 +38,62 @@ interface AttachedFile {
   preview?: string;
 }
 
+interface MaterialResult {
+  id: string;
+  name: string;
+  type?: string;
+  description?: string;
+  category?: string;
+  properties?: Record<string, unknown>;
+  relevanceScore?: number;
+  source?: string;
+}
+
+interface MessageMetadata {
+  taskId?: string;
+  processingTime?: number;
+  overallConfidence?: number;
+  agentCount?: number;
+  provider?: string;
+  finalScore?: number;
+  ragEnabled?: boolean;
+  attachmentCount?: number;
+  hybridAI?: boolean;
+  attempts?: number;
+  crewAI?: boolean;
+  has3DContent?: boolean;
+  designGeneration?: Record<string, unknown>;
+}
+
+interface APIResponse {
+  success?: boolean;
+  data?: Record<string, unknown>;
+  error?: string;
+  error_message?: string;
+  coordinated_result?: {
+    content?: string;
+    analysis?: string;
+    recommendations?: string[];
+    materials?: MaterialResult[];
+  };
+  coordination_summary?: string;
+  task_id?: string;
+  total_processing_time_ms?: number;
+  overall_confidence?: number;
+  agent_executions?: Array<Record<string, unknown>>;
+  response?: string;
+  materials?: MaterialResult[];
+}
+
+interface HybridAIResponse {
+  success: boolean;
+  data?: string;
+  provider?: string;
+  final_score?: number;
+  total_processing_time_ms?: number;
+  attempts: Array<Record<string, unknown>>;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -45,8 +101,8 @@ interface Message {
   timestamp: Date;
   thinking?: string;
   suggestions?: string[];
-  materials?: any[];
-  metadata?: any;
+  materials?: MaterialResult[];
+  metadata?: MessageMetadata;
   attachments?: AttachedFile[];
 }
 
@@ -224,7 +280,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       role: 'user',
       content: input,
       timestamp: new Date(),
-      attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined,
+      ...(attachedFiles.length > 0 && { attachments: [...attachedFiles] }),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -249,7 +305,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       console.log('=====================================');
 
       // Prepare enhanced context with RAG integration
-      let enhancedContext: EnhancedContext = {
+      const enhancedContext: EnhancedContext = {
         previousMessages: messages.slice(-5),
         userPreferences: {
           includeDesignSuggestions: true,
@@ -264,7 +320,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           name: file.name,
           type: file.type,
           size: file.size,
-          url: file.url,
+          url: file.url || '',
         })),
       };
 
@@ -314,13 +370,16 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       }
 
       // Determine which AI service to use based on hybrid configuration
-      let data: any, error: any;
+      let data: APIResponse | null = null;
+      let error: string | null = null;
 
       if (hybridConfig.enableRAG && hybridConfig.primary && hybridConfig.fallback) {
         console.log('🔄 Using Hybrid AI Service...');
         try {
           // Use HybridAIService for enhanced AI processing
-          const hybridResponse = await (HybridAIService as any).processRequest({
+          const hybridResponse = await (HybridAIService as unknown as {
+            processRequest: (params: Record<string, unknown>) => Promise<HybridAIResponse>;
+          }).processRequest({
             prompt: input,
             model: hybridConfig.primary,
             type: 'general',
@@ -333,18 +392,16 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             data = {
               success: true,
               response: hybridResponse.data || 'Processed using hybrid AI models',
-              thinking: 'Processed using hybrid AI models with fallback support',
-              suggestions: [], // Could be enhanced based on hybrid response
-              materials: [], // Could be enhanced based on hybrid response
-              metadata: {
-                provider: hybridResponse.provider,
-                finalScore: hybridResponse.final_score,
-                processingTime: hybridResponse.total_processing_time_ms,
-                ragEnabled: !!ragResults,
-                attachmentCount: attachedFiles.length,
-                hybridAI: true,
-                attempts: hybridResponse.attempts.length,
+              coordination_summary: 'Processed using hybrid AI models with fallback support',
+              coordinated_result: {
+                content: hybridResponse.data || 'Processed using hybrid AI models',
+                recommendations: [],
+                materials: [],
               },
+              task_id: crypto.randomUUID(),
+              total_processing_time_ms: hybridResponse.total_processing_time_ms || 0,
+              overall_confidence: hybridResponse.final_score || 0.7,
+              agent_executions: hybridResponse.attempts || [],
             };
             error = null;
           } else {
@@ -365,8 +422,8 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               attachments: attachedFiles.length > 0 ? attachedFiles : undefined,
             },
           });
-          data = response.data;
-          error = response.error;
+          data = response.data as APIResponse;
+          error = response.error?.message || null;
         }
       } else {
         console.log('🤖 Using standard Material Agent...');
@@ -383,13 +440,13 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             attachments: attachedFiles.length > 0 ? attachedFiles : undefined,
           },
         });
-        data = response.data;
-        error = response.error;
+        data = response.data as APIResponse;
+        error = response.error?.message || null;
       }
 
       if (error) {
         console.error('Material Agent function error:', error);
-        throw new Error(error.message || 'Failed to get AI response');
+        throw new Error(error || 'Failed to get AI response');
       }
 
       if (!data || !data.success) {
@@ -399,7 +456,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       // Transform Material Agent response to expected format
       const transformedData = {
         success: true,
-        response: data.coordinated_result?.content || data.coordinated_result?.analysis || data.coordinated_result || 'Analysis completed successfully',
+        response: data.coordinated_result?.content || data.coordinated_result?.analysis || String(data.coordinated_result) || 'Analysis completed successfully',
         thinking: data.coordination_summary || 'Task processed through Material Agent coordination',
         suggestions: data.coordinated_result?.recommendations || [],
         materials: data.coordinated_result?.materials || [],
@@ -421,8 +478,9 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           console.log('🎨 Attempting 3D generation...');
           // Check if the response contains design-related keywords that would benefit from 3D generation
           const designKeywords = ['interior', 'room', 'space', 'design', 'layout', 'furniture', 'decor'];
+          const responseText = String(data.response || '');
           const containsDesignContent = designKeywords.some(keyword =>
-            data.response.toLowerCase().includes(keyword),
+            responseText.toLowerCase().includes(keyword),
           );
 
           if (containsDesignContent) {
@@ -456,11 +514,15 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         role: 'assistant',
         content: transformedData.response || 'I processed your request successfully.',
         timestamp: new Date(),
-        thinking: transformedData.thinking,
+        thinking: String(transformedData.thinking || ''),
         suggestions: transformedData.suggestions || [],
         materials: transformedData.materials || [],
         metadata: {
-          ...transformedData.metadata,
+          ...(transformedData.metadata?.taskId && { taskId: transformedData.metadata.taskId }),
+          processingTime: transformedData.metadata?.processingTime,
+          overallConfidence: transformedData.metadata?.overallConfidence,
+          agentCount: transformedData.metadata?.agentCount,
+          crewAI: transformedData.metadata?.crewAI,
           ...(enhanced3DContent && {
             has3DContent: true,
             designGeneration: enhanced3DContent,
@@ -476,7 +538,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       // Show success notification with additional info
       toast({
         title: 'AI Response Generated',
-        description: `Found ${data.materials?.length || 0} relevant materials`,
+        description: `Found ${(data.coordinated_result?.materials || []).length} relevant materials`,
         duration: 3000,
       });
 
@@ -506,7 +568,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
     setInput(suggestion);
   };
 
-  const handleMaterialClick = (material: any) => {
+  const handleMaterialClick = (material: MaterialResult) => {
     if (onMaterialSelect && material.id) {
       onMaterialSelect(material.id);
     }
@@ -723,7 +785,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                     <label className="block text-muted-foreground mb-1">Primary Model</label>
                     <select
                       value={hybridConfig.primary}
-                      onChange={(e) => setHybridConfig(prev => ({ ...prev, primary: e.target.value as any }))}
+                      onChange={(e) => setHybridConfig(prev => ({ ...prev, primary: e.target.value as 'openai' | 'claude' | 'vertex' }))}
                       className="w-full p-1 rounded border bg-background"
                     >
                       <option value="openai">OpenAI GPT</option>
@@ -736,7 +798,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                     <label className="block text-muted-foreground mb-1">Fallback Model</label>
                     <select
                       value={hybridConfig.fallback}
-                      onChange={(e) => setHybridConfig(prev => ({ ...prev, fallback: e.target.value as any }))}
+                      onChange={(e) => setHybridConfig(prev => ({ ...prev, fallback: e.target.value as 'openai' | 'claude' | 'vertex' }))}
                       className="w-full p-1 rounded border bg-background"
                     >
                       <option value="openai">OpenAI GPT</option>

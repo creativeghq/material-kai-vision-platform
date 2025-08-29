@@ -12,7 +12,7 @@ import { errorLogger } from './ErrorLogger';
 export function createErrorContext(
   service: string,
   operation: string,
-  metadata?: Record<string, any>,
+  metadata?: Record<string, unknown>,
 ): ErrorContext {
   return {
     operation,
@@ -33,7 +33,7 @@ export async function withErrorHandling<T>(
     errorLogger.logDebug(`Starting operation: ${context.operation}`, {
       service: context.service,
       operation: context.operation,
-      metadata: context.metadata,
+      metadata: context.metadata || undefined,
     });
 
     const result = await operation();
@@ -66,16 +66,18 @@ export async function withErrorHandling<T>(
  * Handle API response errors with proper categorization
  */
 export function handleAPIError(
-  error: any,
+  error: unknown,
   context: ErrorContext,
   endpoint?: string,
 ): never {
   let apiError: APIError;
 
-  if (error.response) {
+  // Type guard to check if error has response property
+  if (error && typeof error === 'object' && 'response' in error) {
+    const errorWithResponse = error as { response: { status: number; statusText?: string; data?: unknown } };
     // HTTP error response
-    const status = error.response.status;
-    const statusText = error.response.statusText || 'Unknown Error';
+    const status = errorWithResponse.response.status;
+    const statusText = errorWithResponse.response.statusText || 'Unknown Error';
 
     let code = 'API_ERROR';
     let severity = ErrorSeverity.HIGH;
@@ -107,13 +109,13 @@ export function handleAPIError(
           status,
           statusText,
           severity,
-          responseData: error.response.data,
+          responseData: errorWithResponse.response.data,
         },
       },
-      error,
+      error instanceof Error ? error : new Error(String(error)),
       code,
     );
-  } else if (error.request) {
+  } else if (error && typeof error === 'object' && 'request' in error) {
     // Network error
     apiError = new APIError(
       `Network error: No response received${endpoint ? ` from ${endpoint}` : ''}`,
@@ -125,13 +127,13 @@ export function handleAPIError(
           networkError: true,
         },
       },
-      error,
+      error instanceof Error ? error : new Error(String(error)),
       'API_NETWORK_ERROR',
     );
   } else {
     // Request setup error
     apiError = new APIError(
-      `Request setup error: ${error.message}${endpoint ? ` for ${endpoint}` : ''}`,
+      `Request setup error: ${error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error)}${endpoint ? ` for ${endpoint}` : ''}`,
       {
         ...context,
         metadata: {
@@ -140,7 +142,7 @@ export function handleAPIError(
           setupError: true,
         },
       },
-      error,
+      error instanceof Error ? error : new Error(String(error)),
       'API_REQUEST_ERROR',
     );
   }
@@ -153,20 +155,20 @@ export function handleAPIError(
  * Handle network errors with retry logic awareness
  */
 export function handleNetworkError(
-  error: any,
+  error: unknown,
   context: ErrorContext,
   retryAttempt?: number,
 ): never {
   const networkError = new NetworkError(
-    `Network operation failed: ${error.message}`,
+    `Network operation failed: ${error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error)}`,
     {
       ...context,
       metadata: {
         ...context.metadata,
         retryAttempt,
         networkError: true,
-        errorCode: error.code,
-        errorType: error.type,
+        errorCode: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+        errorType: error && typeof error === 'object' && 'type' in error ? error.type : undefined,
       },
     },
     error instanceof Error ? error : new Error(String(error)),
@@ -183,7 +185,7 @@ export function handleValidationError(
   message: string,
   context: ErrorContext,
   field?: string,
-  value?: any,
+  value?: unknown,
 ): never {
   const validationError = new ValidationError(
     message,
@@ -206,13 +208,13 @@ export function handleValidationError(
  * Handle database errors with query context
  */
 export function handleDatabaseError(
-  error: any,
+  error: unknown,
   context: ErrorContext,
   query?: string,
-  params?: any[],
+  params?: unknown[],
 ): never {
   const dbError = new DatabaseError(
-    `Database operation failed: ${error.message}`,
+    `Database operation failed: ${error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error)}`,
     {
       ...context,
       metadata: {
@@ -220,8 +222,8 @@ export function handleDatabaseError(
         query,
         params,
         databaseError: true,
-        errorCode: error.code,
-        errorDetail: error.detail,
+        errorCode: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+        errorDetail: error && typeof error === 'object' && 'detail' in error ? error.detail : undefined,
       },
     },
     error instanceof Error ? error : new Error(String(error)),
@@ -235,13 +237,13 @@ export function handleDatabaseError(
  * Handle external service errors with service-specific context
  */
 export function handleExternalServiceError(
-  error: any,
+  error: unknown,
   context: ErrorContext,
   serviceName: string,
   endpoint?: string,
 ): never {
   const serviceError = new ExternalServiceError(
-    `External service error (${serviceName}): ${error.message}`,
+    `External service error (${serviceName}): ${error && typeof error === 'object' && 'message' in error ? String(error.message) : String(error)}`,
     {
       ...context,
       metadata: {
@@ -249,7 +251,7 @@ export function handleExternalServiceError(
         serviceName,
         endpoint,
         externalServiceError: true,
-        serviceResponse: error.response?.data,
+        serviceResponse: error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response ? error.response.data : undefined,
       },
     },
     error instanceof Error ? error : new Error(String(error)),

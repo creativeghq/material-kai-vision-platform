@@ -4,16 +4,16 @@ import { DocumentIntegrationController } from './document-integration';
 // Express types (would be imported from @types/express in real implementation)
 interface Request {
   headers: Record<string, string | string[] | undefined>;
-  body: any;
+  body: unknown;
   params: Record<string, string>;
-  query: Record<string, any>;
+  query: Record<string, unknown>;
   url: string;
   method: string;
 }
 
 interface Response {
   status(code: number): Response;
-  json(data: any): void;
+  json(data: unknown): void;
   headersSent: boolean;
   setHeader(name: string, value: string): void;
 }

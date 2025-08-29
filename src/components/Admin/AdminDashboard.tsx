@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BarChart3,
@@ -96,12 +96,7 @@ const AdminDashboard: React.FC = () => {
   const [, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
 
-  // Load real data from Supabase
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -121,7 +116,12 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load real data from Supabase
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const loadSystemMetrics = async () => {
     try {
@@ -219,8 +219,8 @@ const AdminDashboard: React.FC = () => {
 
       // Add workspace-specific settings if available
       if (workspaces?.[0]?.settings) {
-        const settings = workspaces[0].settings as any;
-        Object.entries(settings).forEach(([key, value]) => {
+        const settings = workspaces[0].settings as unknown;
+        Object.entries(settings as Record<string, unknown>).forEach(([key, value]) => {
           defaultConfigs.push({
             key,
             value: String(value),
@@ -282,8 +282,8 @@ const AdminDashboard: React.FC = () => {
           .limit(1);
 
         if (workspaces?.[0]) {
-          const currentSettings = workspaces[0].settings as any || {};
-          const updatedSettings = { ...currentSettings, [key]: newValue };
+          const currentSettings = workspaces[0].settings as unknown || {};
+          const updatedSettings = { ...(currentSettings as Record<string, unknown>), [key]: newValue };
 
           await supabase
             .from('workspaces')

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Loader2, Wand2, Download, X, ImageIcon } from 'lucide-react';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +21,7 @@ export const Designer3DPage: React.FC = () => {
   const [style, setStyle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<{url: string, modelName: string}[]>([]);
-  const [generationData, setGenerationData] = useState<any>(null);
+  const [generationData, setGenerationData] = useState<unknown>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -37,7 +38,7 @@ export const Designer3DPage: React.FC = () => {
     const checkAdminRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await (supabase as any).rpc('has_role', {
+        const { data } = await (supabase as unknown as { rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: unknown }> }).rpc('has_role', {
           _user_id: user.id,
           _role: 'admin',
         });
@@ -280,11 +281,11 @@ export const Designer3DPage: React.FC = () => {
       } else {
         throw new Error(result.error?.message || 'Failed to start generation');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Generation error:', error);
       toast({
         title: 'Generation Failed',
-        description: error.message || 'Failed to generate 3D interior. Please try again.',
+        description: (error as Error).message || 'Failed to generate 3D interior. Please try again.',
         variant: 'destructive',
       });
       setIsGenerating(false);
@@ -292,7 +293,7 @@ export const Designer3DPage: React.FC = () => {
     }
   };
 
-  const pollForResults = async (_generationId: string) => {
+  const pollForResults = async (_generationId: string) => { // eslint-disable-line @typescript-eslint/no-unused-vars
     const maxAttempts = 60; // 5 minutes with 5-second intervals
     let attempts = 0;
 
@@ -306,7 +307,7 @@ export const Designer3DPage: React.FC = () => {
         //   .single();
 
         // Mock response for now to prevent build errors
-        const data: any = null;
+        const data: unknown = null;
         const error = { message: 'generation_3d table not implemented' };
 
         if (error) {
@@ -380,8 +381,8 @@ export const Designer3DPage: React.FC = () => {
           console.log('🔍 Mapping validation:');
           console.log(`📊 Total models requested: ${filteredModels.length}`);
           console.log(`🖼️ Total results received: ${data.image_urls.length}`);
-          console.log(`✅ Successfully mapped: ${imagesWithModels.filter((img: any) => img.modelId).length}`);
-          console.log(`⚠️ Fallback mappings: ${imagesWithModels.filter((img: any) => !img.modelId).length}`);
+          console.log(`✅ Successfully mapped: ${imagesWithModels.filter((img: unknown) => (img as { modelId?: string }).modelId).length}`);
+          console.log(`⚠️ Fallback mappings: ${imagesWithModels.filter((img: unknown) => !(img as { modelId?: string }).modelId).length}`);
 
           console.log('✅ Final imagesWithModels mapping:', imagesWithModels);
 
@@ -408,7 +409,7 @@ export const Designer3DPage: React.FC = () => {
         } else {
           throw new Error('Generation timed out');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Polling error:', error);
         setIsGenerating(false);
         setIsUploading(false);
@@ -539,9 +540,11 @@ export const Designer3DPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="relative border rounded-lg p-2">
-                  <img
+                  <Image
                     src={imagePreview}
                     alt="Preview"
+                    width={400}
+                    height={128}
                     className="w-full h-32 object-cover rounded"
                   />
                   <Button
@@ -626,9 +629,11 @@ export const Designer3DPage: React.FC = () => {
                       className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                       onClick={() => handleImageClick(index)}
                     >
-                      <img
+                      <Image
                         src={image.url}
                         alt={`Interior design by ${image.modelName}`}
+                        width={400}
+                        height={300}
                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                         onLoad={() => {
                           console.log(`✅ Image ${index + 1} loaded successfully:`, image.url);
@@ -732,7 +737,7 @@ export const Designer3DPage: React.FC = () => {
             const imagesWithModels = images.map((url: string, index: number) => {
               let modelName = `Model ${index + 1}`;
               let modelId = '';
-              let resultIndex = index;
+              const resultIndex = index;
 
               // Strategy 1: Extract model info from URL patterns
               const urlMatch = url.match(/model[_-](\w+)|(\w+)[_-]model/i);

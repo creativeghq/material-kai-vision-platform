@@ -9,19 +9,25 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
+// Auth context interface
+interface AuthContext {
+  userId: string;
+  workspaceId: string;
+}
+
 // Express types (would be imported from @types/express in real implementation)
 interface Request {
   headers: Record<string, string | string[] | undefined>;
-  body: any;
+  body: unknown;
   params: Record<string, string>;
-  query: Record<string, any>;
+  query: Record<string, unknown>;
   url: string;
   method: string;
 }
 
 interface Response {
   status(code: number): Response;
-  json(data: any): void;
+  json(data: unknown): void;
   headersSent: boolean;
   setHeader(name: string, value: string): void;
 }
@@ -35,19 +41,19 @@ interface MivaaRequest {
   endpoint: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers: Record<string, string>;
-  body?: any;
+  body?: unknown;
   params?: Record<string, string>;
-  query?: Record<string, any>;
+  query?: Record<string, unknown>;
   timeout?: number;
 }
 
 interface MivaaResponse {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   metadata?: {
     timestamp: string;
@@ -90,7 +96,7 @@ class MivaaRateLimitHelper {
     return true;
   }
 
-  static async logMivaaUsage(userId: string, workspaceId: string, endpoint: string, metadata?: any): Promise<void> {
+  static async logMivaaUsage(userId: string, workspaceId: string, endpoint: string, metadata?: unknown): Promise<void> {
     console.log(`MIVAA Gateway Usage: ${userId} in ${workspaceId} accessed ${endpoint}`, metadata);
   }
 }
@@ -137,7 +143,7 @@ export class MivaaGatewayController {
 
       if (materialKaiResult.success && materialKaiResult.keyData) {
         // Material Kai authentication successful
-        (req as any).authContext = {
+        (req as unknown as { authContext: { userId: string; workspaceId: string; authType: string; apiKey: string; scopes: string[] } }).authContext = {
           userId: 'material-kai-user',
           workspaceId: materialKaiResult.keyData.workspace_id,
           authType: 'material-kai',
@@ -191,7 +197,7 @@ export class MivaaGatewayController {
       }
 
       // JWT authentication successful
-      (req as any).authContext = {
+      (req as unknown as { authContext: unknown }).authContext = {
         ...jwtAuthResult.authContext,
         authType: 'jwt',
       };
@@ -220,7 +226,7 @@ export class MivaaGatewayController {
    */
   private async rateLimitMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const authContext = (req as any).authContext;
+      const authContext = (req as unknown as { authContext?: { userId: string; workspaceId: string } }).authContext;
       if (!authContext) {
         next();
         return;
@@ -248,7 +254,8 @@ export class MivaaGatewayController {
       }
 
       next();
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Validation error:', error);
       next(); // Continue on rate limit errors
     }
   }
@@ -266,8 +273,8 @@ export class MivaaGatewayController {
           error: {
             code: 'MIVAA_VALIDATION_ERROR',
             message: 'MIVAA request validation failed',
-            details: validationResult.error.issues.map(err => ({
-              field: err.path.join('.'),
+            details: validationResult.error.issues.map((err) => ({
+              field: err.path.map(String).join('.'),
               message: err.message,
             })),
           },
@@ -283,7 +290,7 @@ export class MivaaGatewayController {
       }
 
       // Attach validated request to context
-      (req as any).validatedMivaaRequest = validationResult.data;
+      (req as unknown as { validatedMivaaRequest: unknown }).validatedMivaaRequest = validationResult.data;
       next();
     } catch (error) {
       const errorResponse: MivaaResponse = {
@@ -307,7 +314,7 @@ export class MivaaGatewayController {
   /**
    * Forward request to MIVAA microservice
    */
-  private async forwardToMivaa(mivaaRequest: MivaaRequest, authContext: any): Promise<MivaaResponse> {
+  private async forwardToMivaa(mivaaRequest: MivaaRequest, authContext: AuthContext): Promise<MivaaResponse> {
     const startTime = Date.now();
 
     try {
@@ -432,8 +439,8 @@ export class MivaaGatewayController {
       await this.validateRequest(req, res, () => {});
       if (res.headersSent) return;
 
-      const authContext = (req as any).authContext;
-      const mivaaRequest = (req as any).validatedMivaaRequest as MivaaRequest;
+      const authContext = (req as unknown as { authContext: AuthContext }).authContext;
+      const mivaaRequest = (req as unknown as { validatedMivaaRequest: MivaaRequest }).validatedMivaaRequest;
 
       // Forward request to MIVAA
       const mivaaResponse = await this.forwardToMivaa(mivaaRequest, authContext);

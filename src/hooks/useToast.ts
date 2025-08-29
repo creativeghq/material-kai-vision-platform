@@ -12,7 +12,7 @@ interface ToastState {
   toasts: Toast[];
 }
 
-let toastState: ToastState = { toasts: [] };
+const toastState: ToastState = { toasts: [] };
 let listeners: Array<(state: ToastState) => void> = [];
 
 const notify = () => {

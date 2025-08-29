@@ -1,18 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 
-interface CollaborationTask {
-  id: string;
-  parentTaskId?: string;
-  childTaskIds: string[];
-  taskType: string;
-  requiredAgentTypes: string[];
-  assignedAgents: string[];
-  status: 'planning' | 'executing' | 'coordinating' | 'completed' | 'failed';
-  coordination_plan: any;
-  dependencies: string[];
-  priority: number;
-}
-
 interface AgentCollaborationPlan {
   taskId: string;
   workflow: CollaborationStep[];
@@ -26,14 +13,14 @@ interface CollaborationStep {
   operation: string;
   dependencies: string[];
   estimatedTime: number;
-  inputs: any;
-  outputs: any;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
 }
 
 export class AgentCollaborationWorkflows {
   async createCollaborationTask(
     taskType: string,
-    inputData: any,
+    inputData: Record<string, unknown>,
     priority: number = 5,
     userId: string,
   ): Promise<string | null> {
@@ -50,12 +37,11 @@ export class AgentCollaborationWorkflows {
       const { data: parentTask, error: parentError } = await supabase
         .from('agent_tasks')
         .insert({
+          task_name: `coordination_${taskType}`,
           task_type: `coordination_${taskType}`,
-          input_data: inputData,
-          priority,
-          status: 'planning',
-          coordination_plan: collaborationPlan as any,
-          assigned_agents: [],
+          input_data: JSON.parse(JSON.stringify(inputData)),
+          priority: String(priority),
+          task_status: 'planning',
           user_id: userId,
         })
         .select()
@@ -70,18 +56,12 @@ export class AgentCollaborationWorkflows {
         const { data: childTask, error: childError } = await supabase
           .from('agent_tasks')
           .insert({
+            task_name: step.operation,
             task_type: step.operation,
-            input_data: step.inputs,
-            priority: priority + (step.dependencies.length * 0.1), // Adjust priority based on dependencies
-            status: 'pending',
-            assigned_agents: [],
+            input_data: JSON.parse(JSON.stringify(step.inputs)),
+            priority: String(priority + (step.dependencies.length * 0.1)), // Adjust priority based on dependencies
+            task_status: 'pending',
             user_id: userId,
-            coordination_plan: {
-              parentTaskId: parentTask.id,
-              stepId: step.stepId,
-              dependencies: step.dependencies,
-              requiredAgentType: step.agentType,
-            } as any,
           })
           .select()
           .single();
@@ -94,11 +74,11 @@ export class AgentCollaborationWorkflows {
       await supabase
         .from('agent_tasks')
         .update({
-          coordination_plan: {
+          input_data: JSON.parse(JSON.stringify({
             ...collaborationPlan,
             childTaskIds,
             status: 'planned',
-          } as any,
+          }))
         })
         .eq('id', parentTask.id);
 
@@ -115,7 +95,7 @@ export class AgentCollaborationWorkflows {
     }
   }
 
-  private async analyzeTaskCollaboration(taskType: string, inputData: any): Promise<AgentCollaborationPlan> {
+  private async analyzeTaskCollaboration(taskType: string, inputData: Record<string, unknown>): Promise<AgentCollaborationPlan> {
     const plan: AgentCollaborationPlan = {
       taskId: '',
       workflow: [],
@@ -143,7 +123,7 @@ export class AgentCollaborationWorkflows {
     }
   }
 
-  private createMaterialAnalysisWorkflow(inputData: any): AgentCollaborationPlan {
+  private createMaterialAnalysisWorkflow(inputData: Record<string, unknown>): AgentCollaborationPlan {
     const workflow: CollaborationStep[] = [
       {
         stepId: 'image_preprocessing',
@@ -191,7 +171,7 @@ export class AgentCollaborationWorkflows {
     };
   }
 
-  private createMultiModalRecognitionWorkflow(inputData: any): AgentCollaborationPlan {
+  private createMultiModalRecognitionWorkflow(inputData: Record<string, unknown>): AgentCollaborationPlan {
     const workflow: CollaborationStep[] = [
       {
         stepId: 'image_recognition',
@@ -230,7 +210,7 @@ export class AgentCollaborationWorkflows {
     };
   }
 
-  private create3DSceneAnalysisWorkflow(inputData: any): AgentCollaborationPlan {
+  private create3DSceneAnalysisWorkflow(inputData: Record<string, unknown>): AgentCollaborationPlan {
     const workflow: CollaborationStep[] = [
       {
         stepId: 'point_cloud_processing',
@@ -269,7 +249,7 @@ export class AgentCollaborationWorkflows {
     };
   }
 
-  private createComprehensiveMaterialReportWorkflow(inputData: any): AgentCollaborationPlan {
+  private createComprehensiveMaterialReportWorkflow(inputData: Record<string, unknown>): AgentCollaborationPlan {
     const workflow: CollaborationStep[] = [
       {
         stepId: 'material_identification',
@@ -328,10 +308,13 @@ export class AgentCollaborationWorkflows {
 
       if (error) throw error;
 
-      const coordinationPlan = parentTask.coordination_plan;
+      const coordinationPlan = JSON.parse(String(parentTask.input_data || '{}')) as {
+        workflow: CollaborationStep[];
+        childTaskIds: string[];
+      };
 
       // Start with tasks that have no dependencies
-      const readyTasks = (coordinationPlan as any).workflow.filter((step: CollaborationStep) =>
+      const readyTasks = coordinationPlan.workflow.filter((step: CollaborationStep) =>
         step.dependencies.length === 0,
       );
 
@@ -343,7 +326,7 @@ export class AgentCollaborationWorkflows {
       await supabase
         .from('agent_tasks')
         .update({
-          status: 'executing',
+          task_status: 'executing',
           updated_at: new Date().toISOString(),
         })
         .eq('id', parentTaskId);
@@ -357,7 +340,7 @@ export class AgentCollaborationWorkflows {
       await supabase
         .from('agent_tasks')
         .update({
-          status: 'failed',
+          task_status: 'failed',
           error_message: `Orchestration failed: ${error}`,
           updated_at: new Date().toISOString(),
         })
@@ -369,10 +352,10 @@ export class AgentCollaborationWorkflows {
     try {
       // Find suitable agent for this step
       const { data: suitableAgents, error } = await supabase
-        .from('crewai_agents')
+        .from('agent_tasks')
         .select('*')
         .eq('specialization', step.agentType)
-        .eq('status', 'active')
+        .eq('task_status', 'active')
         .limit(1);
 
       if (error) throw error;
@@ -388,24 +371,28 @@ export class AgentCollaborationWorkflows {
         .from('agent_tasks')
         .select('*')
         .eq('task_type', step.operation)
-        .contains('coordination_plan', { parentTaskId, stepId: step.stepId });
+        .contains('input_data', { parentTaskId, stepId: step.stepId });
 
       if (childError) throw childError;
 
       if (childTasks && childTasks.length > 0) {
         const childTask = childTasks[0];
 
-        // Assign agent to child task
-        await supabase
-          .from('agent_tasks')
-          .update({
-            assigned_agents: [selectedAgent.id],
-            status: 'processing',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', childTask.id);
+        if (childTask) {
+          // Assign agent to child task
+          await supabase
+            .from('agent_tasks')
+            .update({
+              assigned_agents: selectedAgent ? [selectedAgent.id] : [],
+              task_status: 'processing',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', childTask.id);
 
-        console.log(`Assigned agent ${selectedAgent.id} to step ${step.stepId}`);
+          if (selectedAgent) {
+            console.log(`Assigned agent ${selectedAgent.id} to step ${step.stepId}`);
+          }
+        }
       }
 
     } catch (error) {
@@ -424,7 +411,8 @@ export class AgentCollaborationWorkflows {
 
       if (error) throw error;
 
-      const parentTaskId = (stepTask.coordination_plan as any)?.parentTaskId;
+      const stepTaskData = JSON.parse(String(stepTask.input_data || '{}'));
+      const parentTaskId = stepTaskData?.parentTaskId;
       if (!parentTaskId) return;
 
       // Get parent task and its coordination plan
@@ -436,17 +424,17 @@ export class AgentCollaborationWorkflows {
 
       if (parentError) throw parentError;
 
-      const coordinationPlan = parentTask.coordination_plan;
-      const completedStepId = (stepTask.coordination_plan as any)?.stepId;
+      const coordinationPlan = JSON.parse(String(parentTask.input_data || '{}'));
+      const completedStepId = stepTaskData?.stepId;
 
       // Find next steps that are now ready (dependencies satisfied)
-      const readySteps = (coordinationPlan as any).workflow.filter((step: CollaborationStep) => {
+      const readySteps = coordinationPlan.workflow.filter((step: CollaborationStep) => {
         // Check if all dependencies are completed
         return step.dependencies.every((depStepId: string) =>
-          this.isStepCompleted(depStepId, (coordinationPlan as any).childTaskIds),
+          this.isStepCompleted(depStepId, coordinationPlan.childTaskIds),
         );
       }).filter((step: CollaborationStep) =>
-        !this.isStepStarted(step.stepId, (coordinationPlan as any).childTaskIds),
+        !this.isStepStarted(step.stepId, coordinationPlan.childTaskIds),
       );
 
       // Start ready steps
@@ -455,7 +443,7 @@ export class AgentCollaborationWorkflows {
       }
 
       // Check if all steps are completed
-      const allStepsCompleted = await this.areAllStepsCompleted((coordinationPlan as any).childTaskIds);
+      const allStepsCompleted = await this.areAllStepsCompleted(coordinationPlan.childTaskIds);
 
       if (allStepsCompleted) {
         await this.completeCollaborationTask(parentTaskId);
@@ -471,39 +459,41 @@ export class AgentCollaborationWorkflows {
   private async isStepCompleted(stepId: string, childTaskIds: string[]): Promise<boolean> {
     const { data: tasks, error } = await supabase
       .from('agent_tasks')
-      .select('status, coordination_plan')
+      .select('task_status, input_data')
       .in('id', childTaskIds);
 
     if (error) return false;
 
-    return tasks?.some(task =>
-      (task.coordination_plan as any)?.stepId === stepId && task.status === 'completed',
-    ) || false;
+    return tasks?.some(task => {
+      const taskData = JSON.parse(String(task.input_data || '{}'));
+      return taskData?.stepId === stepId && task.task_status === 'completed';
+    }) || false;
   }
 
   private async isStepStarted(stepId: string, childTaskIds: string[]): Promise<boolean> {
     const { data: tasks, error } = await supabase
       .from('agent_tasks')
-      .select('status, coordination_plan')
+      .select('task_status, input_data')
       .in('id', childTaskIds);
 
     if (error) return false;
 
-    return tasks?.some(task =>
-      (task.coordination_plan as any)?.stepId === stepId &&
-      ['processing', 'completed'].includes(task.status),
-    ) || false;
+    return tasks?.some(task => {
+      const taskData = JSON.parse(String(task.input_data || '{}'));
+      return taskData?.stepId === stepId &&
+        ['processing', 'completed'].includes(task.task_status);
+    }) || false;
   }
 
   private async areAllStepsCompleted(childTaskIds: string[]): Promise<boolean> {
     const { data: tasks, error } = await supabase
       .from('agent_tasks')
-      .select('status')
+      .select('task_status')
       .in('id', childTaskIds);
 
     if (error) return false;
 
-    return tasks?.every(task => task.status === 'completed') || false;
+    return tasks?.every(task => task.task_status === 'completed') || false;
   }
 
   private async completeCollaborationTask(parentTaskId: string): Promise<void> {
@@ -520,7 +510,7 @@ export class AgentCollaborationWorkflows {
       const { data: childTasks, error: childError } = await supabase
         .from('agent_tasks')
         .select('*')
-        .in('id', (parentTask.coordination_plan as any)?.childTaskIds || []);
+        .in('id', JSON.parse(String(parentTask.input_data || '{}'))?.childTaskIds || []);
 
       if (childError) throw childError;
 
@@ -531,9 +521,9 @@ export class AgentCollaborationWorkflows {
       await supabase
         .from('agent_tasks')
         .update({
-          status: 'completed',
+          task_status: 'completed',
           result_data: aggregatedResults,
-          processing_time_ms: Date.now() - new Date(parentTask.created_at).getTime(),
+          processing_time_ms: Date.now() - new Date(String(parentTask.created_at || new Date().toISOString())).getTime(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', parentTaskId);
@@ -546,7 +536,7 @@ export class AgentCollaborationWorkflows {
       await supabase
         .from('agent_tasks')
         .update({
-          status: 'failed',
+          task_status: 'failed',
           error_message: `Failed to complete collaboration: ${error}`,
           updated_at: new Date().toISOString(),
         })
@@ -554,12 +544,12 @@ export class AgentCollaborationWorkflows {
     }
   }
 
-  private aggregateCollaborationResults(childTasks: any[]): any {
-    const results: any = {
+  private aggregateCollaborationResults(childTasks: Record<string, unknown>[]): Record<string, unknown> {
+    const results: Record<string, unknown> = {
       collaborationSummary: {
         totalSteps: childTasks.length,
-        completedSteps: childTasks.filter(task => task.status === 'completed').length,
-        totalProcessingTime: childTasks.reduce((sum, task) => sum + (task.processing_time_ms || 0), 0),
+        completedSteps: childTasks.filter(task => task.task_status === 'completed').length,
+        totalProcessingTime: childTasks.reduce((sum, task) => sum + (Number(task.processing_time_ms) || 0), 0),
         averageStepTime: 0,
       },
       stepResults: {},
@@ -568,18 +558,19 @@ export class AgentCollaborationWorkflows {
     // Calculate average step time
     const completedTasks = childTasks.filter(task => task.processing_time_ms);
     if (completedTasks.length > 0) {
-      results.collaborationSummary.averageStepTime =
-        results.collaborationSummary.totalProcessingTime / completedTasks.length;
+      (results.collaborationSummary as Record<string, unknown>).averageStepTime =
+        Number((results.collaborationSummary as Record<string, unknown>).totalProcessingTime) / completedTasks.length;
     }
 
     // Collect individual step results
     childTasks.forEach(task => {
-      if (task.coordination_plan?.stepId) {
-        results.stepResults[task.coordination_plan.stepId] = {
-          status: task.status,
+      const taskData = JSON.parse(String(task.input_data || '{}'));
+      if (taskData?.stepId) {
+        (results.stepResults as Record<string, unknown>)[String(taskData.stepId)] = {
+          status: task.task_status,
           result: task.result_data,
           processingTime: task.processing_time_ms,
-          agent: task.assigned_agents[0],
+          agent: Array.isArray(task.assigned_agents) ? task.assigned_agents[0] : null,
         };
       }
     });
@@ -587,14 +578,15 @@ export class AgentCollaborationWorkflows {
     return results;
   }
 
-  private async createSimpleTask(taskType: string, inputData: any, priority: number, userId: string): Promise<string> {
+  private async createSimpleTask(taskType: string, inputData: Record<string, unknown>, priority: number, userId: string): Promise<string> {
     const { data: task, error } = await supabase
       .from('agent_tasks')
       .insert({
+        task_name: taskType,
         task_type: taskType,
-        input_data: inputData,
-        priority,
-        status: 'pending',
+        input_data: JSON.parse(JSON.stringify(inputData)),
+        priority: String(priority),
+        task_status: 'pending',
         assigned_agents: [],
         user_id: userId,
       })
@@ -606,7 +598,7 @@ export class AgentCollaborationWorkflows {
   }
 
   // Public API for monitoring collaboration tasks
-  async getCollaborationStatus(parentTaskId: string): Promise<any> {
+  async getCollaborationStatus(parentTaskId: string): Promise<Record<string, unknown>> {
     const { data: parentTask, error } = await supabase
       .from('agent_tasks')
       .select('*')
@@ -615,7 +607,8 @@ export class AgentCollaborationWorkflows {
 
     if (error) throw error;
 
-    const childTaskIds = (parentTask.coordination_plan as any)?.childTaskIds || [];
+    const parentData = JSON.parse(String(parentTask.input_data || '{}'));
+    const childTaskIds = parentData?.childTaskIds || [];
 
     const { data: childTasks, error: childError } = await supabase
       .from('agent_tasks')
@@ -628,25 +621,26 @@ export class AgentCollaborationWorkflows {
       parentTask,
       childTasks: childTasks || [],
       progress: this.calculateCollaborationProgress(childTasks || []),
-      estimatedTimeRemaining: this.estimateRemainingTime(parentTask.coordination_plan, childTasks || []),
+      estimatedTimeRemaining: this.estimateRemainingTime(parentData, childTasks || []),
     };
   }
 
-  private calculateCollaborationProgress(childTasks: any[]): number {
+  private calculateCollaborationProgress(childTasks: Record<string, unknown>[]): number {
     if (childTasks.length === 0) return 0;
 
-    const completed = childTasks.filter(task => task.status === 'completed').length;
+    const completed = childTasks.filter(task => task.task_status === 'completed').length;
     return (completed / childTasks.length) * 100;
   }
 
-  private estimateRemainingTime(coordinationPlan: any, childTasks: any[]): number {
+  private estimateRemainingTime(coordinationPlan: Record<string, unknown>, childTasks: Record<string, unknown>[]): number {
     if (!coordinationPlan?.workflow) return 0;
 
-    const remainingSteps = coordinationPlan.workflow.filter((step: CollaborationStep) => {
-      const correspondingTask = childTasks.find(task =>
-        task.coordination_plan?.stepId === step.stepId,
-      );
-      return !correspondingTask || correspondingTask.status !== 'completed';
+    const remainingSteps = (coordinationPlan.workflow as CollaborationStep[]).filter((step: CollaborationStep) => {
+      const correspondingTask = childTasks.find(task => {
+        const taskData = JSON.parse(String(task.input_data || '{}'));
+        return taskData?.stepId === step.stepId;
+      });
+      return !correspondingTask || correspondingTask.task_status !== 'completed';
     });
 
     return remainingSteps.reduce((sum: number, step: CollaborationStep) => sum + step.estimatedTime, 0);

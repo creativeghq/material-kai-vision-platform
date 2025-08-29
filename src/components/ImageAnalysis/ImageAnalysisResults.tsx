@@ -137,111 +137,126 @@ const ImageAnalysisResults: React.FC<ImageAnalysisResultsProps> = ({
   };
 
   // Render OCR results
-  const renderOCRResults = (ocrResults: any[]) => (
+  const renderOCRResults = (ocrResults: unknown[]) => (
     <div className="space-y-3">
-      {ocrResults.map((block, index) => (
-        <Card key={index} className="p-3">
-          <div className="flex items-start justify-between mb-2">
-            <Badge className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
-              Confidence: {(block.confidence * 100).toFixed(1)}%
-            </Badge>
-            <Button
-              className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
-              onClick={() => copyToClipboard(block.text)}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-          </div>
-          <p className="text-sm">{block.text}</p>
-          {block.boundingBox && (
-            <p className="text-xs text-gray-500 mt-1">
-              Position: ({block.boundingBox.x}, {block.boundingBox.y})
-              Size: {block.boundingBox.width}×{block.boundingBox.height}
-            </p>
-          )}
-        </Card>
-      ))}
+      {ocrResults.map((block, index) => {
+        const blockData = block as Record<string, unknown>;
+        const boundingBox = blockData.boundingBox as Record<string, unknown> | undefined;
+        return (
+          <Card key={index} className="p-3">
+            <div className="flex items-start justify-between mb-2">
+              <Badge className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
+                Confidence: {((blockData.confidence as number) * 100).toFixed(1)}%
+              </Badge>
+              <Button
+                className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
+                onClick={() => copyToClipboard(String(blockData.text))}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+            <p className="text-sm">{String(blockData.text)}</p>
+            {boundingBox && (
+              <p className="text-xs text-gray-500 mt-1">
+                Position: ({String(boundingBox.x)}, {String(boundingBox.y)})
+                Size: {String(boundingBox.width)}×{String(boundingBox.height)}
+              </p>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 
   // Render object detection results
-  const renderObjectDetection = (objects: any[]) => (
+  const renderObjectDetection = (objects: unknown[]) => (
     <div className="space-y-3">
-      {objects.map((obj, index) => (
-        <Card key={index} className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Badge className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">{obj.label}</Badge>
-              <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                {(obj.confidence * 100).toFixed(1)}%
-              </Badge>
+      {objects.map((obj, index) => {
+        const objData = obj as Record<string, unknown>;
+        const boundingBox = objData.boundingBox as Record<string, unknown> | undefined;
+        return (
+          <Card key={index} className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Badge className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">{String(objData.label)}</Badge>
+                <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                  {((objData.confidence as number) * 100).toFixed(1)}%
+                </Badge>
+              </div>
             </div>
-          </div>
-          {obj.boundingBox && (
-            <p className="text-xs text-gray-500">
-              Position: ({obj.boundingBox.x}, {obj.boundingBox.y})
-              Size: {obj.boundingBox.width}×{obj.boundingBox.height}
-            </p>
-          )}
-        </Card>
-      ))}
+            {boundingBox && (
+              <p className="text-xs text-gray-500">
+                Position: ({String(boundingBox.x)}, {String(boundingBox.y)})
+                Size: {String(boundingBox.width)}×{String(boundingBox.height)}
+              </p>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 
   // Render table extraction results
-  const renderTableResults = (tables: any[]) => (
+  const renderTableResults = (tables: unknown[]) => (
     <div className="space-y-4">
-      {tables.map((table, index) => (
-        <Card key={index} className="p-3">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <Table className="h-4 w-4" />
-              Table {index + 1}
-            </h4>
-            <Button
-              className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
-              onClick={() => copyToClipboard(JSON.stringify(table.data, null, 2))}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse border border-gray-200">
-              {table.data.map((row: any[], rowIndex: number) => (
-                <tr key={rowIndex} className={rowIndex === 0 ? 'bg-gray-50' : ''}>
-                  {row.map((cell: any, cellIndex: number) => (
-                    <td key={cellIndex} className="border border-gray-200 p-2">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </table>
-          </div>
-        </Card>
-      ))}
+      {tables.map((table, index) => {
+        const tableData = table as Record<string, unknown>;
+        return (
+          <Card key={index} className="p-3">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium flex items-center gap-2">
+                <Table className="h-4 w-4" />
+                Table {index + 1}
+              </h4>
+              <Button
+                className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
+                onClick={() => copyToClipboard(JSON.stringify(tableData.data, null, 2))}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse border border-gray-200">
+                {(tableData.data as unknown[][]).map((row: unknown[], rowIndex: number) => (
+                  <tr key={rowIndex} className={rowIndex === 0 ? 'bg-gray-50' : ''}>
+                    {row.map((cell: unknown, cellIndex: number) => (
+                      <td key={cellIndex} className="border border-gray-200 p-2">
+                        {String(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </table>
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 
   // Render form extraction results
-  const renderFormResults = (forms: any[]) => (
+  const renderFormResults = (forms: unknown[]) => (
     <div className="space-y-3">
-      {forms.map((form, index) => (
-        <Card key={index} className="p-3">
-          <h4 className="font-medium mb-3 flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4" />
-            Form {index + 1}
-          </h4>
-          <div className="space-y-2">
-            {Object.entries(form.fields).map(([key, value]: [string, any]) => (
-              <div key={key} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="font-medium text-sm">{key}:</span>
-                <span className="text-sm">{value}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ))}
+      {forms.map((form, index) => {
+        const formData = form as Record<string, unknown>;
+        const fields = formData.fields as Record<string, unknown>;
+        return (
+          <Card key={index} className="p-3">
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Form {index + 1}
+            </h4>
+            <div className="space-y-2">
+              {Object.entries(fields).map(([key, value]: [string, unknown]) => (
+                <div key={key} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                  <span className="font-medium text-sm">{key}:</span>
+                  <span className="text-sm">{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 

@@ -308,7 +308,7 @@ export class SupabaseConfigUtils {
   /**
    * Validate input parameters for a specific function
    */
-  public static validateFunctionInput(functionName: string, input: any): { success: boolean; error?: string; data?: any } {
+  public static validateFunctionInput(functionName: string, input: unknown): { success: boolean; error?: string; data?: unknown } {
     const functionConfig = this.getFunctionConfig(functionName);
     if (!functionConfig) {
       return { success: false, error: `Function ${functionName} not found` };

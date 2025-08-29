@@ -94,7 +94,7 @@ export class ServiceRegistrationBuilder<T> implements IServiceRegistrationBuilde
  */
 export class ServiceScope implements IServiceScope {
   public readonly id: string;
-  public readonly instances: Map<ServiceIdentifier, any>;
+  public readonly instances: Map<ServiceIdentifier, unknown>;
   public readonly createdAt: Date;
 
   constructor(id: string) {
@@ -108,9 +108,9 @@ export class ServiceScope implements IServiceScope {
     const instances = Array.from(this.instances.values()).reverse();
 
     for (const instance of instances) {
-      if (instance && typeof instance.dispose === 'function') {
+      if (instance && typeof instance === 'object' && instance !== null && 'dispose' in instance && typeof (instance as { dispose: unknown }).dispose === 'function') {
         try {
-          await instance.dispose();
+          await (instance as { dispose: () => Promise<void> }).dispose();
         } catch (error) {
           // Log disposal errors but continue with other instances
           console.warn('Error disposing service instance:', error);
@@ -127,7 +127,7 @@ export class ServiceScope implements IServiceScope {
  */
 export class ServiceContainer implements IServiceContainer {
   private readonly services: Map<ServiceIdentifier, IServiceDescriptor> = new Map();
-  private readonly singletonInstances: Map<ServiceIdentifier, any> = new Map();
+  private readonly singletonInstances: Map<ServiceIdentifier, unknown> = new Map();
   private readonly options: Required<IContainerOptions>;
   private readonly logger?: Logger;
   private healthCheckInterval?: NodeJS.Timeout;
@@ -262,7 +262,7 @@ export class ServiceContainer implements IServiceContainer {
   async getHealthStatus(): Promise<IServiceHealth[]> {
     const healthStatuses: IServiceHealth[] = [];
 
-    for (const [identifier, descriptor] of this.services) {
+    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
       if (!descriptor.healthCheck) {
         continue;
       }
@@ -272,7 +272,7 @@ export class ServiceContainer implements IServiceContainer {
 
       try {
         // Get instance for health check
-        let instance: any;
+        let instance: unknown;
 
         if (descriptor.lifetime === ServiceLifetime.Singleton && this.singletonInstances.has(identifier)) {
           instance = this.singletonInstances.get(identifier);
@@ -306,7 +306,7 @@ export class ServiceContainer implements IServiceContainer {
 
     // Check for circular dependencies
     if (this.options.detectCircularDependencies) {
-      for (const identifier of this.services.keys()) {
+      for (const identifier of Array.from(this.services.keys())) {
         try {
           this.checkCircularDependencies(identifier, new Set());
         } catch (error) {
@@ -318,7 +318,7 @@ export class ServiceContainer implements IServiceContainer {
     }
 
     // Check for missing dependencies
-    for (const [identifier, descriptor] of this.services) {
+    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
       if (descriptor.dependencies) {
         for (const dependency of descriptor.dependencies) {
           if (!this.services.has(dependency)) {
@@ -329,7 +329,7 @@ export class ServiceContainer implements IServiceContainer {
     }
 
     // Validate required services can be instantiated
-    for (const [identifier, descriptor] of this.services) {
+    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
       if (descriptor.required) {
         try {
           // Try to resolve without actually creating the instance
@@ -359,9 +359,9 @@ export class ServiceContainer implements IServiceContainer {
     const instances = Array.from(this.singletonInstances.values()).reverse();
 
     for (const instance of instances) {
-      if (instance && typeof instance.dispose === 'function') {
+      if (instance && typeof instance === 'object' && instance !== null && 'dispose' in instance && typeof (instance as { dispose: unknown }).dispose === 'function') {
         try {
-          await instance.dispose();
+          await (instance as { dispose: () => Promise<void> }).dispose();
         } catch (error) {
           this.log('warn', `Error disposing singleton instance: ${error}`);
         }
@@ -400,7 +400,7 @@ export class ServiceContainer implements IServiceContainer {
     // Handle singleton lifetime
     if (descriptor.lifetime === ServiceLifetime.Singleton) {
       if (this.singletonInstances.has(identifier)) {
-        return this.singletonInstances.get(identifier);
+        return this.singletonInstances.get(identifier) as T;
       }
 
       const instance = this.createInstance(descriptor, resolutionChain, depth);
@@ -474,7 +474,7 @@ export class ServiceContainer implements IServiceContainer {
     resolutionChain: Set<ServiceIdentifier>,
     depth: number,
     scope?: IServiceScope,
-  ): any[] {
+  ): unknown[] {
     if (!descriptor.dependencies || descriptor.dependencies.length === 0) {
       return [];
     }

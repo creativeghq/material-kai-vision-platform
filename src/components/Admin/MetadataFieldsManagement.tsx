@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit, Trash2, Settings, ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,13 +23,14 @@ interface MetadataField {
   is_required: boolean;
   description?: string;
   extraction_hints?: string;
-  dropdown_options?: string[];
-  applies_to_categories?: string[]; // Changed from enum array to string array
+  dropdown_options?: string[] | null;
+  applies_to_categories?: string[] | null; // Changed from enum array to string array, allow null
   is_global: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
 }
+
 
 const materialCategories = [
   'metals', 'plastics', 'ceramics', 'composites', 'textiles',
@@ -76,11 +77,7 @@ export const MetadataFieldsManagement: React.FC = () => {
   const [dropdownOptionInput, setDropdownOptionInput] = useState('');
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadMetadataFields();
-  }, []);
-
-  const loadMetadataFields = async () => {
+  const loadMetadataFields = useCallback(async () => {
     setIsLoading(true);
     try {
       // Note: material_metadata_fields table doesn't exist yet - using placeholder
@@ -96,7 +93,11 @@ export const MetadataFieldsManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadMetadataFields();
+  }, [loadMetadataFields]);
 
   const resetForm = () => {
     setFormData({
@@ -138,7 +139,7 @@ export const MetadataFieldsManagement: React.FC = () => {
 
   const handleSaveField = async () => {
     try {
-      const fieldData: any = {
+      const fieldData: Record<string, unknown> = {
         ...formData,
         dropdown_options: formData.field_type === 'dropdown' ? formData.dropdown_options : null,
         applies_to_categories: formData.is_global ? null : formData.applies_to_categories,
@@ -147,7 +148,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       if (editingField) {
         const { error } = await supabase
           .from('materials_catalog')
-          .update(fieldData)
+          .update(fieldData as Record<string, unknown>)
           .eq('id', editingField.id);
 
         if (error) throw error;
@@ -158,7 +159,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       } else {
         const { error } = await supabase
           .from('materials_catalog')
-          .insert([fieldData]);
+          .insert([fieldData as { category: string; name: string; [key: string]: unknown }]); // TODO: Replace with proper MaterialsCatalog type when schema is defined
 
         if (error) throw error;
         toast({

@@ -16,6 +16,39 @@ import {
   validateTransformationJobRequest,
 } from '../schemas/transformationValidation.js';
 
+// Type definitions for validation service
+interface ValidationOptions {
+  partial?: boolean;
+  sanitize?: boolean;
+  trackPerformance?: boolean;
+}
+
+interface PerformanceTrackingOptions {
+  trackPerformance?: boolean;
+}
+
+// Use unknown for return types to avoid strict type checking issues
+type ValidatedDocument = Record<string, unknown>;
+type ValidatedConfig = Record<string, unknown>;
+type ValidatedRequest = Record<string, unknown>;
+type ValidatedPartialConfig = Record<string, unknown>;
+
+interface ValidationWrapper<TArgs extends unknown[], TReturn> {
+  inputValidator?: (input: unknown) => Promise<unknown>;
+  outputValidator?: (output: TReturn) => Promise<TReturn>;
+  errorHandler?: (error: unknown) => TReturn | never;
+  trackPerformance?: boolean;
+  methodName?: string;
+}
+
+interface PerformanceStats {
+  count: number;
+  average: number;
+  min: number;
+  max: number;
+  p95: number;
+}
+
 /**
  * Integration service for adding validation to existing Phase 1 services
  * Provides validation wrappers and utilities for seamless integration
@@ -38,12 +71,8 @@ export class ValidationIntegrationService {
    */
   public async validateMivaaDocument(
     document: unknown,
-    options: {
-      partial?: boolean;
-      sanitize?: boolean;
-      trackPerformance?: boolean;
-    } = {},
-  ): Promise<any> {
+    options: ValidationOptions = {},
+  ): Promise<ValidatedDocument> {
     const startTime = performance.now();
 
     try {
@@ -97,10 +126,8 @@ export class ValidationIntegrationService {
    */
   public async validateTransformationConfig(
     config: unknown,
-    options: {
-      trackPerformance?: boolean;
-    } = {},
-  ): Promise<any> {
+    options: PerformanceTrackingOptions = {},
+  ): Promise<ValidatedConfig> {
     const startTime = performance.now();
 
     try {
@@ -144,10 +171,8 @@ export class ValidationIntegrationService {
    */
   public async validateTransformationJobRequest(
     request: unknown,
-    options: {
-      trackPerformance?: boolean;
-    } = {},
-  ): Promise<any> {
+    options: PerformanceTrackingOptions = {},
+  ): Promise<ValidatedRequest> {
     const startTime = performance.now();
 
     try {
@@ -191,10 +216,8 @@ export class ValidationIntegrationService {
    */
   public async validatePartialTransformationConfig(
     config: unknown,
-    options: {
-      trackPerformance?: boolean;
-    } = {},
-  ): Promise<any> {
+    options: PerformanceTrackingOptions = {},
+  ): Promise<ValidatedPartialConfig> {
     const startTime = performance.now();
 
     try {
@@ -232,7 +255,7 @@ export class ValidationIntegrationService {
         this.recordPerformanceMetric('partial_transformation_config_validation', processingTime);
       }
 
-      return result.data;
+      return result.data!;
     } catch (error) {
       if (error instanceof ValidationError) {
         throw error;
@@ -244,17 +267,11 @@ export class ValidationIntegrationService {
   /**
    * Create a validation wrapper for service methods
    */
-  public createServiceValidationWrapper<T extends (...args: any[]) => any>(
-    originalMethod: T,
-    validationConfig: {
-      inputValidator?: (input: any) => Promise<any>;
-      outputValidator?: (output: any) => Promise<any>;
-      errorHandler?: (error: any) => any;
-      trackPerformance?: boolean;
-      methodName?: string;
-    },
-  ): T {
-    const wrapper = async (...args: Parameters<T>): Promise<ReturnType<T>> => {
+  public createServiceValidationWrapper<TArgs extends unknown[], TReturn>(
+    originalMethod: (...args: TArgs) => Promise<TReturn>,
+    validationConfig: ValidationWrapper<TArgs, TReturn>,
+  ): (...args: TArgs) => Promise<TReturn> {
+    const wrapper = async (...args: TArgs): Promise<TReturn> => {
       const startTime = performance.now();
       const methodName = validationConfig.methodName || originalMethod.name;
 
@@ -262,11 +279,12 @@ export class ValidationIntegrationService {
         // Validate input if validator provided
         let validatedArgs = args;
         if (validationConfig.inputValidator && args.length > 0) {
-          validatedArgs[0] = await validationConfig.inputValidator(args[0]);
+          const validatedInput = await validationConfig.inputValidator(args[0]);
+          validatedArgs = [validatedInput, ...args.slice(1)] as TArgs;
         }
 
         // Call original method
-        const result = await originalMethod.apply(this, validatedArgs);
+        const result = await originalMethod(...validatedArgs);
 
         // Validate output if validator provided
         let validatedResult = result;
@@ -290,7 +308,7 @@ export class ValidationIntegrationService {
       }
     };
 
-    return wrapper as T;
+    return wrapper;
   }
 
   /**
@@ -313,14 +331,8 @@ export class ValidationIntegrationService {
   /**
    * Get performance statistics for validation operations
    */
-  public getPerformanceStats(): Record<string, {
-    count: number;
-    average: number;
-    min: number;
-    max: number;
-    p95: number;
-  }> {
-    const stats: Record<string, any> = {};
+  public getPerformanceStats(): Record<string, PerformanceStats> {
+    const stats: Record<string, PerformanceStats> = {};
 
     for (const [operation, times] of this.performanceMetrics.entries()) {
       if (times.length === 0) continue;
@@ -352,7 +364,7 @@ export class ValidationIntegrationService {
   public checkPerformanceRequirements(): {
     meetsRequirements: boolean;
     violations: string[];
-    stats: Record<string, any>;
+    stats: Record<string, PerformanceStats>;
   } {
     const stats = this.getPerformanceStats();
     const violations: string[] = [];

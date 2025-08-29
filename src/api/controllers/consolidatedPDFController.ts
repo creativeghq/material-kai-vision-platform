@@ -9,14 +9,14 @@ import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAut
  */
 export interface ApiRequest {
   headers: Record<string, string>;
-  body: any;
+  body: unknown;
   user?: { id: string };
   file?: File;
   path: string;
   method: string;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -27,6 +27,37 @@ export interface ApiResponse<T = any> {
 export interface AuthContext {
   user?: { id: string };
   isAuthenticated: boolean;
+}
+
+/**
+ * Job status and processing types
+ */
+export type JobStatus = 'pending' | 'processing' | 'extracting' | 'transforming' | 'rag-integrating' | 'completed' | 'failed';
+
+export interface ProcessingJob {
+  id: string;
+  status: JobStatus;
+  workspaceId?: string;
+  results?: unknown;
+  error?: unknown;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  // Additional properties that may exist in actual job objects
+  [key: string]: unknown;
+}
+
+export interface BatchOptions {
+  maxConcurrency?: number;
+  failFast?: boolean;
+}
+
+export interface BatchProcessingOptions {
+  extractionType?: 'markdown' | 'tables' | 'images' | 'all';
+  options?: {
+    extractionType: 'markdown' | 'tables' | 'images' | 'all';
+  };
+  batchOptions?: BatchOptions;
 }
 
 /**
@@ -76,7 +107,7 @@ export interface WorkflowStatusResponse {
     percentage: number;
   };
   results?: {
-    extractedContent?: any;
+    extractedContent?: unknown;
     ragIntegration?: {
       documentsStored: number;
       embeddingsGenerated: number;
@@ -240,7 +271,7 @@ export class RateLimitHelper {
       console.warn('Rate limiting is disabled - api_usage_logs table not found. Create database migration to enable this feature.');
 
       // Temporary fallback: allow all requests (no rate limiting)
-      const recentRequests: any[] = [];
+      const recentRequests: unknown[] = [];
       const error = null;
 
       /* COMMENTED OUT UNTIL DATABASE MIGRATION IS CREATED:
@@ -288,13 +319,20 @@ export class RateLimitHelper {
    * Log API usage
    */
   static async logUsage(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _endpoint: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _method: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _clientIP: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _userId?: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _responseStatus?: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _responseTime?: number,
-    _rateLimitExceeded: boolean = false,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _rateLimitExceeded?: boolean,
   ): Promise<void> {
     try {
       // TODO: Create api_usage_logs table migration before enabling this functionality
@@ -339,7 +377,7 @@ export class RateLimitHelper {
  */
 export class ConsolidatedPDFController {
   private mivaaService: MivaaIntegrationService;
-  private activeJobs: Map<string, any> = new Map();
+  private activeJobs: Map<string, ProcessingJob> = new Map();
 
   constructor() {
     this.mivaaService = new MivaaIntegrationService(defaultMivaaConfig);
@@ -616,21 +654,41 @@ export class ConsolidatedPDFController {
 
       const statusResponse: WorkflowStatusResponse = {
         jobId: job.id,
-        status: job.status,
+        status: job.status === 'extracting' || job.status === 'transforming' || job.status === 'rag-integrating'
+          ? 'processing'
+          : job.status as 'pending' | 'processing' | 'completed' | 'failed',
         progress: {
           currentStage: job.status,
           completedStages,
           totalStages: allStages.length,
           percentage,
         },
-        results: job.results,
-        error: job.error,
         timestamps: {
           created: job.createdAt.toISOString(),
-          started: job.startedAt?.toISOString(),
-          completed: job.completedAt?.toISOString(),
+          ...(job.startedAt && { started: job.startedAt.toISOString() }),
+          ...(job.completedAt && { completed: job.completedAt.toISOString() }),
         },
       };
+
+      // Add optional properties only if they exist
+      if (job.results) {
+        statusResponse.results = job.results as {
+          extractedContent?: unknown;
+          ragIntegration?: {
+            documentsStored: number;
+            embeddingsGenerated: number;
+            vectorsIndexed: number;
+          };
+        };
+      }
+
+      if (job.error) {
+        statusResponse.error = job.error as {
+          stage: string;
+          message: string;
+          code: string;
+        };
+      }
 
       // Log usage
       await RateLimitHelper.logUsage(
@@ -773,7 +831,7 @@ export class ConsolidatedPDFController {
    */
   async batchProcess(
     files: File[],
-    options: any,
+    options: BatchProcessingOptions,
     authContext: AuthContext,
   ): Promise<ApiResponse> {
     const startTime = Date.now();
@@ -887,7 +945,7 @@ export class ConsolidatedPDFController {
         data: metrics,
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch {
       return {
         success: false,
         error: 'Failed to get metrics',

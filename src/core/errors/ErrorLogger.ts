@@ -12,7 +12,7 @@ export interface LogEntry {
   service: string;
   operation: string;
   message: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   error?: {
     name: string;
     message: string;
@@ -43,7 +43,7 @@ export class ErrorLogger {
   /**
    * Log an error with full context
    */
-  public logError(error: AppError | Error, context?: Record<string, any>): void {
+  public logError(error: AppError | Error, context?: Record<string, unknown>): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'error',
@@ -51,11 +51,11 @@ export class ErrorLogger {
       service: error instanceof AppError ? error.context.service : 'unknown',
       operation: error instanceof AppError ? error.context.operation : 'unknown',
       message: error.message,
-      metadata: context,
+      metadata: context || undefined,
       error: {
         name: error.name,
         message: error.message,
-        stack: error.stack,
+        stack: error.stack || undefined,
         ...(error instanceof AppError && {
           code: error.code,
           category: error.category,
@@ -71,7 +71,7 @@ export class ErrorLogger {
   /**
    * Log a warning with context
    */
-  public logWarning(message: string, context: { service: string; operation: string; metadata?: Record<string, any> }): void {
+  public logWarning(message: string, context: { service: string; operation: string; metadata?: Record<string, unknown> }): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'warn',
@@ -79,7 +79,7 @@ export class ErrorLogger {
       service: context.service,
       operation: context.operation,
       message,
-      metadata: context.metadata,
+      metadata: context.metadata || undefined,
     };
 
     this.addLogEntry(entry);
@@ -89,7 +89,7 @@ export class ErrorLogger {
   /**
    * Log an info message with context
    */
-  public logInfo(message: string, context: { service: string; operation: string; metadata?: Record<string, any> }): void {
+  public logInfo(message: string, context: { service: string; operation: string; metadata?: Record<string, unknown> }): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'info',
@@ -97,7 +97,7 @@ export class ErrorLogger {
       service: context.service,
       operation: context.operation,
       message,
-      metadata: context.metadata,
+      metadata: context.metadata || undefined,
     };
 
     this.addLogEntry(entry);
@@ -107,7 +107,7 @@ export class ErrorLogger {
   /**
    * Log a debug message with context
    */
-  public logDebug(message: string, context: { service: string; operation: string; metadata?: Record<string, any> }): void {
+  public logDebug(message: string, context: { service: string; operation: string; metadata?: Record<string, unknown> }): void {
     // Only log debug messages in development
     if (process.env.NODE_ENV === 'development') {
       const entry: LogEntry = {
@@ -117,7 +117,7 @@ export class ErrorLogger {
         service: context.service,
         operation: context.operation,
         message,
-        metadata: context.metadata,
+        metadata: context.metadata || undefined,
       };
 
       this.addLogEntry(entry);

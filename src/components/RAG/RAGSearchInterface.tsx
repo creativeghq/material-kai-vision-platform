@@ -129,7 +129,7 @@ export const RAGSearchInterface: React.FC<RAGSearchInterfaceProps> = ({ onResult
 
           {/* Search Options */}
           <div className="flex gap-4 items-center">
-            <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+            <Select value={searchType} onValueChange={(value: 'hybrid' | 'material' | 'knowledge') => setSearchType(value)}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Search Type" />
               </SelectTrigger>

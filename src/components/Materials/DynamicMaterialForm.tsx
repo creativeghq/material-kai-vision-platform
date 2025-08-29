@@ -29,10 +29,26 @@ interface MetadataField {
   sort_order: number;
 }
 
+export interface MaterialData {
+  name: string;
+  description: string;
+  category: string;
+  metadata: Record<string, string | number | boolean>;
+  properties: Record<string, string | number | boolean>;
+  chemical_composition: Record<string, string | number | boolean>;
+}
+
+interface FormData {
+  name: string;
+  description: string;
+  category: string;
+  [key: string]: string;
+}
+
 interface DynamicMaterialFormProps {
   selectedCategory: string;
-  onSave?: (materialData: any) => void;
-  initialData?: any;
+  onSave?: (materialData: MaterialData) => void;
+  initialData?: Partial<FormData>;
 }
 
 const materialCategories = [
@@ -54,7 +70,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
   initialData,
 }) => {
   const [metadataFields, setMetadataFields] = useState<MetadataField[]>([]);
-  const [formData, setFormData] = useState<Record<string, any>>({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
     category: selectedCategory,
@@ -91,7 +107,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
     }
   };
 
-  const handleFieldChange = (fieldName: string, value: any) => {
+  const handleFieldChange = (fieldName: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [fieldName]: value,
@@ -124,10 +140,27 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
     setIsSaving(true);
     try {
       // Prepare metadata object
-      const metadata: Record<string, any> = {};
+      const metadata: Record<string, string | number | boolean> = {};
       metadataFields.forEach(field => {
-        if (formData[field.field_name] !== undefined && formData[field.field_name] !== '') {
-          metadata[field.field_name] = formData[field.field_name];
+        const value = formData[field.field_name];
+        if (value !== undefined && value !== '') {
+          // Convert string values to appropriate types based on field type
+          switch (field.field_type) {
+            case 'number':
+              const numValue = parseFloat(value);
+              if (!isNaN(numValue)) {
+                metadata[field.field_name] = numValue;
+              }
+              break;
+            case 'boolean':
+              metadata[field.field_name] = value === 'true';
+              break;
+            case 'date':
+              metadata[field.field_name] = value; // Store as ISO string
+              break;
+            default:
+              metadata[field.field_name] = value;
+          }
         }
       });
 
@@ -194,7 +227,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
           <Input
             type="number"
             value={value}
-            onChange={(e) => handleFieldChange(field.field_name, parseFloat(e.target.value) || '')}
+            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
             placeholder={field.description}
           />
         );
@@ -222,8 +255,8 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         return (
           <div className="flex items-center space-x-2">
             <Checkbox
-              checked={!!value}
-              onCheckedChange={(checked: boolean) => handleFieldChange(field.field_name, !!checked)}
+              checked={value === 'true'}
+              onCheckedChange={(checked: boolean) => handleFieldChange(field.field_name, checked.toString())}
             />
             <Label>{field.description || 'Yes/No'}</Label>
           </div>
@@ -240,14 +273,14 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {value ? format(new Date(value), 'PPP') : 'Pick a date'}
+                {value && value !== '' ? format(new Date(value), 'PPP') : 'Pick a date'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
                 selected={value ? new Date(value) : undefined}
-                onSelect={(date: Date | undefined) => handleFieldChange(field.field_name, date?.toISOString())}
+                onSelect={(date: Date | undefined) => handleFieldChange(field.field_name, date?.toISOString() || '')}
                 initialFocus
               />
             </PopoverContent>

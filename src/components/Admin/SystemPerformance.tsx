@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Activity,
   Cpu,
@@ -56,7 +56,7 @@ interface MLTask {
   id: string;
   ml_operation_type: string;
   processing_time_ms: number;
-  confidence_scores: any;
+  confidence_scores: Record<string, number> | null;
   created_at: string;
 }
 
@@ -79,11 +79,7 @@ export const SystemPerformance: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchPerformanceData();
-  }, []);
-
-  const fetchPerformanceData = async () => {
+  const fetchPerformanceData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -115,16 +111,16 @@ export const SystemPerformance: React.FC = () => {
 
       if (analyticsError) throw analyticsError;
 
-      setProcessingJobs(queueData as any || []);
-      setMLTasks(mlData as any || []);
+      setProcessingJobs((queueData as ProcessingJob[]) || []);
+      setMLTasks((mlData as MLTask[]) || []);
 
       // Calculate performance metrics
       const totalJobs = queueData?.length || 0;
-      const completedJobs = queueData?.filter((job: any) => job.status === 'completed') || [];
-      const failedJobs = queueData?.filter((job: any) => job.status === 'failed') || [];
+      const completedJobs = queueData?.filter((job: Record<string, unknown>) => job.status === 'completed') || [];
+      const failedJobs = queueData?.filter((job: Record<string, unknown>) => job.status === 'failed') || [];
 
-      const avgProcessingTime = completedJobs.reduce((sum: number, job: any) =>
-        sum + (job.processing_time_ms || 0), 0) / Math.max(completedJobs.length, 1);
+      const avgProcessingTime = completedJobs.reduce((sum: number, job: Record<string, unknown>) =>
+        sum + (Number(job.processing_time_ms) || 0), 0) / Math.max(completedJobs.length, 1);
 
       const successRate = totalJobs > 0 ? (completedJobs.length / totalJobs) * 100 : 0;
       const errorRate = totalJobs > 0 ? (failedJobs.length / totalJobs) * 100 : 0;
@@ -134,13 +130,13 @@ export const SystemPerformance: React.FC = () => {
       let openaiCount = 0, claudeCount = 0, openaiTime = 0, claudeTime = 0;
 
       hybridEvents.forEach(event => {
-        const data = event.event_data as any;
+        const data = event.event_data as Record<string, unknown>;
         if (data?.final_provider === 'openai') {
           openaiCount++;
-          openaiTime += data?.processing_time_ms || 0;
+          openaiTime += Number(data?.processing_time_ms) || 0;
         } else if (data?.final_provider === 'claude') {
           claudeCount++;
-          claudeTime += data?.processing_time_ms || 0;
+          claudeTime += Number(data?.processing_time_ms) || 0;
         }
       });
 
@@ -167,7 +163,11 @@ export const SystemPerformance: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchPerformanceData();
+  }, [fetchPerformanceData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -182,7 +182,7 @@ export const SystemPerformance: React.FC = () => {
   const MetricCard = ({ title, value, icon: Icon, description, trend, status }: {
     title: string;
     value: string | number;
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     description: string;
     trend?: number;
     status?: 'good' | 'warning' | 'error';

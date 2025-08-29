@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import { agentMLCoordinator } from './agentMLCoordinator';
-import { agentLearningSystem } from './agentLearningSystem';
 
 export interface AgentSpecialization {
   id: string;
@@ -156,16 +155,13 @@ export class AgentSpecializationManager {
     },
   ): Promise<TaskAssignment[]> {
     try {
-      // Get all available agents
-      // TODO: Update to use 'material_agents' table when it's created
-      // For now, commenting out this functionality as the table doesn't exist
-      const agents: any[] = [];
-      const error = null;
-
-      // const { data: agents, error } = await supabase
-      //   .from('material_agents')
-      //   .select('*')
-      //   .eq('status', 'active');
+      // Get all available agents from the agent_tasks table
+      // Filter for tasks that represent agent definitions/configurations
+      const { data: agents, error } = await supabase
+        .from('agent_tasks')
+        .select('*')
+        .eq('task_type', 'agent_definition')
+        .eq('task_status', 'completed');
 
       if (error || !agents) {
         console.error('Failed to fetch agents:', error);
@@ -174,7 +170,7 @@ export class AgentSpecializationManager {
 
       // Score each agent for this task
       const agentScores = await Promise.all(
-        agents.map(agent => this.scoreAgentForTask(agent, taskType, requirements)),
+        agents.map(agent => this.scoreAgentForTask(agent as Record<string, unknown>, taskType, requirements)),
       );
 
       // Sort by score and take top agents
@@ -196,7 +192,7 @@ export class AgentSpecializationManager {
    * Score an agent for a specific task
    */
   private async scoreAgentForTask(
-    agent: any,
+    agent: Record<string, unknown>,
     taskType: string,
     requirements: {
       mlOperations: string[];
@@ -235,12 +231,12 @@ export class AgentSpecializationManager {
     reasoning.push(`Performance fit: ${(performanceScore * 100).toFixed(0)}%`);
 
     // Score based on current workload
-    const workloadScore = await this.calculateWorkloadScore(agent.id, specialization.workloadCapacity);
+    const workloadScore = await this.calculateWorkloadScore(String(agent.id || ''), specialization.workloadCapacity);
     score += workloadScore * 0.1;
     reasoning.push(`Availability: ${(workloadScore * 100).toFixed(0)}%`);
 
     // Score based on recent performance
-    const recentPerformance = await this.calculateRecentPerformance(agent.id);
+    const recentPerformance = await this.calculateRecentPerformance(String(agent.id || ''));
     score += recentPerformance * 0.1;
     reasoning.push(`Recent performance: ${(recentPerformance * 100).toFixed(0)}%`);
 
@@ -252,7 +248,7 @@ export class AgentSpecializationManager {
 
     return {
       taskId: '', // Will be set by caller
-      agentId: agent.id,
+      agentId: String(agent.id || ''),
       confidence: Math.min(1, Math.max(0, score)),
       estimatedTime,
       reasoningChain: reasoning,
@@ -262,44 +258,47 @@ export class AgentSpecializationManager {
   /**
    * Get agent specialization (from predefined or learned)
    */
-  private getAgentSpecialization(agent: any): AgentSpecialization {
+  private getAgentSpecialization(agent: Record<string, unknown>): AgentSpecialization {
     // Try to get learned specialization
     const learnedSpec = this.extractLearnedSpecialization(agent);
     if (learnedSpec) return learnedSpec;
 
     // Fall back to default based on agent type
-    const defaultKey = this.mapAgentTypeToSpecialization(agent.agent_type, agent.specialization);
+    const defaultKey = this.mapAgentTypeToSpecialization(
+      String(agent.agent_type || ''),
+      String(agent.specialization || '')
+    );
     return this.agentSpecializations.get(defaultKey) || this.agentSpecializations.get('default_0')!;
   }
 
   /**
    * Extract learned specialization from agent data
    */
-  private extractLearnedSpecialization(agent: any): AgentSpecialization | null {
-    const capabilities = agent.capabilities as any;
-    const performance = agent.performance_metrics as any;
-    const learning = agent.learning_progress as any;
+  private extractLearnedSpecialization(agent: Record<string, unknown>): AgentSpecialization | null {
+    const capabilities = agent.capabilities as Record<string, unknown>;
+    const performance = agent.performance_metrics as Record<string, unknown>;
+    const learning = agent.learning_progress as Record<string, unknown>;
 
     if (!capabilities || !performance) return null;
 
     return {
-      id: agent.id,
-      name: agent.agent_name,
+      id: String(agent.id || ''),
+      name: String(agent.agent_name || ''),
       type: this.inferSpecializationType(capabilities, learning),
       capabilities: {
-        primarySkills: capabilities.skills || [],
-        mlOperations: capabilities.ml_operations || [],
-        knowledgeDomains: capabilities.knowledge_domains || [],
-        collaborationStrengths: capabilities.collaboration_strengths || [],
+        primarySkills: Array.isArray(capabilities.skills) ? capabilities.skills as string[] : [],
+        mlOperations: Array.isArray(capabilities.ml_operations) ? capabilities.ml_operations as string[] : [],
+        knowledgeDomains: Array.isArray(capabilities.knowledge_domains) ? capabilities.knowledge_domains as string[] : [],
+        collaborationStrengths: Array.isArray(capabilities.collaboration_strengths) ? capabilities.collaboration_strengths as string[] : [],
       },
       performanceProfile: {
-        accuracy: performance.ml_task_accuracy || 0.7,
-        speed: this.normalizeSpeed(performance.average_processing_time || 5000),
-        consistency: performance.task_completion_rate || 0.7,
+        accuracy: typeof performance.ml_task_accuracy === 'number' ? performance.ml_task_accuracy : 0.7,
+        speed: this.normalizeSpeed(typeof performance.average_processing_time === 'number' ? performance.average_processing_time : 5000),
+        consistency: typeof performance.task_completion_rate === 'number' ? performance.task_completion_rate : 0.7,
         adaptability: this.calculateAdaptability(learning),
       },
       preferredTasks: this.extractPreferredTasks(learning),
-      workloadCapacity: capabilities.max_concurrent_tasks || 10,
+      workloadCapacity: typeof capabilities.max_concurrent_tasks === 'number' ? capabilities.max_concurrent_tasks : 10,
     };
   }
 
@@ -430,9 +429,9 @@ export class AgentSpecializationManager {
   /**
    * Infer specialization type from capabilities and learning
    */
-  private inferSpecializationType(capabilities: any, learning: any): AgentSpecialization['type'] {
-    const skills = capabilities.skills || [];
-    const strongAreas = learning?.skill_improvements || {};
+  private inferSpecializationType(capabilities: Record<string, unknown>, learning: Record<string, unknown>): AgentSpecialization['type'] {
+    const skills = Array.isArray(capabilities.skills) ? capabilities.skills as string[] : [];
+    const strongAreas = (learning?.skill_improvements as Record<string, unknown>) || {};
 
     if (skills.includes('material_analysis') || strongAreas.material_expertise) {
       return 'material_expert';
@@ -462,11 +461,11 @@ export class AgentSpecializationManager {
   /**
    * Calculate adaptability from learning progress
    */
-  private calculateAdaptability(learning: any): number {
+  private calculateAdaptability(learning: Record<string, unknown>): number {
     if (!learning) return 0.5;
 
-    const recentInsights = learning.recent_insights || [];
-    const skillImprovements = learning.skill_improvements || {};
+    const recentInsights = Array.isArray(learning.recent_insights) ? learning.recent_insights as unknown[] : [];
+    const skillImprovements = (learning.skill_improvements as Record<string, unknown>) || {};
 
     // More recent insights and skill improvements = higher adaptability
     const insightScore = Math.min(1, recentInsights.length / 10);
@@ -478,14 +477,17 @@ export class AgentSpecializationManager {
   /**
    * Extract preferred tasks from learning data
    */
-  private extractPreferredTasks(learning: any): string[] {
+  private extractPreferredTasks(learning: Record<string, unknown>): string[] {
     if (!learning) return [];
 
-    const skillImprovements = learning.skill_improvements || {};
+    const skillImprovements = (learning.skill_improvements as Record<string, unknown>) || {};
 
     return Object.entries(skillImprovements)
-      .filter(([_, improvement]: [string, any]) => improvement.improvement_rate > 0.6)
-      .map(([skill, _]) => skill);
+      .filter(([, improvement]: [string, unknown]) => {
+        const improvementObj = improvement as Record<string, unknown>;
+        return typeof improvementObj.improvement_rate === 'number' && improvementObj.improvement_rate > 0.6;
+      })
+      .map(([skill]) => skill);
   }
 
   /**
@@ -500,20 +502,24 @@ export class AgentSpecializationManager {
    */
   async updateAgentSpecialization(agentId: string): Promise<void> {
     try {
-      const { data: agent, error } = await supabase
-        .from('crewai_agents')
-        .select('*')
-        .eq('id', agentId)
-        .single();
+      // TODO: Update to use correct table when agent schema is finalized
+      // For now, this method is disabled as the table doesn't exist
+      console.log('AgentSpecialization: updateAgentSpecialization called for agent', agentId, 'but disabled due to missing table');
+      
+      // const { data: agent, error } = await supabase
+      //   .from('material_agents')
+      //   .select('*')
+      //   .eq('id', agentId)
+      //   .single();
 
-      if (error || !agent) return;
+      // if (error || !agent) return;
 
-      // Extract learned specialization
-      const learnedSpec = this.extractLearnedSpecialization(agent);
-      if (learnedSpec) {
-        this.agentSpecializations.set(agentId, learnedSpec);
-        console.log('AgentSpecialization: Updated specialization for agent', agentId);
-      }
+      // // Extract learned specialization
+      // const learnedSpec = this.extractLearnedSpecialization(agent);
+      // if (learnedSpec) {
+      //   this.agentSpecializations.set(agentId, learnedSpec);
+      //   console.log('AgentSpecialization: Updated specialization for agent', agentId);
+      // }
 
     } catch (error) {
       console.error('Failed to update agent specialization:', error);

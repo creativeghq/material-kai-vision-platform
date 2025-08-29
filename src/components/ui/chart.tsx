@@ -67,7 +67,7 @@ ChartContainer.displayName = 'Chart';
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
-    ([_, config]) => config.theme || config.color,
+    ([, itemConfig]) => itemConfig.theme || itemConfig.color,
   );
 
   if (!colorConfig.length) {
@@ -110,7 +110,7 @@ const ChartTooltipContent = React.forwardRef<
       nameKey?: string
       labelKey?: string
       active?: boolean
-      payload?: any[]
+      payload?: Array<Record<string, unknown>>
       label?: string
     }
 >(
@@ -264,7 +264,7 @@ const ChartLegendContent = React.forwardRef<
   React.ComponentProps<'div'> & {
       hideIcon?: boolean
       nameKey?: string
-      payload?: any[]
+      payload?: Array<Record<string, unknown>>
       verticalAlign?: 'top' | 'bottom'
     }
 >(

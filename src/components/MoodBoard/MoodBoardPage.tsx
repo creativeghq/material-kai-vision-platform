@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Grid3X3, List, Palette } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -27,11 +27,7 @@ export const MoodBoardPage = () => {
     view_preference: 'grid',
   });
 
-  useEffect(() => {
-    loadMoodBoards();
-  }, []);
-
-  const loadMoodBoards = async () => {
+  const loadMoodBoards = useCallback(async () => {
     try {
       const boards = await moodboardAPI.getUserMoodBoards();
       setMoodboards(boards);
@@ -45,7 +41,11 @@ export const MoodBoardPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadMoodBoards();
+  }, [loadMoodBoards]);
 
   const handleCreateMoodBoard = async () => {
     if (!newMoodBoard.title.trim()) {

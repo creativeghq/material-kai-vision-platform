@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -52,10 +53,12 @@ export const ImageModal: React.FC<ImageModalProps> = ({
         </DialogHeader>
 
         <div className="flex-1 relative bg-background/95">
-          <img
+          <Image
             src={currentImage.url}
             alt={`Interior design by ${currentImage.modelName}`}
             className="w-full h-full object-contain"
+            width={800}
+            height={600}
           />
 
           {/* Navigation buttons */}

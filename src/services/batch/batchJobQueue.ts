@@ -28,7 +28,7 @@ export interface BatchJob {
   type: string;
   priority: JobPriority;
   status: JobStatus;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   metadata: {
     workspaceId: string;
     userId?: string;
@@ -54,7 +54,7 @@ export interface BatchJob {
 export interface JobResult {
   jobId: string;
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
   metrics: {
     processingTime: number;
@@ -115,7 +115,7 @@ export interface QueueMetrics {
 /**
  * Job processor function type
  */
-export type JobProcessor<T = any> = (job: BatchJob) => Promise<T>;
+export type JobProcessor<T = unknown> = (job: BatchJob) => Promise<T>;
 
 /**
  * High-performance batch job queue with priority handling, retry mechanisms,
@@ -197,7 +197,7 @@ export class BatchJobQueue extends EventEmitter {
    */
   async addJob(
     type: string,
-    payload: Record<string, any>,
+    payload: Record<string, unknown>,
     options: {
       priority?: JobPriority;
       workspaceId: string;
@@ -635,7 +635,7 @@ export class BatchJobQueue extends EventEmitter {
   /**
    * Generate unique job ID
    */
-  private generateJobId(type: string, payload: Record<string, any>): string {
+  private generateJobId(type: string, payload: Record<string, unknown>): string {
     const timestamp = Date.now();
     const hash = createHash('md5')
       .update(JSON.stringify({ type, payload, timestamp }))

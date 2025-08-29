@@ -29,8 +29,8 @@ export interface ReplicateResponse {
   started_at?: string;
   completed_at?: string;
   status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
-  input: Record<string, any>;
-  output?: any;
+  input: Record<string, unknown>;
+  output?: unknown;
   error?: string;
   logs?: string;
   metrics?: {
@@ -46,7 +46,7 @@ export interface ReplicateErrorResponse {
 }
 
 // Replicate API Client
-export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
+export class ReplicateApiClient extends BaseApiClient<unknown, ReplicateResponse> {
   private readonly replicateConfig: ReplicateApiConfig;
   private readonly baseUrl = 'https://api.replicate.com/v1';
 
@@ -60,7 +60,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
     this.replicateConfig = config;
   }
 
-  async execute(params: any): Promise<StandardizedApiResponse<ReplicateResponse>> {
+  async execute(params: unknown): Promise<StandardizedApiResponse<ReplicateResponse>> {
     const requestId = this.requestIdGenerator();
     const startTime = Date.now();
 
@@ -90,7 +90,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
     }
   }
 
-  validateParams(params: unknown): any {
+  validateParams(params: unknown): unknown {
     if (!this.modelId) {
       throw new Error('Model ID is required for parameter validation');
     }
@@ -105,8 +105,8 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
       return modelConfig.inputSchema.parse(params);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessage = error.errors
-          .map(err => `${err.path.join('.')}: ${err.message}`)
+        const errorMessage = error.issues
+          .map((err) => `${err.path.join('.')}: ${err.message}`)
           .join(', ');
         throw new Error(`Parameter validation failed: ${errorMessage}`);
       }
@@ -197,7 +197,7 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
     return headers;
   }
 
-  private async makeReplicateRequest(endpoint: string, params: any): Promise<ReplicateResponse> {
+  private async makeReplicateRequest(endpoint: string, params: unknown): Promise<ReplicateResponse> {
     const url = `${this.baseUrl}/predictions`;
 
     const requestBody = {
@@ -221,8 +221,8 @@ export class ReplicateApiClient extends BaseApiClient<any, ReplicateResponse> {
       }
 
       const error = new Error(errorData?.detail || response.statusText);
-      (error as any).response = response;
-      (error as any).data = errorData;
+      (error as unknown as { response: Response; data: ReplicateErrorResponse | null }).response = response;
+      (error as unknown as { response: Response; data: ReplicateErrorResponse | null }).data = errorData;
       throw error;
     }
 
@@ -272,7 +272,7 @@ export function createReplicateClient(modelId: string): ReplicateApiClient {
 // Utility function for direct Replicate API calls (backward compatibility)
 export async function callReplicateModel(
   modelId: string,
-  params: any,
+  params: unknown,
 ): Promise<StandardizedApiResponse<ReplicateResponse>> {
   const client = createReplicateClient(modelId);
   return client.execute(params);

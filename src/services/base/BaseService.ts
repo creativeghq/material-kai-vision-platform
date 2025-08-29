@@ -169,7 +169,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
       requestCount: this.requestCount,
       errorCount: this.errorCount,
       averageLatency,
-      lastActivity: this.lastActivity,
+      lastActivity: this.lastActivity || undefined,
       rateLimitingEnabled: !!this.config.rateLimit,
     };
   }
@@ -210,7 +210,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
   /**
    * Standard error handling
    */
-  protected handleError(error: any, context: string): Error {
+  protected handleError(error: unknown, context: string): Error {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const serviceError = new Error(`${this.config.name} service error in ${context}: ${errorMessage}`);
 

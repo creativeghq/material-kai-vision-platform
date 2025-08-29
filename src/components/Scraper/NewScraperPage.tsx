@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import {
   Select,
   SelectContent,
@@ -22,12 +23,12 @@ import { Separator } from '@/components/ui/separator';
 import { SessionDetailView } from './SessionDetailView';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
 
-interface NewScraperPageProps {}
-
 type ViewMode = 'sessions' | 'detail' | 'create';
 type ScrapingMode = 'single-page' | 'sitemap' | 'crawl' | 'search' | 'map';
 
-export const NewScraperPage: React.FC<NewScraperPageProps> = () => {
+
+
+export const NewScraperPage: React.FC = () => {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
@@ -71,7 +72,7 @@ Return a list of materials found on the page.`);
     blockAds: true,
     extractorMode: 'llm-extraction' as 'llm-extraction' | 'css-extraction',
     schema: '',
-    actions: [] as any[],
+    actions: [] as unknown[],
     maxAge: 0,
     proxy: 'basic' as 'basic' | 'premium' | 'none',
   });
@@ -190,7 +191,7 @@ Return a list of materials found on the page.`);
           concurrentPages,
           firecrawlOptions: selectedService === 'firecrawl' ? firecrawlOptions : undefined,
           jinaOptions: selectedService === 'jina' ? jinaOptions : undefined,
-        },
+        } as Json,
       };
 
       // Insert session into database

@@ -12,7 +12,7 @@ import { BaseApiClient, StandardizedApiResponse, withRetry } from './standardize
 // Hugging Face specific types
 export interface HuggingFaceParams {
   inputs: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 }
 
 export interface HuggingFaceResponse {
@@ -29,7 +29,7 @@ export class HuggingFaceApiClient extends BaseApiClient<HuggingFaceParams, Huggi
   constructor(modelId?: string) {
     super('huggingface', modelId);
     this.huggingFaceConfig = huggingfaceConfig;
-    this.currentModelId = modelId;
+    this.currentModelId = modelId || undefined;
   }
 
   public async execute(params: HuggingFaceParams): Promise<StandardizedApiResponse<HuggingFaceResponse>> {
@@ -62,7 +62,7 @@ export class HuggingFaceApiClient extends BaseApiClient<HuggingFaceParams, Huggi
     }
 
     // Use the exact schema from configuration
-    return modelConfig.inputSchema.parse(params);
+    return modelConfig.inputSchema.parse(params) as HuggingFaceParams;
   }
 
   protected async makeApiCall(
@@ -158,7 +158,7 @@ export class HuggingFaceApiClient extends BaseApiClient<HuggingFaceParams, Huggi
     );
 
     // Validate response using exact schema from configuration
-    const validatedResponse = modelConfig.outputSchema.parse(response);
+    const validatedResponse = modelConfig.outputSchema.parse(response) as HuggingFaceResponse;
 
     return {
       success: true,

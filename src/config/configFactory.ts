@@ -84,7 +84,7 @@ class ConfigurationFactory implements ConfigFactory {
 
     // Apply environment-specific overrides
     if (envVars.LOG_LEVEL) {
-      overriddenConfig.logLevel = envVars.LOG_LEVEL as any;
+      overriddenConfig.logLevel = envVars.LOG_LEVEL as 'error' | 'warn' | 'info' | 'debug';
     }
 
     if (envVars.DEBUG) {
@@ -115,7 +115,7 @@ class ConfigurationFactory implements ConfigFactory {
 
     // Storage overrides
     if (envVars.STORAGE_PROVIDER) {
-      overriddenConfig.externalDependencies.storage.provider = envVars.STORAGE_PROVIDER as any;
+      overriddenConfig.externalDependencies.storage.provider = envVars.STORAGE_PROVIDER as 'local' | 's3' | 'gcs';
     }
 
     if (envVars.AWS_S3_BUCKET) {
@@ -306,7 +306,7 @@ class ConfigurationFactory implements ConfigFactory {
   /**
    * Get configuration summary for logging/debugging
    */
-  public getConfigSummary(): Record<string, any> {
+  public getConfigSummary(): Record<string, unknown> {
     if (!this.currentConfig) {
       return { status: 'No configuration loaded' };
     }

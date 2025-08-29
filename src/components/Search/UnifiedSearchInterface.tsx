@@ -28,7 +28,7 @@ interface SearchResult {
   type: 'material' | 'knowledge' | 'pdf_content';
   similarity_score: number;
   source?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface UnifiedSearchInterfaceProps {
@@ -47,7 +47,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [_searchType, _setSearchType] = useState<'text' | 'image' | 'hybrid'>('text');
+  // const [_searchType, _setSearchType] = useState<'text' | 'image' | 'hybrid'>('text');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +90,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     const actualSearchType = detectQueryType(query);
 
     try {
-      let searchResults: any;
+      let searchResults: SearchResult[];
 
       if (actualSearchType === 'text') {
         // Enhanced text search with MIVAA's LlamaIndex RAG
@@ -122,23 +122,23 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       // Transform results to unified format
       const unifiedResults: SearchResult[] = [
-        ...(searchResults.results || []).map((result: any) => ({
-          id: result.material_id || result.id,
-          title: result.material_name || result.title,
-          content: result.content || result.material_details?.description || '',
-          type: result.result_type || 'material',
-          similarity_score: result.similarity_score,
-          source: result.source_type || 'database',
-          metadata: result.metadata || result.material_details,
+        ...(searchResults.results || []).map((result: Record<string, unknown>) => ({
+          id: (result.material_id as string) || (result.id as string),
+          title: (result.material_name as string) || (result.title as string),
+          content: (result.content as string) || ((result.material_details as Record<string, unknown>)?.description as string) || '',
+          type: (result.result_type as 'material' | 'knowledge' | 'pdf_content') || 'material',
+          similarity_score: result.similarity_score as number,
+          source: (result.source_type as string) || 'database',
+          metadata: (result.metadata as Record<string, unknown>) || (result.material_details as Record<string, unknown>),
         })),
-        ...(searchResults.knowledge_results || []).map((result: any) => ({
-          id: result.id,
-          title: result.title,
-          content: result.content,
+        ...(searchResults.knowledge_results || []).map((result: Record<string, unknown>) => ({
+          id: result.id as string,
+          title: result.title as string,
+          content: result.content as string,
           type: 'knowledge' as const,
-          similarity_score: result.confidence || 0.7,
-          source: result.source_type || 'knowledge_base',
-          metadata: result.metadata,
+          similarity_score: (result.confidence as number) || 0.7,
+          source: (result.source_type as string) || 'knowledge_base',
+          metadata: result.metadata as Record<string, unknown>,
         })),
       ];
 
@@ -176,14 +176,14 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         limit: 8,
       });
 
-      const formatted = quickResults.results.map((result: any) => ({
-        id: result.id,
-        title: result.title || result.name,
-        content: result.content || result.description,
-        type: result.type || 'material',
-        similarity_score: result.confidence || 0.8,
+      const formatted = quickResults.results.map((result: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+        id: result.id as string,
+        title: (result.title as string) || (result.name as string),
+        content: (result.content as string) || (result.description as string),
+        type: (result.type as 'material' | 'knowledge' | 'pdf_content') || 'material',
+        similarity_score: (result.confidence as number) || 0.8,
         source: 'quick_search',
-        metadata: result.metadata,
+        metadata: result.metadata as Record<string, unknown>,
       }));
 
       setResults(formatted);
@@ -384,17 +384,17 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                       <div className="flex flex-wrap gap-2">
                         {result.metadata.category && (
                           <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                            {result.metadata.category}
+                            {String(result.metadata.category)}
                           </Badge>
                         )}
                         {result.metadata.material_categories && Array.isArray(result.metadata.material_categories) &&
-                          result.metadata.material_categories.slice(0, 2).map((cat: string, i: number) => (
-                            <Badge key={i} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{cat}</Badge>
+                          result.metadata.material_categories.slice(0, 2).map((cat: unknown, i: number) => (
+                            <Badge key={i} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{String(cat)}</Badge>
                           ))
                         }
                         {result.metadata.technical_complexity && (
                           <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                            Complexity: {result.metadata.technical_complexity}/10
+                            Complexity: {String(result.metadata.technical_complexity)}/10
                           </Badge>
                         )}
                       </div>
