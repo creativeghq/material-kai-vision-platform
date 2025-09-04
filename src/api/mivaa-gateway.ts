@@ -1,19 +1,7 @@
-import { z } from 'zod';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-import { JWTAuthMiddleware, AuthenticatedRequest, AuthenticationResult } from '../middleware/jwtAuthMiddleware';
-import { MaterialKaiAuthMiddleware } from '../middleware/materialKaiAuthMiddleware';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-
-// Auth context interface
-interface AuthContext {
-  userId: string;
-  workspaceId: string;
-}
+/**
+ * MIVAA Gateway Controller
+ * Routes and proxies requests to the MIVAA Python microservice
+ */
 
 // Express types (would be imported from @types/express in real implementation)
 interface Request {
@@ -32,509 +20,290 @@ interface Response {
   setHeader(name: string, value: string): void;
 }
 
-interface NextFunction {
-  (): void;
-}
-
-// MIVAA Request/Response Types
-interface MivaaRequest {
-  endpoint: string;
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  headers: Record<string, string>;
-  body?: unknown;
+export interface GatewayRequest {
+  action: string;
+  payload?: unknown;
+  endpoint?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  headers?: Record<string, string>;
   params?: Record<string, string>;
   query?: Record<string, unknown>;
-  timeout?: number;
 }
 
-interface MivaaResponse {
+export interface GatewayResponse {
   success: boolean;
   data?: unknown;
   error?: {
     code: string;
     message: string;
-    details?: unknown;
+    details?: string;
+    stack?: string;
   };
-  metadata?: {
+  metadata: {
     timestamp: string;
     processingTime: number;
     version: string;
+    mivaaEndpoint?: string;
   };
 }
 
-// Validation Schemas
-const MivaaRequestSchema = z.object({
-  endpoint: z.string().min(1, 'Endpoint is required'),
-  method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
-  headers: z.record(z.string(), z.string()).optional(),
-  body: z.any().optional(),
-  params: z.record(z.string(), z.string()).optional(),
-  query: z.record(z.string(), z.any()).optional(),
-  timeout: z.number().min(1000).max(300000).optional(), // 1s to 5min
-});
-
-// Rate limiting helper
-class MivaaRateLimitHelper {
-  private static rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-
-  static async checkRateLimit(identifier: string, limit: number = 200, windowMs: number = 60000): Promise<boolean> {
-    const now = Date.now();
-    const key = `mivaa:${identifier}`;
-
-    const current = this.rateLimitStore.get(key);
-
-    if (!current || now > current.resetTime) {
-      this.rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
-      return true;
-    }
-
-    if (current.count >= limit) {
-      return false;
-    }
-
-    current.count++;
-    return true;
-  }
-
-  static async logMivaaUsage(userId: string, workspaceId: string, endpoint: string, metadata?: unknown): Promise<void> {
-    console.log(`MIVAA Gateway Usage: ${userId} in ${workspaceId} accessed ${endpoint}`, metadata);
-  }
-}
-
-/**
- * MIVAA API Gateway Controller
- *
- * Provides a centralized gateway for all MIVAA microservice requests.
- * Implements authentication, rate limiting, request validation, and response formatting.
- * Routes all MIVAA requests through the main app API for consistent access control.
- */
 export class MivaaGatewayController {
-  private readonly MIVAA_BASE_URL: string;
-  private readonly API_VERSION = '1.0.0';
-  private readonly DEFAULT_TIMEOUT = 30000; // 30 seconds
+  private readonly mivaaServiceUrl: string;
+  private readonly apiKey: string;
+  private readonly timeout: number;
 
   constructor() {
-    this.MIVAA_BASE_URL = process.env.MIVAA_BASE_URL || 'http://localhost:8000';
-
-    // Ensure MIVAA base URL doesn't end with slash
-    if (this.MIVAA_BASE_URL.endsWith('/')) {
-      this.MIVAA_BASE_URL = this.MIVAA_BASE_URL.slice(0, -1);
-    }
+    this.mivaaServiceUrl = process.env.MIVAA_SERVICE_URL || 'http://localhost:8000';
+    this.apiKey = process.env.MIVAA_API_KEY || '';
+    this.timeout = parseInt(process.env.MIVAA_TIMEOUT || '30000', 10);
   }
 
   /**
-   * Authentication Middleware for MIVAA requests
-   * Supports both JWT authentication and Material Kai API key authentication
+   * Main gateway endpoint that processes all MIVAA requests
    */
-  private async authenticateRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      // Create Material Kai middleware instance with Supabase client
-      // Create Material Kai middleware instance with Supabase client
-      const materialKaiMiddleware = new MaterialKaiAuthMiddleware(supabase);
-
-      // Extract origin from request headers
-      const origin = req.headers.origin || req.headers.Origin || null;
-
-      // First, try Material Kai API key authentication
-      const materialKaiResult = await materialKaiMiddleware.authenticate(
-        req.headers as Record<string, string | string[] | undefined>,
-        typeof origin === 'string' ? origin : null,
-      );
-
-      if (materialKaiResult.success && materialKaiResult.keyData) {
-        // Material Kai authentication successful
-        (req as unknown as { authContext: { userId: string; workspaceId: string; authType: string; apiKey: string; scopes: string[] } }).authContext = {
-          userId: 'material-kai-user',
-          workspaceId: materialKaiResult.keyData.workspace_id,
-          authType: 'material-kai',
-          apiKey: materialKaiResult.keyData.api_key,
-          scopes: ['mivaa:access', 'material-kai:access'],
-        };
-        next();
-        return;
-      }
-
-      // If Material Kai auth failed, try JWT authentication as fallback
-      const authRequest: AuthenticatedRequest = {
-        headers: req.headers as Record<string, string>,
-        body: req.body,
-      };
-
-      // Extract workspace ID if provided
-      const extractedWorkspaceId = JWTAuthMiddleware.extractWorkspaceId(authRequest);
-      if (extractedWorkspaceId) {
-        authRequest.workspaceId = extractedWorkspaceId;
-      }
-
-      // Authenticate with MIVAA-specific scopes
-      const jwtAuthResult: AuthenticationResult = await JWTAuthMiddleware.authenticate(authRequest, {
-        allowApiKey: true,
-        requiredScopes: ['mivaa:access'],
-        workspaceRequired: true,
-      });
-
-      if (!jwtAuthResult.success) {
-        // Both authentication methods failed
-        const errorResponse: MivaaResponse = {
-          success: false,
-          error: {
-            code: 'MIVAA_AUTH_FAILED',
-            message: 'Authentication failed. Please provide a valid JWT token or Material Kai API key.',
-            details: {
-              materialKaiError: materialKaiResult.error,
-              jwtError: jwtAuthResult.error?.message,
-            },
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            processingTime: 0,
-            version: this.API_VERSION,
-          },
-        };
-
-        res.status(401).json(errorResponse);
-        return;
-      }
-
-      // JWT authentication successful
-      (req as unknown as { authContext: unknown }).authContext = {
-        ...jwtAuthResult.authContext,
-        authType: 'jwt',
-      };
-      next();
-    } catch (error) {
-      const errorResponse: MivaaResponse = {
-        success: false,
-        error: {
-          code: 'MIVAA_AUTH_ERROR',
-          message: 'MIVAA authentication failed',
-          details: error instanceof Error ? error.message : 'Unknown error',
-        },
-        metadata: {
-          timestamp: new Date().toISOString(),
-          processingTime: 0,
-          version: this.API_VERSION,
-        },
-      };
-
-      res.status(500).json(errorResponse);
-    }
-  }
-
-  /**
-   * Rate Limiting Middleware for MIVAA requests
-   */
-  private async rateLimitMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const authContext = (req as unknown as { authContext?: { userId: string; workspaceId: string } }).authContext;
-      if (!authContext) {
-        next();
-        return;
-      }
-
-      const identifier = `${authContext.userId}:${authContext.workspaceId}`;
-      const isAllowed = await MivaaRateLimitHelper.checkRateLimit(identifier, 200, 60000); // 200 requests per minute for MIVAA
-
-      if (!isAllowed) {
-        const errorResponse: MivaaResponse = {
-          success: false,
-          error: {
-            code: 'MIVAA_RATE_LIMIT_EXCEEDED',
-            message: 'MIVAA rate limit exceeded. Please try again later.',
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            processingTime: 0,
-            version: this.API_VERSION,
-          },
-        };
-
-        res.status(429).json(errorResponse);
-        return;
-      }
-
-      next();
-    } catch (error: unknown) {
-      console.error('Validation error:', error);
-      next(); // Continue on rate limit errors
-    }
-  }
-
-  /**
-   * Request Validation Middleware
-   */
-  private async validateRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      // Validate the MIVAA request structure
-      const validationResult = MivaaRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        const errorResponse: MivaaResponse = {
-          success: false,
-          error: {
-            code: 'MIVAA_VALIDATION_ERROR',
-            message: 'MIVAA request validation failed',
-            details: validationResult.error.issues.map((err) => ({
-              field: err.path.map(String).join('.'),
-              message: err.message,
-            })),
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            processingTime: 0,
-            version: this.API_VERSION,
-          },
-        };
-
-        res.status(400).json(errorResponse);
-        return;
-      }
-
-      // Attach validated request to context
-      (req as unknown as { validatedMivaaRequest: unknown }).validatedMivaaRequest = validationResult.data;
-      next();
-    } catch (error) {
-      const errorResponse: MivaaResponse = {
-        success: false,
-        error: {
-          code: 'MIVAA_VALIDATION_ERROR',
-          message: 'Request validation failed',
-          details: error instanceof Error ? error.message : 'Unknown error',
-        },
-        metadata: {
-          timestamp: new Date().toISOString(),
-          processingTime: 0,
-          version: this.API_VERSION,
-        },
-      };
-
-      res.status(500).json(errorResponse);
-    }
-  }
-
-  /**
-   * Forward request to MIVAA microservice
-   */
-  private async forwardToMivaa(mivaaRequest: MivaaRequest, authContext: AuthContext): Promise<MivaaResponse> {
+  public processRequest = async (req: Request, res: Response): Promise<void> => {
     const startTime = Date.now();
 
     try {
-      // Construct full MIVAA URL
-      const mivaaUrl = `${this.MIVAA_BASE_URL}${mivaaRequest.endpoint}`;
-
-      // Prepare headers with authentication
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'MIVAA-Gateway/1.0.0',
-        'X-Workspace-ID': authContext.workspaceId,
-        'X-User-ID': authContext.userId,
-        ...mivaaRequest.headers,
-      };
-
-      // Add MIVAA API key if available
-      const mivaaApiKey = process.env.MIVAA_API_KEY;
-      if (mivaaApiKey) {
-        headers['Authorization'] = `Bearer ${mivaaApiKey}`;
+      // Validate request structure
+      if (!req.body || typeof req.body !== 'object') {
+        this.sendErrorResponse(res, 'INVALID_REQUEST_BODY', 'Request body must be a valid JSON object', startTime);
+        return;
       }
 
-      // Prepare fetch options
-      const fetchOptions: RequestInit = {
-        method: mivaaRequest.method,
-        headers,
-        signal: AbortSignal.timeout(mivaaRequest.timeout || this.DEFAULT_TIMEOUT),
-      };
+      const gatewayRequest = req.body as GatewayRequest;
 
-      // Add body for non-GET requests
-      if (mivaaRequest.method !== 'GET' && mivaaRequest.body) {
-        fetchOptions.body = JSON.stringify(mivaaRequest.body);
+      // Validate required action field
+      if (!gatewayRequest.action || typeof gatewayRequest.action !== 'string') {
+        this.sendErrorResponse(res, 'MISSING_ACTION', 'Request must include a valid action field', startTime);
+        return;
       }
 
-      // Add query parameters to URL
-      const url = new URL(mivaaUrl);
-      if (mivaaRequest.query) {
-        Object.entries(mivaaRequest.query).forEach(([key, value]) => {
-          url.searchParams.append(key, String(value));
-        });
-      }
-
-      // Make request to MIVAA
-      const response = await fetch(url.toString(), fetchOptions);
-      const responseData = await response.json();
-
-      const processingTime = Date.now() - startTime;
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: {
-            code: `MIVAA_ERROR_${response.status}`,
-            message: responseData.message || `MIVAA request failed with status ${response.status}`,
-            details: responseData,
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            processingTime,
-            version: this.API_VERSION,
-          },
-        };
-      }
-
-      return {
-        success: true,
-        data: responseData,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          processingTime,
-          version: this.API_VERSION,
-        },
-      };
+      // Route request based on action
+      const response = await this.routeToMivaaService(gatewayRequest, startTime);
+      res.status(200).json(response);
 
     } catch (error) {
-      const processingTime = Date.now() - startTime;
+      console.error('Error processing MIVAA gateway request:', error);
+      this.sendErrorResponse(
+        res,
+        'GATEWAY_ERROR',
+        'An error occurred while processing the request',
+        startTime,
+        error
+      );
+    }
+  };
 
-      if (error instanceof Error && error.name === 'AbortError') {
-        return {
-          success: false,
-          error: {
-            code: 'MIVAA_TIMEOUT',
-            message: 'MIVAA request timed out',
-            details: { timeout: mivaaRequest.timeout || this.DEFAULT_TIMEOUT },
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            processingTime,
-            version: this.API_VERSION,
-          },
-        };
-      }
+  /**
+   * Health check endpoint for the MIVAA gateway
+   */
+  public healthCheck = async (req: Request, res: Response): Promise<void> => {
+    const startTime = Date.now();
 
-      return {
-        success: false,
-        error: {
-          code: 'MIVAA_CONNECTION_ERROR',
-          message: 'Failed to connect to MIVAA service',
-          details: error instanceof Error ? error.message : 'Unknown error',
+    try {
+      // Check MIVAA service health
+      const isHealthy = await this.checkMivaaServiceHealth();
+      
+      const response: GatewayResponse = {
+        success: isHealthy,
+        data: {
+          status: isHealthy ? 'healthy' : 'unhealthy',
+          gateway: 'operational',
+          mivaaService: isHealthy ? 'reachable' : 'unreachable',
+          timestamp: new Date().toISOString(),
         },
         metadata: {
           timestamp: new Date().toISOString(),
-          processingTime,
-          version: this.API_VERSION,
+          processingTime: Date.now() - startTime,
+          version: '1.0.0',
+          mivaaEndpoint: this.mivaaServiceUrl,
         },
       };
+
+      res.status(isHealthy ? 200 : 503).json(response);
+
+    } catch (error) {
+      console.error('Error in MIVAA health check:', error);
+      this.sendErrorResponse(
+        res,
+        'HEALTH_CHECK_ERROR',
+        'Unable to perform health check',
+        startTime,
+        error
+      );
+    }
+  };
+
+  /**
+   * Route requests to the appropriate MIVAA service endpoint
+   */
+  private async routeToMivaaService(gatewayRequest: GatewayRequest, startTime: number): Promise<GatewayResponse> {
+    const { action, payload } = gatewayRequest;
+
+    // Map gateway actions to MIVAA service endpoints
+    const endpointMap: Record<string, { path: string; method: string }> = {
+      // Embedding actions
+      'generate_embedding': { path: '/api/embeddings/generate', method: 'POST' },
+      'generate_batch_embeddings': { path: '/api/embeddings/batch', method: 'POST' },
+      
+      // Search actions
+      'semantic_search': { path: '/api/search/semantic', method: 'POST' },
+      'vector_search': { path: '/api/search/vector', method: 'POST' },
+      'hybrid_search': { path: '/api/search/hybrid', method: 'POST' },
+      'get_recommendations': { path: '/api/search/recommendations', method: 'POST' },
+      'get_analytics': { path: '/api/analytics', method: 'GET' },
+      
+      // AI Analysis actions (TogetherAI/LLaMA Vision)
+      'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+      'llama_vision_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+      
+      // Document processing actions
+      'extract_text': { path: '/api/documents/extract', method: 'POST' },
+      'process_document': { path: '/api/documents/process', method: 'POST' },
+      'analyze_material': { path: '/api/materials/analyze', method: 'POST' },
+      
+      // Legacy support
+      '/extract': { path: '/api/documents/extract', method: 'POST' },
+      '/process': { path: '/api/documents/process', method: 'POST' },
+      '/status': { path: '/api/status', method: 'GET' },
+    };
+
+    const endpoint = endpointMap[action];
+    if (!endpoint) {
+      throw new Error(`Unknown action: ${action}. Available actions: ${Object.keys(endpointMap).join(', ')}`);
+    }
+
+    // Prepare request to MIVAA service
+    const mivaaUrl = `${this.mivaaServiceUrl}${endpoint.path}`;
+    const requestOptions: RequestInit = {
+      method: endpoint.method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+        'User-Agent': 'MIVAA-Gateway/1.0.0',
+      },
+      signal: AbortSignal.timeout(this.timeout),
+    };
+
+    // Add payload for POST requests
+    if (endpoint.method === 'POST' && payload) {
+      requestOptions.body = JSON.stringify(payload);
+    }
+
+    // Make request to MIVAA service
+    const response = await fetch(mivaaUrl, requestOptions);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`MIVAA service error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      data,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        processingTime: Date.now() - startTime,
+        version: '1.0.0',
+        mivaaEndpoint: mivaaUrl,
+      },
+    };
+  }
+
+  /**
+   * Check if the MIVAA service is healthy and reachable
+   */
+  private async checkMivaaServiceHealth(): Promise<boolean> {
+    try {
+      const healthUrl = `${this.mivaaServiceUrl}/health`;
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        signal: AbortSignal.timeout(5000), // 5 second timeout for health checks
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('MIVAA service health check failed:', error);
+      return false;
     }
   }
 
   /**
-   * POST /api/mivaa/gateway
-   * Main gateway endpoint for MIVAA requests
+   * Send standardized error responses
    */
-  public processRequest = async (req: Request, res: Response): Promise<void> => {
-    try {
-      // Apply middleware
-      await this.authenticateRequest(req, res, () => {});
-      if (res.headersSent) return;
+  private sendErrorResponse(
+    res: Response,
+    errorCode: string,
+    message: string,
+    startTime: number,
+    error?: unknown
+  ): void {
+    const response: GatewayResponse = {
+      success: false,
+      error: {
+        code: errorCode,
+        message,
+        details: error instanceof Error ? error.message : String(error),
+        ...(process.env.NODE_ENV === 'development' && error instanceof Error && { stack: error.stack }),
+      },
+      metadata: {
+        timestamp: new Date().toISOString(),
+        processingTime: Date.now() - startTime,
+        version: '1.0.0',
+      },
+    };
 
-      await this.rateLimitMiddleware(req, res, () => {});
-      if (res.headersSent) return;
-
-      await this.validateRequest(req, res, () => {});
-      if (res.headersSent) return;
-
-      const authContext = (req as unknown as { authContext: AuthContext }).authContext;
-      const mivaaRequest = (req as unknown as { validatedMivaaRequest: MivaaRequest }).validatedMivaaRequest;
-
-      // Forward request to MIVAA
-      const mivaaResponse = await this.forwardToMivaa(mivaaRequest, authContext);
-
-      // Log usage
-      await MivaaRateLimitHelper.logMivaaUsage(
-        authContext.userId,
-        authContext.workspaceId,
-        mivaaRequest.endpoint,
-        { method: mivaaRequest.method, success: mivaaResponse.success },
-      );
-
-      // Return response with appropriate status code
-      const statusCode = mivaaResponse.success ? 200 :
-                        mivaaResponse.error?.code.includes('TIMEOUT') ? 408 :
-                        mivaaResponse.error?.code.includes('RATE_LIMIT') ? 429 :
-                        mivaaResponse.error?.code.includes('AUTH') ? 401 : 500;
-
-      res.status(statusCode).json(mivaaResponse);
-
-    } catch (error) {
-      const errorResponse: MivaaResponse = {
-        success: false,
-        error: {
-          code: 'MIVAA_GATEWAY_ERROR',
-          message: 'MIVAA gateway processing failed',
-          details: error instanceof Error ? error.message : 'Unknown error',
-        },
-        metadata: {
-          timestamp: new Date().toISOString(),
-          processingTime: 0,
-          version: this.API_VERSION,
-        },
-      };
-
-      res.status(500).json(errorResponse);
-    }
-  };
+    // Determine appropriate HTTP status code
+    const statusCode = this.getErrorStatusCode(errorCode);
+    res.status(statusCode).json(response);
+  }
 
   /**
-   * GET /api/mivaa/health
-   * Health check endpoint for MIVAA gateway
+   * Map error codes to appropriate HTTP status codes
    */
-  public healthCheck = async (_req: Request, res: Response): Promise<void> => {
-    try {
-      // Check MIVAA service health
-      const healthRequest: MivaaRequest = {
-        endpoint: '/health',
-        method: 'GET',
-        headers: {},
-        timeout: 5000, // 5 second timeout for health check
-      };
+  private getErrorStatusCode(errorCode: string): number {
+    const statusMap: Record<string, number> = {
+      'INVALID_REQUEST_BODY': 400,
+      'MISSING_ACTION': 400,
+      'VALIDATION_ERROR': 400,
+      'UNAUTHORIZED': 401,
+      'FORBIDDEN': 403,
+      'NOT_FOUND': 404,
+      'METHOD_NOT_ALLOWED': 405,
+      'RATE_LIMIT_EXCEEDED': 429,
+      'GATEWAY_ERROR': 500,
+      'MIVAA_SERVICE_ERROR': 502,
+      'SERVICE_UNAVAILABLE': 503,
+      'TIMEOUT': 504,
+      'HEALTH_CHECK_ERROR': 503,
+    };
 
-      const authContext = { userId: 'system', workspaceId: 'system' };
-      const healthResponse = await this.forwardToMivaa(healthRequest, authContext);
+    return statusMap[errorCode] || 500;
+  }
 
-      const response: MivaaResponse = {
-        success: true,
-        data: {
-          gateway: 'healthy',
-          mivaa: healthResponse.success ? 'healthy' : 'unhealthy',
-          timestamp: new Date().toISOString(),
-          version: this.API_VERSION,
-        },
-        metadata: {
-          timestamp: new Date().toISOString(),
-          processingTime: healthResponse.metadata?.processingTime || 0,
-          version: this.API_VERSION,
-        },
-      };
-
-      res.status(200).json(response);
-    } catch (error) {
-      const errorResponse: MivaaResponse = {
-        success: false,
-        error: {
-          code: 'MIVAA_HEALTH_CHECK_FAILED',
-          message: 'Health check failed',
-          details: error instanceof Error ? error.message : 'Unknown error',
-        },
-        metadata: {
-          timestamp: new Date().toISOString(),
-          processingTime: 0,
-          version: this.API_VERSION,
-        },
-      };
-
-      res.status(503).json(errorResponse);
-    }
-  };
+  /**
+   * Get gateway statistics and configuration info
+   */
+  public getGatewayInfo(): {
+    version: string;
+    mivaaServiceUrl: string;
+    timeout: number;
+    endpoints: string[];
+  } {
+    return {
+      version: '1.0.0',
+      mivaaServiceUrl: this.mivaaServiceUrl,
+      timeout: this.timeout,
+      endpoints: [
+        '/api/mivaa/gateway',
+        '/api/mivaa/health',
+      ],
+    };
+  }
 }
-
-// Export singleton instance
-export const mivaaGateway = new MivaaGatewayController();
-
-// Export types for use in other modules
-export type { MivaaRequest, MivaaResponse };

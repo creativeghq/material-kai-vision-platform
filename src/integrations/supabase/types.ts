@@ -570,12 +570,16 @@ export type Database = {
           embedding: string | null
           embedding_1536: string | null
           id: string
+          llama_analysis: Json | null
           name: string
           properties: Json | null
           safety_data: Json | null
           standards: string[] | null
           thumbnail_url: string | null
           updated_at: string | null
+          visual_analysis_confidence: number | null
+          visual_embedding_1536: string | null
+          visual_embedding_512: string | null
         }
         Insert: {
           category: string
@@ -586,12 +590,16 @@ export type Database = {
           embedding?: string | null
           embedding_1536?: string | null
           id?: string
+          llama_analysis?: Json | null
           name: string
           properties?: Json | null
           safety_data?: Json | null
           standards?: string[] | null
           thumbnail_url?: string | null
           updated_at?: string | null
+          visual_analysis_confidence?: number | null
+          visual_embedding_1536?: string | null
+          visual_embedding_512?: string | null
         }
         Update: {
           category?: string
@@ -602,12 +610,243 @@ export type Database = {
           embedding?: string | null
           embedding_1536?: string | null
           id?: string
+          llama_analysis?: Json | null
           name?: string
           properties?: Json | null
           safety_data?: Json | null
           standards?: string[] | null
           thumbnail_url?: string | null
           updated_at?: string | null
+          visual_analysis_confidence?: number | null
+          visual_embedding_1536?: string | null
+          visual_embedding_512?: string | null
+        }
+        Relationships: []
+      }
+      material_visual_analysis: {
+        Row: {
+          analysis_confidence: number | null
+          clip_embedding: string | null
+          clip_model_version: string | null
+          color_description: string | null
+          created_at: string | null
+          created_by: string | null
+          description_embedding: string | null
+          error_message: string | null
+          finish_type: string | null
+          id: string
+          image_dimensions: Json | null
+          llama_analysis_prompt_hash: string | null
+          llama_confidence_score: number | null
+          llama_model_version: string
+          llama_processing_time_ms: number | null
+          material_id: string
+          material_type: string
+          material_type_embedding: string | null
+          pattern_grain: string | null
+          processing_status: string | null
+          reflectivity: string | null
+          source_image_hash: string | null
+          source_image_url: string | null
+          structural_properties: Json | null
+          surface_texture: string | null
+          updated_at: string | null
+          visual_characteristics: string | null
+        }
+        Insert: {
+          analysis_confidence?: number | null
+          clip_embedding?: string | null
+          clip_model_version?: string | null
+          color_description?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description_embedding?: string | null
+          error_message?: string | null
+          finish_type?: string | null
+          id?: string
+          image_dimensions?: Json | null
+          llama_analysis_prompt_hash?: string | null
+          llama_confidence_score?: number | null
+          llama_model_version?: string
+          llama_processing_time_ms?: number | null
+          material_id: string
+          material_type: string
+          material_type_embedding?: string | null
+          pattern_grain?: string | null
+          processing_status?: string | null
+          reflectivity?: string | null
+          source_image_hash?: string | null
+          source_image_url?: string | null
+          structural_properties?: Json | null
+          surface_texture?: string | null
+          updated_at?: string | null
+          visual_characteristics?: string | null
+        }
+        Update: {
+          analysis_confidence?: number | null
+          clip_embedding?: string | null
+          clip_model_version?: string | null
+          color_description?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description_embedding?: string | null
+          error_message?: string | null
+          finish_type?: string | null
+          id?: string
+          image_dimensions?: Json | null
+          llama_analysis_prompt_hash?: string | null
+          llama_confidence_score?: number | null
+          llama_model_version?: string
+          llama_processing_time_ms?: number | null
+          material_id?: string
+          material_type?: string
+          material_type_embedding?: string | null
+          pattern_grain?: string | null
+          processing_status?: string | null
+          reflectivity?: string | null
+          source_image_hash?: string | null
+          source_image_url?: string | null
+          structural_properties?: Json | null
+          surface_texture?: string | null
+          updated_at?: string | null
+          visual_characteristics?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_visual_analysis_material_id_fkey"
+            columns: ["material_id"]
+            referencedRelation: "materials_catalog"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      visual_analysis_queue: {
+        Row: {
+          analysis_type: string[] | null
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          image_hash: string | null
+          image_url: string
+          material_id: string | null
+          priority: number | null
+          processing_options: Json | null
+          processing_time_ms: number | null
+          result_analysis_id: string | null
+          started_at: string | null
+          status: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          analysis_type?: string[] | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          image_hash?: string | null
+          image_url: string
+          material_id?: string | null
+          priority?: number | null
+          processing_options?: Json | null
+          processing_time_ms?: number | null
+          result_analysis_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          analysis_type?: string[] | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          image_hash?: string | null
+          image_url?: string
+          material_id?: string | null
+          priority?: number | null
+          processing_options?: Json | null
+          processing_time_ms?: number | null
+          result_analysis_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visual_analysis_queue_material_id_fkey"
+            columns: ["material_id"]
+            referencedRelation: "materials_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visual_analysis_queue_result_analysis_id_fkey"
+            columns: ["result_analysis_id"]
+            referencedRelation: "material_visual_analysis"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      visual_search_history: {
+        Row: {
+          average_similarity_score: number | null
+          created_at: string | null
+          id: string
+          max_results: number | null
+          query_clip_embedding: string | null
+          query_description_embedding: string | null
+          query_image_hash: string | null
+          query_image_url: string | null
+          query_llama_analysis: Json | null
+          result_count: number | null
+          search_execution_time_ms: number | null
+          search_filters: Json | null
+          search_type: string
+          session_id: string | null
+          similarity_threshold: number | null
+          top_similarity_score: number | null
+          user_id: string | null
+        }
+        Insert: {
+          average_similarity_score?: number | null
+          created_at?: string | null
+          id?: string
+          max_results?: number | null
+          query_clip_embedding?: string | null
+          query_description_embedding?: string | null
+          query_image_hash?: string | null
+          query_image_url?: string | null
+          query_llama_analysis?: Json | null
+          result_count?: number | null
+          search_execution_time_ms?: number | null
+          search_filters?: Json | null
+          search_type: string
+          session_id?: string | null
+          similarity_threshold?: number | null
+          top_similarity_score?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          average_similarity_score?: number | null
+          created_at?: string | null
+          id?: string
+          max_results?: number | null
+          query_clip_embedding?: string | null
+          query_description_embedding?: string | null
+          query_image_hash?: string | null
+          query_image_url?: string | null
+          query_llama_analysis?: Json | null
+          result_count?: number | null
+          search_execution_time_ms?: number | null
+          search_filters?: Json | null
+          search_type?: string
+          session_id?: string | null
+          similarity_threshold?: number | null
+          top_similarity_score?: number | null
+          user_id?: string | null
         }
         Relationships: []
       }

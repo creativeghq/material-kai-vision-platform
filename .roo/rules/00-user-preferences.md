@@ -30,6 +30,7 @@ preferred_language = "en" # << OPTIONAL. Fallback if specific input/output prefs
 preferred_input_language = "en" # << OPTIONAL. Language user primarily uses for prompts >>
 preferred_output_language = "en" # << OPTIONAL. Preferred language for conversational output, comments, etc. >>
 mcp_github_install_declined = false # << NEW - Boolean. Set to true if user explicitly declines GitHub MCP install suggestion >>
+supabase_mcp_first = true # << NEW - Boolean. Always use Supabase MCP tools before direct database access for Supabase projects >>
 +++
 
 # User Preferences Data (Defined in TOML)

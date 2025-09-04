@@ -15,18 +15,23 @@
         "./src/*"
       ]
     },
+    "strict": true,
     "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
     "noUnusedParameters": true,
-    "skipLibCheck": true,
     "noUnusedLocals": true,
-    "strictNullChecks": true,
+    "skipLibCheck": true,
     "lib": [
       "dom",
       "dom.iterable",
       "esnext"
     ],
     "allowJs": true,
-    "strict": false,
     "noEmit": true,
     "incremental": true,
     "module": "esnext",

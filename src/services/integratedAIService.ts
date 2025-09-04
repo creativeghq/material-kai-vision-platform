@@ -14,16 +14,33 @@ import {
 export interface MaterialAgentTaskRequest {
   user_id: string;
   task_type: string;
-  input_data: any;
+  input_data: MaterialAgentInputData;
   priority?: number;
   required_agents?: string[];
+}
+
+export interface AgentExecutionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface MaterialAgentInputData {</search>
+  image_data?: File;
+  analysis_type?: string;
+  room_type?: string;
+  nerf_data?: any;
+  material_data?: any;
+  spatial_analysis?: any;
+  user_preferences?: UserPreferences;
 }
 
 export interface AgentExecution {
   agent_id: string;
   agent_name: string;
   specialization: string;
-  result: any;
+  result: AgentExecutionResult;
   confidence: number;
   execution_time_ms: number;
   reasoning: string;
@@ -32,7 +49,7 @@ export interface AgentExecution {
 export interface MaterialAgentResult {
   success: boolean;
   task_id: string;
-  coordinated_result: any;
+  coordinated_result: AgentExecutionResult;
   agent_executions: AgentExecution[];
   coordination_summary: string;
   overall_confidence: number;

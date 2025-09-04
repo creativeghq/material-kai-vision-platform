@@ -12,7 +12,7 @@ tags = ["mdtm", "toml", "workflow", "delegation", "task-creation", "coordination
 related_context = [
     ".roo/rules/01-standard-toml-md-format.md",
     ".roo/rules/11-session-management.md", # Logging guidance via Session Management, also general session management rule
-    ".ruru/tasks/",
+    ".roopm/tasks/",
     ".ruru/templates/toml-md/",
     ".ruru/docs/standards/mdtm_standard.md", # General MDTM standard (might need updating for TOML emphasis)
     ".ruru/modes/roo-commander/kb/12-logging-procedures.md" # Detailed logging KB
@@ -41,7 +41,7 @@ This rule defines the standard procedure for creating Markdown-Driven Task Manag
 
 1.  **Generate Task ID:** Create a unique task ID following the convention `TASK-[MODE_PREFIX]-[YYYYMMDD-HHMMSS]` (e.g., `TASK-REACT-20250422-140500`).
 2.  **Select Template:** Choose the appropriate MDTM template from `.ruru/templates/toml-md/` (e.g., `01_mdtm_feature.md`, `02_mdtm_bug.md`).
-3.  **Determine Path:** Construct the full path for the new task file within the `.ruru/tasks/` structure (e.g., `.ruru/tasks/FEATURE_Login/TASK-REACT-20250422-140500.md`).
+3.  **Determine Path:** Construct the full path for the new task file within the `.roopm/tasks/` structure (e.g., `.roopm/tasks/FEATURE_Login/TASK-REACT-20250422-140500.md`).
 4.  **Prepare Content:**
     *   **TOML Frontmatter:** Populate the `+++` block with essential metadata, adhering strictly to TOML syntax (Rule `01-standard-toml-md-format.md`). Include at minimum:
         *   `id`: The generated Task ID.
@@ -66,7 +66,7 @@ This rule defines the standard procedure for creating Markdown-Driven Task Manag
 *   When receiving a `new_task` instruction referencing an MDTM task file:
     1.  **MUST** use `read_file` to load the content of the specified task file path.
     2.  **MUST** perform the work described in the Markdown body, following the checklist items.
-    3.  **MUST** update the Markdown checklist (`- [ ]` -> `- [✅]`) as steps are completed using `apply_diff` or `search_and_replace`. **MUST** add brief notes/logs to the **active session log** (`.ruru/sessions/SESSION-.../session_log.md`) if a `RooComSessionID` was provided in the delegation message, otherwise append logs to the Markdown body of this task file. Use appropriate logging tools (e.g., `insert_content`) as per KB `12-logging-procedures.md`.
+    3.  **MUST** update the Markdown checklist (`- [ ]` -> `- [✅]`) as steps are completed using `apply_diff` or `search_and_replace`. **MUST** add brief notes/logs to the **active session log** (`.roopm/sessions/SESSION-.../session_log.md`) if a `RooComSessionID` was provided in the delegation message, otherwise append logs to the Markdown body of this task file. Use appropriate logging tools (e.g., `insert_content`) as per KB `12-logging-procedures.md`.
     4.  **MUST** update the `status` field in the **TOML block** of the task file upon completion (`"🟢 Done"`) or if blocked (`"⚪ Blocked"`), along with the `updated_date`, using `apply_diff`.
     5.  **MUST** report the final outcome back to the Coordinator using `attempt_completion`, referencing the MDTM task file path.
 

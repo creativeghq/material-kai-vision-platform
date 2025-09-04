@@ -1,40 +1,52 @@
 /**
  * MIVAA Search Integration Service
- * Provides search capabilities through the MIVAA gateway
+ * Provides search and vector similarity capabilities through the MIVAA gateway
  */
 
 export interface SearchRequest {
   query: string;
-  filters?: {
-    documentType?: string;
-    dateRange?: {
-      start: string;
-      end: string;
-    };
-    tags?: string[];
-  };
   limit?: number;
-  offset?: number;
+  threshold?: number;
+  filters?: Record<string, unknown>;
+  searchType?: 'semantic' | 'vector' | 'hybrid';
 }
 
 export interface SearchResult {
   id: string;
-  title: string;
   content: string;
+  metadata: Record<string, unknown>;
   score: number;
-  metadata: {
-    documentType: string;
-    createdAt: string;
-    tags: string[];
-    source?: string;
-  };
+  embedding?: number[];
 }
 
 export interface SearchResponse {
   results: SearchResult[];
-  total: number;
-  query: string;
-  executionTime: number;
+  totalCount: number;
+  searchType: string;
+  processingTime: number;
+  metadata?: {
+    queryEmbedding?: number[];
+    searchParameters?: Record<string, unknown>;
+  };
+}
+
+export interface VectorSearchRequest {
+  embedding: number[];
+  limit?: number;
+  threshold?: number;
+  filters?: Record<string, unknown>;
+}
+
+export interface HybridSearchRequest {
+  textQuery: string;
+  vectorEmbedding?: number[];
+  weights?: {
+    semantic: number;
+    vector: number;
+  };
+  limit?: number;
+  threshold?: number;
+  filters?: Record<string, unknown>;
 }
 
 export class MivaaSearchIntegration {
@@ -47,37 +59,7 @@ export class MivaaSearchIntegration {
   }
 
   /**
-   * Perform a search using MIVAA service
-   */
-  async search(request: SearchRequest): Promise<SearchResponse> {
-    try {
-      const response = await fetch(`${this.gatewayUrl}/api/mivaa/gateway`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          action: 'search',
-          payload: request,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`MIVAA search request failed: ${response.status} ${errorText}`);
-      }
-
-      const result = await response.json();
-      return result.data as SearchResponse;
-    } catch (error) {
-      console.error('Error performing search via MIVAA gateway:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Perform a semantic search using MIVAA service
+   * Perform semantic search using MIVAA service
    */
   async semanticSearch(request: SearchRequest): Promise<SearchResponse> {
     try {
@@ -89,7 +71,10 @@ export class MivaaSearchIntegration {
         },
         body: JSON.stringify({
           action: 'semantic_search',
-          payload: request,
+          payload: {
+            ...request,
+            searchType: 'semantic',
+          },
         }),
       });
 
@@ -107,9 +92,9 @@ export class MivaaSearchIntegration {
   }
 
   /**
-   * Get search suggestions based on partial query
+   * Perform vector similarity search using MIVAA service
    */
-  async getSuggestions(partialQuery: string, limit: number = 5): Promise<string[]> {
+  async vectorSearch(request: VectorSearchRequest): Promise<SearchResponse> {
     try {
       const response = await fetch(`${this.gatewayUrl}/api/mivaa/gateway`, {
         method: 'POST',
@@ -118,20 +103,105 @@ export class MivaaSearchIntegration {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          action: 'get_suggestions',
-          payload: { query: partialQuery, limit },
+          action: 'vector_search',
+          payload: request,
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`MIVAA suggestions request failed: ${response.status} ${errorText}`);
+        throw new Error(`MIVAA vector search request failed: ${response.status} ${errorText}`);
       }
 
       const result = await response.json();
-      return result.data as string[];
+      return result.data as SearchResponse;
     } catch (error) {
-      console.error('Error getting suggestions via MIVAA gateway:', error);
+      console.error('Error performing vector search via MIVAA gateway:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform hybrid search combining semantic and vector search
+   */
+  async hybridSearch(request: HybridSearchRequest): Promise<SearchResponse> {
+    try {
+      const response = await fetch(`${this.gatewayUrl}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          action: 'hybrid_search',
+          payload: {
+            ...request,
+            weights: request.weights || { semantic: 0.7, vector: 0.3 },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`MIVAA hybrid search request failed: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      return result.data as SearchResponse;
+    } catch (error) {
+      console.error('Error performing hybrid search via MIVAA gateway:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search for similar documents by content
+   */
+  async searchSimilarDocuments(content: string, options?: Partial<SearchRequest>): Promise<SearchResponse> {
+    const searchRequest: SearchRequest = {
+      query: content,
+      limit: options?.limit || 10,
+      threshold: options?.threshold || 0.7,
+      searchType: 'semantic',
+    };
+
+    if (options?.filters) {
+      searchRequest.filters = options.filters;
+    }
+
+    return this.semanticSearch(searchRequest);
+  }
+
+  /**
+   * Get search recommendations based on user query
+   */
+  async getSearchRecommendations(query: string, limit: number = 5): Promise<SearchResponse> {
+    try {
+      const response = await fetch(`${this.gatewayUrl}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          action: 'get_recommendations',
+          payload: {
+            query,
+            limit,
+            type: 'search_suggestions',
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`MIVAA recommendations request failed: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      return result.data as SearchResponse;
+    } catch (error) {
+      console.error('Error getting search recommendations via MIVAA gateway:', error);
       throw error;
     }
   }
@@ -139,7 +209,7 @@ export class MivaaSearchIntegration {
   /**
    * Check if the MIVAA search service is available
    */
-  async healthCheck(): Promise<boolean> {
+  async healthCheck(): Promise<{ status: string }> {
     try {
       const response = await fetch(`${this.gatewayUrl}/api/mivaa/health`, {
         method: 'GET',
@@ -148,10 +218,49 @@ export class MivaaSearchIntegration {
         },
       });
 
-      return response.ok;
+      return {
+        status: response.ok ? 'healthy' : 'unhealthy'
+      };
     } catch (error) {
       console.error('MIVAA search service health check failed:', error);
-      return false;
+      return { status: 'unhealthy' };
+    }
+  }
+
+  /**
+   * Get search analytics and statistics
+   */
+  async getSearchAnalytics(): Promise<{
+    totalSearches: number;
+    avgResponseTime: number;
+    popularQueries: string[];
+    searchTypes: Record<string, number>;
+  }> {
+    try {
+      const response = await fetch(`${this.gatewayUrl}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          action: 'get_analytics',
+          payload: {
+            type: 'search_analytics',
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`MIVAA analytics request failed: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error('Error getting search analytics via MIVAA gateway:', error);
+      throw error;
     }
   }
 }

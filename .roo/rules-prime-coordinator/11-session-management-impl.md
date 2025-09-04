@@ -29,7 +29,7 @@ This rule details how `prime-coordinator` implements the standard Session Manage
     *   **Prompting First:** Unless the initial task is clearly trivial, **MUST** first prompt the user regarding session log creation (per Rule 11, Section 3) using `ask_followup_question` with options like: "Create log with goal: [Suggest goal]", "Create log (no goal)", "Proceed without log (default)".
     *   **Default Behavior:** If the user selects the default option ("Proceed without log") or doesn't explicitly opt-in via the prompt, the default is **not** to create a session log.
     *   **Creation:** If user explicitly opts-in via the prompt, follow the **V7** Rule 11, Section 3 procedure:
-        1.  Create main session directory: `.ruru/sessions/SESSION-[SanitizedGoal]-[YYMMDDHHMM]/`.
+        1.  Create main session directory: `.roopm/sessions/SESSION-[SanitizedGoal]-[YYMMDDHHMM]/`.
         2.  Create `artifacts/` subdirectory.
         3.  Create standard artifact subdirectories (e.g., `notes/`, `learnings/`) within `artifacts/` based on `.ruru/docs/standards/session_artifact_guidelines_v1.md`.
         4.  Copy template `.ruru/templates/plain-md/session_artifact_subdir_readme.md` into each standard subdirectory, renaming it `README.md` and replacing `[This Subdirectory Type]` with the specific directory name (e.g., "Notes").

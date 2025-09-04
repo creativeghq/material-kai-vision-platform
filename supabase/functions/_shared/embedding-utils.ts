@@ -1,21 +1,22 @@
 /**
- * Shared Embedding Utilities for Supabase Functions
+ * Shared MIVAA Embedding Utilities for Supabase Functions
  *
- * This module provides centralized embedding generation utilities that ensure
- * consistency across all Supabase Edge Functions. It uses the same configuration
- * standards as the frontend application.
+ * This module provides centralized embedding generation utilities through MIVAA gateway
+ * that ensure consistency across all Supabase Edge Functions. It uses the same configuration
+ * standards as the frontend application but routes through MIVAA for centralized AI management.
  *
  * Environment Variables Required:
- * - EMBEDDING_MODEL: The OpenAI embedding model to use (default: text-embedding-ada-002)
+ * - MIVAA_GATEWAY_URL: Main app URL for MIVAA gateway access
+ * - MIVAA_API_KEY: API key for MIVAA authentication
+ * - EMBEDDING_MODEL: The embedding model to use (default: text-embedding-3-small)
  * - EMBEDDING_DIMENSIONS: The vector dimensions (default: 1536)
- * - OPENAI_API_KEY: OpenAI API key for embedding generation
  */
 
 export interface EmbeddingResponse {
   embedding: number[];
   model: string;
   dimensions: number;
-  usage: {
+  usage?: {
     prompt_tokens: number;
     total_tokens: number;
   };
@@ -27,6 +28,23 @@ export interface EmbeddingError {
   details?: any;
 }
 
+export interface SemanticAnalysisRequest {
+  image_data: string;
+  analysis_type?: string;
+  prompt?: string;
+  options?: {
+    temperature?: number;
+    max_tokens?: number;
+  };
+}
+
+export interface SemanticAnalysisResponse {
+  analysis: string;
+  confidence: number;
+  model_used: string;
+  processing_time_ms: number;
+}
+
 /**
  * Get environment variable with fallback
  */
@@ -36,10 +54,18 @@ function getEnv(key: string, fallback: string = ''): string {
 }
 
 /**
- * Configuration for embedding generation
+ * Configuration for MIVAA integration and embedding generation
  */
+export const MIVAA_CONFIG = {
+  gatewayUrl: getEnv('MIVAA_GATEWAY_URL', 'http://localhost:3000'),
+  apiKey: getEnv('MIVAA_API_KEY', ''),
+  timeout: 30000,
+  maxRetries: 3,
+  retryDelay: 1000,
+} as const;
+
 export const EMBEDDING_CONFIG = {
-  model: getEnv('EMBEDDING_MODEL', 'text-embedding-ada-002'),
+  model: getEnv('EMBEDDING_MODEL', 'text-embedding-3-small'),
   dimensions: parseInt(getEnv('EMBEDDING_DIMENSIONS', '1536')),
   maxTokens: 8191,
   maxRetries: 3,
@@ -74,16 +100,15 @@ function validateConfig(): void {
 }
 
 /**
- * Generate standard embedding using the configured model and dimensions
+ * Generate standard embedding using MIVAA gateway
  *
  * @param text - The text to generate embeddings for
  * @returns Promise<number[]> - The embedding vector
  * @throws Error if embedding generation fails
  */
 export async function generateStandardEmbedding(text: string): Promise<number[]> {
-  const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openAIApiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is required');
+  if (!MIVAA_CONFIG.apiKey) {
+    throw new Error('MIVAA_API_KEY environment variable is required');
   }
 
   // Validate and truncate text if necessary
@@ -94,23 +119,25 @@ export async function generateStandardEmbedding(text: string): Promise<number[]>
   // Retry logic
   for (let attempt = 1; attempt <= EMBEDDING_CONFIG.maxRetries; attempt++) {
     try {
-      console.log(`🔄 Generating embedding (attempt ${attempt}/${EMBEDDING_CONFIG.maxRetries})`);
+      console.log(`🔄 Generating embedding via MIVAA (attempt ${attempt}/${EMBEDDING_CONFIG.maxRetries})`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), EMBEDDING_CONFIG.requestTimeout);
+      const timeoutId = setTimeout(() => controller.abort(), MIVAA_CONFIG.timeout);
 
-      const response = await fetch('https://api.openai.com/v1/embeddings', {
+      const response = await fetch(`${MIVAA_CONFIG.gatewayUrl}/api/mivaa/gateway`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
+          'Authorization': `Bearer ${MIVAA_CONFIG.apiKey}`,
           'Content-Type': 'application/json',
           'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
         },
         body: JSON.stringify({
-          model: EMBEDDING_CONFIG.model,
-          input: truncatedText,
-          dimensions: EMBEDDING_CONFIG.dimensions,
-          encoding_format: 'float',
+          action: 'generate_embedding',
+          payload: {
+            text: truncatedText,
+            model: EMBEDDING_CONFIG.model,
+            dimensions: EMBEDDING_CONFIG.dimensions,
+          },
         }),
         signal: controller.signal,
       });
@@ -119,23 +146,27 @@ export async function generateStandardEmbedding(text: string): Promise<number[]>
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
       }
 
-      const data = await response.json();
-      const embedding = data.data[0].embedding;
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(`MIVAA embedding error: ${result.error?.message || 'Unknown error'}`);
+      }
+
+      const embedding = result.data.embedding;
 
       // Validate embedding dimensions
       if (embedding.length !== EMBEDDING_CONFIG.dimensions) {
         throw new Error(`Invalid embedding dimensions: expected ${EMBEDDING_CONFIG.dimensions}, got ${embedding.length}`);
       }
 
-      console.log(`✅ Embedding generated successfully: ${embedding.length} dimensions`);
+      console.log(`✅ Embedding generated via MIVAA successfully: ${embedding.length} dimensions`);
       return embedding;
 
     } catch (error) {
       lastError = error as Error;
-      console.error(`❌ Embedding generation attempt ${attempt} failed:`, error);
+      console.error(`❌ MIVAA embedding generation attempt ${attempt} failed:`, error);
 
       // Don't retry on certain errors
       if (error instanceof Error) {
@@ -154,7 +185,7 @@ export async function generateStandardEmbedding(text: string): Promise<number[]>
     }
   }
 
-  throw new Error(`Failed to generate embedding after ${EMBEDDING_CONFIG.maxRetries} attempts. Last error: ${lastError?.message}`);
+  throw new Error(`Failed to generate embedding via MIVAA after ${EMBEDDING_CONFIG.maxRetries} attempts. Last error: ${lastError?.message}`);
 }
 
 /**
@@ -255,6 +286,96 @@ export function validateEmbedding(embedding: number[]): boolean {
 }
 
 /**
+ * Generate semantic analysis for images using MIVAA TogetherAI/LLaMA Vision
+ *
+ * @param imageData - Base64 image data or image URL
+ * @param analysisType - Type of analysis to perform
+ * @returns Promise<string> - Generated semantic description
+ */
+export async function generateSemanticAnalysis(
+  imageData: string,
+  analysisType: string = 'material_identification'
+): Promise<string> {
+  if (!MIVAA_CONFIG.apiKey) {
+    throw new Error('MIVAA_API_KEY environment variable is required');
+  }
+
+  const prompt = `Analyze this material image and provide a concise semantic description focusing on:
+  - Material type and classification
+  - Visual appearance and surface characteristics
+  - Color, texture, and pattern properties
+  - Potential use cases and applications
+  
+  Provide a clear, searchable description in 2-3 sentences.`;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MIVAA_CONFIG.maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Generating semantic analysis via MIVAA (attempt ${attempt}/${MIVAA_CONFIG.maxRetries})`);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), MIVAA_CONFIG.timeout);
+
+      const response = await fetch(`${MIVAA_CONFIG.gatewayUrl}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${MIVAA_CONFIG.apiKey}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
+        },
+        body: JSON.stringify({
+          action: 'semantic_analysis',
+          payload: {
+            image_data: imageData,
+            analysis_type: analysisType,
+            prompt: prompt,
+            options: {
+              temperature: 0.1,
+              max_tokens: 200,
+            },
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(`MIVAA semantic analysis error: ${result.error?.message || 'Unknown error'}`);
+      }
+
+      console.log(`✅ Semantic analysis generated via MIVAA successfully`);
+      return result.data.analysis;
+
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`❌ MIVAA semantic analysis attempt ${attempt} failed:`, error);
+
+      // Don't retry on certain errors
+      if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('403')) {
+          throw error; // Authentication errors shouldn't be retried
+        }
+      }
+
+      // Wait before retrying (except on last attempt)
+      if (attempt < MIVAA_CONFIG.maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, MIVAA_CONFIG.retryDelay * attempt));
+      }
+    }
+  }
+
+  throw new Error(`Failed to generate semantic analysis via MIVAA after ${MIVAA_CONFIG.maxRetries} attempts. Last error: ${lastError?.message}`);
+}
+
+/**
  * Get current embedding configuration info
  *
  * @returns object - Current configuration details
@@ -265,7 +386,8 @@ export function getEmbeddingInfo() {
     dimensions: EMBEDDING_CONFIG.dimensions,
     maxTokens: EMBEDDING_CONFIG.maxTokens,
     supportedModels: Object.keys(EMBEDDING_CONFIG.supportedModels),
-    isMivaaCompatible: EMBEDDING_CONFIG.model === 'text-embedding-ada-002' && EMBEDDING_CONFIG.dimensions === 1536,
+    isMivaaEnabled: Boolean(MIVAA_CONFIG.apiKey),
+    mivaaGatewayUrl: MIVAA_CONFIG.gatewayUrl,
   };
 }
 

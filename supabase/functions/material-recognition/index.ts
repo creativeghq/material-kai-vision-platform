@@ -6,6 +6,41 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+// LLaMA Vision Service Integration
+const TOGETHER_AI_API_KEY = Deno.env.get('TOGETHER_AI_API_KEY');
+const TOGETHER_AI_BASE_URL = 'https://api.together.xyz/v1/chat/completions';
+const LLAMA_VISION_MODEL = 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo';
+
+// Enhanced interfaces for LLaMA Vision integration
+interface VisualAnalysisData {
+  embeddings?: number[];
+  visual_features?: {
+    color_palette?: string[];
+    texture_analysis?: string;
+    pattern_detection?: string;
+    lighting_conditions?: string;
+  };
+  material_segmentation?: Array<{
+    segment_id: number;
+    material_type: string;
+    confidence: number;
+    area_percentage: number;
+    bounding_box: BoundingBox;
+  }>;
+}
+
+interface EnhancedMaterialAnalysis {
+  llama_analysis?: {
+    detailed_description: string;
+    material_properties: MaterialProperties;
+    confidence_score: number;
+    visual_features: VisualAnalysisData['visual_features'];
+  };
+  openai_fallback?: boolean;
+  processing_method: 'llama_vision' | 'openai_vision' | 'catalog_fallback';
+  visual_analysis_id?: string;
+}
+
 interface MaterialRecognitionRequest {
   image_url?: string;
   image_data?: string;
@@ -13,6 +48,130 @@ interface MaterialRecognitionRequest {
   confidence_threshold?: number;
   user_id?: string;
   workspace_id?: string;
+  use_llama_vision?: boolean; // New: Enable LLaMA Vision instead of OpenAI
+  enable_visual_analysis?: boolean; // New: Enable full visual feature extraction
+}
+
+// LLaMA Vision Analysis Function
+async function analyzeWithLLamaVision(
+  imageUrl: string,
+  analysisType: string,
+  confidenceThreshold: number
+): Promise<{ materials: RecognizedMaterial[]; visualAnalysis?: VisualAnalysisData; method: string }> {
+  if (!TOGETHER_AI_API_KEY) {
+    throw new Error('LLaMA Vision API key not configured');
+  }
+
+  try {
+    const response = await fetch(TOGETHER_AI_BASE_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${TOGETHER_AI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: LLAMA_VISION_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert materials scientist and visual analyst. Analyze the image to identify materials and their detailed properties.
+            
+REQUIRED OUTPUT FORMAT - Return ONLY valid JSON:
+{
+  "materials": [
+    {
+      "name": "material name",
+      "confidence": 0.0-1.0,
+      "properties": {
+        "category": "category name",
+        "subcategory": "subcategory if applicable",
+        "color": "primary color description",
+        "texture": "texture description",
+        "finish": "surface finish type",
+        "durability": "durability assessment",
+        "sustainability": "sustainability rating"
+      },
+      "bounding_box": {
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      }
+    }
+  ],
+  "visual_features": {
+    "color_palette": ["#hex1", "#hex2"],
+    "texture_analysis": "detailed texture description",
+    "pattern_detection": "patterns observed",
+    "lighting_conditions": "lighting assessment"
+  },
+  "material_segmentation": [
+    {
+      "segment_id": 1,
+      "material_type": "material type",
+      "confidence": 0.0-1.0,
+      "area_percentage": 0.0-100.0,
+      "bounding_box": {"x": 0, "y": 0, "width": 100, "height": 100}
+    }
+  ]
+}
+
+Analysis precision: ${analysisType}. Minimum confidence threshold: ${confidenceThreshold}. Only include materials you can clearly identify.`
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this image for materials and their properties. Focus on architectural and design materials. Provide detailed material segmentation and visual feature analysis.`
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageUrl,
+                  detail: analysisType === 'comprehensive' ? 'high' : 'auto'
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 2000,
+        temperature: 0.1,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`LLaMA Vision API error: ${response.status} - ${errorData}`);
+    }
+
+    const llamaData = await response.json();
+    const analysisText = llamaData.choices[0].message.content;
+
+    try {
+      const parsedAnalysis = JSON.parse(analysisText);
+      
+      // Convert to our format
+      const materials: RecognizedMaterial[] = parsedAnalysis.materials || [];
+      const visualAnalysis: VisualAnalysisData = {
+        visual_features: parsedAnalysis.visual_features,
+        material_segmentation: parsedAnalysis.material_segmentation
+      };
+
+      return {
+        materials: materials.filter(m => m.confidence >= confidenceThreshold),
+        visualAnalysis,
+        method: 'llama_vision'
+      };
+    } catch (parseError) {
+      console.error('Failed to parse LLaMA Vision response:', parseError);
+      throw new Error('Invalid response format from LLaMA Vision');
+    }
+  } catch (error) {
+    console.error('LLaMA Vision analysis failed:', error);
+    throw error;
+  }
 }
 
 interface MaterialProperties {
@@ -146,12 +305,61 @@ Deno.serve(async (req: Request) => {
 
     // Perform actual material recognition using AI/ML services
     let recognizedMaterials = [];
+    let visualAnalysis: VisualAnalysisData | undefined;
+    let processingMethod = 'catalog_fallback';
 
     try {
-      // Use OpenAI Vision API for material recognition
-      const openaiKey = Deno.env.get('OPENAI_API_KEY');
-      if (openaiKey && body.image_url) {
-        const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Primary: Use LLaMA Vision if enabled and configured
+      if (body.use_llama_vision !== false && TOGETHER_AI_API_KEY && body.image_url) {
+        try {
+          console.log('Starting LLaMA Vision analysis...');
+          const llamaResult = await analyzeWithLLamaVision(
+            body.image_url,
+            analysisType,
+            confidenceThreshold
+          );
+          
+          recognizedMaterials = llamaResult.materials;
+          visualAnalysis = llamaResult.visualAnalysis;
+          processingMethod = llamaResult.method;
+          
+          console.log(`LLaMA Vision analysis completed. Found ${recognizedMaterials.length} materials.`);
+          
+          // Store visual analysis data if enabled
+          if (body.enable_visual_analysis && visualAnalysis && recognitionRecord) {
+            const { error: visualAnalysisError } = await supabase
+              .from('material_visual_analysis')
+              .insert({
+                image_url: body.image_url,
+                user_id: body.user_id,
+                workspace_id: body.workspace_id,
+                visual_features: visualAnalysis.visual_features,
+                material_segmentation: visualAnalysis.material_segmentation,
+                analysis_type: analysisType,
+                confidence_threshold: confidenceThreshold,
+                processing_time_ms: Date.now() - startTime,
+                created_at: new Date().toISOString()
+              });
+              
+            if (visualAnalysisError) {
+              console.error('Failed to store visual analysis:', visualAnalysisError);
+            }
+          }
+          
+        } catch (llamaError) {
+          console.error('LLaMA Vision analysis failed, falling back to OpenAI:', llamaError);
+          // Continue to OpenAI fallback
+        }
+      }
+
+      // Fallback: Use OpenAI Vision API if LLaMA failed or not enabled
+      if (recognizedMaterials.length === 0) {
+        const openaiKey = Deno.env.get('OPENAI_API_KEY');
+        if (openaiKey && body.image_url) {
+          console.log('Using OpenAI Vision as fallback...');
+          processingMethod = 'openai_vision';
+          
+          const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openaiKey}`,
@@ -199,9 +407,10 @@ Deno.serve(async (req: Request) => {
             console.error('Failed to parse AI response:', parseError);
           }
         }
+        }
       }
 
-      // If AI recognition failed or no materials found, query materials catalog for similar materials
+      // Final fallback: Query materials catalog for similar materials
       if (recognizedMaterials.length === 0) {
         const { data: catalogMaterials, error: catalogError } = await supabase
           .from('materials_catalog')
@@ -261,6 +470,7 @@ Deno.serve(async (req: Request) => {
           .update({
             status: 'completed',
             materials_found: filteredMaterials.length,
+            processing_method: processingMethod,
             updated_at: new Date().toISOString(),
           })
           .eq('id', recognitionRecord.id);

@@ -23,8 +23,9 @@ relevance = "Critical: Prevents errors due to incorrect path resolution in gener
 
 1.  **Mandatory Workspace Relativity:** When generating content for configuration files (e.g., `.mode.md`, `.rule.md`, `.workflow.md`, `.sop.md`), all file and directory paths specified within TOML frontmatter or Markdown content **MUST** be relative to the workspace root.
 2.  **Valid Starting Points:** Paths should typically start with:
-    *   `.ruru/`
-    *   `.roo/`
+    *   `.ruru/` (Core Roo system files)
+    *   `.roo/` (Core Roo rules and config)
+    *   `.roopm/` (Project management: sessions, tasks, planning)
     *   `./` (for files/dirs directly within the workspace root)
     *   Or another top-level directory within the workspace.
 3.  **Forbidden Navigation:** Paths **MUST NOT** use `../` to navigate up the directory tree relative to the *target* configuration file's location. All paths must resolve correctly when interpreted from the workspace root.

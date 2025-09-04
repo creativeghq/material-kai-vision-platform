@@ -1,6 +1,7 @@
 import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { MATERIAL_CATEGORIES } from '../../src/types/materials.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -188,6 +189,14 @@ interface AnalysisResult {
     method: string;
     processing_time_ms: number;
     model_version: string;
+    extracted_meta?: {
+      finish?: string;
+      size?: string;
+      installation_method?: string;
+      application?: string;
+      r11?: string;
+      metal_types?: string[];
+    };
   };
 }
 
@@ -233,21 +242,110 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
       messages: [
         {
           role: 'system',
-          content: 'You are an expert materials scientist specializing in visual material analysis. Analyze the image to identify the material, its properties, and quality indicators. Respond with structured JSON matching the AnalysisResult interface.',
+          content: `You are an expert materials scientist specializing in visual material analysis and catalog data extraction. Analyze the image to identify the material, its properties, quality indicators, and extract meta fields from catalog content.
+
+Available material categories: ${Object.keys(MATERIAL_CATEGORIES).join(', ')}
+
+For each category, extract these meta fields when visible in the catalog:
+- finish: surface finish type
+- size: dimensions/specifications
+- installation_method: how the material is installed
+- application: where/how the material is used
+- r11: R11 rating if visible (thermal resistance)
+- metal_types: types of metals if applicable
+
+Respond with structured JSON matching the AnalysisResult interface, including extracted meta data in the metadata field.`,
         },
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: `Perform comprehensive visual analysis of this material. Identify:
-              1. Material type and category
-              2. Observable physical properties
-              3. Surface characteristics and finish quality
-              4. Any visible defects or irregularities
-              5. Estimated composition if determinable
-              
-              Provide detailed analysis in JSON format.`,
+              text: `Perform comprehensive visual analysis of this material catalog image. Extract:
+
+1. MATERIAL IDENTIFICATION:
+   - Primary material type and category from: ${Object.keys(MATERIAL_CATEGORIES).join(', ')}
+   - Observable physical properties
+   - Estimated composition if determinable
+
+2. FUNCTIONAL METADATA EXTRACTION (from catalog text/specifications):
+   
+   A. SLIP AND SAFETY RATINGS:
+   - slip_resistance_r_value: DIN 51130 R-values (R9, R10, R11, R12, R13)
+   - barefoot_ramp_rating: DIN 51097 classes (A, B, C for wet barefoot areas)
+   - pendulum_test_value: BS 7976 PTV ratings for wet/dry slip resistance
+   - dcof_rating: ANSI A137.1 Dynamic Coefficient of Friction (≥0.42 recommended)
+   - slip_resistance_general: Any other slip resistance certifications or ratings
+   
+   B. SURFACE GLOSS/REFLECTIVITY:
+   - surface_gloss_level: Super Polished, Polished, Satin/Semi-polished, Matte/Velvet, Anti-glare
+   - gloss_measurement: Numerical gloss values if specified (GU - Gloss Units)
+   
+   C. MECHANICAL PROPERTIES:
+   - mohs_hardness: Hardness scale rating (1-10)
+   - pei_rating: Porcelain Enamel Institute wear rating (Class 0-5)
+   - breaking_strength: Flexural strength in N/mm² or MPa
+   - impact_resistance: ISO 10545-5 ratings or impact test results
+   
+   D. THERMAL PROPERTIES:
+   - thermal_conductivity: Thermal conductivity values (W/m·K)
+   - thermal_expansion: Thermal expansion coefficient
+   - heat_resistance: Maximum temperature ratings
+   - radiant_heating_compatible: Compatibility with underfloor heating
+   
+   E. WATER AND MOISTURE RESISTANCE:
+   - water_absorption: ISO 10545-3 percentage (<0.5% non-porous, etc.)
+   - frost_resistance: Frost resistance ratings or certifications
+   - hydrophobic_treatment: Nano-sealed or hydrophobic surface treatments
+   - mold_mildew_resistant: Anti-microbial or mold resistance properties
+   
+   F. CHEMICAL AND HYGIENE RESISTANCE:
+   - chemical_resistance: ISO 10545-13 ratings or chemical resistance classes
+   - stain_resistance: ISO 10545-14 classes (1-5) or stain resistance ratings
+   - antibacterial_surface: Antibacterial/antimicrobial certifications
+   - acid_alkali_resistance: Specific acid or alkali resistance ratings
+   - food_safe_certification: Food-safe or kitchen-safe certifications
+   
+   G. ACOUSTIC AND ELECTRICAL PROPERTIES:
+   - sound_absorption: NRC ratings or dB reduction values
+   - impact_insulation: IIC ratings for impact sound transmission
+   - antistatic_properties: ESD-safe or anti-static ratings
+   - electrical_conductivity: Conductive tile specifications if applicable
+   
+   H. ENVIRONMENTAL AND SUSTAINABILITY:
+   - voc_emissions: Greenguard, FloorScore, or other VOC emission ratings
+   - recycled_content: Percentage of recycled materials
+   - eco_certifications: LEED credits, BREEAM ratings, other eco-labels
+   - carbon_footprint: Low-carbon, geopolymer, or carbon-neutral ratings
+   - recyclability: End-of-life recyclability or circular material properties
+   
+   I. DIMENSIONAL AND AESTHETIC:
+   - edge_type: Rectified, non-rectified, or calibrated edges
+   - calibration_grade: Dimensional accuracy classifications
+   - texture_3d_rating: 3D texture depth or tactile surface ratings
+   - color_uniformity: Shade variation ratings (V1-V4)
+   - translucency: Backlit capability or light transmission properties
+   - luminescent_properties: Glow-in-the-dark or photoluminescent features
+   
+   LEGACY FIELDS (maintain for compatibility):
+   - finish: surface finish type (use surface_gloss_level for new extractions)
+   - size: dimensions and specifications
+   - installation_method: installation technique
+   - application: usage context (floor, wall, outdoor, etc.)
+   - r11: R11 thermal resistance rating (use slip_resistance_r_value for new extractions)
+   - metal_types: specific metal compositions if applicable
+
+3. QUALITY ASSESSMENT:
+   - Surface characteristics and finish quality
+   - Any visible defects or irregularities
+   - Uniformity and consistency indicators
+
+4. CATALOG CONTEXT:
+   - Product specifications and standards
+   - Installation requirements
+   - Performance characteristics
+
+Provide detailed analysis in JSON format with all extracted meta fields included.`,
             },
             {
               type: 'image_url',
@@ -259,7 +357,7 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
           ],
         },
       ],
-      max_tokens: 1500,
+      max_tokens: 2000,
       temperature: 0.1,
     }),
   });
@@ -274,6 +372,78 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
 
   try {
     const analysis = JSON.parse(analysisText);
+
+    // Extract functional metadata fields from the analysis
+    const metadata = analysis.metadata || {};
+    const functionalMetadata = analysis.functional_metadata || {};
+    
+    const extractedMeta = {
+      // Legacy fields (maintain compatibility)
+      finish: metadata.finish || analysis.finish,
+      size: metadata.size || analysis.size,
+      installation_method: metadata.installation_method || analysis.installation_method,
+      application: metadata.application || analysis.application,
+      r11: metadata.r11 || analysis.r11,
+      metal_types: metadata.metal_types || analysis.metal_types,
+      
+      // Slip and Safety Ratings
+      slip_resistance_r_value: functionalMetadata.slip_resistance_r_value || metadata.slip_resistance_r_value,
+      barefoot_ramp_rating: functionalMetadata.barefoot_ramp_rating || metadata.barefoot_ramp_rating,
+      pendulum_test_value: functionalMetadata.pendulum_test_value || metadata.pendulum_test_value,
+      dcof_rating: functionalMetadata.dcof_rating || metadata.dcof_rating,
+      slip_resistance_general: functionalMetadata.slip_resistance_general || metadata.slip_resistance_general,
+      
+      // Surface Gloss/Reflectivity
+      surface_gloss_level: functionalMetadata.surface_gloss_level || metadata.surface_gloss_level,
+      gloss_measurement: functionalMetadata.gloss_measurement || metadata.gloss_measurement,
+      
+      // Mechanical Properties
+      mohs_hardness: functionalMetadata.mohs_hardness || metadata.mohs_hardness,
+      pei_rating: functionalMetadata.pei_rating || metadata.pei_rating,
+      breaking_strength: functionalMetadata.breaking_strength || metadata.breaking_strength,
+      impact_resistance: functionalMetadata.impact_resistance || metadata.impact_resistance,
+      
+      // Thermal Properties
+      thermal_conductivity: functionalMetadata.thermal_conductivity || metadata.thermal_conductivity,
+      thermal_expansion: functionalMetadata.thermal_expansion || metadata.thermal_expansion,
+      heat_resistance: functionalMetadata.heat_resistance || metadata.heat_resistance,
+      radiant_heating_compatible: functionalMetadata.radiant_heating_compatible || metadata.radiant_heating_compatible,
+      
+      // Water and Moisture Resistance
+      water_absorption: functionalMetadata.water_absorption || metadata.water_absorption,
+      frost_resistance: functionalMetadata.frost_resistance || metadata.frost_resistance,
+      hydrophobic_treatment: functionalMetadata.hydrophobic_treatment || metadata.hydrophobic_treatment,
+      mold_mildew_resistant: functionalMetadata.mold_mildew_resistant || metadata.mold_mildew_resistant,
+      
+      // Chemical and Hygiene Resistance
+      chemical_resistance: functionalMetadata.chemical_resistance || metadata.chemical_resistance,
+      stain_resistance: functionalMetadata.stain_resistance || metadata.stain_resistance,
+      antibacterial_surface: functionalMetadata.antibacterial_surface || metadata.antibacterial_surface,
+      acid_alkali_resistance: functionalMetadata.acid_alkali_resistance || metadata.acid_alkali_resistance,
+      food_safe_certification: functionalMetadata.food_safe_certification || metadata.food_safe_certification,
+      
+      // Acoustic and Electrical Properties
+      sound_absorption: functionalMetadata.sound_absorption || metadata.sound_absorption,
+      impact_insulation: functionalMetadata.impact_insulation || metadata.impact_insulation,
+      antistatic_properties: functionalMetadata.antistatic_properties || metadata.antistatic_properties,
+      electrical_conductivity: functionalMetadata.electrical_conductivity || metadata.electrical_conductivity,
+      
+      // Environmental and Sustainability
+      voc_emissions: functionalMetadata.voc_emissions || metadata.voc_emissions,
+      recycled_content: functionalMetadata.recycled_content || metadata.recycled_content,
+      eco_certifications: functionalMetadata.eco_certifications || metadata.eco_certifications,
+      carbon_footprint: functionalMetadata.carbon_footprint || metadata.carbon_footprint,
+      recyclability: functionalMetadata.recyclability || metadata.recyclability,
+      
+      // Dimensional and Aesthetic
+      edge_type: functionalMetadata.edge_type || metadata.edge_type,
+      calibration_grade: functionalMetadata.calibration_grade || metadata.calibration_grade,
+      texture_3d_rating: functionalMetadata.texture_3d_rating || metadata.texture_3d_rating,
+      color_uniformity: functionalMetadata.color_uniformity || metadata.color_uniformity,
+      translucency: functionalMetadata.translucency || metadata.translucency,
+      luminescent_properties: functionalMetadata.luminescent_properties || metadata.luminescent_properties,
+    };
+
     return {
       mode: 'visual',
       confidence: analysis.confidence || 0.8,
@@ -284,6 +454,7 @@ async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> 
         method: 'gpt-4o-vision',
         processing_time_ms: Date.now() - startTime,
         model_version: 'gpt-4o-2024-05-13',
+        extracted_meta: extractedMeta,
       },
     };
   } catch (error) {

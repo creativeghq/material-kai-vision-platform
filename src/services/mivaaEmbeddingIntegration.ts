@@ -19,6 +19,23 @@ export interface EmbeddingResponse {
   };
 }
 
+export interface SemanticAnalysisRequest {
+  image_data: string;
+  analysis_type?: string;
+  prompt?: string;
+  options?: {
+    temperature?: number;
+    max_tokens?: number;
+  };
+}
+
+export interface SemanticAnalysisResponse {
+  analysis: string;
+  confidence: number;
+  model_used: string;
+  processing_time_ms: number;
+}
+
 export class MivaaEmbeddingIntegration {
   private readonly gatewayUrl: string;
   private readonly apiKey: string;
@@ -84,6 +101,36 @@ export class MivaaEmbeddingIntegration {
       return result.data as EmbeddingResponse[];
     } catch (error) {
       console.error('Error generating batch embeddings via MIVAA gateway:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate semantic analysis for images using TogetherAI/LLaMA Vision via MIVAA
+   */
+  async generateSemanticAnalysis(request: SemanticAnalysisRequest): Promise<SemanticAnalysisResponse> {
+    try {
+      const response = await fetch(`${this.gatewayUrl}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          action: 'semantic_analysis',
+          payload: request,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`MIVAA semantic analysis request failed: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      return result.data as SemanticAnalysisResponse;
+    } catch (error) {
+      console.error('Error generating semantic analysis via MIVAA gateway:', error);
       throw error;
     }
   }

@@ -41,7 +41,8 @@
         "deploy_edge_function",
         "list_edge_functions",
         "list_extensions",
-        "delete_edge_function"
+        "delete_edge_function",
+        "get_advisors"
       ]
     },
     "repomix": {
