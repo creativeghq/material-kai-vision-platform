@@ -16,6 +16,9 @@ import {
   FileText,
   Settings,
   Cpu,
+  Eye,
+  Camera,
+  Image,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,16 +54,16 @@ interface MaterialResult {
 
 interface MessageMetadata {
   taskId?: string;
-  processingTime?: number;
-  overallConfidence?: number;
-  agentCount?: number;
+  processingTime?: number | undefined;
+  overallConfidence?: number | undefined;
+  agentCount?: number | undefined;
   provider?: string;
-  finalScore?: number;
-  ragEnabled?: boolean;
-  attachmentCount?: number;
-  hybridAI?: boolean;
-  attempts?: number;
-  crewAI?: boolean;
+  finalScore?: number | undefined;
+  ragEnabled?: boolean | undefined;
+  attachmentCount?: number | undefined;
+  hybridAI?: boolean | undefined;
+  attempts?: number | undefined;
+  crewAI?: boolean | undefined;
   has3DContent?: boolean;
   designGeneration?: Record<string, unknown>;
 }
@@ -115,6 +118,8 @@ interface HybridModelConfig {
   use3DGeneration: boolean;
   enableRAG: boolean;
   enable3DGeneration: boolean;
+  useVisualSearch: boolean;
+  enableVisualSearch: boolean;
 }
 
 interface RAGResults {
@@ -144,6 +149,7 @@ interface EnhancedContext {
     includeApplicationExamples: boolean;
     use3DGeneration: boolean;
     useRAG: boolean;
+    useVisualSearch: boolean;
   };
   hybridModelConfig: HybridModelConfig;
   attachments: {
@@ -154,6 +160,23 @@ interface EnhancedContext {
     url?: string;
   }[];
   ragResults?: RAGResults;
+  visualSearchResults?: VisualSearchResults;
+}
+
+interface VisualSearchResults {
+  searchId: string;
+  matches: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    similarity_score: number;
+    llama_analysis?: Record<string, unknown>;
+    visual_features?: Record<string, unknown>;
+    thumbnail_url?: string;
+  }>;
+  search_execution_time_ms: number;
+  total_results: number;
+  query_analysis?: Record<string, unknown>;
 }
 
 interface MaterialAgentSearchInterfaceProps {
@@ -183,7 +206,11 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
     use3DGeneration: true,
     enableRAG: true,
     enable3DGeneration: true,
+    useVisualSearch: true,
+    enableVisualSearch: true,
   });
+  const [searchMode, setSearchMode] = useState<'text' | 'visual' | 'hybrid'>('text');
+  const [visualSearchResults, setVisualSearchResults] = useState<VisualSearchResults | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -313,6 +340,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           includeApplicationExamples: true,
           use3DGeneration: hybridConfig.use3DGeneration,
           useRAG: hybridConfig.useRAG,
+          useVisualSearch: hybridConfig.useVisualSearch,
         },
         hybridModelConfig: hybridConfig,
         attachments: attachedFiles.map(file => ({
@@ -366,6 +394,64 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         } catch (ragError) {
           console.warn('⚠️ RAG search failed, continuing without:', ragError);
           // Continue without RAG results
+        }
+      }
+
+      // If Visual Search is enabled and images are attached, perform visual search
+      let visualSearchResults: VisualSearchResults | null = null;
+      if (hybridConfig.useVisualSearch && attachedFiles.some(file => file.type.startsWith('image/'))) {
+        try {
+          console.log('👁️ Performing visual search...');
+          const imageFiles = attachedFiles.filter(file => file.type.startsWith('image/'));
+          
+          for (const imageFile of imageFiles) {
+            try {
+              // Call the visual search API endpoint
+              const apiService = ApiIntegrationService.getInstance();
+              const visualResponse = await apiService.executeSupabaseFunction('visual-search', {
+                user_id: session.user.id,
+                search_type: input.trim() ? 'hybrid' : 'visual', // Hybrid if text + image, pure visual if just image
+                query_text: input.trim() || 'Find similar materials',
+                image_data: {
+                  name: imageFile.name,
+                  type: imageFile.type,
+                  url: imageFile.url,
+                  preview: imageFile.preview,
+                },
+                search_filters: {},
+                similarity_threshold: 0.75,
+                max_results: 20,
+                session_id: sessionId,
+              });
+
+              const apiData = visualResponse.data as any;
+              if (apiData?.success && apiData?.results?.length > 0) {
+                visualSearchResults = {
+                  searchId: apiData.search_id || crypto.randomUUID(),
+                  matches: apiData.results.map((result: any) => ({
+                    id: result.material_id,
+                    name: result.material_name || result.name,
+                    description: result.description,
+                    similarity_score: result.similarity_score,
+                    llama_analysis: result.llama_analysis,
+                    visual_features: result.visual_features,
+                    thumbnail_url: result.thumbnail_url,
+                  })),
+                  search_execution_time_ms: apiData.search_execution_time_ms || 0,
+                  total_results: apiData.results.length,
+                  query_analysis: apiData.query_analysis,
+                };
+                console.log('✅ Visual search completed:', visualSearchResults);
+                enhancedContext.visualSearchResults = visualSearchResults;
+                setVisualSearchResults(visualSearchResults);
+                break; // Use first image for now
+              }
+            } catch (imageError) {
+              console.warn(`⚠️ Visual search failed for ${imageFile.name}:`, imageError);
+            }
+          }
+        } catch (visualError) {
+          console.warn('⚠️ Visual search failed, continuing without:', visualError);
         }
       }
 
@@ -687,6 +773,57 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                         )}
                       </div>
                     )}
+                    {/* Visual Search Results */}
+                    {visualSearchResults && visualSearchResults.matches.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Eye className="h-3 w-3" />
+                          Visual Search Results ({visualSearchResults.total_results} found)
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {visualSearchResults.matches.slice(0, 6).map((match) => (
+                            <div
+                              key={match.id}
+                              onClick={() => handleMaterialClick({
+                                id: match.id,
+                                name: match.name,
+                                description: match.description || 'No description available',
+                                relevanceScore: match.similarity_score,
+                                source: 'visual_search'
+                              })}
+                              className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                            >
+                              {match.thumbnail_url && (
+                                <img 
+                                  src={match.thumbnail_url} 
+                                  alt={match.name}
+                                  className="w-full h-16 object-cover rounded mb-1"
+                                />
+                              )}
+                              <div className="font-medium text-sm">{match.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {match.description}
+                              </div>
+                              <div className="flex items-center gap-1 mt-1">
+                                <Badge className="text-xs border border-blue-200 bg-blue-50 text-blue-700">
+                                  <Eye className="h-2 w-2 mr-1" />
+                                  {Math.round(match.similarity_score * 100)}% visual match
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {visualSearchResults.matches.length > 6 && (
+                          <div className="text-xs text-muted-foreground">
+                            +{visualSearchResults.matches.length - 6} more visual matches found
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground">
+                          Visual search completed in {visualSearchResults.search_execution_time_ms}ms
+                        </div>
+                      </div>
+                    )}
+
 
                     {/* Suggestions */}
                     {message.suggestions && message.suggestions.length > 0 && (

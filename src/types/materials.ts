@@ -1,6 +1,13 @@
 // Material categories are now defined using the MATERIAL_CATEGORIES constant below
 // This provides better type safety and consistency across the application
 
+// Import unified API types for enhanced functionality
+import type {
+  MaterialMetafieldValue,
+  MaterialImage,
+  MaterialRelationship
+} from './unified-material-api';
+
 /**
  * Detection methods available for material recognition
  */
@@ -438,6 +445,14 @@ export interface Material {
   /** Additional metadata and custom properties */
   metadata: MaterialMetadata;
   /** URL to main image (legacy compatibility) */
+  
+  // Enhanced metafield system integration (optional for backward compatibility)
+  /** Dynamic metafield values for custom properties */
+  metafieldValues?: MaterialMetafieldValue[];
+  /** Associated images with metadata */
+  images?: MaterialImage[];
+  /** Material relationships (variants, alternatives, components) */
+  relationships?: MaterialRelationship[];
   imageUrl?: string;
 }
 
@@ -1318,8 +1333,8 @@ export function getAllMaterialApplications(): string[] {
 export interface MoodBoard {
   /** Unique identifier for the mood board */
   id: string;
-  /** Name of the mood board */
-  name: string;
+  /** Title of the mood board */
+  title: string;
   /** Description of the mood board theme */
   description?: string;
   /** Array of material IDs included in the mood board */
@@ -1340,4 +1355,385 @@ export interface MoodBoard {
   createdBy: string;
   /** Thumbnail image URL */
   thumbnailUrl?: string;
+}
+
+
+/**
+ * NeRF (Neural Radiance Fields) Data Structures
+ * Used for 3D reconstruction and spatial analysis
+ */
+export interface NeRFData {
+  /** Unique identifier for the NeRF reconstruction */
+  reconstruction_id: string;
+  /** Point cloud data from the reconstruction */
+  point_cloud?: {
+    /** Array of 3D points */
+    points: Array<{ x: number; y: number; z: number }>;
+    /** Color information for each point */
+    colors?: Array<{ r: number; g: number; b: number }>;
+    /** Confidence scores for point accuracy */
+    confidence_scores?: number[];
+  };
+  /** Camera poses used during reconstruction */
+  camera_poses?: Array<{
+    /** Position of camera in 3D space */
+    position: { x: number; y: number; z: number };
+    /** Rotation quaternion */
+    rotation: { x: number; y: number; z: number; w: number };
+    /** Camera intrinsic parameters */
+    intrinsics?: {
+      focal_length: number;
+      principal_point: { x: number; y: number };
+    };
+  }>;
+  /** Mesh data extracted from NeRF */
+  mesh_data?: {
+    /** Vertex positions */
+    vertices: Array<{ x: number; y: number; z: number }>;
+    /** Face indices */
+    faces: Array<{ a: number; b: number; c: number }>;
+    /** Texture coordinates */
+    texture_coords?: Array<{ u: number; v: number }>;
+  };
+  /** Quality metrics for the reconstruction */
+  quality_metrics?: {
+    /** Overall reconstruction quality score (0-1) */
+    quality_score: number;
+    /** Number of input images used */
+    input_image_count: number;
+    /** Processing time in milliseconds */
+    processing_time_ms: number;
+    /** Error metrics */
+    reconstruction_error?: number;
+  };
+  /** Metadata about the reconstruction process */
+  metadata?: {
+    /** Timestamp when reconstruction was created */
+    created_at: string;
+    /** Processing parameters used */
+    processing_params?: Record<string, unknown>;
+    /** Source data information */
+    source_info?: {
+      image_resolution: string;
+      capture_device: string;
+      capture_settings?: Record<string, unknown>;
+    };
+  };
+}
+
+/**
+ * Spatial Analysis Data Structures
+ * Used for analyzing spatial relationships and room characteristics
+ */
+export interface SpatialAnalysisData {
+  /** Room dimensions and boundaries */
+  room_geometry: {
+    /** Overall room dimensions */
+    dimensions: { width: number; height: number; depth: number };
+    /** Floor plan boundary points */
+    boundary_points: Array<{ x: number; y: number }>;
+    /** Room area in square meters */
+    area_sq_m: number;
+    /** Room volume in cubic meters */
+    volume_cu_m: number;
+  };
+  /** Detected spatial features */
+  spatial_features?: Array<{
+    /** Type of spatial feature */
+    type: 'wall' | 'window' | 'door' | 'column' | 'beam' | 'alcove' | 'corner' | 'opening';
+    /** 3D position of the feature */
+    position: { x: number; y: number; z: number };
+    /** Feature dimensions */
+    dimensions: { width: number; height: number; depth?: number };
+    /** Confidence score for detection */
+    confidence: number;
+    /** Additional properties specific to feature type */
+    properties?: Record<string, unknown>;
+  }>;
+  /** Lighting analysis */
+  lighting_analysis?: {
+    /** Natural light sources */
+    natural_light: Array<{
+      type: 'window' | 'skylight' | 'opening';
+      position: { x: number; y: number; z: number };
+      size: { width: number; height: number };
+      orientation: string;
+      estimated_illuminance?: number;
+    }>;
+    /** Artificial light sources */
+    artificial_light?: Array<{
+      type: 'ceiling' | 'wall' | 'floor' | 'accent';
+      position: { x: number; y: number; z: number };
+      estimated_power?: number;
+      color_temperature?: number;
+    }>;
+    /** Overall lighting quality metrics */
+    lighting_metrics?: {
+      average_illuminance: number;
+      uniformity_ratio: number;
+      glare_assessment: 'low' | 'medium' | 'high';
+    };
+  };
+  /** Traffic flow and accessibility analysis */
+  accessibility_analysis?: {
+    /** Main traffic paths */
+    traffic_paths: Array<{
+      start_point: { x: number; y: number };
+      end_point: { x: number; y: number };
+      width: number;
+      obstruction_level: 'clear' | 'minor' | 'major';
+    }>;
+    /** Accessibility compliance assessment */
+    accessibility_compliance?: {
+      wheelchair_accessible: boolean;
+      minimum_clearances_met: boolean;
+      turning_radius_adequate: boolean;
+      compliance_notes?: string[];
+    };
+    /** Furniture placement constraints */
+    placement_constraints?: Array<{
+      zone: string;
+      constraints: string[];
+      accessibility_requirements: string[];
+    }>;
+  };
+  /** Analysis metadata */
+  analysis_metadata?: {
+    /** When the analysis was performed */
+    analyzed_at: string;
+    /** Analysis method used */
+    analysis_method: 'nerf_based' | 'photogrammetry' | 'manual_measurement' | 'hybrid';
+    /** Confidence in overall analysis */
+    overall_confidence: number;
+    /** Processing time for analysis */
+    processing_time_ms: number;
+  };
+}
+
+/**
+ * Material Data Structures
+ * Enhanced material information beyond basic properties
+ */
+export interface MaterialData {
+  /** Basic material identification */
+  material_id?: string;
+  /** Detected material type */
+  material_type?: string;
+  /** Material category classification */
+  category?: string;
+  /** Subcategory for more specific classification */
+  subcategory?: string;
+  /** Confidence in material identification */
+  identification_confidence?: number;
+  
+  /** Physical and mechanical properties */
+  properties?: {
+    /** Basic material properties */
+    basic?: MaterialProperties;
+    /** Extended mechanical properties */
+    mechanical?: MechanicalPropertiesExtended;
+    /** Thermal characteristics */
+    thermal?: ThermalProperties;
+    /** Water and moisture resistance */
+    moisture_resistance?: WaterMoistureResistance;
+    /** Chemical and hygiene resistance */
+    chemical_resistance?: ChemicalHygieneResistance;
+    /** Acoustic and electrical properties */
+    acoustic_electrical?: AcousticElectricalProperties;
+    /** Environmental and sustainability metrics */
+    sustainability?: EnvironmentalSustainability;
+    /** Surface characteristics */
+    surface?: SurfaceGlossReflectivity;
+    /** Safety ratings */
+    safety?: SlipSafetyRatings;
+  };
+  
+  /** Visual characteristics detected from images */
+  visual_characteristics?: {
+    /** Dominant colors in the material */
+    dominant_colors: Array<{
+      color: string;
+      percentage: number;
+      hex_code?: string;
+    }>;
+    /** Texture description */
+    texture: {
+      type: 'smooth' | 'rough' | 'textured' | 'patterned' | 'glossy' | 'matte';
+      grain_size?: 'fine' | 'medium' | 'coarse';
+      pattern_type?: string;
+      surface_finish?: string;
+    };
+    /** Reflectivity characteristics */
+    reflectivity: {
+      gloss_level: 'matte' | 'satin' | 'semi-gloss' | 'gloss' | 'high-gloss';
+      light_reflection_percentage?: number;
+    };
+  };
+  
+  /** Application and usage information */
+  application_data?: {
+    /** Recommended use cases */
+    recommended_applications: string[];
+    /** Areas where this material should not be used */
+    not_recommended_for?: string[];
+    /** Installation requirements */
+    installation_requirements?: string[];
+    /** Maintenance guidelines */
+    maintenance_requirements?: string[];
+    /** Expected lifespan */
+    expected_lifespan?: {
+      min_years: number;
+      max_years: number;
+      conditions: string;
+    };
+  };
+  
+  /** Commercial and availability information */
+  commercial_data?: {
+    /** Estimated cost range */
+    cost_range?: {
+      min_price_per_unit: number;
+      max_price_per_unit: number;
+      unit: string;
+      currency: string;
+    };
+    /** Common suppliers or brands */
+    suppliers?: string[];
+    /** Availability status */
+    availability: 'readily_available' | 'limited' | 'custom_order' | 'discontinued';
+    /** Lead time for procurement */
+    lead_time_days?: number;
+  };
+  
+  /** Detection and analysis metadata */
+  detection_metadata?: {
+    /** Detection method used */
+    detection_method: DetectionMethod;
+    /** Timestamp of detection/analysis */
+    detected_at: string;
+    /** Source image or data used for detection */
+    source_reference?: string;
+    /** Processing parameters used */
+    processing_params?: Record<string, unknown>;
+    /** Alternative material suggestions */
+    alternatives?: Array<{
+      material_id: string;
+      similarity_score: number;
+      reason: string;
+    }>;
+  };
+}
+
+/**
+ * Agent Execution Result Data Types
+ * Structured types for agent execution results to replace `any`
+ */
+export interface AgentExecutionData {
+  /** Material analysis results */
+  material_analysis?: {
+    /** Identified materials */
+    identified_materials: MaterialData[];
+    /** Overall analysis confidence */
+    confidence_score: number;
+    /** Analysis summary */
+    summary: string;
+  };
+  /** Spatial analysis results */
+  spatial_analysis?: SpatialAnalysisData;
+  /** 3D generation results */
+  generation_results?: {
+    /** Generated model references */
+    model_references: string[];
+    /** Generation parameters used */
+    generation_params: Record<string, unknown>;
+    /** Quality assessment */
+    quality_assessment: {
+      overall_score: number;
+      detail_level: 'low' | 'medium' | 'high';
+      accuracy_assessment: string;
+    };
+  };
+  /** Design recommendations */
+  design_recommendations?: Array<{
+    /** Type of recommendation */
+    type: 'material_substitution' | 'layout_optimization' | 'color_coordination' | 'style_enhancement';
+    /** Recommendation description */
+    description: string;
+    /** Confidence in recommendation */
+    confidence: number;
+    /** Supporting reasoning */
+    reasoning: string;
+    /** Implementation priority */
+    priority: 'low' | 'medium' | 'high';
+  }>;
+  /** Processing metrics */
+  processing_metrics?: {
+    /** Total processing time */
+    total_time_ms: number;
+    /** Memory usage during processing */
+    memory_usage_mb?: number;
+    /** API calls made */
+    api_calls_count?: number;
+    /** Error count during processing */
+    error_count: number;
+  };
+}
+
+/**
+ * Agent Execution Metadata Types
+ * Structured metadata to replace Record<string, any>
+ */
+export interface AgentExecutionMetadata {
+  /** Agent identification */
+  agent_info: {
+    /** Agent unique identifier */
+    agent_id: string;
+    /** Agent version */
+    version: string;
+    /** Agent specialization area */
+    specialization: string;
+    /** Agent capabilities */
+    capabilities: string[];
+  };
+  /** Execution context */
+  execution_context: {
+    /** Execution timestamp */
+    executed_at: string;
+    /** Execution environment */
+    environment: 'development' | 'staging' | 'production';
+    /** User context */
+    user_context?: {
+      user_id: string;
+      session_id?: string;
+      preferences?: Record<string, unknown>;
+    };
+  };
+  /** Performance metrics */
+  performance: {
+    /** Response time in milliseconds */
+    response_time_ms: number;
+    /** Success rate for this execution */
+    success_rate: number;
+    /** Resource utilization */
+    resource_usage?: {
+      cpu_usage_percent?: number;
+      memory_usage_mb?: number;
+      network_calls?: number;
+    };
+  };
+  /** Quality assurance */
+  quality_assurance?: {
+    /** Validation checks performed */
+    validation_checks: string[];
+    /** Quality score (0-1) */
+    quality_score: number;
+    /** Issues identified */
+    issues?: Array<{
+      severity: 'low' | 'medium' | 'high';
+      description: string;
+      recommendation?: string;
+    }>;
+  };
+  /** Additional contextual data */
+  additional_context?: Record<string, string | number | boolean | null>;
 }

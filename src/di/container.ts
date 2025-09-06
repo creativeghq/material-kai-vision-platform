@@ -156,7 +156,7 @@ export class ServiceContainer implements IServiceContainer {
     }
 
     this.validateDescriptor(descriptor);
-    this.services.set(descriptor.identifier, descriptor);
+    this.services.set(descriptor.identifier, descriptor as IServiceDescriptor<unknown>);
 
     this.log('debug', `Registered service: ${this.getServiceName(descriptor.identifier)} (${descriptor.lifetime})`);
   }
@@ -238,7 +238,7 @@ export class ServiceContainer implements IServiceContainer {
       throw new Error('Cannot resolve services from a disposed container');
     }
 
-    const descriptor = this.services.get(identifier);
+    const descriptor = this.services.get(identifier) as IServiceDescriptor<T>;
     if (!descriptor) {
       throw new ServiceNotFoundError(identifier);
     }
@@ -246,7 +246,7 @@ export class ServiceContainer implements IServiceContainer {
     if (descriptor.lifetime === ServiceLifetime.Scoped) {
       // Check if already resolved in this scope
       if (scope.instances.has(identifier)) {
-        return scope.instances.get(identifier);
+        return scope.instances.get(identifier) as T;
       }
 
       // Resolve and cache in scope
@@ -392,7 +392,7 @@ export class ServiceContainer implements IServiceContainer {
       throw new CircularDependencyError(Array.from(resolutionChain));
     }
 
-    const descriptor = this.services.get(identifier);
+    const descriptor = this.services.get(identifier) as IServiceDescriptor<T>;
     if (!descriptor) {
       throw new ServiceNotFoundError(identifier);
     }
@@ -451,7 +451,7 @@ export class ServiceContainer implements IServiceContainer {
 
       // Use constructor
       if (descriptor.implementation) {
-        const dependencies = this.resolveDependencies(descriptor, resolutionChain, depth, scope);
+        const dependencies = this.resolveDependencies(descriptor as IServiceDescriptor<unknown>, resolutionChain, depth, scope);
         return new descriptor.implementation(...dependencies);
       }
 
@@ -470,7 +470,7 @@ export class ServiceContainer implements IServiceContainer {
   }
 
   private resolveDependencies(
-    descriptor: IServiceDescriptor,
+    descriptor: IServiceDescriptor<unknown>,
     resolutionChain: Set<ServiceIdentifier>,
     depth: number,
     scope?: IServiceScope,

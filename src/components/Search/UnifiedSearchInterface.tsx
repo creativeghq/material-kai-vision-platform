@@ -18,18 +18,17 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { MivaaSearchIntegration } from '@/services/mivaaSearchIntegration';
-import { MivaaEmbeddingIntegration } from '@/services/mivaaEmbeddingIntegration';
+import { materialSearchService, MaterialSearchResult } from '@/services/materialSearchService';
 
-interface SearchResult {
-  id: string;
+// Using MaterialSearchResult from our service as base, with additional UI fields
+type SearchResult = MaterialSearchResult & {
   title: string;
   content: string;
   type: 'material' | 'knowledge' | 'pdf_content';
   similarity_score: number;
   source?: string;
   metadata?: Record<string, unknown>;
-}
+};
 
 interface UnifiedSearchInterfaceProps {
   onResultsFound?: (results: SearchResult[]) => void;
@@ -40,9 +39,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   onResultsFound,
   onMaterialSelect,
 }) => {
-  // Initialize MIVAA service instances
-  const mivaaSearchService = new MivaaSearchIntegration();
-  const mivaaEmbeddingService = new MivaaEmbeddingIntegration();
+  // Using modern MaterialSearchService
+  // const materialSearchService is imported as singleton
 
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -92,55 +90,58 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     try {
       let searchResults: SearchResult[];
 
+      let materialSearchResponse;
+
       if (actualSearchType === 'text') {
-        // Enhanced text search with MIVAA's LlamaIndex RAG
-        searchResults = await mivaaSearchService.search({
+        // Enhanced text search using unified MaterialSearchService
+        materialSearchResponse = await materialSearchService.search({
           query: query.trim(),
+          searchType: 'text',
           limit: 15,
+          includeImages: true,
+          includeMetafields: true,
+          includeRelationships: false
         });
       } else if (actualSearchType === 'image') {
-        // Image-based search using MIVAA embedding service
-        const imageBase64 = imagePreview?.split(',')[1] || '';
-        const embeddingResponse = await mivaaEmbeddingService.generateEmbedding({
-          text: imageBase64,
-        });
-        searchResults = await mivaaSearchService.search({
-          query: `image_embedding:${embeddingResponse.embedding.join(',')}`,
+        // Image-based search using MaterialSearchService with image analysis
+        materialSearchResponse = await materialSearchService.search({
+          query: `image_analysis_search:${selectedImage?.name || 'uploaded_image'}`,
+          searchType: 'semantic',
           limit: 12,
+          includeImages: true,
+          includeMetafields: true,
+          includeRelationships: false
         });
       } else {
-        // Hybrid search (text + image) using MIVAA services
-        const imageBase64 = imagePreview?.split(',')[1] || '';
-        const embeddingResponse = await mivaaEmbeddingService.generateEmbedding({
-          text: imageBase64,
-        });
-        searchResults = await mivaaSearchService.search({
-          query: `${query.trim()} image_embedding:${embeddingResponse.embedding.join(',')}`,
+        // Hybrid search (text + image) using MaterialSearchService
+        materialSearchResponse = await materialSearchService.search({
+          query: query.trim(),
+          searchType: 'hybrid',
           limit: 20,
+          includeImages: true,
+          includeMetafields: true,
+          includeRelationships: false
         });
       }
 
-      // Transform results to unified format
-      const unifiedResults: SearchResult[] = [
-        ...(searchResults.results || []).map((result: Record<string, unknown>) => ({
-          id: (result.material_id as string) || (result.id as string),
-          title: (result.material_name as string) || (result.title as string),
-          content: (result.content as string) || ((result.material_details as Record<string, unknown>)?.description as string) || '',
-          type: (result.result_type as 'material' | 'knowledge' | 'pdf_content') || 'material',
-          similarity_score: result.similarity_score as number,
-          source: (result.source_type as string) || 'database',
-          metadata: (result.metadata as Record<string, unknown>) || (result.material_details as Record<string, unknown>),
-        })),
-        ...(searchResults.knowledge_results || []).map((result: Record<string, unknown>) => ({
-          id: result.id as string,
-          title: result.title as string,
-          content: result.content as string,
-          type: 'knowledge' as const,
-          similarity_score: (result.confidence as number) || 0.7,
-          source: (result.source_type as string) || 'knowledge_base',
-          metadata: result.metadata as Record<string, unknown>,
-        })),
-      ];
+      if (!materialSearchResponse.success) {
+        throw new Error(materialSearchResponse.error || 'Search failed');
+      }
+
+      // Transform MaterialSearchResult to SearchResult format
+      const unifiedResults: SearchResult[] = materialSearchResponse.data.map((result) => ({
+        ...result,
+        title: result.name,
+        content: result.description || 'No description available',
+        type: 'material' as const,
+        similarity_score: result.search_score || 0.8,
+        source: 'unified_search',
+        metadata: {
+          category: result.category,
+          properties: result.properties,
+          metafield_values: result.metafield_values
+        }
+      }));
 
       // Sort by similarity score
       unifiedResults.sort((a, b) => b.similarity_score - a.similarity_score);
@@ -170,20 +171,31 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
     setIsSearching(true);
     try {
-      // Quick text-based search using MIVAA's fast search
-      const quickResults = await mivaaSearchService.search({
+      // Quick text-based search using unified material search
+      const quickResponse = await materialSearchService.search({
         query: searchQuery,
+        searchType: 'text',
         limit: 8,
+        includeImages: false,
+        includeMetafields: false,
+        includeRelationships: false
       });
 
-      const formatted = quickResults.results.map((result: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-        id: result.id as string,
-        title: (result.title as string) || (result.name as string),
-        content: (result.content as string) || (result.description as string),
-        type: (result.type as 'material' | 'knowledge' | 'pdf_content') || 'material',
-        similarity_score: (result.confidence as number) || 0.8,
+      if (!quickResponse.success) {
+        throw new Error(quickResponse.error || 'Quick search failed');
+      }
+
+      const formatted: SearchResult[] = quickResponse.data.map((result) => ({
+        ...result,
+        title: result.name,
+        content: result.description || 'No description available',
+        type: 'material' as const,
+        similarity_score: result.search_score || 0.8,
         source: 'quick_search',
-        metadata: result.metadata as Record<string, unknown>,
+        metadata: {
+          category: result.category,
+          properties: result.properties
+        }
       }));
 
       setResults(formatted);
@@ -199,7 +211,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     } finally {
       setIsSearching(false);
     }
-  }, [onResultsFound, toast, mivaaSearchService]);
+  }, [onResultsFound, toast]);
 
   const getResultIcon = (type: string) => {
     switch (type) {
@@ -382,19 +394,19 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     {/* Metadata */}
                     {result.metadata && (
                       <div className="flex flex-wrap gap-2">
-                        {result.metadata.category && (
+                        {result.category && (
                           <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                            {String(result.metadata.category)}
+                            {result.category}
                           </Badge>
                         )}
-                        {result.metadata.material_categories && Array.isArray(result.metadata.material_categories) &&
-                          result.metadata.material_categories.slice(0, 2).map((cat: unknown, i: number) => (
-                            <Badge key={i} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{String(cat)}</Badge>
-                          ))
-                        }
-                        {result.metadata.technical_complexity && (
+                        {result.metafield_values && result.metafield_values.slice(0, 2).map((field, i) => (
+                          <Badge key={i} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                            {field.display_name}: {field.value_text || field.value_number || String(field.value_boolean)}
+                          </Badge>
+                        ))}
+                        {result.properties && (
                           <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                            Complexity: {String(result.metadata.technical_complexity)}/10
+                            Properties Available
                           </Badge>
                         )}
                       </div>

@@ -38,15 +38,19 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
   const [currentStep, setCurrentStep] = useState<string>('');
   const [overallProgress, setOverallProgress] = useState(0);
-  const [generationData] = useState<unknown>(null);
+  const [generationData, setGenerationData] = useState<unknown>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [hasReferenceImage, setHasReferenceImage] = useState(false);
+  const [apiResponse, setApiResponse] = useState<unknown>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollingError, setPollingError] = useState<string | null>(null);
 
   // Workflow control state
   const [isPaused, setIsPaused] = useState(false);
   const [workflowMode, setWorkflowMode] = useState<'running' | 'paused' | 'ready'>('ready');
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     'models': true,
+    'api-response': false,
   });
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
@@ -148,55 +152,63 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
 
     const pollForUpdates = async () => {
       try {
-        // TODO: Implement generation_3d table or replace with proper backend
-        // const { data, error } = await supabase
-        //   .from('generation_3d')
-        //   .select('*')
-        //   .eq('id', generationId)
-        //   .single();
+        setIsPolling(true);
+        setPollingError(null);
 
-        // Mock response for now to prevent build errors
-        // const data: {
-        //   result_data?: { workflow_steps?: Record<string, unknown>[] };
-        //   generation_status?: string;
-        //   image_urls?: string[];
-        //   error_message?: string;
-        // } | null = null;
-        const error = { message: 'generation_3d table not implemented' };
+        // Import supabase client dynamically
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const { data, error } = await supabase
+          .from('generation_3d')
+          .select('*')
+          .eq('id', generationId)
+          .single();
 
         if (error) {
           console.error('Polling error:', error);
+          setPollingError(error.message);
           return;
         }
 
-        // TODO: Uncomment and implement when generation_3d table is available
-        // if (data) {
-        //   setGenerationData(data);
+        if (data) {
+          setGenerationData(data);
+          setApiResponse(data); // Store full API response for display
 
-        //   // Parse workflow data from result_data
-        //   if (data.result_data && typeof data.result_data === 'object' && 'workflow_steps' in data.result_data) {
-        //     const workflowData = data.result_data as { workflow_steps?: Record<string, unknown>[] };
-        //     if (workflowData.workflow_steps) {
-        //       updateStepsFromData(workflowData.workflow_steps);
-        //     }
-        //   }
+          // Parse workflow data from result_data
+          if (data.result_data && typeof data.result_data === 'object' && 'workflow_steps' in data.result_data) {
+            const workflowData = data.result_data as { workflow_steps?: Record<string, unknown>[] };
+            if (workflowData.workflow_steps) {
+              updateStepsFromData(workflowData.workflow_steps);
+            }
+          }
 
-        //   // Check if generation is complete
-        //   if (data.generation_status === 'completed') {
-        //     setIsComplete(true);
-        //     setShowCompletionDialog(true);
-        //     if (data.image_urls && data.image_urls.length > 0) {
-        //       onComplete(data.image_urls);
-        //       // Don't auto-close - show completion dialog instead
-        //     }
-        //   } else if (data.generation_status === 'failed') {
-        //     console.error('Generation failed:', data.error_message);
-        //     setIsComplete(true);
-        //   }
-        // }
+          // Check if generation is complete
+          if (data.generation_status === 'completed') {
+            setIsComplete(true);
+            setShowCompletionDialog(true);
+            setWorkflowMode('ready');
+            if (data.image_urls && data.image_urls.length > 0) {
+              onComplete(data.image_urls);
+              // Don't auto-close - show completion dialog instead
+            }
+          } else if (data.generation_status === 'failed') {
+            console.error('Generation failed:', data.error_message);
+            setIsComplete(true);
+            setWorkflowMode('ready');
+          } else if (data.generation_status === 'processing') {
+            setWorkflowMode('running');
+          }
+        }
 
       } catch (error) {
         console.error('Polling error:', error);
+        setPollingError(error instanceof Error ? error.message : 'Unknown polling error');
+      } finally {
+        setIsPolling(false);
       }
     };
 
@@ -207,7 +219,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     const interval = setInterval(pollForUpdates, 2000); // Poll every 2 seconds
 
     return () => clearInterval(interval);
-  }, [generationId, isOpen, onComplete, onClose]);
+  }, [generationId, isOpen, onComplete]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const updateStepsFromData = (workflowSteps: unknown[]) => {
@@ -321,17 +333,26 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     }));
   };
 
-  // Reset modal state when opened to ensure clean state
+  // Reset modal state when opened to ensure clean state (prevent flashing)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && generationId) {
+      // Only reset if we have a new generation ID
       setIsComplete(false);
       setShowCompletionDialog(false);
       setCurrentStep('');
       setOverallProgress(0);
       setWorkflowMode('ready');
       setIsPaused(false);
+      setApiResponse(null);
+      setPollingError(null);
+      
+      // Initialize steps immediately to prevent flashing
+      const hasRefImage = Boolean(generationData &&
+        typeof generationData === 'object' &&
+        'reference_image_url' in generationData);
+      setHasReferenceImage(hasRefImage);
     }
-  }, [isOpen]);
+  }, [isOpen, generationId]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal>
@@ -460,6 +481,44 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                   </div>
                 </CollapsibleContent>
               </Collapsible>
+
+              {/* API Response Section */}
+              {apiResponse && (
+                <Collapsible
+                  open={expandedSections['api-response'] ?? false}
+                  onOpenChange={() => toggleSection('api-response')}
+                >
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded border">
+                    <div className="flex items-center gap-2">
+                      {expandedSections['api-response'] ?
+                        <ChevronDown className="h-4 w-4" /> :
+                        <ChevronRight className="h-4 w-4" />
+                      }
+                      <h4 className="font-medium text-sm text-muted-foreground">API RESPONSE DATA</h4>
+                    </div>
+                    <Badge className="text-xs border border-gray-300 text-gray-600">
+                      {isPolling ? 'Updating...' : 'Live Data'}
+                    </Badge>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <Card className="ml-4">
+                      <CardContent className="p-3">
+                        {pollingError && (
+                          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
+                            <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                            <span>Polling Error: {pollingError}</span>
+                          </div>
+                        )}
+                        <ScrollArea className="h-32">
+                          <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                            {JSON.stringify(apiResponse, null, 2)}
+                          </pre>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
           </ScrollArea>
 

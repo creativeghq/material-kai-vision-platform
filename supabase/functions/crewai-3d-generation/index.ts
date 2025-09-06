@@ -23,7 +23,69 @@ const GenerationRequestSchema = z.object({
   healthCheck: z.boolean().optional(),
   initializeOnly: z.boolean().optional(),
   replicateApiToken: z.string().optional(),
+  sequential_processing: z.boolean().optional(), // Enable sequential model processing
+  require_image_validation: z.boolean().optional(), // Enforce image validation for img2img models
 });
+
+// Image-to-image models that require reference images
+const IMAGE_TO_IMAGE_MODELS = [
+  'erayyavuz/interior-ai',
+  'jschoormans/comfyui-interior-remodel',
+  'julian-at/interiorly-gen1-dev',
+  'jschoormans/interior-v2',
+  'rocketdigitalai/interior-design-sdxl'
+];
+
+// Text-to-image models that can work without reference images
+const TEXT_TO_IMAGE_MODELS = [
+  'adirik/interior-design', // Unified model - supports both
+  'davisbrown/designer-architecture',
+  'stabilityai/stable-diffusion-xl-base-1.0',
+  'black-forest-labs/FLUX.1-schnell',
+  'stabilityai/stable-diffusion-2-1'
+];
+
+// Validation function for image requirements
+function validateImageRequirements(request: any): { isValid: boolean; errors: string[]; filteredModels?: string[] } {
+  const errors: string[] = [];
+  const hasReferenceImage = Boolean(request.reference_image_url && request.reference_image_url !== '[NO_IMAGE]');
+  
+  // If no specific models requested, use all available models
+  const requestedModels = request.models || [...TEXT_TO_IMAGE_MODELS, ...IMAGE_TO_IMAGE_MODELS];
+  
+  // Filter models based on image availability
+  const validModels: string[] = [];
+  const skippedModels: string[] = [];
+  
+  for (const model of requestedModels) {
+    if (IMAGE_TO_IMAGE_MODELS.includes(model)) {
+      if (hasReferenceImage) {
+        validModels.push(model);
+      } else {
+        skippedModels.push(model);
+        console.log(`⚠️ Skipping image-to-image model ${model} - no reference image provided`);
+      }
+    } else if (TEXT_TO_IMAGE_MODELS.includes(model)) {
+      validModels.push(model);
+    } else {
+      errors.push(`Unknown model: ${model}`);
+    }
+  }
+  
+  if (skippedModels.length > 0) {
+    console.log(`📋 Skipped ${skippedModels.length} image-to-image models due to missing reference image:`, skippedModels);
+  }
+  
+  if (validModels.length === 0) {
+    errors.push('No valid models available for processing. Image-to-image models require a reference image.');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    filteredModels: validModels
+  };
+}
 
 // Global workflow tracking
 let workflowSteps: any[] = [];
@@ -171,7 +233,7 @@ function initializeWorkflowSteps(hasReferenceImage: boolean = false) {
   ];
 }
 
-// Update workflow step status
+// Update workflow step status using the new enhanced database schema
 async function updateWorkflowStep(modelName: string, status: 'running' | 'success' | 'failed' | 'skipped', imageUrl?: string, errorMessage?: string, processingTimeMs?: number) {
   const step = workflowSteps.find(s => s.modelName === modelName);
   if (step) {
@@ -185,23 +247,109 @@ async function updateWorkflowStep(modelName: string, status: 'running' | 'succes
     if (processingTimeMs) step.processingTimeMs = processingTimeMs;
   }
 
-  // Update database with current workflow state
+  // Use the new helper function to update model progress
   if (currentGenerationId) {
     try {
+      const modelResult = status === 'success' && imageUrl ? { url: imageUrl, status: 'success' } : null;
+      const modelError = status === 'failed' && errorMessage ? { error: errorMessage, status: 'failed', timestamp: new Date().toISOString() } : null;
+      const fullApiResponse = {
+        model: modelName,
+        status,
+        imageUrl,
+        errorMessage,
+        processingTimeMs,
+        timestamp: new Date().toISOString(),
+        step_data: step
+      };
+
+      // Call the new helper function
+      await supabase.rpc('update_model_progress', {
+        generation_id: currentGenerationId,
+        model_name: modelName,
+        model_result: modelResult,
+        model_error: modelError,
+        api_response: fullApiResponse
+      });
+
+      console.log(`✅ Updated model progress: ${modelName} -> ${status}`);
+    } catch (error) {
+      console.error('❌ Failed to update model progress in database:', error);
+    }
+  }
+}
+
+// Sequential model processing function
+async function processModelsSequentially(generationId: string, modelsQueue: any[], prompt: string, referenceImageUrl?: string): Promise<void> {
+  console.log(`🔄 Starting sequential processing of ${modelsQueue.length} models for generation ${generationId}`);
+  
+  for (let i = 0; i < modelsQueue.length; i++) {
+    const model = modelsQueue[i];
+    const startTime = Date.now();
+    
+    try {
+      console.log(`🎯 Processing model ${i + 1}/${modelsQueue.length}: ${model.name}`);
+      
+      // Update status to processing
+      await updateWorkflowStep(model.name, 'running');
+      
+      // Update current step in database
       await supabase
         .from('generation_3d')
         .update({
-          result_data: {
-            workflow_steps: workflowSteps,
-            progress: Math.round((workflowSteps.filter(s => s.status === 'success' || s.status === 'failed').length / workflowSteps.length) * 100),
-          },
+          current_step: `Processing model ${model.name} (${i + 1}/${modelsQueue.length})`,
+          current_model_index: i
         })
-        .eq('id', currentGenerationId);
-      console.log(`Updated workflow step: ${modelName} -> ${status}`);
-    } catch (error) {
-      console.error('Failed to update workflow step in database:', error);
+        .eq('id', generationId);
+
+      let result: any;
+      
+      // Process based on model type
+      if (model.name.includes('huggingface') || model.name.includes('stabilityai') || model.name.includes('black-forest-labs')) {
+        // Hugging Face model
+        result = await testHuggingFaceModel(model.name, prompt);
+      } else {
+        // Replicate model
+        result = await testReplicateModel(model.name, prompt, referenceImageUrl);
+      }
+      
+      const processingTime = Date.now() - startTime;
+      
+      // Mark as successful
+      await updateWorkflowStep(model.name, 'success', result.url || result.predictionId, undefined, processingTime);
+      
+      console.log(`✅ Model ${model.name} completed successfully in ${processingTime}ms`);
+      
+      // Add delay between models to prevent rate limiting
+      if (i < modelsQueue.length - 1) {
+        console.log(`⏳ Waiting 2 seconds before next model...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+    } catch (error: any) {
+      const processingTime = Date.now() - startTime;
+      console.error(`❌ Model ${model.name} failed:`, error.message);
+      
+      // Mark as failed with detailed error
+      await updateWorkflowStep(model.name, 'failed', undefined, error.message, processingTime);
+      
+      // Continue to next model rather than stopping entire workflow
+      console.log(`⏭️ Continuing to next model despite failure of ${model.name}`);
     }
   }
+  
+  // Mark workflow as completed
+  await supabase
+    .from('generation_3d')
+    .update({
+      workflow_status: 'completed',
+      generation_status: 'completed',
+      current_step: 'All models processed',
+      completed_at: new Date().toISOString(),
+      total_processing_time_ms: Date.now() - parseInt(generationId.split('_')[1] || '0')
+    })
+    .eq('id', generationId);
+    
+  console.log(`🏁 Sequential processing completed for generation ${generationId}`);
 }
 
 
@@ -2341,11 +2489,34 @@ serve(async (req) => {
 
     console.log('Request validation passed, starting background generation');
 
+    // Validate image requirements for requested models
+    const validation = validateImageRequirements(request);
+    if (!validation.isValid) {
+      console.error('❌ Image requirements validation failed:', validation.errors);
+      return new Response(
+        JSON.stringify({
+          error: 'Image requirements validation failed',
+          details: validation.errors,
+          skipped_models: validation.filteredModels ? [] : undefined,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
+    }
+
+    // Update request with filtered models (remove image-to-image models without reference image)
+    if (validation.filteredModels) {
+      request.models = validation.filteredModels;
+      console.log(`✅ Using ${validation.filteredModels.length} validated models:`, validation.filteredModels);
+    }
+
     // Handle direct test mode (database-free testing)
     if (request.directTestMode || request.skipDatabaseOperations) {
       console.log('Direct test mode detected - bypassing database operations');
 
-      const hasReferenceImage = Boolean(request.reference_image_url);
+      const hasReferenceImage = Boolean(request.reference_image_url && request.reference_image_url !== '[NO_IMAGE]');
       initializeWorkflowSteps(hasReferenceImage);
 
       // If testing a single model, filter the workflow steps
@@ -2421,24 +2592,40 @@ serve(async (req) => {
       }
     }
 
-    // Create initial record first to get the ID
-    // For test mode, provide default values for required fields
-    // Map camelCase frontend fields to snake_case database fields
-    const insertData = {
+    // Use the new helper function to initialize generation workflow
+    const hasReferenceImage = Boolean(request.reference_image_url && request.reference_image_url !== '[NO_IMAGE]');
+    const requestType = hasReferenceImage ? 'image_to_image' : 'text_to_image';
+    
+    // Build models queue from validated models
+    const modelsQueue = (validation.filteredModels || TEXT_TO_IMAGE_MODELS.slice(0, 3)).map(model => ({
+      name: model,
+      type: IMAGE_TO_IMAGE_MODELS.includes(model) ? 'image_to_image' : 'text_to_image',
+      status: 'pending'
+    }));
+
+    console.log('Initializing generation workflow with:', JSON.stringify({
       user_id: request.user_id,
-      prompt: request.prompt,
-      room_type: request.room_type || request.roomType || (request.testMode ? 'living_room' : undefined),
-      style: request.style || (request.testMode ? 'modern' : undefined),
-      generation_status: 'processing',
-    };
+      session_id: `session_${Date.now()}`,
+      prompt: request.prompt.substring(0, 50) + '...',
+      request_type: requestType,
+      models_count: modelsQueue.length,
+      testMode: request.testMode
+    }, null, 2));
 
-    console.log('Inserting record with data:', JSON.stringify(insertData, null, 2));
-
-    const { data: recordData, error: createError } = await supabase
-      .from('generation_3d')
-      .insert(insertData)
-      .select()
-      .single();
+    // Use the new helper function via raw SQL to initialize workflow
+    const { data: recordData, error: createError } = await supabase.rpc('initialize_generation_workflow', {
+      p_user_id: request.user_id,
+      p_session_id: `session_${Date.now()}`,
+      p_prompt: request.prompt,
+      p_request_type: requestType,
+      p_models_queue: modelsQueue,
+      p_style_preferences: {
+        room_type: request.room_type || request.roomType,
+        style: request.style,
+        specific_materials: request.specific_materials || []
+      },
+      p_input_images: hasReferenceImage ? [request.reference_image_url] : []
+    });
 
     if (createError) {
       console.error('Database insert error:', createError);
@@ -2525,22 +2712,47 @@ serve(async (req) => {
       }
     } else {
       // Set the current generation ID for workflow tracking
-      currentGenerationId = recordData.id;
+      currentGenerationId = recordData;
 
-      // Start the generation as a background task to avoid timeout
-      EdgeRuntime.waitUntil(
-        processGeneration(request).catch(error => {
-          console.error('Background generation failed:', error);
-        }),
-      );
+      // Get the models queue from the database
+      const { data: generationData } = await supabase
+        .from('generation_3d')
+        .select('models_queue, input_images')
+        .eq('id', recordData)
+        .single();
+
+      const modelsQueue = generationData?.models_queue || [];
+      const inputImages = generationData?.input_images || [];
+      const hasReferenceImage = inputImages.length > 0;
+
+      // Start sequential processing as background task
+      processModelsSequentially(
+        recordData,
+        modelsQueue,
+        request.prompt,
+        hasReferenceImage ? inputImages[0] : undefined
+      ).catch((error: any) => {
+        console.error('❌ Sequential processing failed:', error);
+        // Update database with error
+        supabase
+          .from('generation_3d')
+          .update({
+            workflow_status: 'failed',
+            generation_status: 'failed',
+            error_message: error.message
+          })
+          .eq('id', recordData);
+      });
 
       // Return immediate response with the generation ID
       return new Response(
         JSON.stringify({
           success: true,
-          message: '3D generation started',
-          generationId: recordData.id,
+          message: '3D generation started with sequential processing',
+          generationId: recordData,
           status: 'processing',
+          models_count: modelsQueue.length,
+          processing_type: 'sequential'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

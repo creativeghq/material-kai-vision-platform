@@ -568,7 +568,7 @@ export function validateExtractedMetaFields(
         severity: 'error',
       });
     } else {
-      extractedMeta.metal_types.forEach((metalType: any, index: number) => {
+      extractedMeta.metal_types.forEach((metalType: unknown, index: number) => {
         if (typeof metalType !== 'string') {
           errors.push({
             field: `extracted_meta.metal_types[${index}]`,

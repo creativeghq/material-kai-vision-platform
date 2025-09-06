@@ -33,7 +33,7 @@ export async function withErrorHandling<T>(
     errorLogger.logDebug(`Starting operation: ${context.operation}`, {
       service: context.service,
       operation: context.operation,
-      metadata: context.metadata || undefined,
+      ...(context.metadata && { metadata: context.metadata }),
     });
 
     const result = await operation();

@@ -123,7 +123,7 @@ class SpaceformerAnalysisService {
    * Get spatial analysis results by ID
    * Note: spatial_analysis table doesn't exist in current schema
    */
-  async getAnalysisResults(analysisId: string): Promise<SpaceformerResult | null> {
+  async getAnalysisResults(_analysisId: string): Promise<SpaceformerResult | null> {
     try {
       // TODO: Implement when spatial_analysis table is available
       console.warn('spatial_analysis table not available in current schema');
@@ -139,7 +139,7 @@ class SpaceformerAnalysisService {
    * List spatial analyses for a user
    * Note: spatial_analysis table doesn't exist in current schema
    */
-  async listUserAnalyses(userId?: string): Promise<SpaceformerResult[]> {
+  async listUserAnalyses(_userId?: string): Promise<SpaceformerResult[]> {
     try {
       // TODO: Implement when spatial_analysis table is available
       console.warn('spatial_analysis table not available in current schema');

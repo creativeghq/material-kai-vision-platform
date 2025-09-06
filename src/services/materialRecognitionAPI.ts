@@ -8,22 +8,53 @@ import type {
   ProcessingJob,
 } from '@/types/materials';
 
+// Database row interface for materials_catalog table
+interface MaterialsRow {
+  id: string;
+  name: string;
+  category: string;
+  description?: string;
+  properties?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  // Add other database fields as they exist
+  [key: string]: unknown;
+}
+
+// Database row interface for recognition results
+interface RecognitionResultRow {
+  id: string;
+  material_id?: string;
+  confidence_score: number;
+  detection_method: string;
+  ai_model_version?: string;
+  user_verified: boolean;
+  created_at: string;
+  verified_at?: string;
+  verified_by?: string;
+  // Add other database fields as they exist
+  [key: string]: unknown;
+}
+
 // Helper function to map database response to our types
-function mapToMaterial(dbMaterial: any): Material {
+function mapToMaterial(dbMaterial: MaterialsRow): Material {
   return {
     ...dbMaterial,
+    properties: (dbMaterial.properties as MaterialProperties) || {},
+    standards: [],
     metadata: {
       color: '',
       finish: '',
       brand: '',
-      properties: dbMaterial.properties || {},
+      additionalProperties: dbMaterial.properties as Record<string, string | number | boolean> || {},
     },
-    createdAt: new Date(dbMaterial.created_at),
-    updatedAt: new Date(dbMaterial.updated_at),
+    createdAt: dbMaterial.created_at,
+    updatedAt: dbMaterial.updated_at,
   };
 }
 
-function mapToRecognitionResult(dbResult: any): RecognitionResult {
+function mapToRecognitionResult(dbResult: RecognitionResultRow): RecognitionResult {
   return {
     ...dbResult,
     // Legacy properties for backward compatibility
@@ -139,9 +170,9 @@ export class MaterialRecognitionAPI {
       const { data: processResult, error: processError } = await supabase.functions
         .invoke('hybrid-material-analysis', {
           body: {
-            file_id: uploadedFiles[0].id, // Use first file for single analysis
-            analysis_type: request.options?.extract_properties ? 'properties_only' : 'comprehensive',
-            include_similar: request.options?.include_similar_materials || false,
+            file_id: uploadedFiles[0]?.id || '', // Use first file for single analysis
+            analysis_type: request.options?.extractProperties ? 'properties_only' : 'comprehensive',
+            include_similar: request.options?.includeSimilarMaterials || false,
             minimum_score: 0.7,
             max_retries: 2,
           },

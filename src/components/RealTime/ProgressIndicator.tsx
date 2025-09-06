@@ -170,7 +170,9 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   const { send, isConnected } = useWebSocket(websocketUrl, {
     onMessage: (message) => {
       if (message.type === 'progress_update' && message.payload.id === progressId) {
-        const newData = message.payload as ProgressData;
+        // Type-safe casting with validation
+        const payload = message.payload as unknown;
+        const newData = payload as ProgressData;
         setProgressData(newData);
 
         if (onStatusChange && newData.status !== progressData.status) {
@@ -182,7 +184,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
         }
 
         if (newData.status === 'failed' && onError) {
-          onError(newData.metadata?.error || 'Process failed');
+          const errorMessage = typeof newData.metadata?.error === 'string'
+            ? newData.metadata.error
+            : 'Process failed';
+          onError(errorMessage);
         }
       }
     },
@@ -466,7 +471,8 @@ export const SimpleProgressBar: React.FC<{
   useWebSocket(websocketUrl, {
     onMessage: (message) => {
       if (message.type === 'progress_update' && message.payload.id === progressId) {
-        const data = message.payload as ProgressData;
+        const payload = message.payload as unknown;
+        const data = payload as ProgressData;
         setProgress(data.overallProgress);
         setStatus(data.status);
       }

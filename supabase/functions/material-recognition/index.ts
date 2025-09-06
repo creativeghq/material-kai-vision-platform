@@ -1,6 +1,15 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
+// Import standardized Edge Function response types
+import {
+  type EdgeFunctionResponse,
+  type MaterialRecognitionResult,
+  createSuccessResponse,
+  createErrorResponse,
+  createJSONResponse,
+} from '../_shared/types';
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -502,46 +511,50 @@ Deno.serve(async (req: Request) => {
 
     const processingTime = Date.now() - startTime;
 
-    const response: MaterialRecognitionResponse = {
-      success: true,
-      materials: filteredMaterials,
-      metadata: {
-        processing_time: processingTime,
-        analysis_type: analysisType,
-        image_dimensions: {
+    // Create standardized success response using the new pattern
+    const responseData: MaterialRecognitionResult = {
+      materials: filteredMaterials.map((material: any) => ({
+        name: material.name,
+        confidence: material.confidence,
+        properties: {
+          category: material.properties.category,
+          subcategory: material.properties.subcategory || undefined,
+          color: material.properties.color || undefined,
+          texture: material.properties.texture || undefined,
+          finish: material.properties.finish || undefined,
+          durability: material.properties.durability || undefined,
+          sustainability: material.properties.sustainability || undefined,
+        },
+        boundingBox: material.bounding_box,
+      })),
+      analysisMetadata: {
+        analysisType: analysisType,
+        processingMethod: 'llama_vision',
+        imageDimensions: {
           width: 800,
           height: 600,
         },
       },
     };
 
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
+    const response = createSuccessResponse(responseData, {
+      processingTime,
+      version: '1.0.0',
     });
+
+    return createJSONResponse(response);
 
   } catch (error) {
     console.error('Material recognition error:', error);
 
-    const response: MaterialRecognitionResponse = {
-      success: false,
-      materials: [],
-      metadata: {
-        processing_time: 0,
-        analysis_type: 'basic',
-      },
-      error: error instanceof Error ? error.message : 'Unknown error occurred',
-    };
+    const response = createErrorResponse(
+      'MATERIAL_RECOGNITION_ERROR',
+      error instanceof Error ? error.message : 'Unknown error occurred',
+      {
+        timestamp: new Date().toISOString(),
+      }
+    );
 
-    return new Response(JSON.stringify(response), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    return createJSONResponse(response, 500);
   }
 });

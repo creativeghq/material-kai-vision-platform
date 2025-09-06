@@ -76,7 +76,7 @@ export class MaterialAgent3DGenerationAPI {
         specific_materials: request.specific_materials,
       });
 
-      const { data, error } = await supabase.functions.invoke('material-agent-3d-generation', {
+      const { data, error } = await supabase.functions.invoke('crewai-3d-generation', {
         body: {
           user_id: user.id,
           prompt: request.prompt,

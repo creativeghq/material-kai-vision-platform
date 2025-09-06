@@ -9,6 +9,36 @@ import {
   ValidationSchemas,
 } from '../_shared/config.ts';
 
+// Import material categories for AI analysis
+const MATERIAL_CATEGORIES = {
+  CERAMICS: { name: 'ceramics', finish: ['glossy', 'matte', 'semi-gloss', 'textured'], size: ['4x4"', '6x6"', '8x8"', '12x12"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'pressure sensitive adhesive'], application: ['floor', 'wall', 'backsplash', 'shower'] },
+  PORCELAIN: { name: 'porcelain', finish: ['polished', 'matte', 'textured', 'glazed'], size: ['12x12"', '18x18"', '24x24"', '30x30"', '36x36"'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'pressure sensitive adhesive'], application: ['floor', 'wall', 'outdoor', 'commercial'] },
+  TRAVERTINE: { name: 'travertine', finish: ['honed', 'polished', 'brushed', 'tumbled'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'pool deck'] },
+  MARBLE: { name: 'marble', finish: ['polished', 'honed', 'brushed', 'tumbled'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'vanity'] },
+  GRANITE: { name: 'granite', finish: ['polished', 'honed', 'flamed', 'leathered'], size: ['12x12"', '18x18"', '24x24"', '30x30"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'outdoor'] },
+  SLATE: { name: 'slate', finish: ['natural cleft', 'honed', 'polished', 'riven'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'roof', 'outdoor'] },
+  LIMESTONE: { name: 'limestone', finish: ['honed', 'polished', 'brushed', 'tumbled'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'pool deck'] },
+  QUARTZITE: { name: 'quartzite', finish: ['polished', 'honed', 'leathered', 'brushed'], size: ['12x12"', '18x18"', '24x24"', '30x30"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'outdoor'] },
+  SANDSTONE: { name: 'sandstone', finish: ['natural cleft', 'honed', 'polished', 'brushed'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'fireplace'] },
+  ONYX: { name: 'onyx', finish: ['polished', 'honed', 'brushed'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'backsplash'] },
+  GLASS: { name: 'glass', finish: ['clear', 'frosted', 'tinted', 'patterned'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'silicone'], application: ['floor', 'wall', 'backsplash', 'shower'] },
+  MOSAIC: { name: 'mosaic', finish: ['glossy', 'matte', 'mixed'], size: ['1x1"', '2x2"', 'sheets'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'backsplash', 'shower'] },
+  METAL: { name: 'metal', finish: ['brushed', 'polished', 'oxidized', 'painted'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'mechanical fasteners'], application: ['floor', 'wall', 'backsplash', 'accent'] },
+  CONCRETE: { name: 'concrete', finish: ['polished', 'matte', 'textured', 'stained'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'commercial'] },
+  WOOD: { name: 'wood', finish: ['natural', 'stained', 'oiled', 'lacquered'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['floating', 'glue down', 'nail down'], application: ['floor', 'wall', 'accent', 'furniture'] },
+  VINYL: { name: 'vinyl', finish: ['matte', 'glossy', 'textured'], size: ['12"', '18"', 'rolls'], installationMethod: ['glue down', 'floating', 'self-adhesive'], application: ['floor', 'wall', 'commercial', 'residential'] },
+  LAMINATE: { name: 'laminate', finish: ['matte', 'glossy', 'textured'], size: ['12x12"', '18x18"', 'rolls'], installationMethod: ['floating', 'glue down'], application: ['floor', 'commercial', 'residential'] },
+  CARPET: { name: 'carpet', finish: ['loop', 'cut', 'frieze', 'shag'], size: ['rolls', 'tiles'], installationMethod: ['glue down', 'tack strips'], application: ['floor', 'commercial', 'residential'] },
+  RUBBER: { name: 'rubber', finish: ['matte', 'textured'], size: ['rolls', 'tiles'], installationMethod: ['glue down', 'self-adhesive'], application: ['floor', 'commercial', 'industrial'] },
+  CORK: { name: 'cork', finish: ['natural', 'stained', 'oiled'], size: ['12x12"', '18x18"', 'rolls'], installationMethod: ['glue down', 'floating'], application: ['floor', 'wall', 'acoustic'] },
+  BAMBOO: { name: 'bamboo', finish: ['natural', 'stained', 'carbonized'], size: ['12x12"', '18x18"', 'rolls'], installationMethod: ['floating', 'glue down', 'nail down'], application: ['floor', 'wall', 'eco-friendly'] },
+  TERRAZZO: { name: 'terrazzo', finish: ['polished', 'honed', 'matte'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'commercial', 'outdoor'] },
+  RECYCLED_GLASS: { name: 'recycled_glass', finish: ['polished', 'matte', 'textured'], size: ['12x12"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'eco-friendly'] },
+  ACRYLIC: { name: 'acrylic', finish: ['clear', 'tinted', 'patterned'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'silicone'], application: ['floor', 'wall', 'shower', 'backsplash'] },
+  CORIAN: { name: 'corian', finish: ['polished', 'matte', 'textured'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'backsplash'] },
+  QUARTZ: { name: 'quartz', finish: ['polished', 'honed', 'matte'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'backsplash'] }
+} as const;
+
 interface PdfExtractionRequest {
   documentId: string;
   extractionType: 'markdown' | 'tables' | 'images' | 'all';
@@ -64,6 +94,209 @@ interface MivaaApiResponse {
   data?: any;
   error?: string;
   processing_time?: number;
+}
+
+interface MaterialMetaExtraction {
+  finish?: string;
+  size?: string;
+  installation_method?: string;
+  application?: string;
+  r11?: string;
+  metal_types?: string[];
+  category?: string;
+  confidence?: number;
+  // Comprehensive functional metadata
+  slip_resistance_r_value?: string;
+  surface_gloss_level?: string;
+  mohs_hardness?: number;
+  pei_rating?: number;
+  water_absorption?: number;
+  chemical_resistance?: string;
+  sound_absorption?: number;
+  voc_emissions?: string;
+  recycled_content?: number;
+  edge_type?: string;
+  [key: string]: any;
+}
+
+interface EnhancedExtractionResult {
+  originalResult: any;
+  materialMetadata?: MaterialMetaExtraction;
+  extractionSource: 'mivaa_only' | 'mivaa_with_ai_analysis';
+  aiAnalysisTime?: number;
+}
+
+/**
+ * Analyze extracted text content using OpenAI to extract material meta fields and categories
+ */
+async function analyzeTextWithOpenAI(textContent: string): Promise<MaterialMetaExtraction> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    console.warn('OpenAI API key not configured, skipping AI analysis');
+    return { confidence: 0 };
+  }
+
+  const startTime = Date.now();
+
+  try {
+    const availableCategories = Object.keys(MATERIAL_CATEGORIES).join(', ');
+    const categoryDetails = Object.entries(MATERIAL_CATEGORIES)
+      .map(([key, category]) => `${key}: finish(${category.finish.join(', ')}), size(${category.size.join(', ')}), installation(${category.installationMethod.join(', ')}), application(${category.application.join(', ')})`)
+      .join('\n');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert materials scientist specializing in catalog data extraction.
+
+Available material categories and their meta fields:
+${categoryDetails}
+
+Extract material properties and meta fields from catalog text content. Focus on identifying:
+
+REQUIRED META FIELDS:
+- finish: surface finish type (polished, matte, honed, brushed, etc.)
+- size: dimensions and specifications (12x12", 24x24", etc.)
+- installation_method: how the material is installed (thinset mortar, epoxy adhesive, etc.)
+- application: where/how the material is used (floor, wall, countertop, etc.)
+- r11: R11 slip resistance rating if mentioned (DIN 51130 standard)
+- metal_types: specific metal compositions if applicable
+- category: primary material category from available options
+
+COMPREHENSIVE FUNCTIONAL METADATA (extract if mentioned):
+- slip_resistance_r_value: DIN 51130 R-values (R9, R10, R11, R12, R13)
+- surface_gloss_level: gloss classification (super-polished, polished, satin, matte, etc.)
+- mohs_hardness: hardness scale rating (1-10)
+- pei_rating: wear rating (Class 0-5)
+- water_absorption: absorption percentage or classification
+- chemical_resistance: chemical resistance ratings or certifications
+- sound_absorption: NRC ratings or dB reduction values
+- voc_emissions: emission ratings (Greenguard, FloorScore, etc.)
+- recycled_content: percentage of recycled materials
+- edge_type: edge characteristics (rectified, non-rectified, etc.)
+
+Return structured JSON with extracted fields. Use null for missing information. Include confidence score (0-1).`,
+          },
+          {
+            role: 'user',
+            content: `Analyze this catalog text content and extract material meta fields and category information:
+
+${textContent.substring(0, 8000)}
+
+Extract all relevant meta fields and provide material category classification. Focus on accuracy and completeness.`,
+          },
+        ],
+        max_tokens: 1500,
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('OpenAI API error:', error);
+      return { confidence: 0 };
+    }
+
+    const data = await response.json();
+    const analysisContent = data.choices[0].message.content;
+
+    try {
+      const analysis = JSON.parse(analysisContent);
+      
+      // Validate and clean the analysis results
+      const cleanedAnalysis: MaterialMetaExtraction = {
+        finish: analysis.finish || null,
+        size: analysis.size || null,
+        installation_method: analysis.installation_method || null,
+        application: analysis.application || null,
+        r11: analysis.r11 || analysis.slip_resistance_r_value || null,
+        metal_types: Array.isArray(analysis.metal_types) ? analysis.metal_types : null,
+        category: analysis.category || null,
+        confidence: analysis.confidence || 0.8,
+        
+        // Comprehensive functional metadata
+        slip_resistance_r_value: analysis.slip_resistance_r_value || null,
+        surface_gloss_level: analysis.surface_gloss_level || null,
+        mohs_hardness: analysis.mohs_hardness || null,
+        pei_rating: analysis.pei_rating || null,
+        water_absorption: analysis.water_absorption || null,
+        chemical_resistance: analysis.chemical_resistance || null,
+        sound_absorption: analysis.sound_absorption || null,
+        voc_emissions: analysis.voc_emissions || null,
+        recycled_content: analysis.recycled_content || null,
+        edge_type: analysis.edge_type || null,
+      };
+
+      // Remove null values
+      Object.keys(cleanedAnalysis).forEach(key => {
+        if (cleanedAnalysis[key] === null || cleanedAnalysis[key] === undefined) {
+          delete cleanedAnalysis[key];
+        }
+      });
+
+      console.log(`OpenAI text analysis completed in ${Date.now() - startTime}ms`);
+      return cleanedAnalysis;
+
+    } catch (parseError) {
+      console.error('Failed to parse OpenAI analysis response:', parseError, analysisContent);
+      return { confidence: 0 };
+    }
+
+  } catch (error) {
+    console.error('OpenAI text analysis error:', error);
+    return { confidence: 0 };
+  }
+}
+
+/**
+ * Validate extracted meta fields against MATERIAL_CATEGORIES
+ */
+function validateMetaFields(metadata: MaterialMetaExtraction): MaterialMetaExtraction {
+  if (!metadata.category) {
+    return metadata;
+  }
+
+  const categoryKey = metadata.category.toUpperCase();
+  const categoryDef = MATERIAL_CATEGORIES[categoryKey as keyof typeof MATERIAL_CATEGORIES];
+  
+  if (!categoryDef) {
+    console.warn(`Unknown category: ${metadata.category}`);
+    return metadata;
+  }
+
+  const validated = { ...metadata };
+
+  // Validate finish
+  if (validated.finish && !categoryDef.finish.includes(validated.finish)) {
+    console.warn(`Invalid finish '${validated.finish}' for category '${metadata.category}'`);
+    validated.finish = categoryDef.finish[0]; // Use first valid option as fallback
+  }
+
+  // Validate size
+  if (validated.size && !categoryDef.size.includes(validated.size)) {
+    console.warn(`Invalid size '${validated.size}' for category '${metadata.category}'`);
+  }
+
+  // Validate installation method
+  if (validated.installation_method && !categoryDef.installationMethod.includes(validated.installation_method)) {
+    console.warn(`Invalid installation method '${validated.installation_method}' for category '${metadata.category}'`);
+  }
+
+  // Validate application
+  if (validated.application && !categoryDef.application.includes(validated.application)) {
+    console.warn(`Invalid application '${validated.application}' for category '${metadata.category}'`);
+  }
+
+  return validated;
 }
 
 serve(async (req) => {
@@ -169,6 +402,43 @@ serve(async (req) => {
       );
     }
 
+    // Analyze extracted text with OpenAI for meta fields and categories
+    let materialMetadata: MaterialMetaExtraction | undefined;
+    let enhancedResult: EnhancedExtractionResult;
+    
+    if (extractionResult.data?.markdown && requestBody.options?.includeMetadata !== false) {
+      console.log('Analyzing extracted text with OpenAI for material meta fields...');
+      const aiAnalysisStart = Date.now();
+      
+      try {
+        const rawMetadata = await analyzeTextWithOpenAI(extractionResult.data.markdown);
+        materialMetadata = validateMetaFields(rawMetadata);
+        
+        enhancedResult = {
+          originalResult: extractionResult.data,
+          materialMetadata,
+          extractionSource: 'mivaa_with_ai_analysis',
+          aiAnalysisTime: Date.now() - aiAnalysisStart,
+        };
+        
+        console.log(`AI analysis completed in ${Date.now() - aiAnalysisStart}ms`);
+        if (materialMetadata.confidence && materialMetadata.confidence > 0.5) {
+          console.log(`Extracted meta fields: category=${materialMetadata.category}, finish=${materialMetadata.finish}, size=${materialMetadata.size}`);
+        }
+      } catch (aiError) {
+        console.error('AI analysis failed, continuing without meta extraction:', aiError);
+        enhancedResult = {
+          originalResult: extractionResult.data,
+          extractionSource: 'mivaa_only',
+        };
+      }
+    } else {
+      enhancedResult = {
+        originalResult: extractionResult.data,
+        extractionSource: 'mivaa_only',
+      };
+    }
+
     // Transform results for RAG if needed
     let ragDocuments: Array<any> = [];
     if (requestBody.options?.outputFormat !== 'json' && extractionResult.data?.markdown) {
@@ -176,12 +446,16 @@ serve(async (req) => {
         extractionResult.data.markdown,
         documentInfo,
         requestBody.options,
+        materialMetadata, // Include extracted metadata in RAG documents
       );
     }
 
-    // Update processing record with success
+    // Update processing record with success including AI-extracted metadata
     const finalResult = {
       ...extractionResult.data,
+      materialMetadata: materialMetadata,
+      extractionSource: enhancedResult.extractionSource,
+      aiAnalysisTime: enhancedResult.aiAnalysisTime,
       ragDocuments: ragDocuments.length > 0 ? ragDocuments : undefined,
     };
 
@@ -524,6 +798,7 @@ async function transformToRagDocuments(
   markdownContent: string,
   documentInfo: any,
   options?: any,
+  materialMetadata?: MaterialMetaExtraction,
 ): Promise<Array<any>> {
   try {
     const chunkSize = options?.chunkSize || 1000;
@@ -542,6 +817,26 @@ async function transformToRagDocuments(
         totalChunks: chunks.length,
         extractionType: 'markdown',
         createdAt: new Date().toISOString(),
+        // Include AI-extracted material metadata if available
+        materialCategory: materialMetadata?.category,
+        materialFinish: materialMetadata?.finish,
+        materialSize: materialMetadata?.size,
+        materialInstallationMethod: materialMetadata?.installation_method,
+        materialApplication: materialMetadata?.application,
+        materialR11: materialMetadata?.r11,
+        materialMetalTypes: materialMetadata?.metal_types,
+        aiExtractionConfidence: materialMetadata?.confidence,
+        // Additional functional metadata
+        slipResistanceRValue: materialMetadata?.slip_resistance_r_value,
+        surfaceGlossLevel: materialMetadata?.surface_gloss_level,
+        mohsHardness: materialMetadata?.mohs_hardness,
+        peiRating: materialMetadata?.pei_rating,
+        waterAbsorption: materialMetadata?.water_absorption,
+        chemicalResistance: materialMetadata?.chemical_resistance,
+        soundAbsorption: materialMetadata?.sound_absorption,
+        vocEmissions: materialMetadata?.voc_emissions,
+        recycledContent: materialMetadata?.recycled_content,
+        edgeType: materialMetadata?.edge_type,
       },
     }));
   } catch (error) {

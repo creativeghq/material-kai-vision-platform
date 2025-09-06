@@ -9,6 +9,22 @@ import {
   ErrorLogger,
   errorLogger,
 } from '@/core/errors';
+import {
+  NeRFData,
+  MaterialData,
+  SpatialAnalysisData,
+  AgentExecutionData,
+  AgentExecutionMetadata,
+} from '@/types/materials';
+import {
+  isAgentExecutionData,
+  isSpatialAnalysisData,
+  isSuccessApiResponse,
+  isErrorApiResponse,
+  validateWithGuard,
+  createValidationResult,
+} from '@/types/guards';
+import { UserPreferences } from '@/services/spaceformerAnalysisService';
 
 // Material Agent Orchestrator Services
 export interface MaterialAgentTaskRequest {
@@ -21,18 +37,18 @@ export interface MaterialAgentTaskRequest {
 
 export interface AgentExecutionResult {
   success: boolean;
-  data?: any;
+  data?: AgentExecutionData;
   error?: string;
-  metadata?: Record<string, any>;
+  metadata?: AgentExecutionMetadata;
 }
 
-export interface MaterialAgentInputData {</search>
+export interface MaterialAgentInputData {
   image_data?: File;
   analysis_type?: string;
   room_type?: string;
-  nerf_data?: any;
-  material_data?: any;
-  spatial_analysis?: any;
+  nerf_data?: NeRFData | null;
+  material_data?: MaterialData | null;
+  spatial_analysis?: SpatialAnalysisData | null;
   user_preferences?: UserPreferences;
 }
 
@@ -139,7 +155,46 @@ export class MaterialAgentOrchestratorAPI {
         throw error;
       }
 
-      return data as MaterialAgentResult;
+      // Add runtime validation for the response data
+      if (!data) {
+        throw new ValidationError('No data received from Material Agent Orchestrator', {
+          operation: 'executeTask',
+          service: 'MaterialAgentOrchestratorAPI',
+          metadata: { endpoint: 'material-agent-orchestrator' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate the response structure
+      const result = data as MaterialAgentResult;
+      if (typeof result.success !== 'boolean' || typeof result.task_id !== 'string') {
+        throw new ValidationError('Invalid response format from Material Agent Orchestrator', {
+          operation: 'executeTask',
+          service: 'MaterialAgentOrchestratorAPI',
+          metadata: {
+            endpoint: 'material-agent-orchestrator',
+            received: typeof result,
+            hasSuccess: 'success' in result,
+            hasTaskId: 'task_id' in result,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate coordinated_result if present
+      if (result.coordinated_result && result.coordinated_result.data) {
+        const validationResult = createValidationResult(
+          result.coordinated_result.data,
+          isAgentExecutionData
+        );
+        
+        if (!validationResult.success) {
+          console.warn('Invalid agent execution data structure:', validationResult.error);
+          // Don't throw - log warning but continue with response
+        }
+      }
+
+      return result;
     } catch (error) {
       // DIAGNOSTIC: Validating error handling issues
       console.log('DEBUG: ErrorContext interface requires these fields:');

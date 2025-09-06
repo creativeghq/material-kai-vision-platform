@@ -162,9 +162,9 @@ export class VisualSearchController {
         }
       };
 
-      // Call the Supabase visual search function
+      // Call the Supabase unified material search function
       const { data, error } = await this.supabaseClient.functions.invoke(
-        'visual-search',
+        'unified-material-search',
         {
           body: searchRequest,
           headers: {
@@ -241,9 +241,9 @@ export class VisualSearchController {
         }
       };
 
-      // Call the Supabase visual search function
+      // Call the Supabase unified material search function
       const { data, error } = await this.supabaseClient.functions.invoke(
-        'visual-search',
+        'unified-material-search',
         {
           body: searchRequest,
           headers: {
@@ -322,9 +322,9 @@ export class VisualSearchController {
         }
       };
 
-      // Call the Supabase visual search function
+      // Call the Supabase unified material search function
       const { data, error } = await this.supabaseClient.functions.invoke(
-        'visual-search',
+        'unified-material-search',
         {
           body: searchRequest,
           headers: {
@@ -396,9 +396,9 @@ export class VisualSearchController {
         limit: requestData.limit || 20
       };
 
-      // Call the Supabase visual search function
+      // Call the Supabase unified material search function
       const { data, error } = await this.supabaseClient.functions.invoke(
-        'visual-search',
+        'unified-material-search',
         {
           body: searchRequest,
           headers: {
@@ -461,9 +461,9 @@ export class VisualSearchController {
         metrics: requestData.metrics || ['search_count', 'response_time', 'success_rate']
       };
 
-      // Call the Supabase visual search function
+      // Call the Supabase unified material search function
       const { data, error } = await this.supabaseClient.functions.invoke(
-        'visual-search',
+        'unified-material-search',
         {
           body: analyticsRequest,
           headers: {

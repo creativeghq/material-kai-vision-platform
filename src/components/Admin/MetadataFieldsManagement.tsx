@@ -15,57 +15,55 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-interface MetadataField {
-  id: string;
-  field_name: string;
-  display_name: string;
-  field_type: string; // Changed from union type to string
-  is_required: boolean;
-  description?: string;
-  extraction_hints?: string;
-  dropdown_options?: string[] | null;
-  applies_to_categories?: string[] | null; // Changed from enum array to string array, allow null
-  is_global: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
+// Import proper TypeScript types
+import type {
+  MaterialMetafieldDefinition,
+  CreateMetafieldDefinitionRequest,
+  MetafieldResponse,
+  MetafieldListResponse
+} from '@/types/unified-material-api';
+import type { MaterialCategory } from '@/types/materials';
+import { getMaterialCategories, getMaterialCategoryName } from '@/types/materials';
 
-
-const materialCategories = [
-  'metals', 'plastics', 'ceramics', 'composites', 'textiles',
-  'wood', 'glass', 'rubber', 'concrete', 'other',
-];
-
-const fieldTypes = [
-  { value: 'text', label: 'Text' },
+/**
+ * Available field data types for metafield definitions
+ */
+const FIELD_TYPES = [
+  { value: 'string', label: 'Text' },
   { value: 'number', label: 'Number' },
-  { value: 'dropdown', label: 'Dropdown' },
   { value: 'boolean', label: 'Boolean' },
   { value: 'date', label: 'Date' },
-];
+  { value: 'select', label: 'Select (Dropdown)' },
+  { value: 'multiselect', label: 'Multi-Select' },
+  { value: 'json', label: 'JSON Object' },
+] as const;
+
+/**
+ * Form data interface for metafield creation/editing
+ */
+interface MetafieldFormData {
+  field_name: string;
+  display_name: string;
+  field_type: MaterialMetafieldDefinition['dataType'];
+  is_required: boolean;
+  description: string;
+  extraction_hints: string;
+  dropdown_options: string[];
+  applies_to_categories: MaterialCategory[];
+  is_global: boolean;
+  sort_order: number;
+}
 
 export const MetadataFieldsManagement: React.FC = () => {
   const navigate = useNavigate();
-  const [fields, setFields] = useState<MetadataField[]>([]);
+  const [fields, setFields] = useState<MaterialMetafieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingField, setEditingField] = useState<MetadataField | null>(null);
-  const [formData, setFormData] = useState<{
-    field_name: string;
-    display_name: string;
-    field_type: string;
-    is_required: boolean;
-    description: string;
-    extraction_hints: string;
-    dropdown_options: string[];
-    applies_to_categories: string[];
-    is_global: boolean;
-    sort_order: number;
-  }>({
+  const [editingField, setEditingField] = useState<MaterialMetafieldDefinition | null>(null);
+  const [formData, setFormData] = useState<MetafieldFormData>({
     field_name: '',
     display_name: '',
-    field_type: 'text',
+    field_type: 'string',
     is_required: false,
     description: '',
     extraction_hints: '',
@@ -76,6 +74,9 @@ export const MetadataFieldsManagement: React.FC = () => {
   });
   const [dropdownOptionInput, setDropdownOptionInput] = useState('');
   const { toast } = useToast();
+
+  // Get available material categories dynamically
+  const availableCategories = getMaterialCategories();
 
   const loadMetadataFields = useCallback(async () => {
     setIsLoading(true);
@@ -103,32 +104,33 @@ export const MetadataFieldsManagement: React.FC = () => {
     setFormData({
       field_name: '',
       display_name: '',
-      field_type: 'text',
+      field_type: 'string',
       is_required: false,
       description: '',
       extraction_hints: '',
       dropdown_options: [],
       applies_to_categories: [],
       is_global: false,
-      sort_order: Math.max(...fields.map(f => f.sort_order), 0) + 1,
+      sort_order: Math.max(...fields.map(f => f.display?.order || 0), 0) + 1,
     });
     setDropdownOptionInput('');
     setEditingField(null);
   };
 
-  const openDialog = (field?: MetadataField) => {
+  const openDialog = (field?: MaterialMetafieldDefinition) => {
     if (field) {
+      // Map from MaterialMetafieldDefinition to form data structure
       setFormData({
-        field_name: field.field_name,
-        display_name: field.display_name,
-        field_type: field.field_type,
-        is_required: field.is_required,
+        field_name: field.name,
+        display_name: field.name, // Use name as display name for now
+        field_type: field.dataType,
+        is_required: field.required,
         description: field.description || '',
-        extraction_hints: field.extraction_hints || '',
-        dropdown_options: field.dropdown_options || [],
-        applies_to_categories: field.applies_to_categories || [],
-        is_global: field.is_global,
-        sort_order: field.sort_order,
+        extraction_hints: '', // This will be a new field
+        dropdown_options: field.validation?.options?.map(opt => opt.value) || [],
+        applies_to_categories: field.applicableCategories,
+        is_global: field.applicableCategories.length === 0, // If no specific categories, it's global
+        sort_order: field.display?.order || 0,
       });
       setEditingField(field);
     } else {

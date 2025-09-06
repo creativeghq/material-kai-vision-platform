@@ -69,6 +69,7 @@ export interface UnifiedPdfProcessingRequest {
   options: {
     extractionType: 'markdown' | 'tables' | 'images' | 'all';
     enableRAGIntegration?: boolean;
+    enableFunctionalMetadata?: boolean;
     pageRange?: {
       start?: number;
       end?: number;
@@ -556,6 +557,128 @@ export class ConsolidatedPDFController {
 
           this.activeJobs.set(jobId, job);
           result = { ...result, jobId };
+        }
+      } else if (request.options.enableFunctionalMetadata) {
+        // Process for functional metadata extraction with enhanced error handling
+        const functionalMetadataRequest = {
+          ...extractionRequest,
+          options: {
+            ...extractionRequest.options,
+            include_functional_metadata: true,
+          },
+        };
+        
+        let jobId: string | undefined;
+        let job: any;
+        
+        try {
+          // Create job tracking early for functional metadata processing
+          if (request.workspaceId) {
+            jobId = this.generateJobId();
+            job = {
+              id: jobId,
+              documentId: request.documentId,
+              workspaceId: request.workspaceId,
+              status: 'processing' as const,
+              filename: file.name,
+              fileSize: file.size,
+              userId: authContext.user.id,
+              options: request.options,
+              metadata: request.metadata,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+
+            this.activeJobs.set(jobId, job);
+          }
+
+          // Attempt functional metadata extraction
+          result = await this.mivaaService.extractFromPdf(functionalMetadataRequest);
+
+          // Validate functional metadata response
+          if (!result || typeof result !== 'object') {
+            throw new Error('Invalid response from MIVAA functional metadata service');
+          }
+
+          // Check if functional metadata was actually extracted
+          const hasValidFunctionalMetadata = result.data?.functional_properties &&
+            Object.keys(result.data.functional_properties).length > 0;
+
+          if (!hasValidFunctionalMetadata) {
+            console.warn('Functional metadata extraction returned no results for document:', request.documentId);
+            result = {
+              ...result,
+              status: 'partial',
+              warnings: [
+                ...(result.warnings || []),
+                'No functional metadata could be extracted from this document'
+              ]
+            };
+          }
+
+          // Update job status on success
+          if (jobId && job) {
+            job.status = 'completed';
+            job.results = result;
+            job.completedAt = new Date();
+            job.updatedAt = new Date();
+            this.activeJobs.set(jobId, job);
+            result = { ...result, jobId };
+          }
+
+        } catch (functionalMetadataError) {
+          console.error('Functional metadata extraction failed:', functionalMetadataError);
+          
+          // Update job status on error
+          if (jobId && job) {
+            job.status = 'failed';
+            job.error = {
+              stage: 'functional_metadata_extraction',
+              message: functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown functional metadata error',
+              code: 'FUNCTIONAL_METADATA_ERROR'
+            };
+            job.updatedAt = new Date();
+            this.activeJobs.set(jobId, job);
+          }
+
+          // Check if this is a critical failure or if we can fall back to standard extraction
+          const isCriticalError = functionalMetadataError instanceof Error &&
+            (functionalMetadataError.message.includes('MIVAA service unavailable') ||
+             functionalMetadataError.message.includes('Authentication failed') ||
+             functionalMetadataError.message.includes('Network timeout'));
+
+          if (isCriticalError) {
+            // Critical error - return failure
+            throw new Error(`Functional metadata extraction failed: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}`);
+          } else {
+            // Non-critical error - fall back to standard extraction with warning
+            console.warn('Falling back to standard extraction due to functional metadata error:', functionalMetadataError);
+            
+            try {
+              result = await this.mivaaService.extractFromPdf(extractionRequest);
+              result = {
+                ...result,
+                status: 'partial',
+                warnings: [
+                  ...(result.warnings || []),
+                  `Functional metadata extraction failed: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}. Standard extraction completed successfully.`
+                ]
+              };
+
+              // Update job with partial success
+              if (jobId && job) {
+                job.status = 'completed';
+                job.results = result;
+                job.completedAt = new Date();
+                job.updatedAt = new Date();
+                this.activeJobs.set(jobId, job);
+                result = { ...result, jobId };
+              }
+            } catch (fallbackError) {
+              // Both functional metadata and standard extraction failed
+              throw new Error(`Both functional metadata and standard extraction failed. Functional metadata error: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}. Standard extraction error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
+            }
+          }
         }
       } else {
         // Standard extraction

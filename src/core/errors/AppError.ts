@@ -64,7 +64,10 @@ export class AppError extends Error {
     this.category = details.category;
     this.severity = details.severity;
     this.context = details.context;
-    this.originalError = details.originalError;
+    // Only assign originalError if it's defined to satisfy exactOptionalPropertyTypes
+    if (details.originalError !== undefined) {
+      this.originalError = details.originalError;
+    }
     this.correlationId = this.generateCorrelationId();
     this.timestamp = new Date().toISOString();
 
@@ -141,7 +144,7 @@ export class ValidationError extends AppError {
       category: ErrorCategory.VALIDATION,
       severity: ErrorSeverity.MEDIUM,
       context,
-      originalError,
+      ...(originalError !== undefined && { originalError }),
     });
   }
 }
@@ -154,7 +157,7 @@ export class NetworkError extends AppError {
       category: ErrorCategory.NETWORK,
       severity: ErrorSeverity.HIGH,
       context,
-      originalError,
+      ...(originalError !== undefined && { originalError }),
     });
   }
 }
@@ -167,7 +170,7 @@ export class APIError extends AppError {
       category: ErrorCategory.API,
       severity: ErrorSeverity.HIGH,
       context,
-      originalError,
+      ...(originalError !== undefined && { originalError }),
     });
   }
 }
@@ -180,7 +183,7 @@ export class DatabaseError extends AppError {
       category: ErrorCategory.DATABASE,
       severity: ErrorSeverity.CRITICAL,
       context,
-      originalError,
+      ...(originalError !== undefined && { originalError }),
     });
   }
 }
@@ -193,7 +196,7 @@ export class ExternalServiceError extends AppError {
       category: ErrorCategory.EXTERNAL_SERVICE,
       severity: ErrorSeverity.HIGH,
       context,
-      originalError,
+      ...(originalError !== undefined && { originalError }),
     });
   }
 }
@@ -206,7 +209,7 @@ export class ConfigurationError extends AppError {
       category: ErrorCategory.CONFIGURATION,
       severity: ErrorSeverity.CRITICAL,
       context,
-      originalError,
+      ...(originalError !== undefined && { originalError }),
     });
   }
 }

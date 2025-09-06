@@ -14,19 +14,36 @@ const supabase = createClient(
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 
+interface MaterialAgentInputData {
+  image_data?: File;
+  analysis_type?: string;
+  room_type?: string;
+  nerf_data?: Record<string, unknown> | null;
+  material_data?: Record<string, unknown> | null;
+  spatial_analysis?: Record<string, unknown> | null;
+  user_preferences?: Record<string, unknown>;
+}
+
 interface MaterialAgentTaskRequest {
   user_id: string;
   task_type: string;
-  input_data: any;
+  input_data: MaterialAgentInputData;
   priority?: number;
   required_agents?: string[];
+}
+
+interface AgentExecutionResult {
+  success: boolean;
+  data?: Record<string, unknown>;
+  error?: string;
+  metadata?: Record<string, unknown>;
 }
 
 interface AgentExecution {
   agent_id: string;
   agent_name: string;
   specialization: string;
-  result: any;
+  result: AgentExecutionResult;
   confidence: number;
   execution_time_ms: number;
   reasoning: string;

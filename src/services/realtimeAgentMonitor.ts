@@ -132,19 +132,6 @@ export class RealtimeAgentMonitor {
     );
   }
 
-  private isDatabaseAgent(record: unknown): record is DatabaseAgent {
-    return (
-      record !== null &&
-      typeof record === 'object' &&
-      'id' in record &&
-      'name' in record &&
-      'status' in record &&
-      typeof (record as Record<string, unknown>).id === 'string' &&
-      typeof (record as Record<string, unknown>).name === 'string' &&
-      typeof (record as Record<string, unknown>).status === 'string'
-    );
-  }
-
   private async handleTaskChange(payload: Record<string, unknown>): Promise<void> {
     const { eventType, new: newRecord, old: oldRecord } = payload;
 
@@ -221,7 +208,7 @@ export class RealtimeAgentMonitor {
     for (const agentId of task.assigned_agents) {
       await this.performanceOptimizer.updateAgentPerformance(agentId, {
         success: true,
-        processing_time_ms: task.processing_time_ms,
+        processingTime: task.processing_time_ms,
       });
 
       await this.updateAgentStatus(agentId, 'idle', []);
@@ -247,7 +234,7 @@ export class RealtimeAgentMonitor {
     for (const agentId of task.assigned_agents) {
       await this.performanceOptimizer.updateAgentPerformance(agentId, {
         success: false,
-        error_message: task.error_message,
+        errorMessage: task.error_message,
       });
 
       await this.updateAgentStatus(agentId, 'error', []);
