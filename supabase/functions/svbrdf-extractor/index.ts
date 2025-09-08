@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 // Helper function to generate realistic SVBRDF map URLs using Supabase Storage
-function generateMapUrls(baseImageUrl: string, extractionId: string): Record<string, string> {
+function generateMapUrls(extractionId: string): Record<string, string> {
   const baseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const storageUrl = `${baseUrl}/storage/v1/object/public/svbrdf-maps`;
 
@@ -22,7 +22,7 @@ function generateMapUrls(baseImageUrl: string, extractionId: string): Record<str
 }
 
 // Helper function to simulate SVBRDF extraction with realistic properties
-function performSVBRDFExtraction(imageUrl: string): {
+function performSVBRDFExtraction(): {
   properties: Record<string, any>;
   confidence: number;
   processingTime: number;
@@ -36,18 +36,26 @@ function performSVBRDFExtraction(imageUrl: string): {
     { name: 'ceramic', albedo: [0.9, 0.9, 0.9], roughness: 0.05, metallic: 0.0 },
   ];
 
-  // Simulate material detection based on image URL patterns or random selection
+  // Simulate material detection based on random selection
   const detectedMaterial = materialTypes[Math.floor(Math.random() * materialTypes.length)];
 
+  // Add null safety check
+  if (!detectedMaterial) {
+    throw new Error('Failed to detect material type');
+  }
+
+  // TypeScript assertion since we've already checked for null above
+  const material = detectedMaterial as NonNullable<typeof detectedMaterial>;
+
   const properties = {
-    material_type: detectedMaterial.name,
+    material_type: material.name,
     albedo: {
-      r: detectedMaterial.albedo[0] + (Math.random() - 0.5) * 0.2,
-      g: detectedMaterial.albedo[1] + (Math.random() - 0.5) * 0.2,
-      b: detectedMaterial.albedo[2] + (Math.random() - 0.5) * 0.2,
+      r: (material.albedo?.[0] ?? 0.5) + (Math.random() - 0.5) * 0.2,
+      g: (material.albedo?.[1] ?? 0.5) + (Math.random() - 0.5) * 0.2,
+      b: (material.albedo?.[2] ?? 0.5) + (Math.random() - 0.5) * 0.2,
     },
-    roughness: Math.max(0.01, Math.min(1.0, detectedMaterial.roughness + (Math.random() - 0.5) * 0.3)),
-    metallic: Math.max(0.0, Math.min(1.0, detectedMaterial.metallic + (Math.random() - 0.5) * 0.2)),
+    roughness: Math.max(0.01, Math.min(1.0, material.roughness + (Math.random() - 0.5) * 0.3)),
+    metallic: Math.max(0.0, Math.min(1.0, material.metallic + (Math.random() - 0.5) * 0.2)),
     normal: {
       x: 0.5 + (Math.random() - 0.5) * 0.1,
       y: 0.5 + (Math.random() - 0.5) * 0.1,
@@ -64,7 +72,7 @@ function performSVBRDFExtraction(imageUrl: string): {
   return { properties, confidence, processingTime };
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -85,7 +93,6 @@ serve(async (req) => {
     }
 
     console.log('Starting SVBRDF extraction for image:', imageUrl);
-    const startTime = Date.now();
 
     // Create processing record using the processing_results table
     const { data: processingRecord, error: insertError } = await supabase
@@ -112,10 +119,10 @@ serve(async (req) => {
     }
 
     // Perform SVBRDF extraction
-    const { properties, confidence, processingTime } = performSVBRDFExtraction(imageUrl);
+    const { properties, confidence, processingTime } = performSVBRDFExtraction();
 
     // Generate realistic map URLs
-    const maps = generateMapUrls(imageUrl, processingRecord.id);
+    const maps = generateMapUrls(processingRecord.id);
 
     // Prepare comprehensive results
     const extractionResults = {
@@ -168,7 +175,7 @@ serve(async (req) => {
     console.error('Error in SVBRDF extraction:', error);
     return new Response(
       JSON.stringify({
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
         success: false,
         status: 'failed',
       }),

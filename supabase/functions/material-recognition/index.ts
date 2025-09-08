@@ -1,9 +1,8 @@
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 // Import standardized Edge Function response types
 import {
-  type EdgeFunctionResponse,
   type MaterialRecognitionResult,
   createSuccessResponse,
   createErrorResponse,
@@ -20,14 +19,59 @@ const TOGETHER_AI_API_KEY = Deno.env.get('TOGETHER_AI_API_KEY');
 const TOGETHER_AI_BASE_URL = 'https://api.together.xyz/v1/chat/completions';
 const LLAMA_VISION_MODEL = 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo';
 
-// Enhanced interfaces for LLaMA Vision integration
+// Enhanced interfaces for comprehensive visual analysis
+interface ColorPalette {
+  dominant_colors: Array<{
+    color: string;
+    percentage: number;
+    name: string;
+  }>;
+  accent_colors: Array<{
+    color: string;
+    percentage: number;
+    name: string;
+  }>;
+  color_harmony: string;
+  color_temperature: string;
+}
+
+interface TextureAnalysis {
+  surface_texture: string;
+  texture_scale: string;
+  texture_pattern: string;
+  texture_directionality: string;
+  surface_roughness: string;
+}
+
+interface PatternDetection {
+  pattern_type: string;
+  pattern_scale: string;
+  pattern_regularity: string;
+  geometric_elements: string[];
+}
+
+interface LightingConditions {
+  lighting_type: string;
+  lighting_direction: string;
+  shadow_presence: string;
+  highlights: string;
+}
+
+interface SurfaceProperties {
+  reflectance: string;
+  transparency: string;
+  surface_defects: string[];
+  wear_patterns: string;
+}
+
 interface VisualAnalysisData {
   embeddings?: number[];
   visual_features?: {
-    color_palette?: string[];
-    texture_analysis?: string;
-    pattern_detection?: string;
-    lighting_conditions?: string;
+    color_palette?: ColorPalette;
+    texture_analysis?: TextureAnalysis;
+    pattern_detection?: PatternDetection;
+    lighting_conditions?: LightingConditions;
+    surface_properties?: SurfaceProperties;
   };
   material_segmentation?: Array<{
     segment_id: number;
@@ -35,19 +79,16 @@ interface VisualAnalysisData {
     confidence: number;
     area_percentage: number;
     bounding_box: BoundingBox;
+    segmentation_method: string;
+    material_interactions: string;
   }>;
-}
-
-interface EnhancedMaterialAnalysis {
-  llama_analysis?: {
-    detailed_description: string;
-    material_properties: MaterialProperties;
-    confidence_score: number;
-    visual_features: VisualAnalysisData['visual_features'];
+  material_categorization?: {
+    primary_material_family: string;
+    construction_type: string;
+    style_classification: string;
+    quality_assessment: string;
+    installation_complexity: string;
   };
-  openai_fallback?: boolean;
-  processing_method: 'llama_vision' | 'openai_vision' | 'catalog_fallback';
-  visual_analysis_id?: string;
 }
 
 interface MaterialRecognitionRequest {
@@ -83,23 +124,37 @@ async function analyzeWithLLamaVision(
         messages: [
           {
             role: 'system',
-            content: `You are an expert materials scientist and visual analyst. Analyze the image to identify materials and their detailed properties.
-            
+            content: `You are an expert materials scientist and visual analyst specializing in architectural, interior design, and construction materials. Analyze the image to identify materials with comprehensive visual analysis.
+
+ENHANCED ANALYSIS REQUIREMENTS:
+1. Material Property Extraction: Identify physical, chemical, and performance characteristics
+2. Visual Feature Description: Detailed surface characteristics, reflectance, and appearance
+3. Material Categorization: Hierarchical classification with industry standards
+4. Texture & Pattern Analysis: Surface texture, grain patterns, and micro-structures
+5. Color Palette Extraction: Precise color identification with hex codes and color theory
+
 REQUIRED OUTPUT FORMAT - Return ONLY valid JSON:
 {
   "materials": [
     {
-      "name": "material name",
+      "name": "specific material name",
       "confidence": 0.0-1.0,
       "properties": {
-        "category": "category name",
-        "subcategory": "subcategory if applicable",
+        "category": "primary category (wood, metal, stone, ceramic, fabric, etc.)",
+        "subcategory": "specific type (oak, aluminum, granite, etc.)",
         "color": "primary color description",
-        "texture": "texture description",
-        "finish": "surface finish type",
-        "durability": "durability assessment",
-        "sustainability": "sustainability rating"
+        "texture": "surface texture (smooth, rough, textured, etc.)",
+        "finish": "surface finish (matte, glossy, satin, etc.)",
+        "durability": "durability rating (low/medium/high/commercial)",
+        "sustainability": "sustainability assessment",
+        "hardness": "material hardness (soft/medium/hard)",
+        "reflectivity": "surface reflectivity (low/medium/high)",
+        "porosity": "porosity level (non-porous/low/medium/high)",
+        "thermal_properties": "thermal characteristics",
+        "maintenance_level": "maintenance requirements (low/medium/high)"
       },
+      "visual_description": "detailed visual description of material appearance",
+      "applications": ["typical use cases"],
       "bounding_box": {
         "x": 0,
         "y": 0,
@@ -109,10 +164,37 @@ REQUIRED OUTPUT FORMAT - Return ONLY valid JSON:
     }
   ],
   "visual_features": {
-    "color_palette": ["#hex1", "#hex2"],
-    "texture_analysis": "detailed texture description",
-    "pattern_detection": "patterns observed",
-    "lighting_conditions": "lighting assessment"
+    "color_palette": {
+      "dominant_colors": [{"color": "#hex", "percentage": 0.0-100.0, "name": "color name"}],
+      "accent_colors": [{"color": "#hex", "percentage": 0.0-100.0, "name": "color name"}],
+      "color_harmony": "color scheme type",
+      "color_temperature": "warm/cool/neutral"
+    },
+    "texture_analysis": {
+      "surface_texture": "detailed texture description",
+      "texture_scale": "micro/fine/medium/coarse",
+      "texture_pattern": "pattern type (geometric, organic, random, etc.)",
+      "texture_directionality": "directional/non-directional",
+      "surface_roughness": "roughness assessment"
+    },
+    "pattern_detection": {
+      "pattern_type": "identified patterns",
+      "pattern_scale": "pattern size assessment",
+      "pattern_regularity": "regular/irregular/random",
+      "geometric_elements": ["identified geometric elements"]
+    },
+    "lighting_conditions": {
+      "lighting_type": "natural/artificial/mixed",
+      "lighting_direction": "direction assessment",
+      "shadow_presence": "shadow characteristics",
+      "highlights": "highlight areas description"
+    },
+    "surface_properties": {
+      "reflectance": "reflection characteristics",
+      "transparency": "transparency level",
+      "surface_defects": ["visible defects or imperfections"],
+      "wear_patterns": "signs of wear or aging"
+    }
   },
   "material_segmentation": [
     {
@@ -120,12 +202,21 @@ REQUIRED OUTPUT FORMAT - Return ONLY valid JSON:
       "material_type": "material type",
       "confidence": 0.0-1.0,
       "area_percentage": 0.0-100.0,
-      "bounding_box": {"x": 0, "y": 0, "width": 100, "height": 100}
+      "bounding_box": {"x": 0, "y": 0, "width": 100, "height": 100},
+      "segmentation_method": "color/texture/edge-based",
+      "material_interactions": "how this material interacts with adjacent materials"
     }
-  ]
+  ],
+  "material_categorization": {
+    "primary_material_family": "dominant material type",
+    "construction_type": "architectural/decorative/structural/functional",
+    "style_classification": "modern/traditional/industrial/etc.",
+    "quality_assessment": "budget/standard/premium/luxury",
+    "installation_complexity": "simple/moderate/complex"
+  }
 }
 
-Analysis precision: ${analysisType}. Minimum confidence threshold: ${confidenceThreshold}. Only include materials you can clearly identify.`
+Analysis precision: ${analysisType}. Minimum confidence threshold: ${confidenceThreshold}. Focus on accurate material identification with comprehensive visual analysis.`
           },
           {
             role: 'user',
@@ -191,6 +282,11 @@ interface MaterialProperties {
   finish?: string;
   durability?: string;
   sustainability?: string;
+  hardness?: string;
+  reflectivity?: string;
+  porosity?: string;
+  thermal_properties?: string;
+  maintenance_level?: string;
 }
 
 interface BoundingBox {
@@ -204,6 +300,8 @@ interface RecognizedMaterial {
   name: string;
   confidence: number;
   properties: MaterialProperties;
+  visual_description?: string;
+  applications?: string[];
   bounding_box: BoundingBox;
 }
 
@@ -432,13 +530,13 @@ Deno.serve(async (req: Request) => {
             confidence: 0.6, // Lower confidence for catalog fallback
             properties: {
               category: material.category || 'Unknown',
-              subcategory: material.subcategory,
-              color: material.color,
-              texture: material.texture,
-              finish: material.finish,
-              durability: material.durability,
-              sustainability: material.sustainability_rating,
-            },
+              subcategory: material.subcategory || '',
+              color: material.color || '',
+              texture: material.texture || '',
+              finish: material.finish || '',
+              durability: material.durability || '',
+              sustainability: material.sustainability_rating || '',
+            } as any,
             bounding_box: {
               x: 0,
               y: 0,
@@ -494,7 +592,7 @@ Deno.serve(async (req: Request) => {
           .from('material_recognition_requests')
           .update({
             status: 'failed',
-            error_message: error.message,
+            error_message: error instanceof Error ? error.message : String(error),
             updated_at: new Date().toISOString(),
           })
           .eq('id', recognitionRecord.id);

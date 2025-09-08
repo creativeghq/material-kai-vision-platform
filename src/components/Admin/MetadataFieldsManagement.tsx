@@ -17,13 +17,10 @@ import { useToast } from '@/hooks/use-toast';
 
 // Import proper TypeScript types
 import type {
-  MaterialMetafieldDefinition,
-  CreateMetafieldDefinitionRequest,
-  MetafieldResponse,
-  MetafieldListResponse
+  MaterialMetafieldDefinition
 } from '@/types/unified-material-api';
 import type { MaterialCategory } from '@/types/materials';
-import { getMaterialCategories, getMaterialCategoryName } from '@/types/materials';
+import { getMaterialCategories } from '@/types/materials';
 
 /**
  * Available field data types for metafield definitions
@@ -77,18 +74,54 @@ export const MetadataFieldsManagement: React.FC = () => {
 
   // Get available material categories dynamically
   const availableCategories = getMaterialCategories();
+  const materialCategories = availableCategories;
 
   const loadMetadataFields = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Note: material_metadata_fields table doesn't exist yet - using placeholder
-      setFields([]); // Set empty array since table doesn't exist yet
-      console.log('Metadata fields feature not yet implemented - table does not exist');
+      // Fetch real data from material_metadata_fields table (verified to exist with 121 rows)
+      const { data, error } = await supabase
+        .from('material_metadata_fields')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      // Transform database data to match MaterialMetafieldDefinition interface
+      const transformedFields: MaterialMetafieldDefinition[] = (data || []).map((field: any) => ({
+        id: field.id,
+        fieldName: field.field_name,
+        displayName: field.display_name || field.field_name,
+        dataType: field.field_type as MaterialMetafieldDefinition['dataType'],
+        isRequired: field.is_required || false,
+        description: field.description || '',
+        validationRules: field.validation_rules || {},
+        defaultValue: field.default_value,
+        category: field.category || 'all',
+        display: {
+          order: field.display_order || 0,
+          section: field.display_section || 'general',
+          helpText: field.help_text || field.description || '',
+        },
+        constraints: field.constraints || {},
+        metadata: {
+          extractionHints: field.extraction_hints || '',
+          isGlobal: field.is_global || false,
+          appliesTo: field.applies_to_categories || [],
+        },
+        createdAt: field.created_at,
+        updatedAt: field.updated_at,
+      }));
+
+      setFields(transformedFields);
+      console.log(`Loaded ${transformedFields.length} metadata fields from database`);
     } catch (error) {
       console.error('Error loading metadata fields:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load metadata fields',
+        description: 'Failed to load metadata fields from database',
         variant: 'destructive',
       });
     } finally {
@@ -143,7 +176,7 @@ export const MetadataFieldsManagement: React.FC = () => {
     try {
       const fieldData: Record<string, unknown> = {
         ...formData,
-        dropdown_options: formData.field_type === 'dropdown' ? formData.dropdown_options : null,
+        dropdown_options: formData.field_type === 'select' ? formData.dropdown_options : null,
         applies_to_categories: formData.is_global ? null : formData.applies_to_categories,
       };
 
@@ -183,8 +216,8 @@ export const MetadataFieldsManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteField = async (field: MetadataField) => {
-    if (!confirm(`Are you sure you want to delete the "${field.display_name}" field?`)) {
+  const handleDeleteField = async (field: MaterialMetafieldDefinition) => {
+    if (!confirm(`Are you sure you want to delete the "${field.name}" field?`)) {
       return;
     }
 
@@ -299,13 +332,13 @@ export const MetadataFieldsManagement: React.FC = () => {
                   <Label htmlFor="field_type">Field Type</Label>
                   <Select
                     value={formData.field_type}
-                    onValueChange={(value: string) => setFormData(prev => ({ ...prev, field_type: value }))}
+                    onValueChange={(value: MaterialMetafieldDefinition['dataType']) => setFormData(prev => ({ ...prev, field_type: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {fieldTypes.map(type => (
+                      {FIELD_TYPES.map((type) => (
                         <SelectItem key={type.value} value={type.value}>
                           {type.label}
                         </SelectItem>
@@ -363,7 +396,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                 />
               </div>
 
-              {formData.field_type === 'dropdown' && (
+              {formData.field_type === 'select' && (
                 <div>
                   <Label>Dropdown Options</Label>
                   <div className="space-y-2">
@@ -391,7 +424,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                 <div>
                   <Label>Applies to Categories</Label>
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    {materialCategories.map(category => (
+                    {materialCategories.map((category: MaterialCategory) => (
                       <div key={category} className="flex items-center space-x-2">
                         <Checkbox
                           id={`category_${category}`}
@@ -462,41 +495,41 @@ export const MetadataFieldsManagement: React.FC = () => {
                   <TableRow key={field.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{field.display_name}</div>
-                        <div className="text-sm text-muted-foreground">{field.field_name}</div>
+                        <div className="font-medium">{field.name}</div>
+                        <div className="text-sm text-muted-foreground">{field.name}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge className="capitalize border border-border bg-background text-foreground">
-                        {field.field_type}
+                        {field.dataType}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {field.is_global ? (
+                      {field.applicableCategories.length === 0 ? (
                         <Badge>Global</Badge>
                       ) : (
                         <div className="flex flex-wrap gap-1">
-                          {field.applies_to_categories?.slice(0, 2).map(cat => (
+                          {field.applicableCategories?.slice(0, 2).map((cat: MaterialCategory) => (
                             <Badge key={cat} className="text-xs capitalize bg-secondary text-secondary-foreground">
                               {cat}
                             </Badge>
                           ))}
-                          {(field.applies_to_categories?.length || 0) > 2 && (
+                          {(field.applicableCategories?.length || 0) > 2 && (
                             <Badge className="text-xs bg-secondary text-secondary-foreground">
-                              +{(field.applies_to_categories?.length || 0) - 2}
+                              +{(field.applicableCategories?.length || 0) - 2}
                             </Badge>
                           )}
                         </div>
                       )}
                     </TableCell>
                     <TableCell>
-                      {field.is_required ? (
+                      {field.required ? (
                         <Badge className="bg-destructive text-destructive-foreground">Required</Badge>
                       ) : (
                         <Badge className="bg-secondary text-secondary-foreground">Optional</Badge>
                       )}
                     </TableCell>
-                    <TableCell>{field.sort_order}</TableCell>
+                    <TableCell>{field.display?.order || 0}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button

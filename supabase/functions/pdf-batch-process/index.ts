@@ -380,7 +380,7 @@ async function validateDocuments(
 
     return { success: true };
   } catch (error) {
-    Logger.logError('validateDocuments', error, { documentIds, userId, workspaceId });
+    Logger.logError('validateDocuments', error, { documentIds: documents.map(doc => doc.documentId), userId, workspaceId });
     return { success: false, error: 'Document validation failed' };
   }
 }

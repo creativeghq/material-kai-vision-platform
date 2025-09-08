@@ -15,6 +15,8 @@ import {
   ArrowUpDown,
   ChevronDown,
   ChevronUp,
+  Database,
+  Link,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -598,6 +600,78 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                         </div>
                       ))}
                     </div>
+                  )}
+
+                {/* Enhanced Metafield System Display */}
+                {material.metafieldValues && material.metafieldValues.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      Metafields
+                    </Label>
+                    <div className="space-y-1">
+                      {material.metafieldValues.map((metafield, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <span className="font-medium">{metafield.key}:</span>
+                          <span className="text-muted-foreground">
+                            {typeof metafield.value === 'string' ? metafield.value : JSON.stringify(metafield.value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Material Images Display */}
+                {material.images && material.images.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Associated Images ({material.images.length})
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {material.images.slice(0, 3).map((image, index) => (
+                        <div key={index} className="relative w-16 h-16 rounded overflow-hidden bg-muted">
+                          <img
+                            src={image.url}
+                            alt={image.alt || `Material image ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ))}
+                      {material.images.length > 3 && (
+                        <div className="w-16 h-16 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                          +{material.images.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Material Relationships Display */}
+                {material.relationships && material.relationships.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Link className="h-4 w-4" />
+                      Related Materials
+                    </Label>
+                    <div className="space-y-1">
+                      {material.relationships.map((relationship, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <Badge variant="outline" className="text-xs">
+                            {relationship.type}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            {relationship.relatedMaterialId}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   </div>
                 )}
               </div>

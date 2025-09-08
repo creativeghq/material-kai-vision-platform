@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 
 import { DocumentWorkflowOrchestrator, ProcessingRequest, WorkflowJob, WorkflowStatus } from '../orchestrators/DocumentWorkflowOrchestrator';
 import { JWTAuthMiddleware, AuthenticatedRequest, AuthenticationResult } from '../middleware/jwtAuthMiddleware';
@@ -403,7 +403,7 @@ export class DocumentIntegrationController {
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Request validation failed',
-            details: validationResult.error.issues.map(err => ({
+            details: validationResult.error.issues.map((err: ZodError['issues'][number]) => ({
               field: err.path.join('.'),
               message: err.message,
             })),
@@ -428,7 +428,7 @@ export class DocumentIntegrationController {
         mivaaDocument: {
           ...mivaaDocument,
           // Convert Zod schema types to MivaaDocument interface types
-          tables: (mivaaDocument.tables || []).map(table => ({
+          tables: (mivaaDocument.tables || []).map((table: { id: string; headers: string[]; rows: string[][]; summary?: string }) => ({
             ...table,
             position: {
               page: 1,
@@ -441,7 +441,7 @@ export class DocumentIntegrationController {
             format: 'json' as const,
             rawData: JSON.stringify(table),
           })),
-          images: (mivaaDocument.images || []).map(image => {
+          images: (mivaaDocument.images || []).map((image: { id: string; description?: string; extractedText?: string }) => {
             const imageMetadata: Record<string, unknown> = {
               id: image.id,
               filename: image.id || 'unknown',

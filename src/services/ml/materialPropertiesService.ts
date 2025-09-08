@@ -6,6 +6,13 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import { BaseService, ServiceConfig } from '../base/BaseService';
+// Import standardized API response types
+import type {
+  MaterialApiResponse,
+  isSuccessfulResponse,
+  ValidationResult
+} from '@/types/unified-material-api';
+import type { Material } from '@/types/materials';
 
 export interface MaterialPropertiesServiceConfig extends ServiceConfig {
   defaultAnalysisType: 'thermal' | 'mechanical' | 'chemical' | 'optical' | 'comprehensive';
@@ -34,19 +41,36 @@ export interface MaterialProperty {
   measurement_method: string;
 }
 
-export interface MaterialPropertiesResult {
-  success: boolean;
-  analysis_id: string;
-  material_id?: string;
+/**
+ * Material properties analysis result using standardized API response pattern
+ */
+export interface MaterialPropertiesAnalysisData {
+  /** Unique analysis identifier */
+  analysisId: string;
+  /** Associated material ID if available */
+  materialId?: string;
+  /** Analyzed properties */
   properties: MaterialProperty[];
-  thermal_properties?: any;
-  mechanical_properties?: any;
-  chemical_properties?: any;
-  optical_properties?: any;
-  confidence_score: number;
-  processing_time_ms: number;
+  /** Thermal analysis results */
+  thermalProperties?: Record<string, any>;
+  /** Mechanical analysis results */
+  mechanicalProperties?: Record<string, any>;
+  /** Chemical analysis results */
+  chemicalProperties?: Record<string, any>;
+  /** Optical analysis results */
+  opticalProperties?: Record<string, any>;
+  /** Overall confidence score (0-1) */
+  confidenceScore: number;
+  /** Processing time in milliseconds */
+  processingTimeMs: number;
+  /** Analysis recommendations */
   recommendations?: string[];
 }
+
+/**
+ * Standardized response type for material properties analysis
+ */
+export type MaterialPropertiesResponse = MaterialApiResponse<MaterialPropertiesAnalysisData>;
 
 class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceConfig> {
 
@@ -143,7 +167,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   /**
    * Analyze material properties from image or existing material
    */
-  async analyzeProperties(request: MaterialPropertiesRequest): Promise<MaterialPropertiesResult> {
+  async analyzeProperties(request: MaterialPropertiesRequest): Promise<MaterialPropertiesResponse> {
     return this.executeOperation(async () => {
       console.log('Starting material properties analysis:', request.analysis_type);
 
@@ -159,7 +183,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
         throw new Error(`Analysis failed: ${error.message}`);
       }
 
-      return data as MaterialPropertiesResult;
+      return data as MaterialPropertiesResponse;
     }, 'analyzeProperties');
   }
 
@@ -204,7 +228,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   /**
    * Comprehensive material analysis
    */
-  async comprehensiveAnalysis(imageData: string): Promise<MaterialPropertiesResult> {
+  async comprehensiveAnalysis(imageData: string): Promise<MaterialPropertiesResponse> {
     return this.analyzeProperties({
       image_data: imageData,
       analysis_type: 'comprehensive',
@@ -214,7 +238,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   /**
    * Quick thermal analysis
    */
-  async thermalAnalysis(imageData: string): Promise<MaterialPropertiesResult> {
+  async thermalAnalysis(imageData: string): Promise<MaterialPropertiesResponse> {
     return this.analyzeProperties({
       image_data: imageData,
       analysis_type: 'thermal',
@@ -224,7 +248,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   /**
    * Mechanical properties analysis
    */
-  async mechanicalAnalysis(imageData: string): Promise<MaterialPropertiesResult> {
+  async mechanicalAnalysis(imageData: string): Promise<MaterialPropertiesResponse> {
     return this.analyzeProperties({
       image_data: imageData,
       analysis_type: 'mechanical',
