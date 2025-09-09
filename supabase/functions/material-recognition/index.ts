@@ -9,15 +9,17 @@ import {
   createJSONResponse,
 } from '../_shared/types';
 
+// Import MIVAA utilities for centralized AI management
+import { generateSemanticAnalysis } from '../_shared/embedding-utils';
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
-// LLaMA Vision Service Integration
-const TOGETHER_AI_API_KEY = Deno.env.get('TOGETHER_AI_API_KEY');
-const TOGETHER_AI_BASE_URL = 'https://api.together.xyz/v1/chat/completions';
-const LLAMA_VISION_MODEL = 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo';
+// MIVAA Gateway Configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
 
 // Enhanced interfaces for comprehensive visual analysis
 interface ColorPalette {
@@ -98,33 +100,35 @@ interface MaterialRecognitionRequest {
   confidence_threshold?: number;
   user_id?: string;
   workspace_id?: string;
-  use_llama_vision?: boolean; // New: Enable LLaMA Vision instead of OpenAI
+  use_mivaa_vision?: boolean; // New: Enable MIVAA Vision instead of OpenAI
   enable_visual_analysis?: boolean; // New: Enable full visual feature extraction
 }
 
-// LLaMA Vision Analysis Function
-async function analyzeWithLLamaVision(
+// MIVAA Analysis Function
+async function analyzeWithMIVAA(
   imageUrl: string,
   analysisType: string,
   confidenceThreshold: number
 ): Promise<{ materials: RecognizedMaterial[]; visualAnalysis?: VisualAnalysisData; method: string }> {
-  if (!TOGETHER_AI_API_KEY) {
-    throw new Error('LLaMA Vision API key not configured');
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured');
   }
 
   try {
-    const response = await fetch(TOGETHER_AI_BASE_URL, {
+    // Use MIVAA gateway for comprehensive material analysis
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${TOGETHER_AI_API_KEY}`,
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
         'Content-Type': 'application/json',
+        'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
       },
       body: JSON.stringify({
-        model: LLAMA_VISION_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert materials scientist and visual analyst specializing in architectural, interior design, and construction materials. Analyze the image to identify materials with comprehensive visual analysis.
+        action: 'advanced_visual_analysis',
+        payload: {
+          image_data: imageUrl,
+          analysis_type: 'material_recognition',
+          prompt: `You are an expert materials scientist and visual analyst specializing in architectural, interior design, and construction materials. Analyze the image to identify materials with comprehensive visual analysis.
 
 ENHANCED ANALYSIS REQUIREMENTS:
 1. Material Property Extraction: Identify physical, chemical, and performance characteristics
@@ -216,60 +220,53 @@ REQUIRED OUTPUT FORMAT - Return ONLY valid JSON:
   }
 }
 
-Analysis precision: ${analysisType}. Minimum confidence threshold: ${confidenceThreshold}. Focus on accurate material identification with comprehensive visual analysis.`
+Analysis precision: ${analysisType}. Minimum confidence threshold: ${confidenceThreshold}. Focus on accurate material identification with comprehensive visual analysis.`,
+          options: {
+            temperature: 0.1,
+            max_tokens: 2000,
           },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Analyze this image for materials and their properties. Focus on architectural and design materials. Provide detailed material segmentation and visual feature analysis.`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageUrl,
-                  detail: analysisType === 'comprehensive' ? 'high' : 'auto'
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 2000,
-        temperature: 0.1,
-        stream: false
-      })
+        },
+      }),
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`LLaMA Vision API error: ${response.status} - ${errorData}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
     }
 
-    const llamaData = await response.json();
-    const analysisText = llamaData.choices[0].message.content;
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(`MIVAA material analysis error: ${result.error?.message || 'Unknown error'}`);
+    }
 
+    // Parse the structured analysis response
+    let parsedAnalysis: any;
     try {
-      const parsedAnalysis = JSON.parse(analysisText);
+      if (typeof result.data.analysis === 'string') {
+        parsedAnalysis = JSON.parse(result.data.analysis);
+      } else {
+        parsedAnalysis = result.data.analysis;
+      }
       
       // Convert to our format
       const materials: RecognizedMaterial[] = parsedAnalysis.materials || [];
       const visualAnalysis: VisualAnalysisData = {
         visual_features: parsedAnalysis.visual_features,
-        material_segmentation: parsedAnalysis.material_segmentation
+        material_segmentation: parsedAnalysis.material_segmentation,
+        material_categorization: parsedAnalysis.material_categorization
       };
 
       return {
         materials: materials.filter(m => m.confidence >= confidenceThreshold),
         visualAnalysis,
-        method: 'llama_vision'
+        method: 'mivaa_vision'
       };
     } catch (parseError) {
-      console.error('Failed to parse LLaMA Vision response:', parseError);
-      throw new Error('Invalid response format from LLaMA Vision');
+      console.error('Failed to parse MIVAA material analysis response:', parseError);
+      throw new Error('Invalid response format from MIVAA material analysis');
     }
   } catch (error) {
-    console.error('LLaMA Vision analysis failed:', error);
+    console.error('MIVAA material analysis failed:', error);
     throw error;
   }
 }
@@ -416,21 +413,21 @@ Deno.serve(async (req: Request) => {
     let processingMethod = 'catalog_fallback';
 
     try {
-      // Primary: Use LLaMA Vision if enabled and configured
-      if (body.use_llama_vision !== false && TOGETHER_AI_API_KEY && body.image_url) {
+      // Primary: Use MIVAA Vision if enabled and configured
+      if (body.use_mivaa_vision !== false && MIVAA_API_KEY && body.image_url) {
         try {
-          console.log('Starting LLaMA Vision analysis...');
-          const llamaResult = await analyzeWithLLamaVision(
+          console.log('Starting MIVAA Vision analysis...');
+          const mivaaResult = await analyzeWithMIVAA(
             body.image_url,
             analysisType,
             confidenceThreshold
           );
           
-          recognizedMaterials = llamaResult.materials;
-          visualAnalysis = llamaResult.visualAnalysis;
-          processingMethod = llamaResult.method;
+          recognizedMaterials = mivaaResult.materials;
+          visualAnalysis = mivaaResult.visualAnalysis;
+          processingMethod = mivaaResult.method;
           
-          console.log(`LLaMA Vision analysis completed. Found ${recognizedMaterials.length} materials.`);
+          console.log(`MIVAA Vision analysis completed. Found ${recognizedMaterials.length} materials.`);
           
           // Store visual analysis data if enabled
           if (body.enable_visual_analysis && visualAnalysis && recognitionRecord) {
@@ -453,13 +450,13 @@ Deno.serve(async (req: Request) => {
             }
           }
           
-        } catch (llamaError) {
-          console.error('LLaMA Vision analysis failed, falling back to OpenAI:', llamaError);
+        } catch (mivaaError) {
+          console.error('MIVAA Vision analysis failed, falling back to OpenAI:', mivaaError);
           // Continue to OpenAI fallback
         }
       }
 
-      // Fallback: Use OpenAI Vision API if LLaMA failed or not enabled
+      // Fallback: Use OpenAI Vision API if MIVAA failed or not enabled
       if (recognizedMaterials.length === 0) {
         const openaiKey = Deno.env.get('OPENAI_API_KEY');
         if (openaiKey && body.image_url) {
@@ -627,7 +624,7 @@ Deno.serve(async (req: Request) => {
       })),
       analysisMetadata: {
         analysisType: analysisType,
-        processingMethod: 'llama_vision',
+        processingMethod: processingMethod as any,
         imageDimensions: {
           width: 800,
           height: 600,

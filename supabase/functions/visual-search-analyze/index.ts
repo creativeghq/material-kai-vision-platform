@@ -9,15 +9,17 @@ import {
   createJSONResponse,
 } from '../_shared/types';
 
+// Import MIVAA utilities for centralized AI management
+import { generateSemanticAnalysis } from '../_shared/embedding-utils';
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
-// LLaMA Vision Service Integration
-const TOGETHER_AI_API_KEY = Deno.env.get('TOGETHER_AI_API_KEY');
-const TOGETHER_AI_BASE_URL = 'https://api.together.xyz/v1/chat/completions';
-const LLAMA_VISION_MODEL = 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo';
+// MIVAA Gateway Configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
 
 // Enhanced Visual Search Analysis Interfaces
 interface ColorInfo {
@@ -114,25 +116,30 @@ async function performVisualAnalysis(
   analysisDepth: string,
   focusAreas: string[]
 ): Promise<VisualSearchAnalysisResult> {
-  if (!TOGETHER_AI_API_KEY) {
-    throw new Error('LLaMA Vision API key not configured');
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured');
   }
 
   const analysisId = `VSA-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   try {
-    const response = await fetch(TOGETHER_AI_BASE_URL, {
+    // Use MIVAA gateway for advanced visual analysis
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${TOGETHER_AI_API_KEY}`,
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
         'Content-Type': 'application/json',
+        'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
       },
       body: JSON.stringify({
-        model: LLAMA_VISION_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an advanced visual analysis AI specializing in material recognition and visual search. Perform comprehensive image analysis for visual search applications.
+        action: 'advanced_visual_analysis',
+        payload: {
+          image_data: imageUrl,
+          analysis_type: 'visual_search',
+          focus_areas: focusAreas,
+          analysis_depth: analysisDepth,
+          response_format: 'structured_json',
+          prompt: `You are an advanced visual analysis AI specializing in material recognition and visual search. Perform comprehensive image analysis for visual search applications.
 
 Focus Areas: ${focusAreas.join(', ')}
 Analysis Depth: ${analysisDepth}
@@ -225,48 +232,44 @@ REQUIRED OUTPUT FORMAT - Return ONLY valid JSON:
   }
 }
 
-Analyze the image comprehensively for visual search matching capabilities.`
+Analyze the image comprehensively for visual search matching capabilities.`,
+          options: {
+            temperature: 0.1,
+            max_tokens: 3000,
           },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Perform comprehensive visual analysis for search matching. Focus on: ${focusAreas.join(', ')}. Analysis depth: ${analysisDepth}.`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageUrl,
-                  detail: analysisDepth === 'comprehensive' ? 'high' : 'auto'
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 3000,
-        temperature: 0.1,
-        stream: false
-      })
+        },
+      }),
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`LLaMA Vision API error: ${response.status} - ${errorData}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
     }
 
-    const llamaData = await response.json();
-    const analysisText = llamaData.choices[0].message.content;
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(`MIVAA visual analysis error: ${result.error?.message || 'Unknown error'}`);
+    }
 
+    // Parse the structured analysis response
+    let parsedAnalysis: VisualSearchAnalysisResult;
     try {
-      const parsedAnalysis = JSON.parse(analysisText);
+      if (typeof result.data.analysis === 'string') {
+        parsedAnalysis = JSON.parse(result.data.analysis);
+      } else {
+        parsedAnalysis = result.data.analysis;
+      }
+      
+      // Ensure analysis_id is set
+      parsedAnalysis.analysis_id = analysisId;
+      
       return parsedAnalysis as VisualSearchAnalysisResult;
     } catch (parseError) {
-      console.error('Failed to parse LLaMA Vision response:', parseError);
-      throw new Error('Invalid response format from LLaMA Vision');
+      console.error('Failed to parse MIVAA visual analysis response:', parseError);
+      throw new Error('Invalid response format from MIVAA visual analysis');
     }
   } catch (error) {
-    console.error('LLaMA Vision analysis failed:', error);
+    console.error('MIVAA visual analysis failed:', error);
     throw error;
   }
 }
@@ -473,8 +476,7 @@ Deno.serve(async (req: Request) => {
 
     const response = createSuccessResponse(responseData, {
       processingTime,
-      version: '1.0.0',
-      capabilities: ['color_analysis', 'texture_analysis', 'material_classification', 'spatial_features', 'similarity_vectors']
+      version: '1.0.0'
     });
 
     return createJSONResponse(response);
