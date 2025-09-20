@@ -134,7 +134,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
     setExpandedCategories(newExpanded);
   };
 
-  const getConfidenceColor = (confidence: string): string => {
+  const getConfidenceColor = (confidence: 'low' | 'medium' | 'high' | string): string => {
     switch (confidence) {
       case 'high': return 'text-green-600 bg-green-100';
       case 'medium': return 'text-yellow-600 bg-yellow-100';
@@ -173,18 +173,18 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
     return <span className="text-sm">{String(value)}</span>;
   };
 
-  const renderCategoryContent = (categoryKey: string, categoryData: any) => {
+  const renderCategoryContent = (categoryKey: string, categoryData: unknown) => {
     const config = CATEGORY_CONFIG[categoryKey as keyof typeof CATEGORY_CONFIG];
     if (!config || !categoryData) return null;
 
     const Icon = config.icon;
-    const hasData = Object.keys(categoryData).length > 0;
+    const hasData = Object.keys(categoryData as Record<string, unknown>).length > 0;
     const isExpanded = expandedCategories.has(categoryKey);
 
     // Get raw data for this category to display highlights/technical details
     const rawCategoryKey = categoryKey.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
     const rawCategoryData = rawFunctionalData?.[rawCategoryKey];
-    const extractionConfidence = rawCategoryData?.extraction_confidence;
+    const extractionConfidence = rawCategoryData?.extraction_confidence as 'low' | 'medium' | 'high' | undefined;
 
     const renderConfidenceIndicator = (confidence?: 'low' | 'medium' | 'high') => {
       if (!confidence || !showConfidence) return null;

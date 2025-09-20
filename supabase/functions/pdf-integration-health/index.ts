@@ -203,7 +203,7 @@ async function checkMivaaHealth(): Promise<{
   const startTime = Date.now();
 
   try {
-    const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'http://localhost:8000';
+    const mivaaBaseUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:8000';
     const healthUrl = `${mivaaBaseUrl}/health`;
 
     const response = await fetch(healthUrl, {
@@ -253,7 +253,7 @@ async function checkIntegrationHealth(): Promise<{
     const requiredEnvVars = [
       'SUPABASE_URL',
       'SUPABASE_SERVICE_ROLE_KEY',
-      'MIVAA_BASE_URL',
+      'MIVAA_GATEWAY_URL',
     ];
 
     const missingVars = requiredEnvVars.filter(varName => !Deno.env.get(varName));

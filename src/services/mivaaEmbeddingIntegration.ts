@@ -41,7 +41,7 @@ export class MivaaEmbeddingIntegration {
   private readonly apiKey: string;
 
   constructor() {
-    this.gatewayUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    this.gatewayUrl = process.env.MIVAA_GATEWAY_URL || 'http://localhost:3000';
     this.apiKey = process.env.MIVAA_API_KEY || '';
   }
 

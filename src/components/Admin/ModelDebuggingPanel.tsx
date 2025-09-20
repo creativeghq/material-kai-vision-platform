@@ -454,6 +454,7 @@ const ModelDebuggingPanel: React.FC = () => {
                                       <Button
                                         className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1 text-xs"
                                         onClick={() => window.open(log.imageUrl, '_blank')}
+                                        aria-label={`View generated image for ${log.model}`}
                                       >
                                         <ExternalLink className="h-3 w-3" />
                                         View Result

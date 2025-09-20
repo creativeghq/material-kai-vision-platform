@@ -41,11 +41,6 @@ interface KnowledgeAnalysis {
 }
 
 async function analyzeContentWithAI(content: string, analysisDepth: string): Promise<KnowledgeAnalysis> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const prompts = {
     surface: 'Analyze this content briefly. Identify main topics, key materials mentioned, and provide a summary. Focus on extracting actionable insights.',
 
@@ -73,70 +68,77 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
     Respond with detailed JSON structure.`,
   };
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert knowledge analyst specializing in technical content analysis, particularly in materials science, engineering, and related domains. Analyze content for key insights, entities, and actionable information. Always respond with valid JSON matching the KnowledgeAnalysis interface.',
-        },
-        {
-          role: 'user',
-          content: `${prompts[analysisDepth] || prompts.comprehensive}\n\nContent to analyze:\n${content}`,
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.1,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  const analysisText = data.choices[0].message.content;
-
   try {
-    return JSON.parse(analysisText);
-  } catch (error) {
-    console.error('Failed to parse OpenAI response:', analysisText);
-    throw new Error('Invalid JSON response from OpenAI');
+    // Primary: Use MIVAA semantic analysis for content analysis
+    const mivaaResponse = await fetch(`${Deno.env.get('MIVAA_API_URL')}/semantic_analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('MIVAA_API_KEY')}`,
+      },
+      body: JSON.stringify({
+        input_text: content,
+        analysis_type: 'knowledge_content_analysis',
+        prompt: `${prompts[analysisDepth as keyof typeof prompts] || prompts.comprehensive}\n\nSystem context: You are an expert knowledge analyst specializing in technical content analysis, particularly in materials science, engineering, and related domains. Analyze content for key insights, entities, and actionable information. Always respond with valid JSON matching the KnowledgeAnalysis interface.`,
+        max_tokens: 2000,
+        temperature: 0.1,
+      }),
+    });
+
+    if (mivaaResponse.ok) {
+      const mivaaData = await mivaaResponse.json();
+      const analysisText = mivaaData.analysis_result || mivaaData.result;
+      
+      try {
+        return JSON.parse(analysisText);
+      } catch (parseError) {
+        console.warn('Failed to parse MIVAA analysis response, MIVAA-only approach:', parseError);
+        // Fall through to OpenAI fallback
+      }
+    } else {
+      console.warn('MIVAA content analysis failed, MIVAA-only approach');
+      // Fall through to OpenAI fallback
+    }
+  } catch (mivaaError) {
+    console.warn('MIVAA content analysis error, MIVAA-only approach:', mivaaError);
+    // Fall through to OpenAI fallback
   }
+
+  // MIVAA-only approach - OpenAI integration removed for centralized AI management
+  console.error('❌ All MIVAA methods failed for content analysis');
+  throw new Error(`Content analysis failed - MIVAA service required. OpenAI direct integration removed as part of centralized AI architecture. Please check MIVAA service availability.`);
 }
 
 async function generateEmbedding(text: string): Promise<number[]> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
+  try {
+    // Primary: Use MIVAA generate_embeddings action
+    const mivaaResponse = await fetch(`${Deno.env.get('MIVAA_API_URL')}/generate_embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('MIVAA_API_KEY')}`,
+      },
+      body: JSON.stringify({
+        input: text.substring(0, 8000), // Limit input length
+        model: 'text-embedding-3-large', // Specify preferred model
+      }),
+    });
+
+    if (mivaaResponse.ok) {
+      const mivaaData = await mivaaResponse.json();
+      if (mivaaData.embeddings && mivaaData.embeddings.length > 0) {
+        return mivaaData.embeddings[0];
+      } else {
+        console.warn('MIVAA embeddings response missing data, MIVAA-only approach');
+      }
+    } else {
+      console.warn('MIVAA embedding generation failed, MIVAA-only approach');
+    }
+  } catch (mivaaError) {
+    console.warn('MIVAA embedding generation error, MIVAA-only approach:', mivaaError);
   }
 
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-large',
-      input: text.substring(0, 8000), // Limit input length
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Embedding API error: ${error.error?.message || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  return data.data[0].embedding;
+  throw new Error('Embedding generation failed - MIVAA service required. OpenAI direct integration removed as part of centralized AI architecture. Please check MIVAA service availability.');
 }
 
 async function findSimilarContent(embedding: number[], limit = 5) {

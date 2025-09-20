@@ -43,7 +43,7 @@ export interface ConsolidatedProcessingOptions {
   enableImageMapping?: boolean;
   enableSemanticAnalysis?: boolean;
   workspaceAware?: boolean;
-  useMivaaProcessing?: boolean; // Flag to use MIVAA vs legacy processing
+  // MIVAA is now the only processing method available
 }
 
 export interface ConsolidatedProcessingResult {
@@ -68,7 +68,6 @@ export interface ConsolidatedProcessingResult {
     overallQuality: number;
   };
   mivaaResult?: any; // MIVAA-specific result data
-  legacyResult?: any; // Legacy ConvertAPI result data
 }
 
 /**
@@ -81,7 +80,6 @@ export interface ConsolidatedProcessingResult {
  * Key Features:
  * - Unified workflow orchestration with step-by-step tracking
  * - MIVAA integration for advanced PDF processing
- * - Fallback to legacy ConvertAPI processing
  * - Real-time progress updates for UI components
  * - Comprehensive error handling and recovery
  */
@@ -144,7 +142,7 @@ export class ConsolidatedPDFWorkflowService {
 
   /**
    * Main entry point for PDF processing
-   * Supports both MIVAA and legacy processing paths
+   * Uses MIVAA processing exclusively
    */
   async startPDFProcessing(
     file: File,
@@ -152,15 +150,12 @@ export class ConsolidatedPDFWorkflowService {
   ): Promise<string> {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Determine processing path based on options
-    const useMivaa = options.useMivaaProcessing !== false; // Default to MIVAA
-
-    // Create workflow steps based on processing path
-    const steps = this.createWorkflowSteps(useMivaa);
+    // Create MIVAA workflow steps
+    const steps = this.createWorkflowSteps();
 
     const job: WorkflowJob = {
       id: jobId,
-      name: useMivaa ? 'Advanced PDF Processing (MIVAA)' : 'Standard PDF Processing (Legacy)',
+      name: 'Advanced PDF Processing (MIVAA)',
       filename: file.name,
       status: 'running',
       startTime: new Date(),
@@ -172,27 +167,22 @@ export class ConsolidatedPDFWorkflowService {
     this.jobs.set(jobId, job);
     this.notifyUpdate(job);
 
-    // Start processing workflow
-    if (useMivaa) {
-      this.executeMivaaWorkflow(jobId, file, options);
-    } else {
-      this.executeLegacyWorkflow(jobId, file, options);
-    }
+    // Start MIVAA processing workflow
+    this.executeMivaaWorkflow(jobId, file, options);
 
     return jobId;
   }
 
   /**
-   * Create workflow steps based on processing type
+   * Create MIVAA workflow steps
    */
-  private createWorkflowSteps(useMivaa: boolean): WorkflowStep[] {
-    const commonSteps: WorkflowStep[] = [
+  private createWorkflowSteps(): WorkflowStep[] {
+    return [
       {
         id: 'auth',
         name: 'Authentication',
         description: 'Verify user authentication and permissions',
         status: 'pending',
-
         details: [],
       },
       {
@@ -200,7 +190,6 @@ export class ConsolidatedPDFWorkflowService {
         name: 'File Upload',
         description: 'Upload PDF to secure storage bucket',
         status: 'pending',
-
         details: [],
       },
       {
@@ -208,100 +197,44 @@ export class ConsolidatedPDFWorkflowService {
         name: 'File Validation',
         description: 'Validate PDF structure and content accessibility',
         status: 'pending',
-
+        details: [],
+      },
+      {
+        id: 'mivaa-processing',
+        name: 'MIVAA Advanced Processing',
+        description: 'Process PDF using MIVAA microservice with LlamaIndex RAG',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'layout-analysis',
+        name: 'Layout Analysis',
+        description: 'Analyze document structure and extract layout elements',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'embedding-generation',
+        name: 'Embedding Generation',
+        description: 'Generate 1536-dimension embeddings using MIVAA integration',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'knowledge-storage',
+        name: 'Knowledge Base Storage',
+        description: 'Store document in enhanced knowledge base with metadata',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'quality-assessment',
+        name: 'Quality Assessment',
+        description: 'Calculate processing quality and confidence metrics',
+        status: 'pending',
         details: [],
       },
     ];
-
-    if (useMivaa) {
-      return [
-        ...commonSteps,
-        {
-          id: 'mivaa-processing',
-          name: 'MIVAA Advanced Processing',
-          description: 'Process PDF using MIVAA microservice with LlamaIndex RAG',
-          status: 'pending',
-
-          details: [],
-        },
-        {
-          id: 'layout-analysis',
-          name: 'Layout Analysis',
-          description: 'Analyze document structure and extract layout elements',
-          status: 'pending',
-
-          details: [],
-        },
-        {
-          id: 'embedding-generation',
-          name: 'Embedding Generation',
-          description: 'Generate 1536-dimension embeddings using MIVAA integration',
-          status: 'pending',
-
-          details: [],
-        },
-        {
-          id: 'knowledge-storage',
-          name: 'Knowledge Base Storage',
-          description: 'Store document in enhanced knowledge base with metadata',
-          status: 'pending',
-
-          details: [],
-        },
-        {
-          id: 'quality-assessment',
-          name: 'Quality Assessment',
-          description: 'Calculate processing quality and confidence metrics',
-          status: 'pending',
-
-          details: [],
-        },
-      ];
-    } else {
-      return [
-        ...commonSteps,
-        {
-          id: 'convertapi-conversion',
-          name: 'PDF to HTML Conversion',
-          description: 'Convert PDF to HTML using ConvertAPI with embedded CSS',
-          status: 'pending',
-
-          details: [],
-        },
-        {
-          id: 'html-extraction',
-          name: 'HTML Content Extraction',
-          description: 'Extract and decode HTML content from ConvertAPI response',
-          status: 'pending',
-
-          details: [],
-        },
-        {
-          id: 'image-processing',
-          name: 'Image Processing',
-          description: 'Extract and process document images with metadata',
-          status: 'pending',
-          icon: Image,
-          details: [],
-        },
-        {
-          id: 'embedding-generation',
-          name: 'Embedding Generation',
-          description: 'Generate vector embeddings using legacy OpenAI integration',
-          status: 'pending',
-
-          details: [],
-        },
-        {
-          id: 'knowledge-storage',
-          name: 'Knowledge Base Storage',
-          description: 'Store document in knowledge base with metadata',
-          status: 'pending',
-
-          details: [],
-        },
-      ];
-    }
   }
 
   /**

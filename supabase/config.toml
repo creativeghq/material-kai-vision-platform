@@ -10,9 +10,6 @@ max_rows = 1000
 [functions.api-gateway]
 verify_jwt = false
 
-[functions.convertapi-pdf-processor]
-verify_jwt = false
-
 [functions.crewai-3d-generation]
 verify_jwt = false
 

@@ -12,30 +12,63 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
-// Generate embedding for search query
-async function generateSearchEmbedding(query: string): Promise<number[] | null> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) return null;
+// MIVAA Gateway configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+// Fallback OpenAI API configuration (for endpoints not yet available in MIVAA)
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const USE_MIVAA_EMBEDDINGS = Deno.env.get('USE_MIVAA_EMBEDDINGS') !== 'false';
+
+async function generateSearchEmbeddingViaMivaa(query: string): Promise<number[] | null> {
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured');
+  }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'text-embedding-3-large',
-        input: query
-      })
+        action: 'generate_embedding',
+        payload: {
+          text: query,
+          model: 'text-embedding-3-large',
+          dimensions: 1536
+        },
+      }),
     });
 
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.data[0].embedding;
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`MIVAA embedding error: ${response.status} - ${error}`);
+    }
+
+    const gatewayResponse = await response.json();
+    
+    if (!gatewayResponse.success) {
+      throw new Error(`MIVAA embedding failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
+    }
+
+    return gatewayResponse.data.embedding || null;
   } catch (error) {
-    console.error('Error generating embedding:', error);
-    return null;
+    console.error('Error generating embedding via MIVAA:', error);
+    throw error;
+  }
+}
+
+// Generate embedding for search query using MIVAA-only approach
+async function generateSearchEmbedding(query: string): Promise<number[] | null> {
+  console.log('Using MIVAA for search embedding generation');
+  
+  try {
+    return await generateSearchEmbeddingViaMivaa(query);
+  } catch (error) {
+    console.error('MIVAA embedding generation failed:', error);
+    throw new Error(`Search embedding generation failed: ${(error as Error).message}. Please check MIVAA service availability.`);
   }
 }
 

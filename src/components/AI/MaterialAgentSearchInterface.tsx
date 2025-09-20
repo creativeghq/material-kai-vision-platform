@@ -424,25 +424,25 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                 session_id: sessionId,
               });
 
-              const apiData = visualResponse.data as any;
-              if (apiData?.success && apiData?.results?.length > 0) {
+              const apiData = visualResponse.data as { success?: boolean; results?: Array<Record<string, unknown>>; search_id?: string; search_execution_time_ms?: number; query_analysis?: Record<string, unknown> };
+              if (apiData?.success && apiData?.results && apiData.results.length > 0) {
                 visualSearchResults = {
                   searchId: apiData.search_id || crypto.randomUUID(),
-                  matches: apiData.results.map((result: any) => ({
-                    id: result.material_id,
-                    name: result.material_name || result.name,
-                    description: result.description,
-                    similarity_score: result.similarity_score,
-                    llama_analysis: result.llama_analysis,
-                    visual_features: result.visual_features,
-                    thumbnail_url: result.thumbnail_url,
+                  matches: apiData.results.map((result) => ({
+                    id: result.material_id as string,
+                    name: (result.material_name as string) || (result.name as string),
+                    description: result.description as string,
+                    similarity_score: result.similarity_score as number,
+                    llama_analysis: result.llama_analysis as Record<string, unknown>,
+                    visual_features: result.visual_features as Record<string, unknown>,
+                    thumbnail_url: result.thumbnail_url as string,
                   })),
                   search_execution_time_ms: apiData.search_execution_time_ms || 0,
                   total_results: apiData.results.length,
-                  query_analysis: apiData.query_analysis,
+                  query_analysis: apiData.query_analysis || {},
                 };
                 console.log('✅ Visual search completed:', visualSearchResults);
-                enhancedContext.visualSearchResults = visualSearchResults;
+                enhancedContext.visualSearchResults = visualSearchResults || null;
                 setVisualSearchResults(visualSearchResults);
                 break; // Use first image for now
               }

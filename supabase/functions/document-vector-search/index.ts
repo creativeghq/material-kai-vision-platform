@@ -7,6 +7,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// MIVAA Gateway configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+// Environment variable controls
+const USE_MIVAA_EMBEDDINGS = Deno.env.get('USE_MIVAA_EMBEDDINGS') !== 'false';
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -45,31 +52,56 @@ interface VectorSearchResponse {
   };
 }
 
+async function generateQueryEmbeddingViaMivaa(query: string): Promise<number[]> {
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured');
+  }
+
+  try {
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+      },
+      body: JSON.stringify({
+        action: 'generate_embedding',
+        payload: {
+          text: query,
+          model: 'text-embedding-3-large',
+          dimensions: 1536
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`MIVAA embedding error: ${response.status} - ${error}`);
+    }
+
+    const gatewayResponse = await response.json();
+    
+    if (!gatewayResponse.success) {
+      throw new Error(`MIVAA embedding failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
+    }
+
+    return gatewayResponse.data.embedding;
+  } catch (error) {
+    console.error('Error generating embedding via MIVAA:', error);
+    throw error;
+  }
+}
+
+// Generate query embedding using MIVAA-only approach
 async function generateQueryEmbedding(query: string): Promise<number[]> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
+  console.log('Using MIVAA for document query embedding generation');
+  
+  try {
+    return await generateQueryEmbeddingViaMivaa(query);
+  } catch (error) {
+    console.error('MIVAA embedding generation failed:', error);
+    throw new Error(`Document query embedding generation failed: ${(error as Error).message}. Please check MIVAA service availability.`);
   }
-
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-large',
-      input: query,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Embedding API error: ${error.error?.message || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  return data.data[0].embedding;
 }
 
 async function performSemanticSearch(

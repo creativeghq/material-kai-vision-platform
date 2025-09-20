@@ -53,7 +53,7 @@ export class MivaaGatewayController {
   private readonly timeout: number;
 
   constructor() {
-    this.mivaaServiceUrl = process.env.MIVAA_SERVICE_URL || 'http://localhost:8000';
+    this.mivaaServiceUrl = process.env.MIVAA_GATEWAY_URL || 'http://localhost:8000';
     this.apiKey = process.env.MIVAA_API_KEY || '';
     this.timeout = parseInt(process.env.MIVAA_TIMEOUT || '30000', 10);
   }
@@ -156,7 +156,20 @@ export class MivaaGatewayController {
       
       // AI Analysis actions (TogetherAI/LLaMA Vision)
       'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
-      'llama_vision_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+      'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
+      
+      // CLIP Embedding actions (HuggingFace)
+      'clip_embedding_generation': { path: '/api/embeddings/clip-generate', method: 'POST' },
+      
+      // Chat completion and conversational AI
+      'chat_completion': { path: '/api/chat/completions', method: 'POST' },
+      'contextual_response': { path: '/api/chat/contextual', method: 'POST' },
+      
+      // Audio processing
+      'audio_transcription': { path: '/api/audio/transcribe', method: 'POST' },
+      
+      // Batch processing
+      'batch_embedding': { path: '/api/embeddings/batch', method: 'POST' },
       
       // Document processing actions
       'extract_text': { path: '/api/documents/extract', method: 'POST' },

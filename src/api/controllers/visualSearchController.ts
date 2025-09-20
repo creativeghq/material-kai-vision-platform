@@ -8,7 +8,7 @@
 
 interface Request {
   headers: Record<string, string | string[] | undefined>;
-  body: any;
+  body: unknown;
   params: Record<string, string>;
   query: Record<string, unknown>;
   url: string;
@@ -23,15 +23,15 @@ interface Response {
 }
 
 // Supabase client interfaces
-interface SupabaseResponse<T = any> {
+interface SupabaseResponse<T = unknown> {
   data: T | null;
-  error: any | null;
+  error: Error | null;
 }
 
 interface SupabaseClient {
   functions: {
     invoke(functionName: string, options?: {
-      body?: any;
+      body?: unknown;
       headers?: Record<string, string>;
     }): Promise<SupabaseResponse>;
   };
@@ -43,7 +43,7 @@ interface SearchByImageRequest {
   searchType?: 'visual' | 'semantic' | 'hybrid' | 'properties';
   filters?: {
     materialTypes?: string[];
-    properties?: Record<string, any>;
+    properties?: Record<string, unknown>;
     minConfidence?: number;
   };
   limit?: number;
@@ -60,7 +60,7 @@ interface SearchByDescriptionRequest {
   searchType?: 'semantic' | 'hybrid' | 'properties';
   filters?: {
     materialTypes?: string[];
-    properties?: Record<string, any>;
+    properties?: Record<string, unknown>;
     minConfidence?: number;
   };
   limit?: number;
@@ -77,7 +77,7 @@ interface HybridSearchRequest {
   searchType: 'hybrid';
   filters?: {
     materialTypes?: string[];
-    properties?: Record<string, any>;
+    properties?: Record<string, unknown>;
     minConfidence?: number;
   };
   limit?: number;
@@ -90,7 +90,7 @@ interface HybridSearchRequest {
 }
 
 interface MaterialPropertySearchRequest {
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   searchType: 'properties';
   filters?: {
     materialTypes?: string[];
@@ -128,7 +128,7 @@ export class VisualSearchController {
    */
   public searchByImage = async (req: Request, res: Response): Promise<void> => {
     try {
-      const requestData: SearchByImageRequest = req.body;
+      const requestData = req.body as SearchByImageRequest;
 
       // Validate required fields
       if (!requestData.image) {
@@ -208,7 +208,7 @@ export class VisualSearchController {
    */
   public searchByDescription = async (req: Request, res: Response): Promise<void> => {
     try {
-      const requestData: SearchByDescriptionRequest = req.body;
+      const requestData = req.body as SearchByDescriptionRequest;
 
       // Validate required fields
       if (!requestData.description) {
@@ -271,12 +271,12 @@ export class VisualSearchController {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Search by description error:', error);
       res.status(500).json({
         error: 'Internal server error during description search',
         code: 'INTERNAL_ERROR',
-        details: error.message
+        details: (error as Error).message
       });
     }
   };
@@ -287,7 +287,7 @@ export class VisualSearchController {
    */
   public hybridSearch = async (req: Request, res: Response): Promise<void> => {
     try {
-      const requestData: HybridSearchRequest = req.body;
+      const requestData = req.body as HybridSearchRequest;
 
       // Validate required fields
       if (!requestData.image && !requestData.description) {
@@ -352,12 +352,12 @@ export class VisualSearchController {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Hybrid search error:', error);
       res.status(500).json({
         error: 'Internal server error during hybrid search',
         code: 'INTERNAL_ERROR',
-        details: error.message
+        details: (error as Error).message
       });
     }
   };
@@ -368,7 +368,7 @@ export class VisualSearchController {
    */
   public searchByProperties = async (req: Request, res: Response): Promise<void> => {
     try {
-      const requestData: MaterialPropertySearchRequest = req.body;
+      const requestData = req.body as MaterialPropertySearchRequest;
 
       // Validate required fields
       if (!requestData.properties || Object.keys(requestData.properties).length === 0) {

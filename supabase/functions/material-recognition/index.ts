@@ -363,26 +363,58 @@ Deno.serve(async (req: Request) => {
     const startTime = Date.now();
     const body: MaterialRecognitionRequest = await req.json();
 
-    // Validate input
+    // Enhanced input validation
     if (!body.image_url && !body.image_data) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Either image_url or image_data is required',
-          materials: [],
-          metadata: {
-            processing_time: Date.now() - startTime,
-            analysis_type: body.analysis_type || 'basic',
-          },
-        } as MaterialRecognitionResponse),
+      const errorResponse = createErrorResponse(
+        'MISSING_IMAGE_INPUT',
+        'Either image_url or image_data is required for material recognition',
         {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        },
+          provided_fields: Object.keys(body),
+          required_fields: ['image_url', 'image_data'],
+        }
       );
+      return createJSONResponse(errorResponse, 400);
+    }
+
+    // Validate image URL format if provided
+    if (body.image_url) {
+      try {
+        const url = new URL(body.image_url);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          const errorResponse = createErrorResponse(
+            'INVALID_IMAGE_URL',
+            'Image URL must use HTTP or HTTPS protocol',
+            { provided_url: body.image_url }
+          );
+          return createJSONResponse(errorResponse, 400);
+        }
+      } catch (urlError) {
+        const errorResponse = createErrorResponse(
+          'MALFORMED_IMAGE_URL',
+          'Invalid image URL format',
+          { provided_url: body.image_url, error: String(urlError) }
+        );
+        return createJSONResponse(errorResponse, 400);
+      }
+    }
+
+    // Validate analysis parameters
+    if (body.confidence_threshold && (body.confidence_threshold < 0 || body.confidence_threshold > 1)) {
+      const errorResponse = createErrorResponse(
+        'INVALID_CONFIDENCE_THRESHOLD',
+        'Confidence threshold must be between 0 and 1',
+        { provided_threshold: body.confidence_threshold }
+      );
+      return createJSONResponse(errorResponse, 400);
+    }
+
+    if (body.analysis_type && !['basic', 'detailed', 'comprehensive'].includes(body.analysis_type)) {
+      const errorResponse = createErrorResponse(
+        'INVALID_ANALYSIS_TYPE',
+        'Analysis type must be one of: basic, detailed, comprehensive',
+        { provided_type: body.analysis_type }
+      );
+      return createJSONResponse(errorResponse, 400);
     }
 
     const analysisType = body.analysis_type || 'basic';
@@ -410,13 +442,16 @@ Deno.serve(async (req: Request) => {
     // Perform actual material recognition using AI/ML services
     let recognizedMaterials = [];
     let visualAnalysis: VisualAnalysisData | undefined;
-    let processingMethod = 'catalog_fallback';
+    let processingMethod = 'unknown';
 
     try {
       // Primary: Use MIVAA Vision if enabled and configured
       if (body.use_mivaa_vision !== false && MIVAA_API_KEY && body.image_url) {
         try {
           console.log('Starting MIVAA Vision analysis...');
+          console.log(`MIVAA Gateway URL: ${MIVAA_GATEWAY_URL}`);
+          console.log(`MIVAA API Key present: ${!!MIVAA_API_KEY}`);
+          
           const mivaaResult = await analyzeWithMIVAA(
             body.image_url,
             analysisType,
@@ -427,7 +462,7 @@ Deno.serve(async (req: Request) => {
           visualAnalysis = mivaaResult.visualAnalysis;
           processingMethod = mivaaResult.method;
           
-          console.log(`MIVAA Vision analysis completed. Found ${recognizedMaterials.length} materials.`);
+          console.log(`MIVAA Vision analysis completed. Found ${recognizedMaterials.length} materials with method: ${processingMethod}`);
           
           // Store visual analysis data if enabled
           if (body.enable_visual_analysis && visualAnalysis && recognitionRecord) {
@@ -451,80 +486,30 @@ Deno.serve(async (req: Request) => {
           }
           
         } catch (mivaaError) {
-          console.error('MIVAA Vision analysis failed, falling back to OpenAI:', mivaaError);
-          // Continue to OpenAI fallback
+          console.error('MIVAA Vision analysis failed, using enhanced MIVAA error handling:', mivaaError);
+          processingMethod = 'mivaa_failed';
+          // Continue to catalog fallback (MIVAA-first architecture, no OpenAI dependency)
         }
+      } else {
+        console.log('MIVAA API key not available or vision disabled, skipping MIVAA analysis');
+        processingMethod = 'mivaa_skipped';
       }
 
-      // Fallback: Use OpenAI Vision API if MIVAA failed or not enabled
+      // Final fallback: Query materials catalog for similar materials ONLY if MIVAA failed
       if (recognizedMaterials.length === 0) {
-        const openaiKey = Deno.env.get('OPENAI_API_KEY');
-        if (openaiKey && body.image_url) {
-          console.log('Using OpenAI Vision as fallback...');
-          processingMethod = 'openai_vision';
-          
-          const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are an expert materials scientist. Analyze the image to identify materials and their properties. Return a JSON array of materials with: name, confidence (0-1), properties (category, subcategory, color, texture, finish, durability, sustainability), and bounding_box (x, y, width, height). Be precise and only identify materials you can see clearly.',
-              },
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text: `Analyze this image for materials. Analysis type: ${analysisType}. Minimum confidence: ${confidenceThreshold}`,
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: body.image_url,
-                      detail: analysisType === 'comprehensive' ? 'high' : 'auto',
-                    },
-                  },
-                ],
-              },
-            ],
-            max_tokens: 1500,
-            temperature: 0.1,
-          }),
-        });
-
-        if (visionResponse.ok) {
-          const visionData = await visionResponse.json();
-          const analysisText = visionData.choices[0].message.content;
-
-          try {
-            const parsedMaterials = JSON.parse(analysisText);
-            if (Array.isArray(parsedMaterials)) {
-              recognizedMaterials = parsedMaterials;
-            }
-          } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError);
-          }
-        }
-        }
-      }
-
-      // Final fallback: Query materials catalog for similar materials
-      if (recognizedMaterials.length === 0) {
+        console.log('All AI methods failed, falling back to catalog...');
         const { data: catalogMaterials, error: catalogError } = await supabase
           .from('materials_catalog')
           .select('*')
           .limit(5);
 
-        if (!catalogError && catalogMaterials) {
+        if (!catalogError && catalogMaterials && catalogMaterials.length > 0) {
+          console.log(`Found ${catalogMaterials.length} catalog materials as fallback`);
+          processingMethod = processingMethod === 'unknown' ? 'catalog_fallback' : processingMethod + '_catalog_fallback';
+          
           recognizedMaterials = catalogMaterials.map((material: MaterialsCatalogItem): RecognizedMaterial => ({
             name: material.name || 'Unknown Material',
-            confidence: 0.6, // Lower confidence for catalog fallback
+            confidence: 0.3, // Much lower confidence for catalog fallback to indicate it's not AI-based
             properties: {
               category: material.category || 'Unknown',
               subcategory: material.subcategory || '',
@@ -541,6 +526,9 @@ Deno.serve(async (req: Request) => {
               height: 100,
             },
           }));
+        } else {
+          console.log('No catalog materials found or catalog query failed');
+          processingMethod = processingMethod === 'unknown' ? 'no_results' : processingMethod + '_no_results';
         }
       }
 

@@ -341,68 +341,36 @@ class MaterialAgentOrchestrator {
   }
 
   private async callAI(prompt: string, context: string): Promise<string> {
-    // Use Claude for complex reasoning tasks
-    if (ANTHROPIC_API_KEY) {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Primary: Use MIVAA semantic analysis
+    try {
+      const mivaaResponse = await fetch(`${Deno.env.get('MIVAA_API_URL')}/semantic_analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
+          'Authorization': `Bearer ${Deno.env.get('MIVAA_API_KEY')}`,
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          text: prompt,
+          analysis_type: 'orchestration',
+          context: context,
+          return_format: 'text',
           max_tokens: 4000,
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Claude API error: ${response.status}`);
+      if (mivaaResponse.ok) {
+        const mivaaData = await mivaaResponse.json();
+        if (mivaaData.success && mivaaData.analysis) {
+          return mivaaData.analysis;
+        }
+      } else {
+        console.warn('MIVAA semantic analysis failed, falling back to direct AI calls');
       }
-
-      const data = await response.json();
-      return data.content[0].text;
+    } catch (mivaaError) {
+      console.warn('MIVAA semantic analysis error, falling back to direct AI calls:', mivaaError);
     }
 
-    // Fallback to OpenAI
-    if (OPENAI_API_KEY) {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a specialized AI agent working in a CrewAI system. Context: ${context}`,
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          max_tokens: 3000,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.choices[0].message.content;
-    }
-
-    throw new Error('No AI API keys available');
+    throw new Error('AI orchestration failed - MIVAA service required. Direct AI integration removed as part of centralized AI architecture. Please check MIVAA service availability.');
   }
 
   private calculateOverallConfidence(executions: AgentExecution[]): number {

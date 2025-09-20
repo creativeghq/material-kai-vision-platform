@@ -600,7 +600,8 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                         </div>
                       ))}
                     </div>
-                  )}
+                  </div>
+                )}
 
                 {/* Enhanced Metafield System Display */}
                 {material.metafieldValues && material.metafieldValues.length > 0 && (
@@ -672,7 +673,6 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                       ))}
                     </div>
                   </div>
-                  </div>
                 )}
               </div>
             )}
@@ -734,6 +734,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
               <span>Created: {new Date(material.createdAt).toLocaleDateString()}</span>
               <span>Updated: {new Date(material.updatedAt).toLocaleDateString()}</span>
             </div>
+          </CardContent>
           </CardContent>
         </CollapsibleContent>
       </Collapsible>

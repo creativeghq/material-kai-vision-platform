@@ -6,6 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// MIVAA Gateway configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+// Environment variable controls
+const USE_MIVAA_EMBEDDINGS = Deno.env.get('USE_MIVAA_EMBEDDINGS') !== 'false';
+const USE_MIVAA_CHAT = Deno.env.get('USE_MIVAA_CHAT') !== 'false'; // For future when MIVAA supports text chat
+
 interface SearchRequest {
   query: string
   searchType?: 'semantic' | 'hybrid' | 'keyword'
@@ -64,7 +72,54 @@ function setCache(key: string, embedding: number[]): void {
   });
 }
 
-// Generate query embedding using OpenAI text-embedding-ada-002 (1536 dimensions)
+async function generateQueryEmbeddingViaMivaa(text: string): Promise<number[]> {
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured');
+  }
+
+  try {
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+      },
+      body: JSON.stringify({
+        action: 'generate_embedding',
+        payload: {
+          text: text,
+          model: 'text-embedding-ada-002',
+          dimensions: 1536
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`MIVAA embedding error: ${response.status} - ${error}`);
+    }
+
+    const gatewayResponse = await response.json();
+    
+    if (!gatewayResponse.success) {
+      throw new Error(`MIVAA embedding failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
+    }
+
+    const embedding = gatewayResponse.data.embedding;
+
+    // Validate embedding dimensions
+    if (embedding.length !== 1536) {
+      throw new Error(`Invalid embedding dimensions: expected 1536, got ${embedding.length}`);
+    }
+
+    return embedding;
+  } catch (error) {
+    console.error('Error generating embedding via MIVAA:', error);
+    throw error;
+  }
+}
+
+// Generate query embedding using MIVAA-only approach with caching
 async function generateQueryEmbedding(text: string): Promise<number[]> {
   const cacheKey = `embedding_${hashQuery(text)}`;
 
@@ -75,45 +130,23 @@ async function generateQueryEmbedding(text: string): Promise<number[]> {
     return cachedEmbedding;
   }
 
-  const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openAIApiKey) {
-    throw new Error('OpenAI API key not found');
-  }
-
+  console.log('Using MIVAA for query embedding generation');
+  
   try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002', // 1536 dimensions for MIVAA compatibility
-        input: text,
-        dimensions: 1536,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const embedding = data.data[0].embedding;
-
-    // Validate embedding dimensions
+    const embedding = await generateQueryEmbeddingViaMivaa(text);
+    
+    // Validate embedding dimensions for MIVAA compatibility
     if (embedding.length !== 1536) {
       throw new Error(`Invalid embedding dimensions: expected 1536, got ${embedding.length}`);
     }
 
     // Cache the embedding
     setCache(cacheKey, embedding);
-
+    
     return embedding;
   } catch (error) {
-    console.error('Error generating embedding:', error);
-    throw new Error(`Failed to generate embedding: ${error.message}`);
+    console.error('MIVAA embedding generation failed:', error);
+    throw new Error(`Query embedding generation failed: ${(error as Error).message}. Please check MIVAA service availability.`);
   }
 }
 
@@ -181,15 +214,14 @@ async function performKeywordSearch(
   }
 }
 
-// Generate contextual response using GPT-4
+// Generate contextual response using MIVAA gateway
 async function generateRAGContext(query: string, searchResults: SearchResult[]): Promise<string> {
   if (searchResults.length === 0) {
     return 'No relevant context found for the query.';
   }
 
-  const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openAIApiKey) {
-    throw new Error('OpenAI API key not found');
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured for context generation');
   }
 
   const context = searchResults
@@ -204,39 +236,47 @@ ${context}
 Please provide a detailed, accurate response based solely on the provided context. If the context doesn't contain enough information to fully answer the query, please indicate what information is missing.`;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant that provides accurate information based on the given context. Always cite your sources when possible.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 1000,
-        temperature: 0.3,
+        action: 'chat_completion',
+        payload: {
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that provides accurate information based on the given context. Always cite your sources when possible.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          model: 'gpt-4',
+          max_tokens: 1000,
+          temperature: 0.3,
+        }
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      const error = await response.text();
+      throw new Error(`MIVAA chat completion error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
-    return data.choices[0].message.content;
+    const gatewayResponse = await response.json();
+    
+    if (!gatewayResponse.success) {
+      throw new Error(`MIVAA chat completion failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
+    }
+
+    return gatewayResponse.data.choices?.[0]?.message?.content || gatewayResponse.data.response || gatewayResponse.data.content || "Response generated successfully.";
   } catch (error) {
-    console.error('Error generating RAG context:', error);
-    return `Error generating contextual response: ${error.message}`;
+    console.error('Error generating RAG context via MIVAA:', error);
+    return `Error generating contextual response - MIVAA service required. Direct AI integration removed as part of centralized AI architecture. Please check MIVAA service availability.`;
   }
 }
 

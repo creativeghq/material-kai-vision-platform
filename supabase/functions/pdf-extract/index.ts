@@ -9,35 +9,8 @@ import {
   ValidationSchemas,
 } from '../_shared/config.ts';
 
-// Import material categories for AI analysis
-const MATERIAL_CATEGORIES = {
-  CERAMICS: { name: 'ceramics', finish: ['glossy', 'matte', 'semi-gloss', 'textured'], size: ['4x4"', '6x6"', '8x8"', '12x12"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'pressure sensitive adhesive'], application: ['floor', 'wall', 'backsplash', 'shower'] },
-  PORCELAIN: { name: 'porcelain', finish: ['polished', 'matte', 'textured', 'glazed'], size: ['12x12"', '18x18"', '24x24"', '30x30"', '36x36"'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'pressure sensitive adhesive'], application: ['floor', 'wall', 'outdoor', 'commercial'] },
-  TRAVERTINE: { name: 'travertine', finish: ['honed', 'polished', 'brushed', 'tumbled'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'pool deck'] },
-  MARBLE: { name: 'marble', finish: ['polished', 'honed', 'brushed', 'tumbled'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'vanity'] },
-  GRANITE: { name: 'granite', finish: ['polished', 'honed', 'flamed', 'leathered'], size: ['12x12"', '18x18"', '24x24"', '30x30"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'outdoor'] },
-  SLATE: { name: 'slate', finish: ['natural cleft', 'honed', 'polished', 'riven'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'roof', 'outdoor'] },
-  LIMESTONE: { name: 'limestone', finish: ['honed', 'polished', 'brushed', 'tumbled'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'pool deck'] },
-  QUARTZITE: { name: 'quartzite', finish: ['polished', 'honed', 'leathered', 'brushed'], size: ['12x12"', '18x18"', '24x24"', '30x30"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'outdoor'] },
-  SANDSTONE: { name: 'sandstone', finish: ['natural cleft', 'honed', 'polished', 'brushed'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'fireplace'] },
-  ONYX: { name: 'onyx', finish: ['polished', 'honed', 'brushed'], size: ['12x12"', '16x16"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'backsplash'] },
-  GLASS: { name: 'glass', finish: ['clear', 'frosted', 'tinted', 'patterned'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'silicone'], application: ['floor', 'wall', 'backsplash', 'shower'] },
-  MOSAIC: { name: 'mosaic', finish: ['glossy', 'matte', 'mixed'], size: ['1x1"', '2x2"', 'sheets'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'backsplash', 'shower'] },
-  METAL: { name: 'metal', finish: ['brushed', 'polished', 'oxidized', 'painted'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'mechanical fasteners'], application: ['floor', 'wall', 'backsplash', 'accent'] },
-  CONCRETE: { name: 'concrete', finish: ['polished', 'matte', 'textured', 'stained'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'outdoor', 'commercial'] },
-  WOOD: { name: 'wood', finish: ['natural', 'stained', 'oiled', 'lacquered'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['floating', 'glue down', 'nail down'], application: ['floor', 'wall', 'accent', 'furniture'] },
-  VINYL: { name: 'vinyl', finish: ['matte', 'glossy', 'textured'], size: ['12"', '18"', 'rolls'], installationMethod: ['glue down', 'floating', 'self-adhesive'], application: ['floor', 'wall', 'commercial', 'residential'] },
-  LAMINATE: { name: 'laminate', finish: ['matte', 'glossy', 'textured'], size: ['12x12"', '18x18"', 'rolls'], installationMethod: ['floating', 'glue down'], application: ['floor', 'commercial', 'residential'] },
-  CARPET: { name: 'carpet', finish: ['loop', 'cut', 'frieze', 'shag'], size: ['rolls', 'tiles'], installationMethod: ['glue down', 'tack strips'], application: ['floor', 'commercial', 'residential'] },
-  RUBBER: { name: 'rubber', finish: ['matte', 'textured'], size: ['rolls', 'tiles'], installationMethod: ['glue down', 'self-adhesive'], application: ['floor', 'commercial', 'industrial'] },
-  CORK: { name: 'cork', finish: ['natural', 'stained', 'oiled'], size: ['12x12"', '18x18"', 'rolls'], installationMethod: ['glue down', 'floating'], application: ['floor', 'wall', 'acoustic'] },
-  BAMBOO: { name: 'bamboo', finish: ['natural', 'stained', 'carbonized'], size: ['12x12"', '18x18"', 'rolls'], installationMethod: ['floating', 'glue down', 'nail down'], application: ['floor', 'wall', 'eco-friendly'] },
-  TERRAZZO: { name: 'terrazzo', finish: ['polished', 'honed', 'matte'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'commercial', 'outdoor'] },
-  RECYCLED_GLASS: { name: 'recycled_glass', finish: ['polished', 'matte', 'textured'], size: ['12x12"', '18x18"', '24x24"'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'eco-friendly'] },
-  ACRYLIC: { name: 'acrylic', finish: ['clear', 'tinted', 'patterned'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive', 'silicone'], application: ['floor', 'wall', 'shower', 'backsplash'] },
-  CORIAN: { name: 'corian', finish: ['polished', 'matte', 'textured'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'backsplash'] },
-  QUARTZ: { name: 'quartz', finish: ['polished', 'honed', 'matte'], size: ['12x12"', '18x18"', '24x24"', 'custom'], installationMethod: ['thinset mortar', 'epoxy adhesive'], application: ['floor', 'wall', 'countertop', 'backsplash'] }
-} as const;
+// Import material categories from centralized source
+import { MATERIAL_CATEGORIES } from '../../src/types/materials.ts';
 
 interface PdfExtractionRequest {
   documentId: string;
@@ -126,13 +99,19 @@ interface EnhancedExtractionResult {
   aiAnalysisTime?: number;
 }
 
+// MIVAA Gateway configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+// MIVAA-only configuration (OpenAI dependency removed)
+const USE_MIVAA_PROXY = Deno.env.get('USE_MIVAA_TEXT_ANALYSIS') !== 'false';
+
 /**
- * Analyze extracted text content using OpenAI to extract material meta fields and categories
+ * Analyze extracted text content using MIVAA proxy to extract material meta fields and categories
  */
-async function analyzeTextWithOpenAI(textContent: string): Promise<MaterialMetaExtraction> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    console.warn('OpenAI API key not configured, skipping AI analysis');
+async function analyzeTextWithMivaa(textContent: string): Promise<MaterialMetaExtraction> {
+  if (!MIVAA_API_KEY) {
+    console.warn('MIVAA API key not configured, returning empty analysis');
     return { confidence: 0 };
   }
 
@@ -144,18 +123,20 @@ async function analyzeTextWithOpenAI(textContent: string): Promise<MaterialMetaE
       .map(([key, category]) => `${key}: finish(${category.finish.join(', ')}), size(${category.size.join(', ')}), installation(${category.installationMethod.join(', ')}), application(${category.application.join(', ')})`)
       .join('\n');
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+        'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert materials scientist specializing in catalog data extraction.
+        action: 'chat_completion',
+        payload: {
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert materials scientist specializing in catalog data extraction.
 
 Available material categories and their meta fields:
 ${categoryDetails}
@@ -184,33 +165,45 @@ COMPREHENSIVE FUNCTIONAL METADATA (extract if mentioned):
 - edge_type: edge characteristics (rectified, non-rectified, etc.)
 
 Return structured JSON with extracted fields. Use null for missing information. Include confidence score (0-1).`,
-          },
-          {
-            role: 'user',
-            content: `Analyze this catalog text content and extract material meta fields and category information:
+            },
+            {
+              role: 'user',
+              content: `Analyze this catalog text content and extract material meta fields and category information:
 
 ${textContent.substring(0, 8000)}
 
 Extract all relevant meta fields and provide material category classification. Focus on accuracy and completeness.`,
+            },
+          ],
+          options: {
+            max_tokens: 1500,
+            temperature: 0.1,
           },
-        ],
-        max_tokens: 1500,
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
+        },
       }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('OpenAI API error:', error);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('MIVAA gateway error:', errorData);
       return { confidence: 0 };
     }
 
-    const data = await response.json();
-    const analysisContent = data.choices[0].message.content;
+    const gatewayResponse = await response.json();
+    
+    if (!gatewayResponse.success) {
+      console.error('MIVAA chat completion failed:', gatewayResponse.error);
+      return { confidence: 0 };
+    }
+
+    const analysisContent = gatewayResponse.data?.content || gatewayResponse.data?.response;
+    if (!analysisContent) {
+      console.error('No analysis content in MIVAA response');
+      return { confidence: 0 };
+    }
 
     try {
-      const analysis = JSON.parse(analysisContent);
+      const analysis = JSON.parse(typeof analysisContent === 'string' ? analysisContent : JSON.stringify(analysisContent));
       
       // Validate and clean the analysis results
       const cleanedAnalysis: MaterialMetaExtraction = {
@@ -243,19 +236,20 @@ Extract all relevant meta fields and provide material category classification. F
         }
       });
 
-      console.log(`OpenAI text analysis completed in ${Date.now() - startTime}ms`);
+      console.log(`MIVAA text analysis completed in ${Date.now() - startTime}ms`);
       return cleanedAnalysis;
 
     } catch (parseError) {
-      console.error('Failed to parse OpenAI analysis response:', parseError, analysisContent);
+      console.error('Failed to parse MIVAA analysis response:', parseError, analysisContent);
       return { confidence: 0 };
     }
 
   } catch (error) {
-    console.error('OpenAI text analysis error:', error);
+    console.error('MIVAA text analysis error:', error);
     return { confidence: 0 };
   }
 }
+
 
 /**
  * Validate extracted meta fields against MATERIAL_CATEGORIES
@@ -402,16 +396,19 @@ serve(async (req) => {
       );
     }
 
-    // Analyze extracted text with OpenAI for meta fields and categories
+    // Analyze extracted text with MIVAA (preferred) or OpenAI (fallback) for meta fields and categories
     let materialMetadata: MaterialMetaExtraction | undefined;
     let enhancedResult: EnhancedExtractionResult;
     
     if (extractionResult.data?.markdown && requestBody.options?.includeMetadata !== false) {
-      console.log('Analyzing extracted text with OpenAI for material meta fields...');
+      console.log('Analyzing extracted text with MIVAA for material meta fields...');
       const aiAnalysisStart = Date.now();
       
       try {
-        const rawMetadata = await analyzeTextWithOpenAI(extractionResult.data.markdown);
+        const rawMetadata = USE_MIVAA_PROXY
+          ? await analyzeTextWithMivaa(extractionResult.data.markdown)
+          : { confidence: 0 }; // MIVAA-only architecture, no OpenAI fallback
+          
         materialMetadata = validateMetaFields(rawMetadata);
         
         enhancedResult = {
@@ -421,7 +418,7 @@ serve(async (req) => {
           aiAnalysisTime: Date.now() - aiAnalysisStart,
         };
         
-        console.log(`AI analysis completed in ${Date.now() - aiAnalysisStart}ms`);
+        console.log(`AI analysis completed in ${Date.now() - aiAnalysisStart}ms via ${USE_MIVAA_PROXY ? 'MIVAA' : 'MIVAA-only fallback'}`);
         if (materialMetadata.confidence && materialMetadata.confidence > 0.5) {
           console.log(`Extracted meta fields: category=${materialMetadata.category}, finish=${materialMetadata.finish}, size=${materialMetadata.size}`);
         }
@@ -697,7 +694,7 @@ async function processPdfWithMivaa(
   options?: any,
 ): Promise<MivaaApiResponse> {
   try {
-    const mivaaBaseUrl = Deno.env.get('MIVAA_BASE_URL') || 'http://localhost:8000';
+    const mivaaBaseUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:8000';
     const mivaaApiKey = Deno.env.get('MIVAA_API_KEY');
     const timeout = parseInt(Deno.env.get('PDF_PROCESSING_TIMEOUT') || '300000'); // 5 minutes default
 

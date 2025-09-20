@@ -3,19 +3,16 @@ import { performance } from 'perf_hooks';
 import { EventEmitter } from 'events';
 
 import { Logger } from 'winston';
-import { OpenAI } from 'openai';
 
 /**
  * Configuration interface for the EmbeddingGenerationService
  */
 export interface EmbeddingGenerationConfig {
-  openai: {
+  mivaa: {
+    gatewayUrl: string;
     apiKey: string;
-    model: string;
-    maxTokens: number;
-    dimensions?: number;
-    baseURL?: string;
     timeout?: number;
+    model?: string; // Optional model override for MIVAA
   };
   batch: {
     maxSize: number;
@@ -120,13 +117,12 @@ interface BatchQueueItem {
 }
 
 /**
- * Service for generating embeddings using OpenAI's text-embedding models
+ * Service for generating embeddings using MIVAA's embedding generation capabilities
  * Provides batch processing, caching, rate limiting, and comprehensive error handling
  */
 export class EmbeddingGenerationService extends EventEmitter {
   private readonly config: EmbeddingGenerationConfig;
   private readonly logger: Logger;
-  private readonly openai: OpenAI;
   private readonly cache: Map<string, CacheEntry>;
   private readonly rateLimiter: RateLimiter;
   private readonly batchQueue: BatchQueueItem[];
@@ -148,13 +144,6 @@ export class EmbeddingGenerationService extends EventEmitter {
     this.config = config;
     this.logger = logger;
 
-    // Initialize OpenAI client
-    this.openai = new OpenAI({
-      apiKey: config.openai.apiKey,
-      baseURL: config.openai.baseURL,
-      timeout: config.openai.timeout || 30000,
-    });
-
     // Initialize cache
     this.cache = new Map();
 
@@ -164,8 +153,8 @@ export class EmbeddingGenerationService extends EventEmitter {
     // Initialize batch queue
     this.batchQueue = [];
 
-    this.logger.info('EmbeddingGenerationService initialized', {
-      model: config.openai.model,
+    this.logger.info('EmbeddingGenerationService initialized with MIVAA backend', {
+      gatewayUrl: config.mivaa.gatewayUrl,
       batchSize: config.batch.maxSize,
       cacheEnabled: config.cache.enabled,
     });
@@ -440,20 +429,55 @@ export class EmbeddingGenerationService extends EventEmitter {
   }
 
   /**
-   * Generate embedding with retry logic
+   * Generate embedding with retry logic using MIVAA backend
    */
   private async generateWithRetry(text: string): Promise<any> {
     let lastError: Error;
 
     for (let attempt = 1; attempt <= this.config.retry.maxAttempts; attempt++) {
       try {
-        const response = await this.openai.embeddings.create({
-          model: this.config.openai.model,
-          input: text,
-          dimensions: this.config.openai.dimensions,
+        const response = await fetch(`${this.config.mivaa.gatewayUrl}/api/mivaa/gateway`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.config.mivaa.apiKey}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'Material-Kai-Vision-Platform-EmbeddingService/1.0',
+          },
+          body: JSON.stringify({
+            action: 'batch_embedding',
+            payload: {
+              texts: [text],
+              options: {
+                model: this.config.mivaa.model || 'clip',
+                normalize: true,
+                batch_size: 1,
+              },
+            },
+          }),
         });
 
-        return response;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        }
+
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(`MIVAA batch embedding error: ${result.error?.message || 'Unknown error'}`);
+        }
+
+        // Transform MIVAA response to match expected format
+        const embeddingData = result.data.embeddings?.[0] || result.data;
+        return {
+          data: [{
+            embedding: embeddingData.embedding || embeddingData,
+          }],
+          model: result.data.model || this.config.mivaa.model || 'mivaa-clip',
+          usage: {
+            prompt_tokens: Math.ceil(text.length / 4), // Estimate tokens
+            total_tokens: Math.ceil(text.length / 4),
+          },
+        };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -466,7 +490,7 @@ export class EmbeddingGenerationService extends EventEmitter {
           this.config.retry.maxDelay,
         );
 
-        this.logger.warn('Embedding generation attempt failed, retrying', {
+        this.logger.warn('MIVAA embedding generation attempt failed, retrying', {
           attempt,
           delay,
           error: lastError.message,
@@ -529,7 +553,7 @@ export class EmbeddingGenerationService extends EventEmitter {
    */
   private getCacheKey(text: string): string {
     return createHash('sha256')
-      .update(`${this.config.openai.model}:${text}`)
+      .update(`${this.config.mivaa.model || 'mivaa-clip'}:${text}`)
       .digest('hex');
   }
 
@@ -648,12 +672,11 @@ export class EmbeddingGenerationService extends EventEmitter {
  * Default configuration for EmbeddingGenerationService
  */
 export const defaultEmbeddingConfig: EmbeddingGenerationConfig = {
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY || '',
-    model: 'text-embedding-3-small',
-    maxTokens: 8192,
-    dimensions: 1536,
+  mivaa: {
+    gatewayUrl: process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000',
+    apiKey: process.env.NEXT_PUBLIC_MIVAA_API_KEY || '',
     timeout: 30000,
+    model: 'clip', // Default to CLIP for embeddings
   },
   batch: {
     maxSize: 100,

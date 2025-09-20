@@ -94,44 +94,56 @@ interface VoiceToMaterialResult {
   };
 }
 
-// OpenAI API configuration
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+// MIVAA Gateway configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
 
 async function transcribeAudio(audioData: Uint8Array, format: string, language?: string): Promise<any> {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key not configured');
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured');
   }
 
   try {
-    // Create form data for OpenAI Whisper API
-    const formData = new FormData();
-    const audioBlob = new Blob([audioData as BlobPart], { type: `audio/${format}` });
-    formData.append('file', audioBlob, `audio.${format}`);
-    formData.append('model', 'whisper-1');
-    formData.append('response_format', 'verbose_json');
-    formData.append('timestamp_granularities[]', 'segment');
+    console.log('Using MIVAA gateway for audio transcription');
+    
+    // Convert audio data to base64 for MIVAA transport
+    const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(audioData)));
+    
+    const payload = {
+      audio_data: base64Audio,
+      audio_format: format,
+      language: language,
+      transcription_model: 'whisper-1',
+      response_format: 'verbose_json',
+      timestamp_granularities: ['segment']
+    };
 
-    if (language) {
-      formData.append('language', language);
-    }
-
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
       },
-      body: formData,
+      body: JSON.stringify({
+        action: 'audio_transcription',
+        payload: payload,
+      }),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenAI Whisper API error: ${response.status} - ${error}`);
+      throw new Error(`MIVAA audio transcription error: ${response.status} - ${error}`);
     }
 
-    const transcriptionData = await response.json();
-    return transcriptionData;
+    const gatewayResponse = await response.json();
+    
+    if (!gatewayResponse.success) {
+      throw new Error(`MIVAA transcription failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
+    }
+
+    return gatewayResponse.data;
   } catch (error) {
-    console.error('Error transcribing audio:', error);
+    console.error('Error transcribing audio via MIVAA:', error);
     throw error;
   }
 }

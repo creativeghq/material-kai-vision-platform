@@ -11,6 +11,14 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// MIVAA Gateway configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+// Environment variable controls
+const USE_MIVAA_EMBEDDINGS = Deno.env.get('USE_MIVAA_EMBEDDINGS') !== 'false';
+const USE_MIVAA_CHAT = Deno.env.get('USE_MIVAA_CHAT') !== 'false'; // For future when MIVAA supports text chat
+
 // Initialize Supabase client
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -38,30 +46,54 @@ interface RAGSearchResult {
   processing_time_ms: number;
 }
 
-// Generate embeddings using OpenAI
-async function generateQueryEmbedding(text: string): Promise<number[]> {
-  console.log('Generating embedding for query:', text.substring(0, 100));
-
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-ada-002',
-      input: text,
-      // text-embedding-ada-002 produces 1536 dimensions by default
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error: ${error}`);
+async function generateQueryEmbeddingViaMivaa(text: string): Promise<number[]> {
+  if (!MIVAA_API_KEY) {
+    throw new Error('MIVAA API key not configured');
   }
 
-  const data = await response.json();
-  return data.data[0].embedding;
+  try {
+    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+      },
+      body: JSON.stringify({
+        action: 'generate_embedding',
+        payload: {
+          text: text,
+          model: 'text-embedding-ada-002',
+          dimensions: 1536
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`MIVAA embedding error: ${response.status} - ${error}`);
+    }
+
+    const gatewayResponse = await response.json();
+    
+    if (!gatewayResponse.success) {
+      throw new Error(`MIVAA embedding failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
+    }
+
+    return gatewayResponse.data.embedding;
+  } catch (error) {
+    console.error('Error generating embedding via MIVAA:', error);
+    throw error;
+  }
+}
+
+// Generate embeddings with MIVAA only - OpenAI fallback removed
+async function generateQueryEmbedding(text: string): Promise<number[]> {
+  if (!USE_MIVAA_EMBEDDINGS) {
+    throw new Error('MIVAA embeddings disabled - direct AI integration removed as part of centralized AI architecture. Please enable MIVAA service.');
+  }
+
+  console.log('Using MIVAA proxy for query embedding generation');
+  return await generateQueryEmbeddingViaMivaa(text);
 }
 
 // Perform enhanced vector search
@@ -118,38 +150,47 @@ ${knowledgeContext}
 
 Provide a comprehensive answer that synthesizes this information and directly addresses the user's question. Focus on practical insights and material recommendations.`;
 
-  console.log('Generating contextual response with OpenAI');
+  console.log('Generating contextual response with MIVAA chat completion');
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a material expert assistant. Provide helpful, accurate information about materials based on the provided context.',
-        },
-        {
-          role: 'user',
-          content: contextPrompt,
-        },
-      ],
-      max_tokens: 1000,
-      temperature: 0.3,
-    }),
-  });
+  try {
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'chat_completion',
+        payload: {
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a material expert assistant. Provide helpful, accurate information about materials based on the provided context.',
+            },
+            {
+              role: 'user',
+              content: contextPrompt,
+            },
+          ],
+          model: 'gpt-4',
+          max_tokens: 1000,
+          temperature: 0.3,
+        }
+      }),
+    });
 
-  if (!response.ok) {
-    console.error('OpenAI API error for context generation');
-    return "I found relevant materials but couldn't generate a detailed response. Please check the search results.";
+    if (!response.ok) {
+      console.error('MIVAA chat completion error for context generation');
+      return "I found relevant materials but couldn't generate a detailed response. Please check the search results.";
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || data.response || data.content || "Response generated successfully.";
+    
+  } catch (error) {
+    console.error('MIVAA chat completion failed:', error);
+    return "I found relevant materials but couldn't generate a detailed response. Please check MIVAA service availability.";
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
 
 // Main request handler

@@ -40,7 +40,7 @@ export interface HybridAIServiceConfig extends ServiceConfig {
 
 export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   private readonly PROVIDERS: AIProvider[] = [
-    { name: 'openai', priority: 1, available: true },
+    { name: 'mivaa', priority: 1, available: true },
     { name: 'claude', priority: 2, available: true },
   ];
 
@@ -85,8 +85,8 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 
         let result: any;
         switch (provider.name) {
-          case 'openai':
-            result = await HybridAIService.callOpenAI(request);
+          case 'mivaa':
+            result = await HybridAIService.callMIVAA(request);
             break;
           case 'claude':
             result = await HybridAIService.callClaude(request);
@@ -176,10 +176,80 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     return data;
   }
 
-  // OpenAI API calls (for client-side use)
-  private static async callOpenAI(request: HybridRequest): Promise<any> {
-    // This would be called from edge function, not client
-    throw new Error('Use callHybridAnalysis instead for client-side calls');
+  // MIVAA API calls (primary provider)
+  private static async callMIVAA(request: HybridRequest): Promise<any> {
+    const mivaaGatewayUrl = process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000';
+    const mivaaApiKey = process.env.NEXT_PUBLIC_MIVAA_API_KEY;
+    
+    if (!mivaaApiKey) {
+      throw new Error('MIVAA API key not configured');
+    }
+
+    // Map request type to MIVAA action
+    let mivaaAction: string;
+    switch (request.type) {
+      case 'material-analysis':
+        mivaaAction = request.imageUrl ? 'llama_vision_analysis' : 'chat_completion';
+        break;
+      case '3d-generation':
+        mivaaAction = 'chat_completion';
+        break;
+      case 'text-processing':
+        mivaaAction = 'chat_completion';
+        break;
+      default:
+        mivaaAction = 'chat_completion';
+    }
+
+    const systemPrompt = HybridAIService.getSystemPrompt(request.type);
+
+    const payload: any = {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: request.prompt },
+      ],
+      options: {
+        max_tokens: 2000,
+        temperature: 0.1,
+      },
+    };
+
+    // Add image data for vision analysis
+    if (request.imageUrl && mivaaAction === 'llama_vision_analysis') {
+      payload.image_data = request.imageUrl;
+      payload.analysis_type = 'material_analysis';
+    }
+
+    const response = await fetch(`${mivaaGatewayUrl}/api/mivaa/gateway`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${mivaaApiKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Material-Kai-Vision-Platform-Client/1.0',
+      },
+      body: JSON.stringify({
+        action: mivaaAction,
+        payload,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(`MIVAA ${mivaaAction} error: ${result.error?.message || 'Unknown error'}`);
+    }
+
+    // Return standardized response format
+    return {
+      text: result.data.content || result.data.response || result.data.analysis,
+      raw_response: result.data,
+      provider: 'mivaa',
+      action: mivaaAction,
+    };
   }
 
   // Claude API calls (for client-side use)

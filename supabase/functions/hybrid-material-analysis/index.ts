@@ -1,7 +1,48 @@
 import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { MATERIAL_CATEGORIES } from '../../src/types/materials.ts';
+// Dynamic material categories - fetch from database instead of hardcoded
+let MATERIAL_CATEGORIES: Record<string, { name: string; metaFields: string[] }> = {};
+
+// Function to fetch dynamic material categories
+async function fetchMaterialCategories() {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    // Call the get-material-categories edge function for legacy format
+    const response = await fetch(`${supabaseUrl}/functions/v1/get-material-categories/legacy-format`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    if (result.success) {
+      MATERIAL_CATEGORIES = result.data;
+      console.log(`Loaded ${Object.keys(MATERIAL_CATEGORIES).length} dynamic material categories`);
+    } else {
+      throw new Error(result.error || 'Failed to fetch categories');
+    }
+  } catch (error) {
+    console.error('Failed to fetch dynamic categories, using fallback:', error);
+    // Minimal fallback categories
+    MATERIAL_CATEGORIES = {
+      ceramics: { name: 'ceramics', metaFields: ['r11_rating', 'finish', 'size', 'installation_method', 'application'] },
+      porcelain: { name: 'porcelain', metaFields: ['r11_rating', 'finish', 'size', 'installation_method', 'application'] },
+      natural_stone: { name: 'natural_stone', metaFields: ['r11_rating', 'finish', 'size', 'installation_method', 'application'] },
+      metal: { name: 'metal', metaFields: ['metal_type', 'finish', 'size', 'installation_method', 'application'] },
+      other: { name: 'other', metaFields: ['finish', 'size', 'installation_method', 'application'] }
+    };
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +53,109 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
+
+// Enhanced features extracted from ai-material-analysis for better UI performance
+
+// Analysis type flexibility for different use cases
+type AnalysisType = 'comprehensive' | 'quick' | 'properties_only';
+
+// Result validation system from ai-material-analysis
+function validateResult(result: any): { score: number; issues: string[] } {
+  let score = 1.0;
+  const issues: string[] = [];
+
+  // Check material name quality
+  if (!result.material_name || result.material_name.trim().length < 2) {
+    score -= 0.3;
+    issues.push('Missing or invalid material name');
+  }
+
+  // Check category presence
+  if (!result.category) {
+    score -= 0.2;
+    issues.push('Missing category classification');
+  }
+
+  // Check confidence threshold
+  if (result.confidence < 0.6) {
+    score -= 0.2;
+    issues.push('Low confidence score');
+  }
+
+  // Check properties completeness
+  if (!result.properties || Object.keys(result.properties).length < 2) {
+    score -= 0.2;
+    issues.push('Insufficient property extraction');
+  }
+
+  // Generic response detection (superior feature from ai-material-analysis)
+  const genericTerms = ['unknown', 'generic', 'standard', 'typical', 'unspecified', 'unclear'];
+  const responseText = JSON.stringify(result).toLowerCase();
+  const genericCount = genericTerms.filter(term => responseText.includes(term)).length;
+  
+  if (genericCount > 2) {
+    score -= 0.1;
+    issues.push('Contains too many generic terms');
+  }
+
+  // Additional quality checks
+  if (result.material_name && result.material_name.toLowerCase().includes('unknown')) {
+    score -= 0.15;
+    issues.push('Material name indicates uncertainty');
+  }
+
+  return { 
+    score: Math.max(0, Math.min(1, score)),
+    issues 
+  };
+}
+
+// Enhanced prompt engineering from ai-material-analysis
+function getAnalysisPrompts(analysisType: AnalysisType, availableCategories: string[]): {
+  comprehensive: string;
+  quick: string;
+  properties_only: string;
+} {
+  const categoryList = availableCategories.join(', ');
+  
+  return {
+    comprehensive: `Analyze this material image comprehensively. You are an expert materials scientist with extensive knowledge.
+
+CRITICAL REQUIREMENTS:
+1. Material identification with confidence score (0-1)
+2. Category classification from: ${categoryList}
+3. Physical properties (density, strength, thermal properties)
+4. Meta properties: R11 rating, metal types, finish, size, installation method, application
+5. Chemical composition if identifiable
+6. Safety considerations and handling requirements
+7. Relevant industry standards
+
+RESPONSE FORMAT: Valid JSON only. Include confidence scores for each property extracted.
+
+QUALITY REQUIREMENTS:
+- Avoid generic terms like "unknown", "typical", "standard"
+- Provide specific, technical descriptions
+- Include numerical values where possible
+- Specify exact standards and certifications`,
+
+    quick: `Quickly identify this material with high accuracy. Focus on:
+1. Material name and type
+2. Category from: ${categoryList}
+3. Key identifying features
+4. Confidence score (0-1)
+
+RESPONSE FORMAT: Valid JSON only. Be specific, avoid generic terms.`,
+
+    properties_only: `Focus exclusively on material properties and characteristics:
+1. Physical properties (hardness, density, texture)
+2. Meta properties (R11, finish, size, installation, application)
+3. Performance characteristics
+4. Safety ratings
+5. Technical specifications
+
+RESPONSE FORMAT: Valid JSON only. Include specific measurements and ratings.`
+  };
+}
 
 // Database helper functions for retrieving analysis data
 async function getSpectralDataFromDatabase(fileId: string): Promise<any> {
@@ -224,25 +368,12 @@ interface HybridAnalysisResponse {
 }
 
 async function performVisualAnalysis(imageUrl: string): Promise<AnalysisResult> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const startTime = Date.now();
+  let usedMethod = 'unknown';
+  let processedResult: any = null;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert materials scientist specializing in visual material analysis and catalog data extraction. Analyze the image to identify the material, its properties, quality indicators, and extract meta fields from catalog content.
+  // Comprehensive material analysis prompt for both MIVAA and OpenAI
+  const materialAnalysisPrompt = `You are an expert materials scientist specializing in visual material analysis and catalog data extraction. Analyze the image to identify the material, its properties, quality indicators, and extract meta fields from catalog content.
 
 Available material categories: ${Object.keys(MATERIAL_CATEGORIES).join(', ')}
 
@@ -254,14 +385,9 @@ For each category, extract these meta fields when visible in the catalog:
 - r11: R11 rating if visible (thermal resistance)
 - metal_types: types of metals if applicable
 
-Respond with structured JSON matching the AnalysisResult interface, including extracted meta data in the metadata field.`,
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Perform comprehensive visual analysis of this material catalog image. Extract:
+Respond with structured JSON matching the AnalysisResult interface, including extracted meta data in the metadata field.`;
+
+  const detailedAnalysisPrompt = `Perform comprehensive visual analysis of this material catalog image. Extract:
 
 1. MATERIAL IDENTIFICATION:
    - Primary material type and category from: ${Object.keys(MATERIAL_CATEGORIES).join(', ')}
@@ -345,39 +471,152 @@ Respond with structured JSON matching the AnalysisResult interface, including ex
    - Installation requirements
    - Performance characteristics
 
-Provide detailed analysis in JSON format with all extracted meta fields included.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageUrl,
-                detail: 'high',
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.1,
-    }),
-  });
+Provide detailed analysis in JSON format with all extracted meta fields included.`;
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Visual analysis failed: ${error.error?.message || 'Unknown error'}`);
+  // Try MIVAA first
+  try {
+    console.log('🔍 Attempting MIVAA semantic analysis for visual material analysis');
+    
+    const mivaaResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'semantic_analysis',
+        input_type: 'image',
+        analysis_type: 'material_catalog_analysis',
+        image_url: imageUrl,
+        prompt: `${materialAnalysisPrompt}\n\n${detailedAnalysisPrompt}`,
+        parameters: {
+          response_format: 'json',
+          max_tokens: 2000,
+          temperature: 0.1,
+        },
+      }),
+    });
+
+    if (mivaaResponse.ok) {
+      const mivaaData = await mivaaResponse.json();
+      console.log('✅ MIVAA semantic analysis successful');
+      
+      // Parse MIVAA response using proven pattern
+      const mivaaResult = mivaaData.analysis_result || mivaaData.result;
+      if (mivaaResult) {
+        processedResult = typeof mivaaResult === 'string' ? JSON.parse(mivaaResult) : mivaaResult;
+        usedMethod = 'mivaa-semantic-analysis';
+      } else {
+        throw new Error('No analysis result in MIVAA response');
+      }
+    } else {
+      const errorData = await mivaaResponse.json();
+      throw new Error(`MIVAA request failed: ${errorData.error || 'Unknown error'}`);
+    }
+  } catch (mivaaError) {
+    console.log(`⚠️ MIVAA semantic analysis failed: ${(mivaaError as Error).message}, trying parallel MIVAA approach`);
+    
+    // Enhanced fallback: Use parallel MIVAA actions for better performance and reliability
+    try {
+      console.log('🔄 Attempting parallel MIVAA analysis (LLaMA vision + CLIP embeddings)');
+      
+      // Prepare parallel MIVAA requests
+      const llamaRequest = {
+        action: 'llama_vision_analysis',
+        payload: {
+          image_url: imageUrl,
+          analysis_type: 'comprehensive_material_analysis',
+          prompt: `${materialAnalysisPrompt}\n\n${detailedAnalysisPrompt}`,
+          options: {
+            response_format: 'json',
+            max_tokens: 2000,
+            temperature: 0.1,
+            include_confidence_scores: true
+          }
+        }
+      };
+
+      const clipRequest = {
+        action: 'clip_embedding_generation',
+        payload: {
+          image_url: imageUrl,
+          embedding_type: 'visual_similarity',
+          options: {
+            normalize: true,
+            dimensions: 512
+          }
+        }
+      };
+
+      // Execute both MIVAA requests in parallel
+      const [llamaResponse, clipResponse] = await Promise.all([
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(llamaRequest),
+        }),
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(clipRequest),
+        })
+      ]);
+
+      // Process LLaMA vision result
+      if (llamaResponse.ok) {
+        const llamaData = await llamaResponse.json();
+        const llamaResult = llamaData.analysis_result || llamaData.result || llamaData.data;
+        
+        if (llamaResult) {
+          processedResult = typeof llamaResult === 'string' ? JSON.parse(llamaResult) : llamaResult;
+          usedMethod = 'mivaa-llama-vision-parallel';
+          
+          // Optionally enhance with CLIP embeddings if successful
+          if (clipResponse.ok) {
+            const clipData = await clipResponse.json();
+            if (clipData.embedding || clipData.visual_embedding) {
+              processedResult.visual_embeddings = {
+                clip_embedding: clipData.embedding || clipData.visual_embedding,
+                embedding_type: 'clip_512d',
+                model_used: clipData.model_used || 'clip-vit-base-patch32'
+              };
+              usedMethod = 'mivaa-parallel-llama-clip';
+            }
+          }
+          
+          console.log('✅ Parallel MIVAA analysis successful');
+        } else {
+          throw new Error('No analysis result in parallel MIVAA response');
+        }
+      } else {
+        const llamaError = await llamaResponse.json();
+        throw new Error(`Parallel MIVAA LLaMA analysis failed: ${llamaError.error || 'Unknown error'}`);
+      }
+      
+    } catch (parallelError) {
+      console.error('❌ All MIVAA methods failed:', (parallelError as Error).message);
+      throw new Error(`Material analysis failed: ${(parallelError as Error).message}. Please check MIVAA service availability.`);
+    }
   }
 
-  const data = await response.json();
-  const analysisText = data.choices[0].message.content;
+  // Process and extract metadata from either MIVAA or OpenAI result
+  if (!processedResult) {
+    throw new Error('No valid analysis result obtained from either MIVAA or OpenAI');
+  }
+try {
+  const analysis = processedResult;
 
-  try {
-    const analysis = JSON.parse(analysisText);
-
-    // Extract functional metadata fields from the analysis
-    const metadata = analysis.metadata || {};
-    const functionalMetadata = analysis.functional_metadata || {};
-    
-    const extractedMeta = {
+  // Extract functional metadata fields from the analysis
+  const metadata = analysis.metadata || {};
+  const functionalMetadata = analysis.functional_metadata || {};
+  
+  const extractedMeta = {
       // Legacy fields (maintain compatibility)
       finish: metadata.finish || analysis.finish,
       size: metadata.size || analysis.size,
@@ -451,15 +690,15 @@ Provide detailed analysis in JSON format with all extracted meta fields included
       properties: analysis.properties || {},
       quality_indicators: analysis.quality_indicators || {},
       processing_metadata: {
-        method: 'gpt-4o-vision',
+        method: usedMethod,
         processing_time_ms: Date.now() - startTime,
-        model_version: 'gpt-4o-2024-05-13',
+        model_version: usedMethod === 'mivaa-semantic-analysis' ? 'mivaa-v1' : 'gpt-4o-2024-05-13',
         extracted_meta: extractedMeta,
       },
     };
   } catch (error) {
-    console.error('Failed to parse visual analysis response:', analysisText);
-    throw new Error('Invalid JSON response from visual analysis');
+    console.error('Failed to parse visual analysis response:', processedResult);
+    throw new Error(`Invalid JSON response from ${usedMethod}: ${error instanceof Error ? error.message : 'Unknown parsing error'}`);
   }
 }
 
@@ -950,6 +1189,10 @@ function generateRecommendations(results: AnalysisResult[], consensus: any): str
 }
 
 serve(async (req: Request) => {
+  // Ensure dynamic categories are loaded for this request
+  if (Object.keys(MATERIAL_CATEGORIES).length === 0) {
+    await fetchMaterialCategories();
+  }
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

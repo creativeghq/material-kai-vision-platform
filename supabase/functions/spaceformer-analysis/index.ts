@@ -493,35 +493,56 @@ class SpaceFormerProcessor {
   }
 
   private async callAI(prompt: string): Promise<string> {
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error('Anthropic API key not available');
+    const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+    const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+    if (!MIVAA_API_KEY) {
+      throw new Error('MIVAA API key not configured for spatial analysis');
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      }),
-    });
+    try {
+      const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MIVAA_API_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'chat_completion',
+          payload: {
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a spatial analysis expert specializing in interior design, architecture, and space optimization.',
+              },
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 4000,
+            temperature: 0.3,
+          }
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status}`);
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`MIVAA chat completion error: ${response.status} - ${error}`);
+      }
+
+      const gatewayResponse = await response.json();
+      
+      if (!gatewayResponse.success) {
+        throw new Error(`MIVAA chat completion failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
+      }
+
+      return gatewayResponse.data.choices?.[0]?.message?.content || gatewayResponse.data.response || gatewayResponse.data.content || "Spatial analysis completed successfully.";
+    } catch (error) {
+      console.error('Error calling MIVAA for spatial analysis:', error);
+      throw new Error('Spatial analysis failed - MIVAA service required. Direct AI integration removed as part of centralized AI architecture. Please check MIVAA service availability.');
     }
-
-    const data = await response.json();
-    return data.content[0].text;
   }
 
   private async createAnalysisRecord(analysisId: string, request: SpaceFormerRequest): Promise<void> {

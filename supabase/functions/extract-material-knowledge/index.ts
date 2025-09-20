@@ -67,11 +67,6 @@ interface MaterialKnowledge {
 }
 
 async function extractFromText(text: string, focus: string): Promise<MaterialKnowledge> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const prompts = {
     materials: `Extract material information from this text. Focus on identifying:
     - Material names and categories
@@ -115,51 +110,88 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
     Provide detailed structured JSON response matching the MaterialKnowledge interface.`,
   };
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  try {
+    // Primary: Use MIVAA semantic analysis for text processing
+    const mivaaResponse = await fetch(`${Deno.env.get('MIVAA_API_URL')}/semantic_analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('MIVAA_API_KEY')}`,
+      },
+      body: JSON.stringify({
+        input_text: text,
+        analysis_type: 'material_knowledge_extraction',
+        prompt: `${prompts[focus] || prompts.comprehensive}\n\nSystem context: You are an expert materials engineer and knowledge extraction specialist. Extract structured material knowledge from technical content. Always respond with valid JSON matching the MaterialKnowledge interface. Include confidence scores (0-1) for all extracted information.`,
+        max_tokens: 3000,
+        temperature: 0.1,
+      }),
+    });
+
+    if (mivaaResponse.ok) {
+      const mivaaData = await mivaaResponse.json();
+      const extractionText = mivaaData.analysis_result || mivaaData.result;
+      
+      try {
+        return JSON.parse(extractionText);
+      } catch (parseError) {
+        console.warn('Failed to parse MIVAA response, falling back to OpenAI:', parseError);
+        // Fall through to OpenAI fallback
+      }
+    } else {
+      console.warn('MIVAA semantic analysis failed, falling back to OpenAI');
+      // Fall through to OpenAI fallback
+    }
+  } catch (mivaaError) {
+    console.warn('MIVAA semantic analysis error, falling back to OpenAI:', mivaaError);
+    // Fall through to OpenAI fallback
+  }
+
+  // Enhanced MIVAA-only approach with robust error handling
+  console.log('🔄 Attempting enhanced MIVAA semantic analysis for text content');
+  
+  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${openaiKey}`,
+      'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert materials engineer and knowledge extraction specialist. Extract structured material knowledge from technical content. Always respond with valid JSON matching the MaterialKnowledge interface. Include confidence scores (0-1) for all extracted information.',
-        },
-        {
-          role: 'user',
-          content: `${prompts[focus] || prompts.comprehensive}\n\nText to analyze:\n${text}`,
-        },
-      ],
-      max_tokens: 3000,
-      temperature: 0.1,
+      action: 'semantic_analysis',
+      payload: {
+        text: text,
+        analysis_type: 'material_knowledge_extraction',
+        prompt: `${prompts[focus] || prompts.comprehensive}\n\nText to analyze:\n${text}`,
+        options: {
+          response_format: 'json',
+          max_tokens: 3000,
+          temperature: 0.1,
+          include_confidence_scores: true
+        }
+      }
     }),
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
+    const errorData = await response.json();
+    throw new Error(`MIVAA semantic analysis failed: ${errorData.error || 'Service unavailable'}. Please check MIVAA service status.`);
   }
 
-  const data = await response.json();
-  const extractionText = data.choices[0].message.content;
+  const mivaaData = await response.json();
+  const analysisResult = mivaaData.analysis_result || mivaaData.result || mivaaData.data;
+  
+  if (!analysisResult) {
+    throw new Error('No analysis result in MIVAA response');
+  }
 
   try {
-    return JSON.parse(extractionText);
+    return typeof analysisResult === 'string' ? JSON.parse(analysisResult) : analysisResult;
   } catch (error) {
-    console.error('Failed to parse OpenAI response:', extractionText);
-    throw new Error('Invalid JSON response from OpenAI');
+    console.error('Failed to parse MIVAA response:', analysisResult);
+    throw new Error('Invalid JSON response from MIVAA semantic analysis');
   }
 }
 
 async function extractFromImage(imageUrl: string, focus: string): Promise<MaterialKnowledge> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const prompts = {
     materials: `Analyze this image to identify materials. Look for:
     - Material types and categories visible
@@ -187,55 +219,47 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
     Provide detailed JSON response.`,
   };
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert materials scientist specializing in visual material analysis. Extract material knowledge from images with high accuracy. Always respond with valid JSON matching the MaterialKnowledge interface.',
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: prompts[focus] || prompts.comprehensive,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageUrl,
-                detail: 'high',
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.1,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`OpenAI Vision API error: ${error.error?.message || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  const extractionText = data.choices[0].message.content;
-
   try {
-    return JSON.parse(extractionText);
-  } catch (error) {
-    console.error('Failed to parse OpenAI Vision response:', extractionText);
-    throw new Error('Invalid JSON response from OpenAI Vision');
+    // Primary: Use MIVAA semantic analysis for image processing
+    const mivaaResponse = await fetch(`${Deno.env.get('MIVAA_API_URL')}/semantic_analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('MIVAA_API_KEY')}`,
+      },
+      body: JSON.stringify({
+        input_type: 'image',
+        image_url: imageUrl,
+        analysis_type: 'material_knowledge_extraction',
+        prompt: `${prompts[focus as keyof typeof prompts] || prompts.comprehensive}\n\nSystem context: You are an expert materials scientist specializing in visual material analysis. Extract material knowledge from images with high accuracy. Always respond with valid JSON matching the MaterialKnowledge interface.`,
+        max_tokens: 2000,
+        temperature: 0.1,
+        detail: 'high',
+      }),
+    });
+
+    if (mivaaResponse.ok) {
+      const mivaaData = await mivaaResponse.json();
+      const extractionText = mivaaData.analysis_result || mivaaData.result;
+      
+      try {
+        return JSON.parse(extractionText);
+      } catch (parseError) {
+        console.warn('Failed to parse MIVAA image response, falling back to OpenAI:', parseError);
+        // Fall through to OpenAI fallback
+      }
+    } else {
+      console.warn('MIVAA image analysis failed, falling back to OpenAI');
+      // Fall through to OpenAI fallback
+    }
+  } catch (mivaaError) {
+    console.warn('MIVAA image analysis error, falling back to OpenAI:', mivaaError);
+    // Fall through to OpenAI fallback
   }
+
+  // MIVAA-only approach - OpenAI integration removed for centralized AI management
+  console.error('❌ All MIVAA methods failed for knowledge extraction');
+  throw new Error(`Material knowledge extraction failed - MIVAA service required. OpenAI direct integration removed as part of centralized AI architecture. Please check MIVAA service availability.`);
 }
 
 async function extractFromDocument(fileId: string, focus: string): Promise<MaterialKnowledge> {
@@ -331,7 +355,7 @@ async function processKnowledgeExtraction(request: ExtractionRequest): Promise<a
 
     // Add metadata
     knowledge.metadata = {
-      extraction_method: 'gpt-4o-vision',
+      extraction_method: 'mivaa-semantic-analysis',
       processing_time_ms: Date.now() - startTime,
       source_type: request.source_type,
       confidence_score: calculateOverallConfidence(knowledge),

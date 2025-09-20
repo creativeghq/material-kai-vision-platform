@@ -20,7 +20,7 @@ interface SystemStatus {
   version: string;
   uptime_ms: number;
   components: {
-    llama_vision: ComponentStatus;
+    mivaa_gateway: ComponentStatus;
     database: ComponentStatus;
     storage: ComponentStatus;
     vector_search: ComponentStatus;
@@ -71,41 +71,48 @@ interface UserActivitySummary {
   storage_usage_mb: number;
 }
 
-async function checkLLamaVisionHealth(): Promise<ComponentStatus> {
+async function checkMIVAAGatewayHealth(): Promise<ComponentStatus> {
   const startTime = Date.now();
-  const apiKey = Deno.env.get('TOGETHER_AI_API_KEY');
+  const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+  const mivaaApiKey = Deno.env.get('MIVAA_API_KEY');
   
-  if (!apiKey) {
+  if (!mivaaApiKey) {
     return {
       status: 'down',
       last_check: new Date().toISOString(),
-      error_message: 'API key not configured'
+      error_message: 'MIVAA API key not configured'
     };
   }
 
   try {
-    // Simple health check with minimal token usage
-    const response = await fetch('https://api.together.xyz/v1/models', {
+    // Health check via MIVAA gateway health endpoint
+    const response = await fetch(`${mivaaGatewayUrl}/api/health`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${mivaaApiKey}`,
+        'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
       },
     });
 
     const responseTime = Date.now() - startTime;
 
     if (response.ok) {
+      const healthData = await response.json().catch(() => ({}));
       return {
         status: 'healthy',
         last_check: new Date().toISOString(),
-        response_time_ms: responseTime
+        response_time_ms: responseTime,
+        metrics: {
+          gateway_status: healthData.status || 'unknown',
+          ai_backend_healthy: healthData.ai_backend_status === 'healthy' ? 1 : 0
+        }
       };
     } else {
       return {
         status: 'degraded',
         last_check: new Date().toISOString(),
         response_time_ms: responseTime,
-        error_message: `HTTP ${response.status}`
+        error_message: `MIVAA Gateway HTTP ${response.status}`
       };
     }
   } catch (error) {
@@ -113,7 +120,7 @@ async function checkLLamaVisionHealth(): Promise<ComponentStatus> {
       status: 'down',
       last_check: new Date().toISOString(),
       response_time_ms: Date.now() - startTime,
-      error_message: error instanceof Error ? error.message : 'Unknown error'
+      error_message: error instanceof Error ? error.message : 'MIVAA Gateway connection failed'
     };
   }
 }
@@ -188,8 +195,8 @@ async function checkStorageHealth(): Promise<ComponentStatus> {
 }
 
 async function getSystemStatus(): Promise<SystemStatus> {
-  const [llamaHealth, dbHealth, storageHealth] = await Promise.all([
-    checkLLamaVisionHealth(),
+  const [mivaaHealth, dbHealth, storageHealth] = await Promise.all([
+    checkMIVAAGatewayHealth(),
     checkDatabaseHealth(),
     checkStorageHealth()
   ]);
@@ -202,9 +209,9 @@ async function getSystemStatus(): Promise<SystemStatus> {
   };
 
   // Calculate overall system status
-  const componentStatuses = [llamaHealth.status, dbHealth.status, storageHealth.status, vectorHealth.status];
-  const overallStatus = componentStatuses.includes('down') ? 'down' 
-    : componentStatuses.includes('degraded') ? 'degraded' 
+  const componentStatuses = [mivaaHealth.status, dbHealth.status, storageHealth.status, vectorHealth.status];
+  const overallStatus = componentStatuses.includes('down') ? 'down'
+    : componentStatuses.includes('degraded') ? 'degraded'
     : 'healthy';
 
   // Get performance metrics
@@ -235,7 +242,7 @@ async function getSystemStatus(): Promise<SystemStatus> {
     version: '1.0.0',
     uptime_ms: Date.now() - new Date('2025-09-06T00:00:00Z').getTime(), // Placeholder
     components: {
-      llama_vision: llamaHealth,
+      mivaa_gateway: mivaaHealth,
       database: dbHealth,
       storage: storageHealth,
       vector_search: vectorHealth

@@ -404,42 +404,33 @@ interface MaterialMatch {
   description?: string;
 }
 
-// CrewAI Agent: Parse user request with hybrid AI approach
+// CrewAI Agent: Parse user request with MIVAA-first approach
 async function parseUserRequestHybrid(prompt: string) {
-  // Try OpenAI first
+  // Try MIVAA first
   try {
-    const openaiResult = await parseWithOpenAI(prompt);
-    const validation = validateParseResult(openaiResult);
+    const mivaaResult = await parseWithMIVAA(prompt);
+    const validation = validateParseResult(mivaaResult);
 
     if (validation.score >= 0.7) {
-      console.log(`OpenAI parsing successful with score: ${validation.score}`);
-      return openaiResult;
+      console.log(`MIVAA parsing successful with score: ${validation.score}`);
+      return mivaaResult;
     }
 
-    console.log(`OpenAI parsing score ${validation.score} below threshold, trying Claude...`);
+    console.log(`MIVAA parsing score ${validation.score} below threshold, trying Claude...`);
   } catch (error) {
-    console.log(`OpenAI parsing failed: ${error.message}, trying Claude...`);
+    console.log(`MIVAA parsing failed: ${error.message}, trying Claude...`);
   }
 
-  // Try Claude as fallback
-  try {
-    const claudeResult = await parseWithClaude(prompt);
-    const validation = validateParseResult(claudeResult);
-
-    console.log(`Claude parsing completed with score: ${validation.score}`);
-    return claudeResult;
-  } catch (error) {
-    console.error(`Claude parsing also failed: ${error.message}`);
-    // Return basic fallback
-    return {
-      room_type: 'living room',
-      style: 'modern',
-      materials: [],
-      features: [],
-      layout: '',
-      enhanced_prompt: prompt,
-    };
-  }
+  // Return basic fallback - direct AI integration removed as part of centralized AI architecture
+  console.error('MIVAA parsing failed - returning basic fallback. Please check MIVAA service availability.');
+  return {
+    room_type: 'living room',
+    style: 'modern',
+    materials: [],
+    features: [],
+    layout: '',
+    enhanced_prompt: prompt,
+  };
 }
 
 function validateParseResult(result: any): { score: number } {
@@ -454,49 +445,63 @@ function validateParseResult(result: any): { score: number } {
   return { score: Math.max(0, Math.min(1, score)) };
 }
 
-async function parseWithOpenAI(prompt: string) {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
+async function parseWithMIVAA(prompt: string) {
+  const mivaaApiKey = Deno.env.get('MIVAA_API_KEY');
+  const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+  
+  if (!mivaaApiKey) {
+    throw new Error('MIVAA API key not configured');
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(`${mivaaGatewayUrl}/api/mivaa/gateway`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${openaiKey}`,
+      'Authorization': `Bearer ${mivaaApiKey}`,
       'Content-Type': 'application/json',
+      'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a CrewAI Agent specialized in parsing interior design requests. Extract:
-          1. Room type (living room, kitchen, bedroom, etc.)
-          2. Style (modern, Swedish, industrial, etc.)
-          3. Specific materials mentioned (oak, marble, steel, etc.)
-          4. Key furniture or features
-          5. Layout specifications (L-shape, open concept, etc.)
-          
-          Respond in JSON format with: room_type, style, materials, features, layout, enhanced_prompt`,
+      action: 'chat_completion',
+      payload: {
+        messages: [
+          {
+            role: 'system',
+            content: `You are a CrewAI Agent specialized in parsing interior design requests. Extract:
+            1. Room type (living room, kitchen, bedroom, etc.)
+            2. Style (modern, Swedish, industrial, etc.)
+            3. Specific materials mentioned (oak, marble, steel, etc.)
+            4. Key furniture or features
+            5. Layout specifications (L-shape, open concept, etc.)
+            
+            Respond in JSON format with: room_type, style, materials, features, layout, enhanced_prompt`,
+          },
+          {
+            role: 'user',
+            content: `Parse this interior design request: "${prompt}"`,
+          },
+        ],
+        options: {
+          max_tokens: 500,
+          temperature: 0.2,
         },
-        {
-          role: 'user',
-          content: `Parse this interior design request: "${prompt}"`,
-        },
-      ],
-      max_tokens: 500,
-      temperature: 0.2,
+      },
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
   }
 
-  const data = await response.json();
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(`MIVAA chat completion error: ${result.error?.message || 'Unknown error'}`);
+  }
+
   try {
-    return JSON.parse(data.choices[0].message.content);
+    // Parse the chat completion response
+    const content = result.data.content || result.data.response || result.data;
+    return JSON.parse(typeof content === 'string' ? content : JSON.stringify(content));
   } catch {
     return {
       room_type: 'living room',
@@ -509,54 +514,6 @@ async function parseWithOpenAI(prompt: string) {
   }
 }
 
-async function parseWithClaude(prompt: string) {
-  const claudeKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!claudeKey) {
-    throw new Error('Claude API key not configured');
-  }
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${claudeKey}`,
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      messages: [
-        {
-          role: 'user',
-          content: `Parse this interior design request and extract room type, style, materials, features, and layout. Create an enhanced prompt for image generation.
-
-Request: "${prompt}"
-
-Respond in JSON format with: room_type, style, materials, features, layout, enhanced_prompt`,
-        },
-      ],
-      max_tokens: 500,
-      system: 'You are an interior design expert. Parse requests accurately and enhance prompts for better image generation.',
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Claude API error: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  try {
-    return JSON.parse(data.content[0].text);
-  } catch {
-    return {
-      room_type: 'living room',
-      style: 'modern',
-      materials: [],
-      features: [],
-      layout: '',
-      enhanced_prompt: prompt,
-    };
-  }
-}
 
 // Enhanced error handling and logging for 3D generation
 function logModelAttempt(modelName: string, status: 'start' | 'success' | 'error', details?: any) {

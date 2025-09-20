@@ -108,7 +108,7 @@ const KnowledgeBaseManagement: React.FC = () => {
   }, [toast]);
 
   const filterEntries = useCallback(() => {
-    let filtered = entries;
+    let filtered = [...entries];
 
     // Standard text search
     if (searchTerm) {
@@ -133,7 +133,7 @@ const KnowledgeBaseManagement: React.FC = () => {
     if (functionalPropertyFilters.searchQuery) {
       const query = functionalPropertyFilters.searchQuery.toLowerCase();
       filtered = filtered.filter(entry => {
-        const functionalMetadata = (entry.metadata as any)?.functional_metadata;
+        const functionalMetadata = (entry.metadata as Record<string, unknown>)?.functional_metadata;
         if (!functionalMetadata) return false;
         
         // Search in functional metadata content
@@ -143,18 +143,18 @@ const KnowledgeBaseManagement: React.FC = () => {
     }
 
     // Filter by active functional categories
-    if (functionalPropertyFilters.activeCategories.length > 0) {
-      filtered = filtered.filter(entry => {
-        const functionalMetadata = (entry.metadata as any)?.functional_metadata;
-        if (!functionalMetadata) return false;
-        
-        // Check if entry has data in any of the selected categories
-        return functionalPropertyFilters.activeCategories.some(category => {
-          const categoryData = functionalMetadata[category];
-          return categoryData && Object.keys(categoryData).length > 0;
-        });
+  if (functionalPropertyFilters.activeCategories.length > 0) {
+    filtered = filtered.filter(entry => {
+      const functionalMetadata = (entry.metadata as Record<string, unknown>)?.functional_metadata;
+      if (!functionalMetadata) return false;
+      
+      // Check if entry has data in any of the selected categories
+      return functionalPropertyFilters.activeCategories.some(category => {
+        const categoryData = (functionalMetadata as Record<string, any>)[category];
+        return categoryData && Object.keys(categoryData).length > 0;
       });
-    }
+    });
+  }
 
     setFilteredEntries(filtered);
   }, [entries, searchTerm, statusFilter, contentTypeFilter, functionalPropertyFilters]);
@@ -408,7 +408,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 onFiltersChange={setFunctionalPropertyFilters}
                 availableMaterials={entries.map(entry => ({
                   id: entry.id,
-                  functionalMetadata: (entry.metadata as any)?.functional_metadata
+                  functionalMetadata: (entry.metadata as Record<string, unknown>)?.functional_metadata
                 }))}
                 displayMode="compact"
                 isLoading={loading}
@@ -459,7 +459,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {(entry.metadata as any)?.functional_metadata ? (
+                          {(entry.metadata as Record<string, unknown>)?.functional_metadata ? (
                             <Badge className="bg-amber-100 text-amber-800 border-amber-200">
                               <Zap className="h-3 w-3 mr-1" />
                               Available

@@ -207,7 +207,13 @@ export class ContainerFactory {
         container.register({
             identifier: 'IBatchProcessingService',
             factory: () => {
-                throw new Error('BatchProcessingService implementation not yet available');
+                // Dynamic import would require async factory, using require for now
+                // TODO: Consider refactoring to async factory pattern if needed
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const { BatchProcessingService } = require('../services/batch/batchProcessingService');
+                const config = container.resolve('BatchProcessingConfig');
+                const logger = container.resolve('Logger');
+                return new BatchProcessingService(config, logger);
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['BatchProcessingConfig', 'Logger'],
@@ -512,7 +518,7 @@ export class ContainerFactory {
     /**
      * Configure services for production environment
      */
-    private configureProductionServices(): void {
+    private configureProductionServices(container: IServiceContainer): void {
         // Production-specific optimizations
         // Could include connection pooling, caching, etc.
     }
@@ -520,7 +526,7 @@ export class ContainerFactory {
     /**
      * Configure services for test environment
      */
-    private configureTestServices(): void {
+    private configureTestServices(container: IServiceContainer): void {
         // Test-specific configurations
         // Mock services, in-memory databases, etc.
     }

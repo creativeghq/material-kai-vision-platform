@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/collapsible';
 
 import { type FunctionalMetadata } from '@/types/materials';
+import { type LucideIcon } from 'lucide-react';
 
 interface EnhancedFunctionalMetadataCardProps {
   /** Functional metadata object containing all 9 categories */
@@ -121,7 +122,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
   onPropertyClick,
   rawFunctionalData,
   extractionSummary,
-}) => {
+}: EnhancedFunctionalMetadataCardProps) => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const toggleCategory = (categoryKey: string) => {
@@ -134,7 +135,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
     setExpandedCategories(newExpanded);
   };
 
-  const getConfidenceColor = (confidence: string): string => {
+  const getConfidenceColor = (confidence: 'low' | 'medium' | 'high' | string): string => {
     switch (confidence) {
       case 'high': return 'text-green-600 bg-green-100';
       case 'medium': return 'text-yellow-600 bg-yellow-100';
@@ -196,9 +197,16 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
     );
   };
 
-  const renderCategoryContent = (categoryKey: string, categoryData: any) => {
+  const renderCategoryContent = (categoryKey: string, categoryData: unknown) => {
     const config = CATEGORY_CONFIG[categoryKey as keyof typeof CATEGORY_CONFIG];
     if (!config || !categoryData) return null;
+
+    // Type guard to check if categoryData is a record
+    const isRecord = (obj: unknown): obj is Record<string, unknown> => {
+      return obj !== null && typeof obj === 'object' && !Array.isArray(obj);
+    };
+
+    if (!isRecord(categoryData)) return null;
 
     const Icon = config.icon;
     const hasData = Object.keys(categoryData).length > 0;

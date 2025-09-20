@@ -569,7 +569,7 @@ export class ConsolidatedPDFController {
         };
         
         let jobId: string | undefined;
-        let job: any;
+        let job: ProcessingJob;
         
         try {
           // Create job tracking early for functional metadata processing

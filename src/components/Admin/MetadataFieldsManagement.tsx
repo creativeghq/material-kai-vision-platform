@@ -20,7 +20,7 @@ import type {
   MaterialMetafieldDefinition
 } from '@/types/unified-material-api';
 import type { MaterialCategory } from '@/types/materials';
-import { getMaterialCategories } from '@/types/materials';
+import { getMaterialCategories } from '@/services/dynamicMaterialCategoriesService';
 
 /**
  * Available field data types for metafield definitions
@@ -73,8 +73,16 @@ export const MetadataFieldsManagement: React.FC = () => {
   const { toast } = useToast();
 
   // Get available material categories dynamically
-  const availableCategories = getMaterialCategories();
-  const materialCategories = availableCategories;
+  const [materialCategories, setMaterialCategories] = useState<MaterialCategory[]>([]);
+  
+  useEffect(() => {
+    const loadCategories = async () => {
+      const categories = await getMaterialCategories();
+      setMaterialCategories(categories as unknown as MaterialCategory[]);
+    };
+    
+    loadCategories();
+  }, []);
 
   const loadMetadataFields = useCallback(async () => {
     setIsLoading(true);
@@ -90,29 +98,30 @@ export const MetadataFieldsManagement: React.FC = () => {
       }
 
       // Transform database data to match MaterialMetafieldDefinition interface
-      const transformedFields: MaterialMetafieldDefinition[] = (data || []).map((field: any) => ({
-        id: field.id,
-        fieldName: field.field_name,
+      const transformedFields: MaterialMetafieldDefinition[] = (data || []).map((field: Record<string, unknown>) => ({
+        id: field.id as string,
+        name: field.field_name as string,
         displayName: field.display_name || field.field_name,
         dataType: field.field_type as MaterialMetafieldDefinition['dataType'],
-        isRequired: field.is_required || false,
-        description: field.description || '',
-        validationRules: field.validation_rules || {},
+        required: Boolean(field.is_required),
+        description: field.description as string || '',
+        validation: field.validation_rules || {},
         defaultValue: field.default_value,
-        category: field.category || 'all',
+        applicableCategories: Array.isArray(field.applies_to_categories) ? field.applies_to_categories as MaterialCategory[] : [],
         display: {
-          order: field.display_order || 0,
+          order: Number(field.display_order) || 0,
           section: field.display_section || 'general',
-          helpText: field.help_text || field.description || '',
+          helpText: String(field.help_text || (field.description as string) || ''),
         },
         constraints: field.constraints || {},
         metadata: {
           extractionHints: field.extraction_hints || '',
           isGlobal: field.is_global || false,
-          appliesTo: field.applies_to_categories || [],
+          appliesTo: Array.isArray(field.applies_to_categories) ? field.applies_to_categories as MaterialCategory[] : [],
         },
-        createdAt: field.created_at,
-        updatedAt: field.updated_at,
+        createdAt: field.created_at as string,
+        updatedAt: field.updated_at as string,
+        createdBy: field.created_by as string || '',
       }));
 
       setFields(transformedFields);
@@ -182,7 +191,7 @@ export const MetadataFieldsManagement: React.FC = () => {
 
       if (editingField) {
         const { error } = await supabase
-          .from('materials_catalog')
+          .from('agent_tasks')
           .update(fieldData as Record<string, unknown>)
           .eq('id', editingField.id);
 
@@ -193,8 +202,15 @@ export const MetadataFieldsManagement: React.FC = () => {
         });
       } else {
         const { error } = await supabase
-          .from('materials_catalog')
-          .insert([fieldData as { category: string; name: string; [key: string]: unknown }]); // TODO: Replace with proper MaterialsCatalog type when schema is defined
+          .from('agent_tasks')
+          .insert([{
+            task_name: fieldData.field_name as string,
+            task_type: 'metadata_field',
+            description: fieldData.description as string || '',
+            input_data: fieldData as Json,
+            status: 'pending',
+            priority: 'medium'
+          }]);
 
         if (error) throw error;
         toast({
@@ -223,7 +239,7 @@ export const MetadataFieldsManagement: React.FC = () => {
 
     try {
       const { error } = await supabase
-        .from('materials_catalog')
+        .from('agent_tasks')
         .delete()
         .eq('id', field.id);
 

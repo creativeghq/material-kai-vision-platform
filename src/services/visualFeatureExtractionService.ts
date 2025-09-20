@@ -1,4 +1,4 @@
-ki/**
+/**
  * Visual Feature Extraction Service
  * 
  * Orchestrates the complete visual feature extraction pipeline, coordinating
@@ -6,17 +6,17 @@ ki/**
  * database storage for the visual search system.
  */
 
-import { 
-  LLaMAVisionService, 
-  MaterialVisionAnalysisRequest,
-  MaterialVisionAnalysisResult 
-} from './llamaVisionService';
-import { 
-  ImagePreprocessingService, 
+import {
+  ImagePreprocessingService,
   ImageValidationResult,
   ProcessedImageResult,
-  ImageMetadata 
+  ImageMetadata
 } from './imagePreprocessing';
+import {
+  MivaaGatewayController,
+  GatewayRequest,
+  GatewayResponse
+} from '../api/mivaa-gateway';
 import { supabase } from '../integrations/supabase/client';
 import { Database } from '../integrations/supabase/types';
 import {
@@ -27,11 +27,50 @@ import {
 } from '../core/errors';
 import { createErrorContext } from '../core/errors/utils';
 
+// MIVAA Vision Analysis Result Interface (replacing the deleted LLaMA service types)
+export interface MaterialVisionAnalysisResult {
+  success: boolean;
+  analysis_id: string;
+  model_used: string;
+  processing_time_ms: number;
+  cost_info?: {
+    cost: number;
+    tokens_used?: number;
+  };
+  materials_detected: Array<{
+    material_type: string;
+    confidence: number;
+    properties: {
+      texture?: string;
+      color?: string;
+      finish?: string;
+      pattern?: string;
+      [key: string]: any;
+    };
+  }>;
+  overall_analysis: {
+    description: string;
+    style_assessment?: string;
+    technical_properties?: any;
+    [key: string]: any;
+  };
+  error_message?: string;
+}
+
+export interface MaterialVisionAnalysisRequest {
+  user_id: string;
+  image_url?: string;
+  image_data?: string;
+  analysis_type: string;
+  context?: any;
+  options?: any;
+}
+
 // Type definitions for the visual feature extraction pipeline
 export interface VisualFeatureExtractionRequest {
   user_id: string;
   material_id?: string; // Optional - can be created if not provided
-  image_data: Buffer | string; // Raw image data or base64
+  image_data?: Uint8Array | string; // Raw image data or base64
   image_url?: string; // Alternative to image_data
   analysis_options?: {
     include_embeddings?: boolean;
@@ -64,7 +103,7 @@ export interface VisualFeatureExtractionResult {
     description_embedding?: number[];
     material_type_embedding?: number[];
     clip_embedding?: number[];
-  };
+  } | undefined;
   processing_metadata: {
     processing_time_ms: number;
     image_hash: string;
@@ -84,7 +123,7 @@ export interface BatchVisualFeatureExtractionRequest {
   images: Array<{
     id: string; // User-provided identifier
     material_id?: string;
-    image_data: Buffer | string;
+    image_data?: Uint8Array | string;
     image_url?: string;
     analysis_options?: VisualFeatureExtractionRequest['analysis_options'];
     context?: VisualFeatureExtractionRequest['context'];
@@ -133,8 +172,273 @@ export interface QueueProcessingStatus {
  * LLaMA vision analysis, embedding generation, and database storage.
  */
 export class VisualFeatureExtractionService {
-  private static llamaService = new LLaMAVisionService();
+  private static mivaaGateway = new MivaaGatewayController();
   private static imagePreprocessing = new ImagePreprocessingService();
+
+  /**
+   * Call MIVAA analysis service directly
+   */
+  private static async callMivaaAnalysis(request: GatewayRequest): Promise<GatewayResponse> {
+    try {
+      // Use hardcoded config for now - in production this would come from config service
+      const mivaaServiceUrl = 'http://localhost:8000';
+      const apiKey = 'development-key';
+      const timeout = 30000;
+      
+      // Map action to MIVAA endpoint
+      const endpointMap: Record<string, { path: string; method: string }> = {
+        'llama_vision_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+        'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+      };
+      
+      const endpoint = endpointMap[request.action];
+      if (!endpoint) {
+        throw new Error(`Unknown MIVAA action: ${request.action}`);
+      }
+      
+      const mivaaUrl = `${mivaaServiceUrl}${endpoint.path}`;
+      const requestOptions: RequestInit = {
+        method: endpoint.method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'User-Agent': 'Visual-Feature-Extraction/1.0.0',
+        },
+        signal: AbortSignal.timeout(timeout),
+        body: JSON.stringify(request.payload)
+      };
+      
+      const response = await fetch(mivaaUrl, requestOptions);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`MIVAA service error (${response.status}): ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      return {
+        success: true,
+        data,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          processingTime: Date.now() - Date.now(),
+          version: '1.0.0',
+          mivaaEndpoint: mivaaUrl,
+        },
+      };
+    } catch (error) {
+      errorLogger.logError(error as Error, {
+        service: 'VisualFeatureExtractionService',
+        operation: 'callMivaaAnalysis',
+        request_action: request.action
+      });
+      
+      return {
+        success: false,
+        error: {
+          code: 'MIVAA_CALL_FAILED',
+          message: error instanceof Error ? error.message : 'Unknown MIVAA call error',
+          details: String(error)
+        },
+        metadata: {
+          timestamp: new Date().toISOString(),
+          processingTime: 0,
+          version: '1.0.0'
+        }
+      };
+    }
+  }
+
+  /**
+   * Adapt MIVAA gateway response to MaterialVisionAnalysisResult format
+   */
+  private static adaptMivaaResponse(mivaaResponse: GatewayResponse): MaterialVisionAnalysisResult {
+    if (!mivaaResponse.success || !mivaaResponse.data) {
+      return {
+        success: false,
+        analysis_id: `failed_${Date.now()}`,
+        model_used: 'llama-3.2-vision',
+        processing_time_ms: mivaaResponse.metadata.processingTime,
+        materials_detected: [],
+        overall_analysis: {
+          description: 'Analysis failed',
+        },
+        error_message: mivaaResponse.error?.message || 'MIVAA analysis failed'
+      };
+    }
+
+    const data = mivaaResponse.data as any;
+    
+    return {
+      success: true,
+      analysis_id: data.analysis_id || `analysis_${Date.now()}`,
+      model_used: data.model_used || 'llama-3.2-vision',
+      processing_time_ms: mivaaResponse.metadata.processingTime,
+      cost_info: {
+        cost: data.cost_info?.cost || 0,
+        tokens_used: data.cost_info?.tokens_used
+      },
+      materials_detected: data.materials_detected || [{
+        material_type: data.material_type || 'unknown',
+        confidence: data.confidence || 0,
+        properties: {
+          texture: data.texture,
+          color: data.color,
+          finish: data.finish,
+          pattern: data.pattern,
+          ...data.properties
+        }
+      }],
+      overall_analysis: {
+        description: data.description || data.overall_analysis?.description || '',
+        style_assessment: data.style_assessment || data.overall_analysis?.style_assessment,
+        technical_properties: data.technical_properties || data.overall_analysis?.technical_properties,
+        ...data.overall_analysis
+      }
+    };
+  }
+
+  /**
+   * Perform parallel MIVAA analysis using both LLaMA vision and CLIP embeddings
+   */
+  private static async performParallelMivaaAnalysis(params: {
+    user_id: string;
+    image_url: string;
+    image_data: string;
+    analysis_type: string;
+    context: any;
+    include_embeddings: boolean;
+    include_clip_analysis: boolean;
+  }): Promise<[MaterialVisionAnalysisResult, any]> {
+    try {
+      // Prepare both MIVAA requests
+      const llamaRequest: GatewayRequest = {
+        action: 'llama_vision_analysis',
+        payload: {
+          user_id: params.user_id,
+          image_url: params.image_url,
+          image_data: params.image_data,
+          analysis_type: params.analysis_type,
+          context: params.context,
+          options: {
+            include_confidence_scores: true,
+            include_detailed_properties: params.include_embeddings
+          }
+        }
+      };
+
+      const clipRequest: GatewayRequest = {
+        action: 'clip_embedding_generation',
+        payload: {
+          user_id: params.user_id,
+          image_url: params.image_url,
+          image_data: params.image_data,
+          embedding_type: 'visual_similarity',
+          options: {
+            normalize: true,
+            dimensions: 512
+          }
+        }
+      };
+
+      // Execute both requests in parallel using Promise.all
+      const [llamaResponse, clipResponse] = await Promise.all([
+        this.callMivaaAnalysis(llamaRequest),
+        params.include_clip_analysis ? this.callMivaaAnalysis(clipRequest) : Promise.resolve(null)
+      ]);
+
+      // Adapt LLaMA response
+      const llamaResult = this.adaptMivaaResponse(llamaResponse);
+
+      // Extract CLIP embeddings if available
+      const clipEmbeddings = clipResponse?.success ?
+        this.extractClipEmbeddings(clipResponse) : null;
+
+      return [llamaResult, clipEmbeddings];
+
+    } catch (error) {
+      errorLogger.logError(error as Error, {
+        service: 'VisualFeatureExtractionService',
+        operation: 'performParallelMivaaAnalysis'
+      });
+
+      // Return failed LLaMA result and null embeddings
+      const failedResult: MaterialVisionAnalysisResult = {
+        success: false,
+        analysis_id: `failed_${Date.now()}`,
+        model_used: 'llama-3.2-vision',
+        processing_time_ms: 0,
+        materials_detected: [],
+        overall_analysis: {
+          description: 'Parallel analysis failed',
+        },
+        error_message: error instanceof Error ? error.message : 'Parallel analysis failed'
+      };
+
+      return [failedResult, null];
+    }
+  }
+
+  /**
+   * Extract CLIP embeddings from MIVAA gateway response
+   */
+  private static extractClipEmbeddings(clipResponse: GatewayResponse): any {
+    if (!clipResponse.success || !clipResponse.data) {
+      return null;
+    }
+
+    const data = clipResponse.data as any;
+    return {
+      clip_embedding: data.embedding || data.visual_embedding || data.embeddings,
+      embedding_type: 'clip_512d',
+      model_used: data.model_used || 'clip-vit-base-patch32',
+      processing_time_ms: clipResponse.metadata.processingTime || 0,
+      confidence_score: data.confidence || 1.0
+    };
+  }
+
+  /**
+   * Combine embeddings from LLaMA and CLIP sources
+   */
+  private static combineEmbeddingResults(
+    llamaResult: MaterialVisionAnalysisResult,
+    clipEmbeddings: any
+  ): any {
+    const combined: any = {};
+
+    // Add description embeddings from LLaMA (if any)
+    if (llamaResult.overall_analysis?.description) {
+      // Generate description embedding from LLaMA text output
+      combined.description_embedding = this.generateTextEmbedding(
+        llamaResult.overall_analysis.description
+      );
+    }
+
+    // Add material type embedding
+    if (llamaResult.materials_detected?.[0]?.material_type) {
+      combined.material_type_embedding = this.generateTextEmbedding(
+        llamaResult.materials_detected[0].material_type
+      );
+    }
+
+    // Add CLIP visual embeddings
+    if (clipEmbeddings?.clip_embedding) {
+      combined.clip_embedding = clipEmbeddings.clip_embedding;
+    }
+
+    return Object.keys(combined).length > 0 ? combined : undefined;
+  }
+
+  /**
+   * Generate text embedding (placeholder - would call text embedding service)
+   */
+  private static generateTextEmbedding(text: string): number[] | null {
+    // TODO: Implement actual text embedding generation via MIVAA
+    // For now, return null to indicate no text embeddings
+    // This would be replaced with a call to a text embedding MIVAA action
+    return null;
+  }
 
   /**
    * Extract visual features from a single image
@@ -167,25 +471,17 @@ export class VisualFeatureExtractionService {
         return this.formatExistingAnalysisResult(existingAnalysis, extractionId, startTime);
       }
 
-      // 3. Perform LLaMA vision analysis
-      const llamaRequest: MaterialVisionAnalysisRequest = {
+      // 3. Perform parallel MIVAA analysis (LLaMA vision + CLIP embeddings)
+      const [llamaResult, clipEmbeddings] = await VisualFeatureExtractionService.performParallelMivaaAnalysis({
         user_id: request.user_id,
         image_url: request.image_url || '',
         image_data: preprocessedImage.processedImageData ?
           preprocessedImage.processedImageData.toString('base64') : '',
         analysis_type: request.analysis_options?.analysis_type || 'comprehensive',
-        context: request.context ? {
-          room_type: request.context.room_type || undefined,
-          application_area: request.context.application_area || undefined,
-          expected_materials: request.context.expected_category ? [request.context.expected_category] : undefined
-        } : undefined,
-        options: {
-          include_confidence_scores: true,
-          include_detailed_properties: request.analysis_options?.include_embeddings || false
-        }
-      };
-
-      const llamaResult = await LLaMAVisionService.analyzeMaterialImage(llamaRequest);
+        context: request.context || {},
+        include_embeddings: request.analysis_options?.include_embeddings || false,
+        include_clip_analysis: request.analysis_options?.include_clip_analysis !== false
+      });
       
       if (!llamaResult.success) {
         return this.createErrorResult(
@@ -196,18 +492,17 @@ export class VisualFeatureExtractionService {
         );
       }
 
-      // 4. Generate embeddings if requested
-      const embeddings = request.analysis_options?.include_embeddings ? 
-        await this.generateEmbeddings(llamaResult) : undefined;
+      // 4. Combine embeddings from parallel sources
+      const embeddings = VisualFeatureExtractionService.combineEmbeddingResults(llamaResult, clipEmbeddings);
 
       // 5. Store visual analysis in database
       const analysisId = await this.storeVisualAnalysis({
         material_id: request.material_id || llamaResult.analysis_id,
         llama_result: llamaResult,
         image_hash: preprocessedImage.hash,
-        image_url: request.image_url,
+        image_url: request.image_url || undefined,
         image_dimensions: preprocessedImage.processedMetadata || preprocessedImage.originalMetadata,
-        embeddings: embeddings || undefined,
+        embeddings: embeddings,
         user_id: request.user_id
       });
 
@@ -229,7 +524,7 @@ export class VisualFeatureExtractionService {
           confidence_score: llamaResult.materials_detected?.[0]?.confidence || 0,
           structured_properties: this.extractStructuredProperties(llamaResult),
         },
-        embeddings: embeddings,
+        embeddings: embeddings || undefined,
         processing_metadata: {
           processing_time_ms: Date.now() - startTime,
           image_hash: preprocessedImage.hash,
@@ -338,7 +633,7 @@ export class VisualFeatureExtractionService {
 
       const statusMap: Record<string, QueueProcessingStatus> = {};
       
-      data?.forEach(item => {
+      data?.forEach((item: any) => {
         statusMap[item.id] = {
           queue_id: item.id,
           status: (item.status as any) || 'pending',
@@ -365,10 +660,10 @@ export class VisualFeatureExtractionService {
     request: VisualFeatureExtractionRequest
   ): Promise<ProcessedImageResult> {
     if (request.image_data) {
-      // Convert string/Buffer to Buffer for processing
-      const buffer = typeof request.image_data === 'string' 
+      // Convert string/Uint8Array to Buffer for processing
+      const buffer = typeof request.image_data === 'string'
         ? Buffer.from(request.image_data, 'base64')
-        : request.image_data;
+        : Buffer.from(request.image_data);
       
       return ImagePreprocessingService.processImage(buffer, {
         targetWidth: 1024,

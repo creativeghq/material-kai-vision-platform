@@ -78,9 +78,9 @@ export interface SpaceFormerRequest {
   user_id: string;
   nerf_reconstruction_id?: string;
   room_type: string;
-  room_dimensions?: any;
-  user_preferences?: any;
-  constraints?: any;
+  room_dimensions?: Record<string, unknown>;
+  user_preferences?: UserPreferences;
+  constraints?: Record<string, unknown>;
 }
 
 export interface SpatialFeature {
@@ -372,7 +372,7 @@ export class SpaceFormerAPI {
     roomType: string,
     nerfReconstructionId?: string,
     svbrdfExtractionIds?: string[],
-    userPreferences?: any,
+    userPreferences?: UserPreferences,
   ): Promise<SpaceFormerResult> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
