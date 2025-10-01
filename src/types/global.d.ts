@@ -11,23 +11,7 @@ declare module '@tanstack/react-query' {
   export * from 'react-query';
 }
 
-declare module 'next/image' {
-  import { ComponentType } from 'react';
-  interface ImageProps {
-    src: string;
-    alt: string;
-    width?: number;
-    height?: number;
-    fill?: boolean;
-    priority?: boolean;
-    className?: string;
-    style?: React.CSSProperties;
-    onError?: (event: any) => void;
-    onLoad?: (event: any) => void;
-  }
-  const Image: ComponentType<ImageProps>;
-  export default Image;
-}
+
 
 declare module '@supabase/supabase-js' {
   export const createClient: any;

@@ -26,11 +26,7 @@ export default defineConfig(({ mode }) => ({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  define: {
-    // Expose NEXT_PUBLIC_ prefixed environment variables to the client
-    'process.env.NEXT_PUBLIC_SUPABASE_URL': JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-  },
+
   build: {
     rollupOptions: {
       external: ['fs', 'path', 'crypto', 'stream', 'buffer', 'util'],
@@ -53,5 +49,14 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     exclude: ['@huggingface/transformers'],
+  },
+  define: {
+    // Expose NEXT_PUBLIC_ prefixed environment variables to the client
+    'process.env.NEXT_PUBLIC_SUPABASE_URL': JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    // Prevent Node.js modules from being imported in the browser
+    'global': 'globalThis',
+    // Define empty modules for Node.js modules
+    'require': 'undefined',
   },
 }));
