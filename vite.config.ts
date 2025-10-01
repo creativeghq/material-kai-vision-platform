@@ -17,7 +17,14 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'automatic',
+      jsxImportSource: 'react',
+      babel: {
+        plugins: [],
+        presets: []
+      }
+    }),
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
@@ -46,9 +53,15 @@ export default defineConfig(({ mode }) => ({
     assetsDir: 'assets',
     // Set chunk size warning limit
     chunkSizeWarningLimit: 1000,
+    // Ensure proper JSX runtime handling
+    target: 'es2020',
   },
   optimizeDeps: {
     exclude: ['@huggingface/transformers'],
+  },
+  esbuild: {
+    jsx: 'automatic',
+    jsxImportSource: 'react',
   },
   define: {
     // Expose NEXT_PUBLIC_ prefixed environment variables to the client
