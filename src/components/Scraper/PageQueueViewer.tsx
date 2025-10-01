@@ -71,53 +71,40 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
 
   const loadPages = async () => {
     try {
-      // Mock data for scraping pages since 'scraping_pages' table doesn't exist
-      const mockPages: ScrapingPage[] = [
-        {
-          id: '1',
-          url: 'https://example.com/page1',
-          status: 'completed',
-          started_at: new Date(Date.now() - 300000).toISOString(),
-          completed_at: new Date(Date.now() - 240000).toISOString(),
-          materials_found: 5,
-          error_message: null,
-          processing_time_ms: 60000,
-          retry_count: 0,
-          page_index: 1,
-          created_at: new Date(Date.now() - 360000).toISOString(),
-          updated_at: new Date(Date.now() - 240000).toISOString(),
-        },
-        {
-          id: '2',
-          url: 'https://example.com/page2',
-          status: 'processing',
-          started_at: new Date(Date.now() - 120000).toISOString(),
-          completed_at: null,
-          materials_found: 0,
-          error_message: null,
-          processing_time_ms: null,
-          retry_count: 0,
-          page_index: 2,
-          created_at: new Date(Date.now() - 180000).toISOString(),
-          updated_at: new Date(Date.now() - 120000).toISOString(),
-        },
-        {
-          id: '3',
-          url: 'https://example.com/page3',
-          status: 'pending',
-          started_at: null,
-          completed_at: null,
-          materials_found: 0,
-          error_message: null,
-          processing_time_ms: null,
-          retry_count: 0,
-          page_index: 3,
-          created_at: new Date(Date.now() - 60000).toISOString(),
-          updated_at: new Date(Date.now() - 60000).toISOString(),
-        },
-      ];
+      // Query real data from scraping_pages table
+      const { data: pagesData, error } = await supabase
+        .from('scraping_pages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('page_index', { ascending: true });
 
-      setPages(mockPages);
+      if (error) {
+        console.error('Error loading pages:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load pages from database',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Transform the data to match the expected interface
+      const transformedPages: ScrapingPage[] = (pagesData || []).map(page => ({
+        id: page.id,
+        url: page.url,
+        status: page.status,
+        started_at: page.started_at,
+        completed_at: page.completed_at,
+        materials_found: page.materials_found || 0,
+        error_message: page.error_message,
+        processing_time_ms: page.processing_time_ms,
+        retry_count: page.retry_count || 0,
+        page_index: page.page_index,
+        created_at: page.created_at,
+        updated_at: page.updated_at,
+      }));
+
+      setPages(transformedPages);
     } catch (error) {
       console.error('Error loading pages:', error);
       toast({
@@ -134,8 +121,21 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
     const apiService = ApiIntegrationService.getInstance();
 
     try {
-      // Mock: Reset page status to pending (replace with actual database call when available)
-      console.log('Mock: Resetting page status to pending for page:', pageId);
+      // Update database to reset page status to pending
+      const { error: updateError } = await supabase
+        .from('scraping_pages')
+        .update({
+          status: 'pending',
+          error_message: null,
+          started_at: null,
+          completed_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', pageId);
+
+      if (updateError) {
+        throw new Error(`Failed to update page status: ${updateError.message}`);
+      }
 
       // Update local state to reflect the retry
       setPages(prevPages =>

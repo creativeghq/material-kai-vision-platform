@@ -9,6 +9,8 @@ import { AuthGuard } from '@/components/Layout/AuthGuard';
 
 // Import configuration to ensure initialization
 import '@/config';
+import { monitoringService } from '@/services/monitoring/monitoringService';
+import { getMonitoringConfig } from '@/config/monitoring';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
@@ -36,22 +38,34 @@ import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestions
 import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
 import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
+import HealthPage from './pages/Health';
+import { CriticalErrorBoundary, PageErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 
 const queryClient = new QueryClient();
 
+// Initialize monitoring service
+monitoringService.initialize(getMonitoringConfig());
+
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+  <CriticalErrorBoundary name="Application Root">
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <Routes>
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth" element={
+              <PageErrorBoundary name="Auth Page">
+                <Auth />
+              </PageErrorBoundary>
+            } />
             <Route path="/" element={
-              <AuthGuard>
-                <Index />
-              </AuthGuard>
+              <PageErrorBoundary name="Home Page">
+                <AuthGuard>
+                  <Index />
+                </AuthGuard>
+              </PageErrorBoundary>
             } />
             <Route path="/recognition" element={
               <AuthGuard>
@@ -207,6 +221,8 @@ const App = () => (
                 </Layout>
               </AuthGuard>
             } />
+            <Route path="/health" element={<HealthPage />} />
+            <Route path="/ready" element={<HealthPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -214,6 +230,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </CriticalErrorBoundary>
 );
 
 export default App;

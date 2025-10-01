@@ -1,6 +1,6 @@
 import React from 'react';
 import { Home, ArrowLeft } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 
@@ -15,7 +15,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   description,
   breadcrumbs = [],
 }) => {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <div className="border-b bg-card px-6 py-4">
@@ -24,14 +24,14 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
           {/* Navigation Buttons */}
           <div className="flex items-center space-x-2">
             <Button
-              onClick={() => router.push('/')}
+              onClick={() => navigate('/')}
               className="flex items-center gap-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 text-sm"
             >
               <Home className="h-4 w-4" />
               Main App
             </Button>
             <Button
-              onClick={() => router.push('/admin')}
+              onClick={() => navigate('/admin')}
               className="flex items-center gap-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -48,7 +48,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
                   <React.Fragment key={index}>
                     {crumb.path ? (
                       <button
-                        onClick={() => router.push(crumb.path!)}
+                        onClick={() => navigate(crumb.path!)}
                         className="hover:text-foreground transition-colors"
                       >
                         {crumb.label}

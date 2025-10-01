@@ -16,6 +16,19 @@ export interface PDFUploadOptions {
   enableSemanticAnalysis?: boolean;
 }
 
+export interface MivaaProcessingResult {
+  jobId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  extractedText?: string;
+  embeddings?: number[][];
+  chunks?: Array<{
+    id: string;
+    content: string;
+    metadata: Record<string, string | number>;
+  }>;
+  error?: string;
+}
+
 export interface PDFProcessingResult {
   success: boolean;
   processingId: string;
@@ -34,7 +47,7 @@ export interface PDFProcessingResult {
   message: string;
   // Enhanced MIVAA-specific fields
   workflowJobId?: string;
-  mivaaProcessingResult?: unknown;
+  mivaaProcessingResult?: MivaaProcessingResult;
   embeddingsGenerated?: number;
   chunksCreated?: number;
 }
@@ -333,7 +346,13 @@ export class PDFContentService {
     successfulProcessing: number;
     averageConfidence: number;
     totalMaterials: number;
-    recentActivity: unknown[];
+    recentActivity: Array<{
+      id: string;
+      filename: string;
+      status: string;
+      timestamp: string;
+      materialsDetected: number;
+    }>;
   }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();

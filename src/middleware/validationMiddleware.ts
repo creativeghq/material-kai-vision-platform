@@ -31,7 +31,7 @@ export class ValidationError extends Error {
     path: string;
     message: string;
     code: string;
-    value?: unknown;
+    value?: string | number | boolean | null;
   }>;
   public readonly validationType: string;
   public readonly timestamp: string;
@@ -39,7 +39,7 @@ export class ValidationError extends Error {
 
   constructor(
     message: string,
-    errors: Array<{ path: string; message: string; code: string; value?: unknown }>,
+    errors: Array<{ path: string; message: string; code: string; value?: string | number | boolean | null }>,
     validationType: string,
     requestId?: string,
   ) {
@@ -216,10 +216,10 @@ function createValidationMiddleware<T>(
 /**
  * Utility function to get nested value from object
  */
-function getNestedValue(obj: Record<string, unknown>, path: (string | number)[]): unknown {
-  return path.reduce((current: unknown, key) => {
-    return current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined;
-  }, obj as unknown);
+function getNestedValue(obj: Record<string, any>, path: (string | number)[]): any {
+  return path.reduce((current: any, key) => {
+    return current && typeof current === 'object' ? current[key] : undefined;
+  }, obj);
 }
 
 /**
@@ -424,15 +424,30 @@ export const validationErrorHandler = (
 };
 
 /**
+ * Type definitions for validated data
+ */
+export interface ValidatedData {
+  [key: string]: string | number | boolean | null | ValidatedData | ValidatedData[];
+}
+
+export interface ValidatedQuery {
+  [key: string]: string | string[] | undefined;
+}
+
+export interface ValidatedParams {
+  [key: string]: string;
+}
+
+/**
  * Extend Express Request interface to include validated data
  */
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      validatedData?: unknown;
-      validatedQuery?: unknown;
-      validatedParams?: unknown;
+      validatedData?: ValidatedData;
+      validatedQuery?: ValidatedQuery;
+      validatedParams?: ValidatedParams;
     }
   }
 }

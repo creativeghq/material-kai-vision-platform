@@ -20,7 +20,8 @@ interface RealtimeEventData {
   performance?: AgentPerformanceMetrics;
   level?: 'info' | 'warning' | 'error' | 'critical';
   message?: string;
-  [key: string]: unknown;
+  metadata?: Record<string, string | number | boolean>;
+  additionalData?: Record<string, any>;
 }
 
 interface SystemAlert {
@@ -37,7 +38,8 @@ interface AgentPerformanceMetrics {
   taskCount: number;
   errorRate: number;
   lastUpdated: string;
-  [key: string]: unknown;
+  customMetrics?: Record<string, number>;
+  tags?: string[];
 }
 
 interface AgentStatus {
@@ -46,7 +48,8 @@ interface AgentStatus {
   currentTasks: string[];
   lastHeartbeat: string;
   performance: AgentPerformanceMetrics;
-  [key: string]: unknown;
+  capabilities?: string[];
+  configuration?: Record<string, any>;
 }
 
 interface _DatabaseAgent {
@@ -71,12 +74,15 @@ interface SystemAlert {
   agentId?: string;
   taskId?: string;
   timestamp: string;
-  [key: string]: unknown;
+  category?: string;
+  details?: Record<string, string | number>;
 }
+
+type EventListener = (event: RealtimeEvent) => void;
 
 export class RealtimeAgentMonitor {
   private performanceOptimizer: AgentPerformanceOptimizer;
-  private listeners: Map<string, ((...args: unknown[]) => void)[]> = new Map();
+  private listeners: Map<string, EventListener[]> = new Map();
   private agentStatuses: Map<string, AgentStatus> = new Map();
   private systemAlerts: SystemAlert[] = [];
   private monitoringInterval: NodeJS.Timeout | null = null;
@@ -115,7 +121,7 @@ export class RealtimeAgentMonitor {
   }
 
   // Type guard functions
-  private isTaskRecord(record: unknown): record is TaskRecord {
+  private isTaskRecord(record: any): record is TaskRecord {
     return (
       record !== null &&
       typeof record === 'object' &&
@@ -428,14 +434,14 @@ export class RealtimeAgentMonitor {
   }
 
   // Public API methods
-  addEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
+  addEventListener(eventType: string, listener: EventListener): void {
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, []);
     }
     this.listeners.get(eventType)!.push(listener);
   }
 
-  removeEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
+  removeEventListener(eventType: string, listener: EventListener): void {
     const listeners = this.listeners.get(eventType);
     if (listeners) {
       const index = listeners.indexOf(listener);

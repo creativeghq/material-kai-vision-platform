@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   Clock,
 } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +61,7 @@ interface ApiUsageLog {
 }
 
 export const AnalyticsDashboard: React.FC = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<UsageAnalytics>({
     total_searches: 0,
     total_api_calls: 0,
@@ -214,14 +214,14 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => router.push('/')}
+                onClick={() => navigate('/')}
                 className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
               <Button
-                onClick={() => router.push('/admin')}
+                onClick={() => navigate('/admin')}
                 className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <ArrowLeft className="h-4 w-4" />

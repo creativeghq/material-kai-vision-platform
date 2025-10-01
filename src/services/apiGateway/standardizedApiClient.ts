@@ -15,7 +15,7 @@
 import { ApiConfig, ApiConfigManager } from '../../config';
 
 // Standardized response wrapper (preserves original data structure)
-export interface StandardizedApiResponse<T = unknown> {
+export interface StandardizedApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: StandardizedError;
@@ -32,18 +32,18 @@ export interface StandardizedApiResponse<T = unknown> {
 export interface StandardizedError {
   code: string;
   message: string;
-  details?: unknown; // Preserves API-specific error details
-  originalError?: unknown; // Keeps the raw error for debugging
+  details?: Record<string, any>; // Preserves API-specific error details
+  originalError?: Error | any; // Keeps the raw error for debugging
   retryable: boolean;
   apiSpecific?: {
     statusCode?: number;
     headers?: Record<string, string>;
-    body?: unknown;
+    body?: Record<string, any>;
   };
 }
 
 // Base interface for all API clients (preserves unique implementations)
-export interface StandardizedApiClient<TParams = unknown, TResponse = unknown> {
+export interface StandardizedApiClient<TParams = any, TResponse = any> {
   readonly apiType: string;
   readonly modelId?: string;
 
@@ -51,10 +51,10 @@ export interface StandardizedApiClient<TParams = unknown, TResponse = unknown> {
   execute(params: TParams): Promise<StandardizedApiResponse<TResponse>>;
 
   // Validation using API-specific schemas
-  validateParams(params: unknown): TParams;
+  validateParams(params: any): TParams;
 
   // Error handling preserving API-specific details
-  handleError(error: unknown): StandardizedError;
+  handleError(error: Error | any): StandardizedError;
 
   // Health check for the API
   healthCheck(): Promise<boolean>;
@@ -78,11 +78,11 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
   }
 
   abstract execute(params: TParams): Promise<StandardizedApiResponse<TResponse>>;
-  abstract validateParams(params: unknown): TParams;
+  abstract validateParams(params: any): TParams;
   abstract healthCheck(): Promise<boolean>;
 
   // Common error handling that preserves API-specific details
-  handleError(error: unknown): StandardizedError {
+  handleError(error: Error | any): StandardizedError {
     const baseError: StandardizedError = {
       code: 'UNKNOWN_ERROR',
       message: 'An unknown error occurred',
@@ -100,7 +100,7 @@ export abstract class BaseApiClient<TParams, TResponse> implements StandardizedA
   }
 
   // Hook for API-specific error enhancement
-  protected enhanceError(baseError: StandardizedError, _originalError: unknown): StandardizedError {
+  protected enhanceError(baseError: StandardizedError, _originalError: Error | any): StandardizedError {
     return baseError;
   }
 
@@ -167,7 +167,7 @@ export async function withRetry<T>(
   config: Partial<RetryConfig> = {},
 ): Promise<T> {
   const retryConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
-  let lastError: unknown;
+  let lastError: Error | any;
 
   for (let attempt = 1; attempt <= retryConfig.maxAttempts; attempt++) {
     try {

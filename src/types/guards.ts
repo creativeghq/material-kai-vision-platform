@@ -167,3 +167,49 @@ export function parseWithDefault<T>(
 ): T {
   return guard(value) ? value : defaultValue;
 }
+
+/**
+ * Validation result interface
+ */
+export interface ValidationResult<T = any> {
+  isValid: boolean;
+  data?: T;
+  errors?: string[];
+}
+
+/**
+ * Creates a validation result object
+ * @param isValid - Whether validation passed
+ * @param data - The validated data (if valid)
+ * @param errors - Array of error messages (if invalid)
+ * @returns ValidationResult object
+ */
+export function createValidationResult<T>(
+  isValid: boolean,
+  data?: T,
+  errors?: string[]
+): ValidationResult<T> {
+  return {
+    isValid,
+    data,
+    errors,
+  };
+}
+
+/**
+ * Validates with a type guard and returns a validation result
+ * @param value - Value to validate
+ * @param guard - Type guard function
+ * @param errorMessage - Error message if validation fails
+ * @returns ValidationResult
+ */
+export function validateWithGuard<T>(
+  value: unknown,
+  guard: (val: unknown) => val is T,
+  errorMessage: string
+): ValidationResult<T> {
+  if (guard(value)) {
+    return createValidationResult(true, value);
+  }
+  return createValidationResult(false, undefined, [errorMessage]);
+}

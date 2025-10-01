@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 
 import { SearchHub } from './SearchHub';
 import { HeroSection } from './HeroSection';
@@ -9,28 +9,28 @@ import styles from './Dashboard.module.css';
 import { searchHubConfig } from './dashboardData';
 
 export const Dashboard: React.FC = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
 
-  const navigate = (path: string) => {
-    router.push(path);
+  const handleNavigate = (path: string) => {
+    navigate(path);
   };
 
   return (
     <div className={styles.container}>
       {/* Hero Section */}
-      <HeroSection onNavigate={navigate} />
+      <HeroSection onNavigate={handleNavigate} />
 
       {/* Main Search Interface */}
       <div className={styles.mainSection}>
         <SearchHub
           onMaterialSelect={searchHubConfig.onMaterialSelect}
-          onNavigateToMoodboard={() => navigate('/moodboard')}
-          onNavigateTo3D={() => navigate('/3d')}
+          onNavigateToMoodboard={() => handleNavigate('/moodboard')}
+          onNavigateTo3D={() => handleNavigate('/3d')}
         />
       </div>
 
       {/* Feature Cards */}
-      <FeatureGrid onNavigate={navigate} />
+      <FeatureGrid onNavigate={handleNavigate} />
 
       {/* Enhanced System Metrics */}
       <MetricsGrid />

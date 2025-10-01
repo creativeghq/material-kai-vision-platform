@@ -8,8 +8,7 @@ import {
   Search,
   Globe,
 } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { Link, useLocation } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 
@@ -25,11 +24,11 @@ const navigationItems = [
 ];
 
 export const Sidebar: React.FC = () => {
-  const router = useRouter();
+  const location = useLocation();
 
   const isActive = (path: string) => {
-    if (path === '/') return router.pathname === '/';
-    return router.pathname.startsWith(path);
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -45,7 +44,7 @@ export const Sidebar: React.FC = () => {
             }`}
             asChild
           >
-            <Link href={item.path}>
+            <Link to={item.path}>
               <item.icon className="w-4 h-4 mr-2" />
               {item.label}
             </Link>

@@ -57,7 +57,7 @@ export const openaiConfig: OpenAIApiConfig = {
   name: 'OpenAI API',
   type: 'openai',
   baseUrl: 'https://api.openai.com/v1',
-  apiKey: typeof window === 'undefined' ? process.env.OPENAI_API_KEY : undefined,
+  apiKey: undefined, // API key will be provided by the API registry at runtime
   timeout: 30000, // 30 seconds for embedding generation
   retryAttempts: 3,
   rateLimit: {

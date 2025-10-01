@@ -39,6 +39,22 @@ export const supabase = createClient<Database>(url, key, {
     storage: typeof window !== 'undefined' ? localStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: false, // Optimize for SPA
+    flowType: 'pkce', // Use PKCE flow for better security
+  },
+  global: {
+    headers: {
+      'cache-control': '3600', // Cache for 1 hour
+    },
+  },
+  db: {
+    schema: 'public',
+  },
+  realtime: {
+    // Only enable realtime when needed
+    params: {
+      eventsPerSecond: 10,
+    },
   },
 });
 

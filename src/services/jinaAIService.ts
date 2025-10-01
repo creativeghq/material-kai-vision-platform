@@ -101,11 +101,15 @@ class JinaAIService {
   private segmentUrl = 'https://segment.jina.ai';
 
   private async getApiKey(): Promise<string> {
-    // In production, this would come from Supabase Edge Function secrets
-    // For development, we'll use environment variable simulation
-    const apiKey = 'your-jina-api-key'; // This will be replaced with proper secret management
+    // SECURITY: API key must be retrieved from server-side environment variables
+    // This service should only be used in server-side contexts (API routes, Edge Functions)
+    if (typeof window !== 'undefined') {
+      throw new Error('JinaAI service cannot be used in client-side code for security reasons');
+    }
+
+    const apiKey = process.env.JINA_API_KEY;
     if (!apiKey) {
-      throw new Error('Jina AI API key not configured. Get yours at https://jina.ai/?sui=apikey');
+      throw new Error('JINA_API_KEY environment variable not configured. Get yours at https://jina.ai/?sui=apikey');
     }
     return apiKey;
   }
