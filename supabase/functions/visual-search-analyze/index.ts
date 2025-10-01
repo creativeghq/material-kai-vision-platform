@@ -10,7 +10,7 @@ import {
 } from '../_shared/types.ts';
 
 // Import MIVAA utilities for centralized AI management
-import { generateSemanticAnalysis } from '../_shared/embedding-utils';
+import { generateSemanticAnalysis } from '../_shared/embedding-utils.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
