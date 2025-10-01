@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Loader2, Wand2, Download, X, ImageIcon } from 'lucide-react';
-import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -546,11 +545,9 @@ export const Designer3DPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="relative border rounded-lg p-2">
-                  <Image
+                  <img
                     src={imagePreview}
                     alt="Preview"
-                    width={400}
-                    height={128}
                     className="w-full h-32 object-cover rounded"
                   />
                   <Button
@@ -635,11 +632,9 @@ export const Designer3DPage: React.FC = () => {
                       className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                       onClick={() => handleImageClick(index)}
                     >
-                      <Image
+                      <img
                         src={image.url}
                         alt={`Interior design by ${image.modelName}`}
-                        width={400}
-                        height={300}
                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                         onLoad={() => {
                           console.log(`✅ Image ${index + 1} loaded successfully:`, image.url);

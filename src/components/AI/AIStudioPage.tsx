@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import Image from 'next/image';
 import {
   Upload, Camera, Brain, Zap, Target, CheckCircle, Clock,
   Layers, Users, BarChart3, Lightbulb, Home, Ruler, Palette,
@@ -284,11 +283,10 @@ export const AIStudioPage: React.FC = () => {
                     {svbrdfExtractions.slice(0, 3).map((extraction: SVBRDFExtraction, index: number) => (
                       <div key={index} className="aspect-square bg-muted rounded overflow-hidden">
                         {extraction.albedo_map_url && (
-                          <Image
+                          <img
                             src={extraction.albedo_map_url}
                             alt="Material preview"
-                            fill
-                            className="object-cover"
+                            className="w-full h-full object-cover"
                           />
                         )}
                       </div>
