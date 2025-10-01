@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
 import { PDFExportOptions } from './PDFExportOptions';
 
@@ -256,8 +256,8 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
 
   const performAIAnalysis = async (tiles: ReviewedTile[]) => {
-    const apiService = ApiIntegrationService.getInstance();
-    const result = await apiService.executeSupabaseFunction('hybrid-material-analysis', {
+    const apiService = BrowserApiIntegrationService.getInstance();
+    const result = await apiService.callSupabaseFunction('hybrid-material-analysis', {
       materials: tiles.map(tile => ({
         id: tile.id,
         text: tile.corrected_text || tile.extracted_text,
@@ -281,8 +281,8 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         Properties: ${JSON.stringify(tile.structured_data || {})}.
         Clean, professional material sample visualization, white background, detailed texture.`;
 
-        const apiService = ApiIntegrationService.getInstance();
-        const result = await apiService.executeSupabaseFunction('generate-material-image', {
+        const apiService = BrowserApiIntegrationService.getInstance();
+        const result = await apiService.callSupabaseFunction('generate-material-image', {
           prompt,
           material_type: tile.corrected_material_type || tile.material_type,
           tile_id: tile.id,

@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
 interface MaterialSuggestion {
   name: string;
@@ -66,8 +66,8 @@ export const MaterialSuggestionsPanel: React.FC = () => {
     setIsGenerating(true);
     try {
       // Call enhanced RAG search for material suggestions
-      const apiService = ApiIntegrationService.getInstance();
-      const result = await apiService.executeSupabaseFunction('enhanced-rag-search', {
+      const apiService = BrowserApiIntegrationService.getInstance();
+      const result = await apiService.callSupabaseFunction('enhanced-rag-search', {
         query: `${config.roomType} ${config.style} ${config.prompt}`,
         action: 'material_suggestions',
         searchType: 'hybrid',
@@ -156,8 +156,8 @@ export const MaterialSuggestionsPanel: React.FC = () => {
         throw new Error('User not authenticated');
       }
 
-      const apiService = ApiIntegrationService.getInstance();
-      const result = await apiService.executeSupabaseFunction('crewai-3d-generation', {
+      const apiService = BrowserApiIntegrationService.getInstance();
+      const result = await apiService.callSupabaseFunction('crewai-3d-generation', {
         user_id: user.id,
         prompt: config.prompt,
         room_type: config.roomType,

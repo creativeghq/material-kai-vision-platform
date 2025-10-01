@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
 interface ScrapingPage {
   id: string;
@@ -118,7 +118,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
   };
 
   const retryPage = async (pageId: string) => {
-    const apiService = ApiIntegrationService.getInstance();
+    const apiService = BrowserApiIntegrationService.getInstance();
 
     try {
       // Update database to reset page status to pending
@@ -149,7 +149,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
       // Trigger single page processing
       const page = pages.find(p => p.id === pageId);
       if (page) {
-        const result = await apiService.executeSupabaseFunction('scrape-single-page', {
+        const result = await apiService.callSupabaseFunction('scrape-single-page', {
           pageUrl: page.url,
           sessionId: sessionId,
           pageId: pageId,

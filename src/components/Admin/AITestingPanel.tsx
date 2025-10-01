@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
 interface TestResult {
   provider: string;
@@ -64,8 +64,8 @@ export const AITestingPanel: React.FC = () => {
       };
 
       // Test hybrid analysis
-      const apiService = ApiIntegrationService.getInstance();
-      const result = await apiService.executeSupabaseFunction('hybrid-material-analysis', {
+      const apiService = BrowserApiIntegrationService.getInstance();
+      const result = await apiService.callSupabaseFunction('hybrid-material-analysis', {
         file_id: testFile.id,
         analysis_type: 'comprehensive',
         include_similar: false,
@@ -122,8 +122,8 @@ export const AITestingPanel: React.FC = () => {
     setTesting(true);
 
     try {
-      const apiService = ApiIntegrationService.getInstance();
-      const result = await apiService.executeSupabaseFunction('crewai-3d-generation', {
+      const apiService = BrowserApiIntegrationService.getInstance();
+      const result = await apiService.callSupabaseFunction('crewai-3d-generation', {
         user_id: (await supabase.auth.getUser()).data.user?.id,
         prompt: testPrompt,
         room_type: 'living room',

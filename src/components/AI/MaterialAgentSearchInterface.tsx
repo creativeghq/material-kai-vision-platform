@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { EnhancedRAGService } from '@/services/enhancedRAGService';
 import { HybridAIService } from '@/services/hybridAIService';
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
@@ -405,8 +405,8 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           for (const imageFile of imageFiles) {
             try {
               // Call the visual search API endpoint
-              const apiService = ApiIntegrationService.getInstance();
-              const visualResponse = await apiService.executeSupabaseFunction('visual-search', {
+              const apiService = BrowserApiIntegrationService.getInstance();
+              const visualResponse = await apiService.callSupabaseFunction('visual-search', {
                 user_id: session.user.id,
                 search_type: input.trim() ? 'hybrid' : 'visual', // Hybrid if text + image, pure visual if just image
                 query_text: input.trim() || 'Find similar materials',
@@ -494,8 +494,8 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         } catch (hybridError) {
           console.warn('⚠️ Hybrid AI failed, falling back to standard Material Agent:', hybridError);
           // Fallback to standard Material Agent
-          const apiService = ApiIntegrationService.getInstance();
-          const response = await apiService.executeSupabaseFunction('material-agent-orchestrator', {
+          const apiService = BrowserApiIntegrationService.getInstance();
+          const response = await apiService.callSupabaseFunction('material-agent-orchestrator', {
             user_id: session.user.id,
             task_type: 'comprehensive_design',
             input_data: {
@@ -512,8 +512,8 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       } else {
         console.log('🤖 Using standard Material Agent...');
         // Use standard Material Agent endpoint
-        const apiService = ApiIntegrationService.getInstance();
-        const response = await apiService.executeSupabaseFunction('material-agent-orchestrator', {
+        const apiService = BrowserApiIntegrationService.getInstance();
+        const response = await apiService.callSupabaseFunction('material-agent-orchestrator', {
           user_id: session.user.id,
           task_type: 'comprehensive_design',
           input_data: {

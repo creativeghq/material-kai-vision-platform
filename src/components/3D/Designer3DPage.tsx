@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
 import { ImageModal } from './ImageModal';
 import { ThreeJsViewer } from './ThreeJsViewer';
@@ -257,9 +257,9 @@ export const Designer3DPage: React.FC = () => {
       });
 
       // Use the new centralized API integration service
-      const apiService = ApiIntegrationService.getInstance();
+      const apiService = BrowserApiIntegrationService.getInstance();
       console.log('🔍 DEBUG: About to call API with request data');
-      const result = await apiService.executeSupabaseFunction('crewai-3d-generation', requestData);
+      const result = await apiService.callSupabaseFunction('crewai-3d-generation', requestData);
       console.log('Generation response received:', result);
 
       // Type assertion for the response data

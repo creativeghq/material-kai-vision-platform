@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { ApiIntegrationService } from '@/services/apiGateway/apiIntegrationService';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import {
@@ -105,8 +105,8 @@ Return a list of materials found on the page.`);
       console.log('Parsing sitemap:', url);
 
       // Use the centralized API system to parse sitemap
-      const apiService = ApiIntegrationService.getInstance();
-      const result = await apiService.executeSupabaseFunction('parse-sitemap', {
+      const apiService = BrowserApiIntegrationService.getInstance();
+      const result = await apiService.callSupabaseFunction('parse-sitemap', {
         sitemapUrl: url,
         maxPages: maxPages,
       });
