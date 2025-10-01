@@ -7,10 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/Layout/AuthGuard';
 
-// Import configuration to ensure initialization
-import '@/config';
 import { monitoringService } from '@/services/monitoring/monitoringService';
-import { getMonitoringConfig } from '@/config/monitoring';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
@@ -43,8 +40,13 @@ import { CriticalErrorBoundary, PageErrorBoundary } from './components/ErrorBoun
 
 const queryClient = new QueryClient();
 
-// Initialize monitoring service
-monitoringService.initialize(getMonitoringConfig());
+// Initialize monitoring service with basic config
+monitoringService.initialize({
+  enabled: false,
+  environment: 'development',
+  version: '1.0.0',
+  providers: {}
+});
 
 const App = () => (
   <CriticalErrorBoundary name="Application Root">
