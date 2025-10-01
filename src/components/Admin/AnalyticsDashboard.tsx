@@ -96,11 +96,11 @@ export const AnalyticsDashboard: React.FC = () => {
       if (apiError) throw apiError;
 
       // Filter and cast data to match expected types
-      const filteredSearchData = (searchData || []).filter(item =>
+      const filteredSearchData = (searchData || []).filter((item: any) =>
         item.created_at &&
         item.event_type &&
         item.id,
-      ).map(item => ({
+      ).map((item: any) => ({
         id: item.id,
         query_text: (item.event_data as Record<string, unknown>)?.query as string || 'Unknown query',
         results_shown: (item.event_data as Record<string, unknown>)?.results_count as number || 0,
@@ -112,11 +112,11 @@ export const AnalyticsDashboard: React.FC = () => {
         session_id: item.session_id,
       }));
 
-      const filteredApiData = (apiData || []).filter(item =>
+      const filteredApiData = (apiData || []).filter((item: any) =>
         item.created_at &&
         item.id &&
         item.status_code !== null,
-      ).map(item => ({
+      ).map((item: any) => ({
         ...item,
         response_status: item.status_code || 0,
         response_time_ms: item.response_time_ms || 0,
@@ -132,10 +132,10 @@ export const AnalyticsDashboard: React.FC = () => {
       const totalSearches = searchData?.length || 0;
       const totalApiCalls = apiData?.length || 0;
       const uniqueUsers = new Set([
-        ...searchData?.map(s => s.user_id).filter(Boolean) || [],
-        ...apiData?.map(a => a.api_key_id).filter(Boolean) || [],
+        ...searchData?.map((s: any) => s.user_id).filter(Boolean) || [],
+        ...apiData?.map((a: any) => a.api_key_id).filter(Boolean) || [],
       ]).size;
-      const avgResponseTime = apiData?.reduce((sum, log) => sum + (log.response_time_ms || 0), 0) / Math.max(apiData?.length || 1, 1);
+      const avgResponseTime = apiData?.reduce((sum: any, log: any) => sum + (log.response_time_ms || 0), 0) / Math.max(apiData?.length || 1, 1);
 
       setAnalytics({
         total_searches: totalSearches,

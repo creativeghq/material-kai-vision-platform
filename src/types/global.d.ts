@@ -89,83 +89,7 @@ declare module 'three' {
   export const Uint32BufferAttribute: any;
 }
 
-declare module '@react-three/fiber' {
-  import { ComponentType, ReactNode } from 'react';
-  export const Canvas: ComponentType<any>;
-  export const useLoader: any;
-  export const useFrame: any;
-  export const useThree: any;
-  export const extend: any;
-  export const createRoot: any;
-  export const events: any;
-  export const invalidate: any;
-  export const advance: any;
-  export const render: any;
-  export const unmountComponentAtNode: any;
-  export const act: any;
 
-  // Three.js object types for JSX
-  export interface ThreeElements {
-    mesh: any;
-    boxGeometry: any;
-    meshStandardMaterial: any;
-    planeGeometry: any;
-    ambientLight: any;
-    directionalLight: any;
-    group: any;
-    primitive: any;
-    points: any;
-    line: any;
-    lineBasicMaterial: any;
-    bufferGeometry: any;
-    bufferAttribute: any;
-    perspectiveCamera: any;
-    orthographicCamera: any;
-    scene: any;
-    fog: any;
-    fogExp2: any;
-    hemisphereLight: any;
-    pointLight: any;
-    rectAreaLight: any;
-    spotLight: any;
-    texture: any;
-    videoTexture: any;
-    dataTexture: any;
-    dataTexture3D: any;
-    compressedTexture: any;
-    cubeTexture: any;
-    canvasTexture: any;
-    rawShaderMaterial: any;
-    shaderMaterial: any;
-    pointsMaterial: any;
-    meshBasicMaterial: any;
-    meshLambertMaterial: any;
-    meshPhongMaterial: any;
-    meshToonMaterial: any;
-    meshNormalMaterial: any;
-    meshMatcapMaterial: any;
-    meshDepthMaterial: any;
-    meshDistanceMaterial: any;
-    meshPhysicalMaterial: any;
-    lineDashedMaterial: any;
-    sprite: any;
-    spriteMaterial: any;
-    instancedMesh: any;
-    skinnedMesh: any;
-    skeleton: any;
-    bone: any;
-    animationMixer: any;
-    keyframeTrack: any;
-    propertyMixer: any;
-    propertyBinding: any;
-    quaternionKeyframeTrack: any;
-    vectorKeyframeTrack: any;
-    colorKeyframeTrack: any;
-    numberKeyframeTrack: any;
-    booleanKeyframeTrack: any;
-    stringKeyframeTrack: any;
-  }
-}
 
 declare module '@react-three/drei' {
   import { ComponentType } from 'react';
@@ -213,7 +137,24 @@ declare module 'use-sync-external-store' {}
 declare module 'webxr' {}
 declare module 'yargs-parser' {}
 
-// JSX namespace for React Three Fiber
+// React Three Fiber JSX namespace augmentation
+declare module '@react-three/fiber' {
+  import { ComponentType, ReactNode } from 'react';
+  export const Canvas: ComponentType<any>;
+  export const useLoader: any;
+  export const useFrame: any;
+  export const useThree: any;
+  export const extend: any;
+  export const createRoot: any;
+  export const events: any;
+  export const invalidate: any;
+  export const advance: any;
+  export const render: any;
+  export const unmountComponentAtNode: any;
+  export const act: any;
+}
+
+// Global JSX namespace for React Three Fiber
 declare global {
   namespace JSX {
     interface IntrinsicElements {

@@ -82,7 +82,7 @@ const AgentMLCoordination: React.FC = () => {
       if (mlTasksResult.error) throw mlTasksResult.error;
 
       const agentData = (agentTasksResult.data || []).filter((task: Record<string, unknown>) => task.status !== null) as AgentTask[];
-      const mlData = (mlTasksResult.data || []).filter(task => task.agent_task_id !== null && task.created_at !== null) as MLTask[];
+      const mlData = (mlTasksResult.data || []).filter((task: any) => task.agent_task_id !== null && task.created_at !== null) as MLTask[];
 
       setAgentTasks(agentData);
       setMLTasks(mlData);

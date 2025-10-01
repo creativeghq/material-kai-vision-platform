@@ -727,7 +727,7 @@ export const ApiGatewayAdmin: React.FC = () => {
 
         {/* Endpoint Details Modal */}
         <Sheet open={endpointDetailsOpen} onOpenChange={setEndpointDetailsOpen}>
-          <SheetContent className="w-[700px] sm:w-[800px]" side="right">
+          <SheetContent className="w-[700px] sm:w-[800px]" side={"right" as const}>
             <SheetHeader>
               <SheetTitle>API Endpoint Details</SheetTitle>
               <SheetDescription>

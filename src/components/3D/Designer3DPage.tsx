@@ -619,7 +619,7 @@ export const Designer3DPage: React.FC = () => {
       </Card>
 
       {/* Results Grid */}
-      {(generatedImages.length > 0 ? (
+      {generatedImages.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Generated Interior Designs</CardTitle>
@@ -674,7 +674,7 @@ export const Designer3DPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      ) : null) as React.ReactNode}
+      )}
 
       {/* 3D Viewer */}
       {generatedImages.length > 0 && (

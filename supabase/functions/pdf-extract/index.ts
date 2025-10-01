@@ -9,8 +9,96 @@ import {
   ValidationSchemas,
 } from '../_shared/config.ts';
 
-// Import material categories from centralized source
-import { MATERIAL_CATEGORIES } from '../../src/types/materials.ts';
+// Dynamic material categories - fetch from database instead of hardcoded
+let MATERIAL_CATEGORIES: Record<string, {
+  name: string;
+  finish: string[];
+  size: string[];
+  installationMethod: string[];
+  application: string[];
+}> = {};
+
+// Function to fetch dynamic material categories and convert to expected format
+async function fetchMaterialCategories() {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Call the get-material-categories edge function
+    const response = await fetch(`${supabaseUrl}/functions/v1/get-material-categories`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      // Convert the database format to the expected format for pdf-extract
+      const convertedCategories: typeof MATERIAL_CATEGORIES = {};
+
+      for (const category of result.data) {
+        // Extract property values from metaFields
+        const finish = ['natural', 'matte', 'glossy', 'textured', 'smooth', 'brushed', 'polished'];
+        const size = ['small', 'medium', 'large', 'custom', 'standard', 'oversized'];
+        const installationMethod = ['adhesive', 'mechanical', 'welded', 'screwed', 'nailed', 'clipped', 'interlocking'];
+        const application = ['interior', 'exterior', 'industrial', 'decorative', 'structural', 'functional'];
+
+        convertedCategories[category.key.toUpperCase()] = {
+          name: category.name,
+          finish,
+          size,
+          installationMethod,
+          application
+        };
+      }
+
+      MATERIAL_CATEGORIES = convertedCategories;
+      console.log(`Loaded ${Object.keys(MATERIAL_CATEGORIES).length} dynamic material categories`);
+    } else {
+      throw new Error(result.error || 'Failed to fetch categories');
+    }
+  } catch (error) {
+    console.error('Failed to fetch dynamic categories, using fallback:', error);
+    // Fallback categories with the expected format
+    MATERIAL_CATEGORIES = {
+      WOOD: {
+        name: 'Wood',
+        finish: ['natural', 'stained', 'painted', 'varnished', 'oiled', 'waxed', 'lacquered'],
+        size: ['small', 'medium', 'large', 'custom', 'standard', 'plank', 'board'],
+        installationMethod: ['nailed', 'screwed', 'glued', 'interlocking', 'floating', 'stapled'],
+        application: ['interior', 'exterior', 'structural', 'decorative', 'flooring', 'furniture']
+      },
+      METAL: {
+        name: 'Metal',
+        finish: ['brushed', 'polished', 'matte', 'anodized', 'galvanized', 'powder-coated', 'painted'],
+        size: ['small', 'medium', 'large', 'custom', 'sheet', 'rod', 'tube'],
+        installationMethod: ['welded', 'bolted', 'screwed', 'riveted', 'clipped', 'magnetic'],
+        application: ['structural', 'decorative', 'industrial', 'architectural', 'mechanical', 'electrical']
+      },
+      CERAMIC: {
+        name: 'Ceramic',
+        finish: ['glazed', 'unglazed', 'matte', 'glossy', 'textured', 'polished', 'natural'],
+        size: ['small', 'medium', 'large', 'tile', 'slab', 'custom', 'mosaic'],
+        installationMethod: ['adhesive', 'mortar', 'mechanical', 'grouted', 'dry-set', 'wet-set'],
+        application: ['interior', 'exterior', 'flooring', 'wall', 'countertop', 'decorative']
+      },
+      STONE: {
+        name: 'Stone',
+        finish: ['natural', 'polished', 'honed', 'brushed', 'flamed', 'sandblasted', 'tumbled'],
+        size: ['small', 'medium', 'large', 'slab', 'tile', 'block', 'veneer'],
+        installationMethod: ['mortar', 'adhesive', 'mechanical', 'dry-stack', 'anchored', 'grouted'],
+        application: ['interior', 'exterior', 'structural', 'decorative', 'landscaping', 'countertop']
+      }
+    };
+  }
+}
 
 interface PdfExtractionRequest {
   documentId: string;
@@ -299,6 +387,11 @@ serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Ensure material categories are loaded
+  if (Object.keys(MATERIAL_CATEGORIES).length === 0) {
+    await fetchMaterialCategories();
   }
 
   try {

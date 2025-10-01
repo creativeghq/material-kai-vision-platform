@@ -36,6 +36,8 @@
   "include": [
     "src",
     "src/types/global.d.ts",
+    "src/types/modules.d.ts",
+    "src/types/jsx.d.ts",
     "vite.config.ts"
   ],
   "exclude": [

@@ -82,8 +82,8 @@ export const AITestingPanel: React.FC = () => {
       // Process results
       const testResults: TestResult[] = [];
 
-      if (data.attempts) {
-        data.attempts.forEach((attempt: { provider: string; score?: number; success: boolean; error?: string; response?: string; processing_time_ms?: number }) => {
+      if ((data as any).attempts) {
+        (data as any).attempts.forEach((attempt: { provider: string; score?: number; success: boolean; error?: string; response?: string; processing_time_ms?: number }) => {
           testResults.push({
             provider: attempt.provider,
             score: attempt.score || 0,
@@ -102,7 +102,7 @@ export const AITestingPanel: React.FC = () => {
 
       toast({
         title: 'Test Completed',
-        description: `Analysis completed with score: ${data.final_score?.toFixed(2) || 'N/A'}`,
+        description: `Analysis completed with score: ${(data as any).final_score?.toFixed(2) || 'N/A'}`,
         variant: 'default',
       });
 
@@ -138,7 +138,7 @@ export const AITestingPanel: React.FC = () => {
 
       toast({
         title: '3D Generation Test Completed',
-        description: `Generation completed in ${(data?.processing_time_ms / 1000).toFixed(2)}s`,
+        description: `Generation completed in ${((data as any)?.processing_time_ms / 1000).toFixed(2)}s`,
         variant: 'default',
       });
 

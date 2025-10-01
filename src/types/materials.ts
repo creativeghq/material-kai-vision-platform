@@ -109,6 +109,66 @@ export enum MaterialCategory {
   COMPOSITE = 'composite'
 }
 
+// Material categories with metadata for PDF extraction and processing
+export const MATERIAL_CATEGORIES = {
+  WOOD: {
+    name: 'Wood',
+    finish: ['natural', 'stained', 'painted', 'varnished', 'oiled', 'waxed', 'lacquered'],
+    size: ['small', 'medium', 'large', 'custom', 'standard', 'plank', 'board'],
+    installationMethod: ['nailed', 'screwed', 'glued', 'interlocking', 'floating', 'stapled'],
+    application: ['interior', 'exterior', 'structural', 'decorative', 'flooring', 'furniture']
+  },
+  METAL: {
+    name: 'Metal',
+    finish: ['brushed', 'polished', 'matte', 'anodized', 'galvanized', 'powder-coated', 'painted'],
+    size: ['small', 'medium', 'large', 'custom', 'sheet', 'rod', 'tube'],
+    installationMethod: ['welded', 'bolted', 'screwed', 'riveted', 'clipped', 'magnetic'],
+    application: ['structural', 'decorative', 'industrial', 'architectural', 'mechanical', 'electrical']
+  },
+  PLASTIC: {
+    name: 'Plastic',
+    finish: ['smooth', 'textured', 'matte', 'glossy', 'transparent', 'translucent', 'opaque'],
+    size: ['small', 'medium', 'large', 'custom', 'sheet', 'film', 'molded'],
+    installationMethod: ['adhesive', 'mechanical', 'heat-welded', 'ultrasonic', 'snap-fit', 'threaded'],
+    application: ['interior', 'exterior', 'packaging', 'automotive', 'medical', 'consumer']
+  },
+  CERAMIC: {
+    name: 'Ceramic',
+    finish: ['glazed', 'unglazed', 'matte', 'glossy', 'textured', 'polished', 'natural'],
+    size: ['small', 'medium', 'large', 'tile', 'slab', 'custom', 'mosaic'],
+    installationMethod: ['adhesive', 'mortar', 'mechanical', 'grouted', 'dry-set', 'wet-set'],
+    application: ['interior', 'exterior', 'flooring', 'wall', 'countertop', 'decorative']
+  },
+  GLASS: {
+    name: 'Glass',
+    finish: ['clear', 'frosted', 'tinted', 'reflective', 'textured', 'laminated', 'tempered'],
+    size: ['small', 'medium', 'large', 'custom', 'panel', 'sheet', 'block'],
+    installationMethod: ['framed', 'structural', 'adhesive', 'mechanical', 'glazed', 'curtain-wall'],
+    application: ['architectural', 'decorative', 'safety', 'insulating', 'solar', 'automotive']
+  },
+  FABRIC: {
+    name: 'Fabric',
+    finish: ['natural', 'treated', 'waterproof', 'fire-resistant', 'stain-resistant', 'antimicrobial'],
+    size: ['small', 'medium', 'large', 'roll', 'panel', 'custom', 'tile'],
+    installationMethod: ['adhesive', 'stapled', 'sewn', 'velcro', 'magnetic', 'tensioned'],
+    application: ['upholstery', 'drapery', 'wall-covering', 'acoustic', 'outdoor', 'industrial']
+  },
+  STONE: {
+    name: 'Stone',
+    finish: ['natural', 'polished', 'honed', 'brushed', 'flamed', 'sandblasted', 'tumbled'],
+    size: ['small', 'medium', 'large', 'slab', 'tile', 'block', 'veneer'],
+    installationMethod: ['mortar', 'adhesive', 'mechanical', 'dry-stack', 'anchored', 'grouted'],
+    application: ['interior', 'exterior', 'structural', 'decorative', 'landscaping', 'countertop']
+  },
+  COMPOSITE: {
+    name: 'Composite',
+    finish: ['smooth', 'textured', 'wood-grain', 'stone-look', 'metallic', 'matte', 'glossy'],
+    size: ['small', 'medium', 'large', 'custom', 'panel', 'plank', 'sheet'],
+    installationMethod: ['mechanical', 'adhesive', 'interlocking', 'clipped', 'screwed', 'snap-fit'],
+    application: ['interior', 'exterior', 'structural', 'decorative', 'marine', 'automotive']
+  }
+} as const;
+
 // Import dynamic material categories service and types
 import {
   MaterialCategory as DynamicMaterialCategory,

@@ -420,7 +420,8 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-3">
               {/* Unified Models Section */}
-              {(<Collapsible
+              {(
+                <Collapsible
                 open={Boolean(expandedSections['models'])}
                 onOpenChange={() => toggleSection('models')}
               >
@@ -482,7 +483,8 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                     ))}
                   </div>
                 </CollapsibleContent>
-              </Collapsible>) as React.ReactNode}
+              </Collapsible>
+              ) as React.ReactNode}
 
               {/* API Response Section */}
               {apiResponse && (
