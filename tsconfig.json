@@ -43,6 +43,9 @@
   "exclude": [
     "node_modules",
     "dist",
-    "coverage"
+    "coverage",
+    ".ruru",
+    "scripts",
+    "supabase"
   ]
 }

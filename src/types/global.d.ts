@@ -6,7 +6,6 @@
 
 // Import React types for JSX
 import * as React from 'react';
-/// <reference types="node" />
 
 declare module '@tanstack/react-query' {
   export * from 'react-query';
