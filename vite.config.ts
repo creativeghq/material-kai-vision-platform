@@ -5,7 +5,8 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react({
-      jsxRuntime: 'classic'
+      jsxRuntime: 'automatic',
+      jsxImportSource: 'react'
     })
   ],
   server: {
@@ -16,5 +17,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src')
     }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom']
   }
 })
