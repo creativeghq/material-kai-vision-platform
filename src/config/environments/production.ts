@@ -119,6 +119,6 @@ export const productionConfig: AppConfig = {
   hotReload: {
     enabled: false, // Disabled in production
     watchPaths: [],
-    debounceMs: 0,
+    debounceMs: 100, // Minimum value required by schema (not used when disabled)
   },
 };

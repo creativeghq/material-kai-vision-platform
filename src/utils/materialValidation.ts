@@ -258,7 +258,7 @@ export function validateMaterialMetadata(
 /**
  * Validate material properties for data integrity
  */
-export function validateMaterialProperties(properties: any): ValidationResult {
+export function validateMaterialProperties(properties: Record<string, unknown>): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -387,7 +387,7 @@ export function validateMaterialProperties(properties: any): ValidationResult {
  * Validate extracted AI data for completeness and accuracy
  */
 export function validateExtractedAIData(
-  extractedData: any,
+  extractedData: Record<string, unknown>,
   expectedCategory?: MaterialCategory
 ): ValidationResult {
   const errors: ValidationError[] = [];
@@ -481,7 +481,7 @@ export function validateExtractedAIData(
  * Validate extracted meta fields from AI processing
  */
 export function validateExtractedMetaFields(
-  extractedMeta: any,
+  extractedMeta: Record<string, unknown>,
   category?: MaterialCategory
 ): ValidationResult {
   const errors: ValidationError[] = [];
@@ -698,7 +698,7 @@ function validateR11Format(r11: string): boolean {
  * Helper function to check if extracted data is complete
  */
 export function checkExtractionCompleteness(
-  extractedData: any,
+  extractedData: Record<string, unknown>,
   expectedFields: string[] = ['finish', 'size', 'installation_method', 'application']
 ): {
   completeness: number;
@@ -726,8 +726,8 @@ export function checkExtractionCompleteness(
 /**
  * Sanitize and normalize extracted material data
  */
-export function sanitizeExtractedData(rawData: any): {
-  sanitized: any;
+export function sanitizeExtractedData(rawData: Record<string, unknown>): {
+  sanitized: Record<string, unknown>;
   changes: string[];
 } {
   const changes: string[] = [];
@@ -785,7 +785,7 @@ export function sanitizeExtractedData(rawData: any): {
     // Normalize metal types
     if (meta.metal_types && Array.isArray(meta.metal_types)) {
       const normalized = meta.metal_types
-        .filter((type: any) => typeof type === 'string')
+        .filter((type: unknown): type is string => typeof type === 'string')
         .map((type: string) => type.trim().toLowerCase())
         .filter((type: string) => type.length > 0);
       
@@ -822,7 +822,7 @@ function normalizeR11Rating(r11: string): string {
  * Create a Material object from extracted AI data
  */
 export function createMaterialFromExtractedData(
-  extractedData: any,
+  extractedData: Record<string, unknown>,
   additionalInfo: {
     id: string;
     name: string;

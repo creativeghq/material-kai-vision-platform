@@ -2,15 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 
 import {
-  validateMivaaDocument,
-  validatePartialMivaaDocument,
   MivaaDocumentSchema,
   PartialMivaaDocumentSchema,
 } from '../schemas/mivaaValidation.js';
 import {
-  validateTransformationConfig,
-  validatePartialTransformationConfig,
-  validateTransformationJobRequest,
   TransformationConfigSchema,
   PartialTransformationConfigSchema,
   TransformationJobRequestSchema,
@@ -36,7 +31,7 @@ export class ValidationError extends Error {
     path: string;
     message: string;
     code: string;
-    value?: any;
+    value?: unknown;
   }>;
   public readonly validationType: string;
   public readonly timestamp: string;
@@ -44,7 +39,7 @@ export class ValidationError extends Error {
 
   constructor(
     message: string,
-    errors: Array<{ path: string; message: string; code: string; value?: any }>,
+    errors: Array<{ path: string; message: string; code: string; value?: unknown }>,
     validationType: string,
     requestId?: string,
   ) {
@@ -221,10 +216,10 @@ function createValidationMiddleware<T>(
 /**
  * Utility function to get nested value from object
  */
-function getNestedValue(obj: any, path: (string | number)[]): any {
-  return path.reduce((current, key) => {
-    return current && typeof current === 'object' ? current[key] : undefined;
-  }, obj);
+function getNestedValue(obj: Record<string, unknown>, path: (string | number)[]): unknown {
+  return path.reduce((current: unknown, key) => {
+    return current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined;
+  }, obj as unknown);
 }
 
 /**
@@ -285,7 +280,7 @@ export const validateTransformationJobRequestMiddleware = (options?: ValidationO
 /**
  * Middleware for validating query parameters
  */
-export const validateQueryParams = (schema: z.ZodSchema<any>, options?: ValidationOptions) => {
+export const validateQueryParams = (schema: z.ZodSchema<unknown>, options?: ValidationOptions) => {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   return (req: Request, res: Response, next: NextFunction) => {
@@ -342,7 +337,7 @@ export const validateQueryParams = (schema: z.ZodSchema<any>, options?: Validati
 /**
  * Middleware for validating URL parameters
  */
-export const validateUrlParams = (schema: z.ZodSchema<any>, options?: ValidationOptions) => {
+export const validateUrlParams = (schema: z.ZodSchema<unknown>, options?: ValidationOptions) => {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   return (req: Request, res: Response, next: NextFunction) => {
@@ -432,11 +427,12 @@ export const validationErrorHandler = (
  * Extend Express Request interface to include validated data
  */
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      validatedData?: any;
-      validatedQuery?: any;
-      validatedParams?: any;
+      validatedData?: unknown;
+      validatedQuery?: unknown;
+      validatedParams?: unknown;
     }
   }
 }

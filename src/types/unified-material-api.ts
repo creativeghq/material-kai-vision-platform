@@ -11,10 +11,9 @@ import type {
   MaterialCategory,
   MaterialProperties,
   FunctionalMetadata,
-  ProcessingJob,
-  RecognitionResult,
-  MaterialData,
-  UploadedFile
+  RecognitionResult as _RecognitionResult,
+  MaterialData as _MaterialData,
+  UploadedFile as _UploadedFile,
 } from './materials';
 
 // =============================================================================
@@ -132,12 +131,12 @@ export interface UpdateMaterialRequest {
 /**
  * Response payload for material operations
  */
-export interface MaterialResponse extends MaterialApiResponse<Material> {}
+export type MaterialResponse = MaterialApiResponse<Material>;
 
 /**
  * Response payload for material list operations
  */
-export interface MaterialListResponse extends MaterialApiResponse<PaginatedResponse<Material>> {}
+export type MaterialListResponse = MaterialApiResponse<PaginatedResponse<Material>>;
 
 /**
  * Request parameters for material search
@@ -265,12 +264,12 @@ export interface SetMaterialMetafieldsRequest {
 /**
  * Response for metafield operations
  */
-export interface MetafieldResponse extends MaterialApiResponse<MaterialMetafieldDefinition> {}
+export type MetafieldResponse = MaterialApiResponse<MaterialMetafieldDefinition>;
 
 /**
  * Response for metafield list operations
  */
-export interface MetafieldListResponse extends MaterialApiResponse<PaginatedResponse<MaterialMetafieldDefinition>> {}
+export type MetafieldListResponse = MaterialApiResponse<PaginatedResponse<MaterialMetafieldDefinition>>;
 
 // =============================================================================
 // Material Images API Types
@@ -377,12 +376,12 @@ export interface UpdateMaterialImageRequest {
 /**
  * Response for image operations
  */
-export interface MaterialImageResponse extends MaterialApiResponse<MaterialImage> {}
+export type MaterialImageResponse = MaterialApiResponse<MaterialImage>;
 
 /**
  * Response for image list operations
  */
-export interface MaterialImageListResponse extends MaterialApiResponse<MaterialImage[]> {}
+export type MaterialImageListResponse = MaterialApiResponse<MaterialImage[]>;
 
 // =============================================================================
 // Material Relationships API Types
@@ -433,12 +432,12 @@ export interface CreateMaterialRelationshipRequest {
 /**
  * Response for relationship operations
  */
-export interface MaterialRelationshipResponse extends MaterialApiResponse<MaterialRelationship> {}
+export type MaterialRelationshipResponse = MaterialApiResponse<MaterialRelationship>;
 
 /**
  * Response for relationship list operations
  */
-export interface MaterialRelationshipListResponse extends MaterialApiResponse<MaterialRelationship[]> {}
+export type MaterialRelationshipListResponse = MaterialApiResponse<MaterialRelationship[]>;
 
 // =============================================================================
 // Unified Search API Types
@@ -491,7 +490,7 @@ export interface UnifiedSearchResult {
 /**
  * Response for unified search operations
  */
-export interface UnifiedSearchResponse extends MaterialApiResponse<PaginatedResponse<UnifiedSearchResult>> {}
+export type UnifiedSearchResponse = MaterialApiResponse<PaginatedResponse<UnifiedSearchResult>>;
 
 // =============================================================================
 // Edge Function Response Types

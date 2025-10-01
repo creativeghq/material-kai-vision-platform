@@ -3,7 +3,6 @@ import {
   Shield,
   Droplets,
   Thermometer,
-  Zap,
   Hammer,
   Leaf,
   Waves,
@@ -21,16 +20,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
-import { 
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 
 import { type FunctionalMetadata } from '@/types/materials';
-import { type LucideIcon } from 'lucide-react';
 
 interface EnhancedFunctionalMetadataCardProps {
   /** Functional metadata object containing all 9 categories */
@@ -144,7 +140,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
     }
   };
 
-  const renderPropertyValue = (key: string, value: unknown): React.ReactNode => {
+  const renderPropertyValue = (_key: string, value: unknown): React.ReactNode => {
     if (value === null || value === undefined) return null;
     
     if (typeof value === 'boolean') {

@@ -23,7 +23,7 @@ export interface Generation3DResult {
     id: string;
     name: string;
     category: string;
-    properties: Record<string, any>;
+    properties: Record<string, unknown>;
   }>;
   quality_assessment: {
     score: number;
@@ -39,20 +39,20 @@ export interface Generation3DRecord {
   generation_name: string;
   generation_type: string;
   generation_status: string;
-  input_data: any;
-  output_data: any;
-  generation_config: any;
+  input_data: unknown;
+  output_data: unknown;
+  generation_config: unknown;
   progress_percentage: number;
   error_message: string | null;
   processing_time_ms: number | null;
   estimated_completion_time: string | null;
-  file_urls: any;
+  file_urls: unknown;
   preview_url: string | null;
   download_url: string | null;
   file_size_bytes: number | null;
   quality_score: number | null;
-  tags: any;
-  metadata: any;
+  tags: unknown;
+  metadata: unknown;
   created_at: string | null;
   updated_at: string | null;
   started_at: string | null;
@@ -149,7 +149,7 @@ export class MaterialAgent3DGenerationAPI {
   }
 
   // Get analytics for 3D generations
-  static async getGenerationAnalytics(timeRange = '30 days') {
+  static async getGenerationAnalytics(_timeRange = '30 days') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -183,7 +183,7 @@ export class MaterialAgent3DGenerationAPI {
       let qualityCount = 0;
 
       data?.forEach(event => {
-        const eventData = event.event_data as any;
+        const eventData = event.event_data as Record<string, unknown>;
 
         // Processing time
         if (eventData.processing_time_ms) {

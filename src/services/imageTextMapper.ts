@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-import type { ImageElement, TextBlock, DOMElement } from './htmlDOMAnalyzer';
+import type { ImageElement, TextBlock } from './htmlDOMAnalyzer';
 import type { DocumentChunk } from './layoutAwareChunker';
 import { HybridMLService } from './ml/hybridMLService';
 import { OCRService } from './ml/ocrService';
@@ -87,8 +87,8 @@ export class ImageTextMapper {
 
   constructor() {
     // Initialize services with minimal configs to avoid further errors
-    this.mlService = {} as any; // Temporarily disable to fix build
-    this.ocrService = {} as any; // Temporarily disable to fix build
+    this.mlService = {} as unknown as HybridMLService; // Temporarily disable to fix build
+    this.ocrService = {} as unknown as OCRService; // Temporarily disable to fix build
   }
 
   /**
@@ -399,7 +399,7 @@ export class ImageTextMapper {
     image: ImageElement,
     textBlocks: TextBlock[],
     type: ImageTextAssociation['associationType'],
-    options: MappingOptions,
+    _options: MappingOptions,
   ): Promise<ImageTextAssociation> {
     const associationId = this.generateAssociationId();
 
@@ -463,7 +463,7 @@ export class ImageTextMapper {
       // Convert image URL to blob for OCR processing
       const response = await fetch(image.src);
       const blob = await response.blob();
-      const file = new File([blob], 'image.jpg', { type: blob.type });
+      const _file = new File([blob], 'image.jpg', { type: blob.type });
 
       return 'OCR temporarily disabled'; // Temporarily return placeholder
     } catch (error) {
@@ -488,7 +488,7 @@ export class ImageTextMapper {
       const analysisResult = await this.mlService.analyzeMaterials([file]);
 
       return {
-        materialTypes: (analysisResult as any).results?.map((r: any) => r.label) || [],
+        materialTypes: (analysisResult as Record<string, unknown>).results ? ((analysisResult as Record<string, unknown>).results as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => r.label as string) : [],
         colorAnalysis: {
           dominantColors: ['#8B4513', '#D2B48C'], // Mock colors
           colorScheme: 'warm',
@@ -511,7 +511,7 @@ export class ImageTextMapper {
   /**
    * Detect objects and features in image
    */
-  private async detectObjectsAndFeatures(image: ImageElement): Promise<{
+  private async detectObjectsAndFeatures(_image: ImageElement): Promise<{
     objects: string[];
     features: string[];
   }> {
@@ -618,7 +618,7 @@ export class ImageTextMapper {
   /**
    * Check if text contains figure references
    */
-  private containsFigureReference(text: string, image: ImageElement): boolean {
+  private containsFigureReference(text: string, _image: ImageElement): boolean {
     const figurePatterns = [
       /figure\s+\d+/i,
       /fig\.\s*\d+/i,
@@ -858,7 +858,7 @@ export class ImageTextMapper {
   /**
    * Convert knowledge base entry to association format
    */
-  private convertKnowledgeEntryToAssociation(row: any): ImageTextAssociation {
+  private convertKnowledgeEntryToAssociation(row: Record<string, unknown>): ImageTextAssociation {
     const metadata = row.metadata || {};
 
     return {

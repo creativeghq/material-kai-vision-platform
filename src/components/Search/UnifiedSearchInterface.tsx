@@ -88,7 +88,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     const actualSearchType = detectQueryType(query);
 
     try {
-      let searchResults: SearchResult[];
+      let _searchResults: SearchResult[];
 
       let materialSearchResponse;
 

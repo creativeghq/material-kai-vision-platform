@@ -27,7 +27,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
   });
 
   const serviceRef = useRef<MaterialRealtimeService | null>(null);
-  const [materialData, setMaterialData] = useState<any>(null);
+  const [materialData, setMaterialData] = useState<Record<string, unknown> | null>(null);
   const [imageUpdates, setImageUpdates] = useState<MaterialChangePayload[]>([]);
   const [metafieldUpdates, setMetafieldUpdates] = useState<MaterialChangePayload[]>([]);
   const [relationshipUpdates, setRelationshipUpdates] = useState<MaterialChangePayload[]>([]);
@@ -43,10 +43,10 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
     const callbacks: MaterialSubscriptionCallbacks = {
       onMaterialChange: (payload) => {
         console.log('Material change received:', payload);
-        
+
         if (payload.new) {
-          setMaterialData((prev: any) => ({
-            ...prev,
+          setMaterialData((prev: Record<string, unknown> | null) => ({
+            ...(prev || {}),
             ...payload.new
           }));
         }

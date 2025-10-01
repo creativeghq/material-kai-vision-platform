@@ -1,6 +1,6 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
-import { MLResult, TextEmbeddingResult } from './types';
+import { MLResult } from './types';
 
 export interface OCRResult {
   text: string;
@@ -64,7 +64,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
           throw new Error('Canvas context not available');
         }
       }
-    } catch (error) {
+    } catch (_error) {
       throw new Error('Canvas functionality not available for OCR processing');
     }
   }
@@ -96,10 +96,10 @@ export class OCRService extends BaseService<OCRServiceConfig> {
 
       // Use browser's built-in text detection if available
       if ('TextDetector' in window) {
-        const textDetector = new (window as any).TextDetector();
-        const textResults = await textDetector.detect(imageBitmap);
+        const textDetector = new (window as Record<string, unknown>).TextDetector();
+        const textResults = await (textDetector as Record<string, unknown>).detect(imageBitmap);
 
-        const blocks: TextBlock[] = textResults.map((result: any) => ({
+        const blocks: TextBlock[] = (textResults as unknown[]).map((result: Record<string, unknown>) => ({
           text: result.rawValue,
           confidence: result.confidence || 0.8,
           bbox: result.boundingBox ? {
@@ -184,7 +184,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
   /**
    * Extract structured data from OCR result
    */
-  async extractStructuredData(ocrResult: OCRResult): Promise<any> {
+  async extractStructuredData(ocrResult: OCRResult): Promise<Record<string, unknown>> {
     return this.executeOperation(async () => {
       const { text } = ocrResult;
 
@@ -199,7 +199,7 @@ export class OCRService extends BaseService<OCRServiceConfig> {
         dateCode: /(?:Date|Manufactured|Prod\.?\s+Date)[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
       };
 
-      const extractedData: any = {};
+      const extractedData: Record<string, unknown> = {};
 
       for (const [key, pattern] of Object.entries(patterns)) {
         const match = text.match(pattern);

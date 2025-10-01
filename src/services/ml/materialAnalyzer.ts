@@ -104,6 +104,36 @@ export interface MaterialAnalysisOptions {
   applicationContext?: string;
 }
 
+// Visual Analysis Interfaces - Critical for MIVAA API Integration
+export interface ColorAnalysis {
+  brightness: number;
+  contrast: number;
+  dominantColors: string[];
+  metallic: number;
+  matte: number;
+}
+
+export interface TextureAnalysis {
+  roughness: number;
+  regularity: number;
+  pattern: string;
+  edgeDensity: number;
+  uniformity: number;
+}
+
+export interface SurfaceAnalysis {
+  smoothness: number;
+  reflectivity: number;
+  porosity: number;
+  glossiness: number;
+}
+
+export interface VisualFeatures {
+  color: ColorAnalysis;
+  texture: TextureAnalysis;
+  surface: SurfaceAnalysis;
+}
+
 interface MaterialAnalyzerServiceConfig extends ServiceConfig {
   enableAdvancedAnalysis?: boolean;
   knowledgeBaseSize?: number;
@@ -447,7 +477,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
   private async performVisualAnalysis(imageBitmap: ImageBitmap): Promise<{
     materialType: string;
     confidence: number;
-    visualFeatures: any;
+    visualFeatures: VisualFeatures;
   }> {
     if (!this.config.enableVisualAnalysis) {
       throw new Error('Visual analysis is disabled in service configuration');
@@ -483,9 +513,9 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     };
   }
 
-  private analyzeColors(imageData: ImageData): any {
-    const { data, width, height } = imageData;
-    const colorStats = {
+  private analyzeColors(imageData: ImageData): ColorAnalysis {
+    const { data, width: _width, height: _height } = imageData;
+    const colorStats: ColorAnalysis = {
       brightness: 0,
       contrast: 0,
       dominantColors: [] as string[],
@@ -529,12 +559,12 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     return colorStats;
   }
 
-  private analyzeTexture(imageData: ImageData): any {
+  private analyzeTexture(imageData: ImageData): TextureAnalysis {
     const { data, width, height } = imageData;
 
     // Simple texture analysis using local binary patterns
     let roughness = 0;
-    let uniformity = 0;
+    const _uniformity = 0;
     let edgeCount = 0;
 
     for (let y = 1; y < height - 1; y++) {
@@ -564,15 +594,19 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     }
 
     const pixelCount = (width - 2) * (height - 2);
+    const calculatedRoughness = roughness / pixelCount;
+    const calculatedUniformity = 1 - (edgeCount / pixelCount);
 
     return {
-      roughness: roughness / pixelCount,
+      roughness: calculatedRoughness,
+      regularity: calculatedUniformity,
+      pattern: edgeCount / pixelCount > 0.3 ? 'irregular' : 'regular',
       edgeDensity: edgeCount / pixelCount,
-      uniformity: 1 - (edgeCount / pixelCount),
+      uniformity: calculatedUniformity,
     };
   }
 
-  private analyzeSurface(imageData: ImageData): any {
+  private analyzeSurface(imageData: ImageData): SurfaceAnalysis {
     const { data } = imageData;
 
     let reflection = 0;
@@ -602,19 +636,19 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     const pixelCount = data.length / 4;
 
     return {
-      reflection: reflection / pixelCount,
-      glossiness: glossiness / Math.max(reflection, 1),
-      porosity: porosity / pixelCount,
       smoothness: 1 - (porosity / pixelCount),
+      reflectivity: reflection / pixelCount,
+      porosity: porosity / pixelCount,
+      glossiness: glossiness / Math.max(reflection, 1),
     };
   }
 
-  private classifyMaterial(colorAnalysis: any, textureAnalysis: any, surfaceAnalysis: any): {
+  private classifyMaterial(colorAnalysis: ColorAnalysis, textureAnalysis: TextureAnalysis, surfaceAnalysis: SurfaceAnalysis): {
     type: string;
     confidence: number;
   } {
     const features = {
-      metallic: surfaceAnalysis.reflection > 0.1 && surfaceAnalysis.glossiness > 0.7,
+      metallic: surfaceAnalysis.reflectivity > 0.1 && surfaceAnalysis.glossiness > 0.7,
       rough: textureAnalysis.roughness > 100,
       smooth: surfaceAnalysis.smoothness > 0.8,
       dark: colorAnalysis.brightness < 100,
@@ -653,7 +687,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   private enhancePropertiesFromVisual(
     baseProperties: Partial<MaterialProperties>,
-    visualAnalysis: any,
+    visualAnalysis: Record<string, unknown>,
   ): MaterialProperties {
     const enhanced = JSON.parse(JSON.stringify(baseProperties)) as MaterialProperties;
 
@@ -762,7 +796,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   private generateRecommendations(
     materialType: string,
-    properties: MaterialProperties,
+    _properties: MaterialProperties,
   ): AdvancedMaterialAnalysisResult['recommendations'] {
     const recommendations = {
       applications: [] as string[],
@@ -801,7 +835,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
   private assessQuality(
     properties: MaterialProperties,
-    visualAnalysis: any,
+    visualAnalysis: Record<string, unknown>,
   ): AdvancedMaterialAnalysisResult['qualityAssessment'] {
     const scores = {
       mechanical: (properties.mechanicalProperties.tensileStrength / 500) * 10,

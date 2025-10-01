@@ -384,7 +384,7 @@ export class MultiScaleTextureModule {
   /**
    * Compute energy feature from GLCM
    */
-  private computeEnergy(glcm: Float32Array, levels: number): number {
+  private computeEnergy(glcm: Float32Array, _levels: number): number {
     let energy = 0;
     for (let i = 0; i < glcm.length; i++) {
       energy += glcm[i] * glcm[i];
@@ -408,7 +408,7 @@ export class MultiScaleTextureModule {
   /**
    * Compute entropy feature from GLCM
    */
-  private computeEntropy(glcm: Float32Array, levels: number): number {
+  private computeEntropy(glcm: Float32Array, _levels: number): number {
     let entropy = 0;
     for (let i = 0; i < glcm.length; i++) {
       if (glcm[i] > 0) {
@@ -469,7 +469,7 @@ export class MultiScaleTextureModule {
     image: Float32Array,
     width: number,
     height: number,
-    kernelSize: number,
+    _kernelSize: number,
   ): Float32Array {
     // Sobel operators
     const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
@@ -548,7 +548,7 @@ export class MultiScaleTextureModule {
   /**
    * Extract statistical features
    */
-  private extractStatisticalFeatures(image: Float32Array, width: number, height: number): Float32Array {
+  private extractStatisticalFeatures(image: Float32Array, _width: number, _height: number): Float32Array {
     // Compute basic statistical moments
     let mean = 0;
     let variance = 0;
@@ -794,7 +794,7 @@ export class MultiScaleTextureModule {
   /**
    * Export module state for saving
    */
-  public exportState(): any {
+  public exportState(): Record<string, unknown> {
     return {
       config: this.config,
       fusionWeights: Array.from(this.fusionWeights),
@@ -805,9 +805,9 @@ export class MultiScaleTextureModule {
   /**
    * Import module state from saved data
    */
-  public importState(state: any): void {
+  public importState(state: Record<string, unknown>): void {
     this.config = { ...state.config };
-    this.fusionWeights = new Float32Array(state.fusionWeights);
+    this.fusionWeights = new Float32Array(state.fusionWeights as ArrayLike<number>);
     this.attentionWeights = state.attentionWeights.map((w: number[]) => new Float32Array(w));
   }
 }

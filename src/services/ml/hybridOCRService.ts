@@ -29,7 +29,7 @@ export interface HybridOCRResult extends OCRResult {
   processingMethod: 'client' | 'server' | 'hybrid';
   fallbackUsed?: boolean;
   recommendation?: string;
-  structuredData?: any;
+  structuredData?: unknown;
   documentType?: string;
 }
 
@@ -432,8 +432,8 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
     // we'll provide a basic status implementation
     try {
       // Try to create instances to check if services are available
-      const ocrInstance = OCRService.createInstance();
-      const serverInstance = ServerMLService.createInstance();
+      const _ocrInstance = OCRService.createInstance();
+      const _serverInstance = ServerMLService.createInstance();
 
       return {
         clientSupported: true, // OCR service is available
@@ -448,7 +448,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
           'Hybrid: Fallback Processing',
         ],
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         clientSupported: false,
         serverAvailable: false,
@@ -472,14 +472,14 @@ export interface HybridOCRStatic {
 }
 
 // Add static methods to HybridOCRService class
-(HybridOCRService as any).processOCR = async function(
+(HybridOCRService as unknown as { processOCR: (imageFile: File, options?: HybridOCROptions) => Promise<MLResult> }).processOCR = async function(
   imageFile: File,
   options: HybridOCROptions = {},
 ): Promise<MLResult> {
   return hybridOCRService.processOCR(imageFile, options);
 };
 
-(HybridOCRService as any).determineProcessingStrategy = async function(
+(HybridOCRService as unknown as { determineProcessingStrategy: (file: File, options?: HybridOCROptions) => Promise<'client' | 'server'> }).determineProcessingStrategy = async function(
   file: File,
   options: HybridOCROptions = {},
 ): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string; estimatedTime: string; accuracy: string; }> {

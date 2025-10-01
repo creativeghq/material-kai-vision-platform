@@ -10,7 +10,6 @@ import {
   Upload,
   Filter,
   RefreshCw,
-  ExternalLink,
   Image as ImageIcon,
   Zap,
   EyeOff,
@@ -29,7 +28,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { FunctionalPropertySearch, type FunctionalPropertyFilters } from '../Search/FunctionalPropertySearch';
-import { FunctionalCategoryFilters } from '../Search/FunctionalCategoryFilters';
 
 import EmbeddingGenerationPanel from './EmbeddingGenerationPanel';
 import { KnowledgeBasePDFViewer } from '@/components/PDF/KnowledgeBasePDFViewer';
@@ -150,8 +148,8 @@ const KnowledgeBaseManagement: React.FC = () => {
       
       // Check if entry has data in any of the selected categories
       return functionalPropertyFilters.activeCategories.some(category => {
-        const categoryData = (functionalMetadata as Record<string, any>)[category];
-        return categoryData && Object.keys(categoryData).length > 0;
+        const categoryData = (functionalMetadata as Record<string, unknown>)[category];
+        return categoryData && typeof categoryData === 'object' && categoryData !== null && Object.keys(categoryData).length > 0;
       });
     });
   }
@@ -541,7 +539,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                   <div className="text-center py-12">
                     <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-4">
-                      Click "View" on any entry above to see the enhanced PDF viewer with functional metadata
+                      Click &quot;View&quot; on any entry above to see the enhanced PDF viewer with functional metadata
                     </p>
                     <Button
                       variant="outline"

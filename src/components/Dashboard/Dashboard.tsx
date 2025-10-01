@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
 import { SearchHub } from './SearchHub';
 import { HeroSection } from './HeroSection';
@@ -9,7 +9,11 @@ import styles from './Dashboard.module.css';
 import { searchHubConfig } from './dashboardData';
 
 export const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
+
+  const navigate = (path: string) => {
+    router.push(path);
+  };
 
   return (
     <div className={styles.container}>

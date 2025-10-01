@@ -2,7 +2,7 @@ import { performance } from 'perf_hooks';
 import { createHash } from 'crypto';
 
 import { DocumentChunk, DocumentChunkingService, ChunkingStrategy } from './documentChunkingService';
-import { MivaaEmbeddingIntegration, EmbeddingRequest, EmbeddingResponse } from './mivaaEmbeddingIntegration';
+import { MivaaEmbeddingIntegration, EmbeddingRequest } from './mivaaEmbeddingIntegration';
 
 /**
  * Mivaa document structure from PDF extractor
@@ -632,7 +632,7 @@ export class MivaaToRagTransformer {
     lines.forEach((line, index) => {
       const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
       if (headerMatch) {
-        const level = headerMatch[1].length;
+        const _level = headerMatch[1].length;
         const title = headerMatch[2].trim();
         headers.push(title);
 
@@ -781,11 +781,11 @@ export class MivaaToRagTransformer {
   private findRelatedChunks(chunks: DocumentChunk[], position: { page: number }): DocumentChunk[] {
     // Simple heuristic: find chunks that might be on the same page
     const pageSize = 1000; // Approximate characters per page
-    const targetPosition = position.page * pageSize;
+    const _targetPosition = position.page * pageSize;
 
     return chunks.filter(chunk => {
       const chunkStart = chunk.position.startIndex;
-      const chunkEnd = chunk.position.endIndex;
+      const _chunkEnd = chunk.position.endIndex;
       const chunkPage = Math.floor(chunkStart / pageSize);
 
       return Math.abs(chunkPage - position.page) <= 1;

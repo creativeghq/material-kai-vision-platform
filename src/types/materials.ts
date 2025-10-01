@@ -115,7 +115,6 @@ import {
   MaterialProperty as DynamicMaterialProperty,
   LegacyMaterialCategories,
   getMaterialCategories,
-  getMaterialCategoriesLegacy,
   getMaterialProperties,
   dynamicMaterialCategoriesService
 } from '../services/dynamicMaterialCategoriesService';
@@ -251,6 +250,41 @@ export enum ProcessingJobStatus {
   Failed = 'failed'
 }
 
+// File upload and processing types - Critical for Material Recognition API
+export interface UploadedFile {
+  id: string;
+  user_id: string;
+  file_name: string;
+  file_type: 'image' | 'document' | '3d_model';
+  file_size: number;
+  storage_path: string;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+export interface RecognitionRequest {
+  files: File[];
+  options: {
+    detection_methods?: string[];
+    confidence_threshold?: number;
+    include_similar_materials?: boolean;
+    extract_properties?: boolean;
+  };
+}
+
+export interface ProcessingJob {
+  id: string;
+  user_id: string;
+  job_type: 'recognition' | '3d_reconstruction' | 'batch_analysis';
+  input_data: Record<string, unknown>;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  priority?: number;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
 export interface RecognitionResult {
   materialId: string;
   confidence: number;
@@ -291,7 +325,7 @@ export type DeepPartial<T> = {
 };
 
 export type RequiredKeys<T, K extends keyof T> = T & Required<Pick<T, K>>;
-export type Flatten<T> = T extends any[] ? T[number] : T;
+export type Flatten<T> = T extends unknown[] ? T[number] : T;
 
 // Database operation result types
 export type QueryResult<T> = {

@@ -1,6 +1,6 @@
 export interface MLResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
   confidence?: number;
   processingTime?: number;

@@ -9,7 +9,6 @@ import { ApiRegistry } from '../../config/apiConfig';
 import {
   INTERIOR_DESIGN_MODELS,
   ModelParameterValidator,
-  ModelConfig,
 } from './replicateModelConfigs';
 
 interface ReplicateServiceConfig extends ServiceConfig {
@@ -26,8 +25,8 @@ interface ReplicatePrediction {
     get: string;
     cancel: string;
   };
-  input: any;
-  output?: any;
+  input: unknown;
+  output?: unknown;
   error?: string;
   started_at?: string;
   completed_at?: string;
@@ -293,10 +292,10 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     modelId: string,
     prompt: string,
     imageUrl?: string,
-    options: Record<string, any> = {},
+    options: Record<string, unknown> = {},
   ): Promise<string | string[]> {
     return this.executeOperation(async () => {
-      const startTime = Date.now();
+      const _startTime = Date.now();
 
       // Get model configuration
       const modelConfig = INTERIOR_DESIGN_MODELS[modelId];
@@ -305,7 +304,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       }
 
       // Prepare base parameters
-      const baseParams: Record<string, any> = {
+      const baseParams: Record<string, unknown> = {
         prompt,
         ...options,
       };
@@ -378,11 +377,11 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     testPrompt: string = 'modern living room with comfortable seating',
     imageUrl?: string,
   ): Promise<{
-    results: Record<string, { success: boolean; output?: any; error?: string; processingTime: number }>;
+    results: Record<string, { success: boolean; output?: unknown; error?: string; processingTime: number }>;
     summary: { total: number; successful: number; failed: number; successRate: number };
   }> {
     return this.executeOperation(async () => {
-      const results: Record<string, any> = {};
+      const results: Record<string, unknown> = {};
       const modelIds = Object.keys(INTERIOR_DESIGN_MODELS);
 
       console.log(`Testing ${modelIds.length} interior design models...`);
@@ -410,7 +409,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       }
 
       // Calculate summary statistics
-      const successful = Object.values(results).filter((r: any) => r.success).length;
+      const successful = Object.values(results).filter((r: unknown) => (r as { success: boolean }).success).length;
       const failed = modelIds.length - successful;
       const successRate = Math.round((successful / modelIds.length) * 100);
 
@@ -491,7 +490,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     status: 'working' | 'failing' | 'untested';
     lastTested?: string;
   }> {
-    const models: Record<string, any> = {};
+    const models: Record<string, unknown> = {};
 
     for (const [modelId, config] of Object.entries(INTERIOR_DESIGN_MODELS)) {
       models[modelId] = {
@@ -547,7 +546,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
 
   // Private helper methods
 
-  private async createPrediction(request: any): Promise<ReplicatePrediction> {
+  private async createPrediction(request: Record<string, unknown>): Promise<ReplicatePrediction> {
     const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions`, {
       method: 'POST',
       headers: {
@@ -593,7 +592,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     throw new Error(`Prediction ${predictionId} timed out after ${maxAttempts} attempts`);
   }
 
-  private parseSVBRDFOutput(output: any): Partial<SVBRDFMaps> {
+  private parseSVBRDFOutput(output: unknown): Partial<SVBRDFMaps> {
     // Parse the output to extract different map types
     // This is a simplified implementation - actual parsing would depend on the model output format
     if (Array.isArray(output) && output.length >= 4) {
@@ -607,7 +606,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     return {};
   }
 
-  private async fallbackMaterialAnalysis(imageUrl: string): Promise<MaterialProperties> {
+  private async fallbackMaterialAnalysis(_imageUrl: string): Promise<MaterialProperties> {
     // Fallback analysis with default values
     return {
       material_type: 'unknown',

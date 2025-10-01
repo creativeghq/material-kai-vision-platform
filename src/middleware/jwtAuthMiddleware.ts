@@ -20,7 +20,7 @@ export interface JWTAuthOptions {
 
 export interface AuthenticatedRequest {
   headers: Record<string, string>;
-  body: any;
+  body: Record<string, unknown>;
   user?: { id: string; email?: string };
   apiKey?: string;
   workspaceId?: string;

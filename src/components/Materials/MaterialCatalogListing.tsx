@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Package,
   Filter,
@@ -26,7 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 
 import {
@@ -85,7 +85,7 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
   allowSorting = true,
   viewMode: initialViewMode = 'grid',
 }) => {
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
   const [showFilters, setShowFilters] = useState(false);
@@ -102,11 +102,11 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
 
   // Filter and sort materials based on current filter state
   const filteredAndSortedMaterials = useMemo(() => {
-    let filtered = materials.filter(material => {
+    const filtered = materials.filter(material => {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           material.name.toLowerCase().includes(searchLower) ||
           material.description?.toLowerCase().includes(searchLower) ||
           material.category.toLowerCase().includes(searchLower) ||
@@ -471,7 +471,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
   expanded,
   onToggleExpand,
   onSelect,
-  onEdit,
+  onEdit: _onEdit,
 }) => {
   const categoryDef = MATERIAL_CATEGORIES[material.category];
 
@@ -734,7 +734,6 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
               <span>Created: {new Date(material.createdAt).toLocaleDateString()}</span>
               <span>Updated: {new Date(material.updatedAt).toLocaleDateString()}</span>
             </div>
-          </CardContent>
           </CardContent>
         </CollapsibleContent>
       </Collapsible>

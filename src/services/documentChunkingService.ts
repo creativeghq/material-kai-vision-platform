@@ -36,8 +36,8 @@ export interface ChunkMetadata {
   language?: string;
   contentType: 'text' | 'table' | 'image' | 'mixed';
   headers?: string[];
-  tableData?: any;
-  imageMetadata?: any;
+  tableData?: unknown;
+  imageMetadata?: unknown;
   quality: {
     completeness: number;
     coherence: number;
@@ -79,8 +79,8 @@ export interface DocumentInput {
     workspaceId: string;
     documentId?: string;
     language?: string;
-    extractedTables?: any[];
-    extractedImages?: any[];
+    extractedTables?: unknown[];
+    extractedImages?: unknown[];
     structure?: {
       headers: string[];
       sections: Array<{
@@ -428,7 +428,7 @@ export class DocumentChunkingService {
   private async postProcessChunks(
     chunks: DocumentChunk[],
     document: DocumentInput,
-    strategy: ChunkingStrategy,
+    _strategy: ChunkingStrategy,
   ): Promise<DocumentChunk[]> {
     // Update total chunks count
     chunks.forEach(chunk => {
@@ -524,7 +524,7 @@ export class DocumentChunkingService {
     };
   }
 
-  private estimatePageNumber(position: number, totalLength: number): number {
+  private estimatePageNumber(position: number, _totalLength: number): number {
     // Rough estimate: 2000 characters per page
     return Math.floor(position / 2000) + 1;
   }
@@ -571,7 +571,7 @@ export class DocumentChunkingService {
     const averageChunkSize = chunks.reduce((sum, chunk) => sum + chunk.content.length, 0) / chunksGenerated;
 
     // Calculate overlap efficiency (how much content is actually overlapped)
-    const totalContent = chunks.reduce((sum, chunk) => sum + chunk.content.length, 0);
+    const _totalContent = chunks.reduce((sum, chunk) => sum + chunk.content.length, 0);
     const uniqueContent = new Set(chunks.map(chunk => chunk.hash)).size;
     const overlapEfficiency = uniqueContent / chunksGenerated;
 
@@ -619,10 +619,10 @@ export class DocumentChunkingService {
     return warnings;
   }
 
-  private createChunkingError(code: string, message: string, originalError?: any): Error {
+  private createChunkingError(code: string, message: string, originalError?: unknown): Error {
     const error = new Error(message);
-    (error as any).code = code;
-    (error as any).originalError = originalError;
+    (error as Record<string, unknown>).code = code;
+    (error as Record<string, unknown>).originalError = originalError;
     return error;
   }
 }

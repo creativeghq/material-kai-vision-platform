@@ -9,27 +9,22 @@ interface HuggingFaceServiceConfig extends ServiceConfig {
   baseUrl?: string;
 }
 
-interface ModelResult {
-  outputs: ClassificationOutput[] | EmbeddingOutput[] | TextOutput[] | number[] | number[][];
-  error?: string;
-}
-
 // Specific output types for different model responses
-interface ClassificationOutput {
+interface _ClassificationOutput {
   label: string;
   score: number;
 }
 
-interface EmbeddingOutput {
+interface _EmbeddingOutput {
   embedding?: number[];
   embeddings?: number[][];
 }
 
-interface TextOutput {
+interface _TextOutput {
   generated_text: string;
 }
 
-interface EmbeddingResult {
+interface _EmbeddingResult {
   embeddings: number[][];
   model: string;
   usage: {
@@ -246,7 +241,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
     }
   }
 
-  private async callHuggingFaceAPI(model: string, payload: any): Promise<any> {
+  private async callHuggingFaceAPI(model: string, payload: Record<string, unknown>): Promise<unknown> {
     if (!this.apiKey) {
       throw new Error('HuggingFace API key not available');
     }
@@ -270,7 +265,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
     return await response.json();
   }
 
-  private parseClassificationResult(result: any): ClassificationResult[] {
+  private parseClassificationResult(result: unknown): ClassificationResult[] {
     if (Array.isArray(result)) {
       return result.map(item => ({
         label: item.label || item.class || 'unknown',

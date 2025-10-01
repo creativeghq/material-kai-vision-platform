@@ -11,11 +11,8 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 
@@ -39,7 +36,7 @@ export const FunctionalCategoryFilters = ({
   const updatePropertyFilter = useCallback((
     categoryKey: string,
     propertyKey: string,
-    value: any
+    value: unknown
   ) => {
     const newFilters = {
       ...filters,
@@ -663,7 +660,7 @@ export const FunctionalCategoryFilters = ({
       default:
         return (
           <div className="p-4 text-sm text-muted-foreground">
-            Category filters for "{category}" are not yet implemented.
+            Category filters for &quot;{category}&quot; are not yet implemented.
           </div>
         );
     }

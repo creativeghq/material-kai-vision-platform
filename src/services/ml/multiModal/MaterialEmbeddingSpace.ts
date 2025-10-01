@@ -9,7 +9,7 @@ export interface MaterialEmbedding {
   id: string;
   embedding: Float32Array;
   materialType: string;
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   confidence: number;
   timestamp: number;
 }
@@ -26,7 +26,7 @@ export interface SimilarityResult {
   materialId: string;
   similarity: number;
   materialType: string;
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   distance: number;
 }
 
@@ -60,7 +60,7 @@ export class MaterialEmbeddingSpace {
     materialId: string,
     crossModalFeatures: CrossModalFeatures,
     materialType: string,
-    properties: Record<string, any>,
+    properties: Record<string, unknown>,
   ): MaterialEmbedding {
     // Project cross-modal features to embedding space
     const embedding = this.projectToEmbeddingSpace(crossModalFeatures);
@@ -185,7 +185,7 @@ export class MaterialEmbeddingSpace {
 
     for (let iter = 0; iter < maxIterations; iter++) {
       // Assign points to nearest centroids
-      const newAssignments = embeddings.map((embedding, index) => {
+      const newAssignments = embeddings.map((embedding, _index) => {
         let bestCluster = 0;
         let bestDistance = Infinity;
 

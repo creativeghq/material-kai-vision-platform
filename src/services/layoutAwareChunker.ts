@@ -443,7 +443,7 @@ export class LayoutAwareChunker {
         try {
           const result = await this.textEmbedder.generateEmbedding(chunk.text);
           if (result.success && 'embedding' in result) {
-            chunk.embedding = (result as any).embedding;
+            chunk.embedding = (result as Record<string, unknown>).embedding as number[];
           }
         } catch (error) {
           console.warn(`Failed to generate HuggingFace embedding for chunk ${chunk.id}:`, error);
@@ -703,7 +703,7 @@ export class LayoutAwareChunker {
   /**
    * Convert knowledge base entry to chunk format
    */
-  private convertKnowledgeEntryToChunk(row: any): DocumentChunk {
+  private convertKnowledgeEntryToChunk(row: Record<string, unknown>): DocumentChunk {
     const metadata = row.metadata || {};
 
     return {

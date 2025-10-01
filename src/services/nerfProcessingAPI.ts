@@ -28,7 +28,7 @@ export interface NeRFReconstructionRecord {
   processing_time_ms?: number;
   quality_score?: number;
   error_message?: string;
-  metadata: any;
+  metadata: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -134,7 +134,7 @@ export class NeRFProcessingAPI {
         const file = files[i];
         const fileName = `${user.id}/${timestamp}/image_${i + 1}.${file.name.split('.').pop()}`;
 
-        const { data, error } = await supabase.storage
+        const { data: _data, error } = await supabase.storage
           .from('material-images')
           .upload(fileName, file);
 
@@ -164,7 +164,7 @@ export class NeRFProcessingAPI {
   /**
    * Get reconstruction analytics
    */
-  static async getReconstructionAnalytics(timeRange = '30 days') {
+  static async getReconstructionAnalytics(_timeRange = '30 days') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {

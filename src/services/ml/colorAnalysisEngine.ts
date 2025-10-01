@@ -240,7 +240,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     const pixels = this.samplePixels(imageData, 1000); // Sample for performance
     const clusters = this.kMeansCluster(pixels, k);
 
-    return clusters.map((cluster, index) => {
+    return clusters.map((cluster, _index) => {
       const rgb = {
         r: Math.round(cluster.centroid[0]),
         g: Math.round(cluster.centroid[1]),
@@ -265,7 +265,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
    */
   private kMeansCluster(points: number[][], k: number, maxIterations: number = 50) {
     // Initialize centroids randomly
-    let centroids = Array.from({ length: k }, () =>
+    const centroids = Array.from({ length: k }, () =>
       points[Math.floor(Math.random() * points.length)].slice(),
     );
 
@@ -583,17 +583,17 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     return { l: lab.l, c, h: h < 0 ? h + 360 : h };
   }
 
-  private findClosestPantone(rgb: { r: number; g: number; b: number }): string {
+  private findClosestPantone(_rgb: { r: number; g: number; b: number }): string {
     // Simplified - would use actual Pantone color database
     return `PANTONE ${Math.floor(Math.random() * 999) + 1}-C`;
   }
 
-  private findClosestRAL(rgb: { r: number; g: number; b: number }): string {
+  private findClosestRAL(_rgb: { r: number; g: number; b: number }): string {
     // Simplified - would use actual RAL color database
     return `RAL ${Math.floor(Math.random() * 9999) + 1000}`;
   }
 
-  private getColorName(rgb: { r: number; g: number; b: number }): string {
+  private getColorName(_rgb: { r: number; g: number; b: number }): string {
     // Simplified color naming - would use comprehensive color name database
     const names = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'Brown', 'Gray', 'Black', 'White'];
     return names[Math.floor(Math.random() * names.length)];
@@ -614,7 +614,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
 
   private calculateColorBalance(colors: Color[]): number {
     // Simplified balance calculation
-    const total = colors.reduce((sum, color) => sum + color.percentage, 0);
+    const _total = colors.reduce((sum, color) => sum + color.percentage, 0);
     const ideal = 1 / colors.length;
     const variance = colors.reduce((sum, color) => sum + Math.abs(color.percentage - ideal), 0);
     return Math.max(0, 1 - variance);
@@ -638,7 +638,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     return variance < 100 && avg > 100;
   }
 
-  private getColorCulturalMeanings(color: Color): CulturalAssociation[] {
+  private getColorCulturalMeanings(_color: Color): CulturalAssociation[] {
     // Simplified cultural associations - would use comprehensive database
     return [
       {
@@ -650,7 +650,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     ];
   }
 
-  private getColorPsychology(color: Color): { emotions: string[]; energy: number; formality: number; warmth: number; trust: number } {
+  private getColorPsychology(_color: Color): { emotions: string[]; energy: number; formality: number; warmth: number; trust: number } {
     // Simplified psychological analysis
     return {
       emotions: ['calm', 'confident'],
@@ -661,7 +661,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
     };
   }
 
-  private determineMood(emotions: string[], colors: Color[]): string {
+  private determineMood(emotions: string[], _colors: Color[]): string {
     return emotions.length > 0 ? emotions[0] : 'neutral';
   }
 

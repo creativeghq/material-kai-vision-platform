@@ -1,5 +1,4 @@
 // Get your Jina AI API key for free: https://jina.ai/?sui=apikey
-import { supabase } from '@/integrations/supabase/client';
 
 export interface JinaEmbeddingResponse {
   data: Array<{
@@ -89,7 +88,7 @@ export interface MaterialData {
   category?: string;
   price?: string;
   images: string[];
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   sourceUrl: string;
   supplier?: string;
   confidence?: number;
@@ -273,7 +272,7 @@ class JinaAIService {
       headers['X-No-Cache'] = 'true';
     }
 
-    const body: any = { q: query };
+    const body: Record<string, unknown> = { q: query };
     if (options.num) body.num = options.num;
     if (options.location) body.location = options.location;
     if (options.language) body.hl = options.language;

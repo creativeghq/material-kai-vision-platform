@@ -8,7 +8,7 @@ import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAut
  * Request/Response types for unified PDF API
  */
 export interface ApiRequest {
-  headers: Record<string, string>;
+  headers: { [key: string]: string };
   body: unknown;
   user?: { id: string };
   file?: File;
@@ -40,9 +40,9 @@ export interface ProcessingJob {
   workspaceId?: string;
   results?: unknown;
   error?: unknown;
-  createdAt: Date;
-  startedAt?: Date;
-  completedAt?: Date;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
   // Additional properties that may exist in actual job objects
   [key: string]: unknown;
 }

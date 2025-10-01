@@ -3,7 +3,6 @@ import {
   Shield,
   Droplets,
   Thermometer,
-  Zap,
   Hammer,
   Leaf,
   Waves,
@@ -21,8 +20,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
 import {
   Collapsible,
   CollapsibleContent,
@@ -143,7 +140,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
     }
   };
 
-  const renderPropertyValue = (key: string, value: unknown): React.ReactNode => {
+  const renderPropertyValue = (_key: string, value: unknown): React.ReactNode => {
     if (value === null || value === undefined) return null;
     
     if (typeof value === 'boolean') {

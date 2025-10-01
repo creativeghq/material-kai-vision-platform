@@ -1,47 +1,46 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 
-import { DocumentChunkingService, ChunkingStrategy } from '../services/documentChunkingService';
+import { DocumentChunkingService } from '../services/documentChunkingService';
 import { MivaaToRagTransformer, MivaaDocument, RagDocument, TransformationConfig } from '../services/mivaaToRagTransformer';
 import { EnhancedRAGService } from '../services/enhancedRAGService';
-import { DocumentVectorStoreService, createDocumentVectorStoreService, BatchStoreRequest } from '../services/documentVectorStoreService';
-import { ErrorHandler } from '../utils/errorHandler';
+import { createDocumentVectorStoreService, BatchStoreRequest } from '../services/documentVectorStoreService';
 import { MivaaIntegrationService } from '../services/pdf/mivaaIntegrationService';
 
 // Define EmbeddingInput interface for compatibility
 interface EmbeddingInput {
   id: string;
   text: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Type definitions for external dependencies
 interface Logger {
-  info(message: string, meta?: any): void;
-  error(message: string, meta?: any): void;
-  warn(message: string, meta?: any): void;
-  debug(message: string, meta?: any): void;
+  info(message: string, meta?: Record<string, unknown>): void;
+  error(message: string, meta?: Record<string, unknown>): void;
+  warn(message: string, meta?: Record<string, unknown>): void;
+  debug(message: string, meta?: Record<string, unknown>): void;
 }
 
 interface Queue {
-  add(name: string, data: any, options?: any): Promise<Job>;
-  process(name: string, processor: (job: Job) => Promise<any>): void;
+  add(name: string, data: Record<string, unknown>, options?: Record<string, unknown>): Promise<Job>;
+  process(name: string, processor: (job: Job) => Promise<unknown>): void;
   getJobs(types: string[]): Promise<Job[]>;
   close(): Promise<void>;
-  on(event: string, handler: (...args: any[]) => void): void;
+  on(event: string, handler: (...args: unknown[]) => void): void;
 }
 
 interface Job {
-  data: any;
+  data: Record<string, unknown>;
   remove(): Promise<void>;
 }
 
 // Simple queue implementation for development
 class SimpleQueue extends EventEmitter implements Queue {
   private jobs: Map<string, Job> = new Map();
-  private processors: Map<string, (job: Job) => Promise<any>> = new Map();
+  private processors: Map<string, (job: Job) => Promise<unknown>> = new Map();
 
-  async add(name: string, data: any, options?: any): Promise<Job> {
+  async add(name: string, data: Record<string, unknown>, _options?: Record<string, unknown>): Promise<Job> {
     const job: Job = {
       data: { ...data, jobType: name },
       remove: async () => {
@@ -67,11 +66,11 @@ class SimpleQueue extends EventEmitter implements Queue {
     return job;
   }
 
-  process(name: string, processor: (job: Job) => Promise<any>): void {
+  process(name: string, processor: (job: Job) => Promise<unknown>): void {
     this.processors.set(name, processor);
   }
 
-  async getJobs(types: string[]): Promise<Job[]> {
+  async getJobs(_types: string[]): Promise<Job[]> {
     return Array.from(this.jobs.values());
   }
 
@@ -91,7 +90,7 @@ export interface ProcessingRequest {
   mivaaDocument: MivaaDocument;
   config?: Partial<WorkflowConfig>;
   priority?: 'low' | 'normal' | 'high';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -159,8 +158,8 @@ export interface WorkflowStage {
   startTime?: Date;
   endTime?: Date;
   error?: string;
-  result?: any;
-  metrics?: Record<string, any>;
+  result?: unknown;
+  metrics?: Record<string, unknown>;
 }
 
 /**
@@ -193,16 +192,16 @@ export interface WorkflowState {
   requestId: string;
   workspaceId: string;
   currentStage: string;
-  stageData: Record<string, any>;
+  stageData: Record<string, unknown>;
   checkpoints: Array<{
     stage: string;
     timestamp: Date;
-    data: any;
+    data: unknown;
   }>;
   rollbackPoints: Array<{
     stage: string;
     timestamp: Date;
-    state: any;
+    state: unknown;
   }>;
 }
 
@@ -295,7 +294,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
     transformerService: MivaaToRagTransformer,
     ragService: EnhancedRAGService,
     logger: Logger,
-    redisConfig?: any,
+    _redisConfig?: Record<string, unknown>,
   ) {
     super();
 
@@ -319,7 +318,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
    * Process a document through the complete workflow
    */
   async processDocument(request: ProcessingRequest): Promise<WorkflowJob> {
-    const startTime = performance.now();
+    const _startTime = performance.now();
     const jobId = this.generateJobId();
     const config = { ...this.defaultConfig, ...request.config };
 
@@ -348,7 +347,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
 
     try {
       // Add job to processing queue
-      const queueJob = await this.processingQueue.add('process-document', {
+      const _queueJob = await this.processingQueue.add('process-document', {
         jobId,
         request,
         config,
@@ -549,7 +548,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
    * Setup event handlers
    */
   private setupEventHandlers(): void {
-    this.processingQueue.on('completed', (job: Job, result: any) => {
+    this.processingQueue.on('completed', (job: Job, _result: unknown) => {
       this.logger.info('Queue job completed', { jobId: job.data.jobId });
     });
 
@@ -613,7 +612,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       });
 
       // Stage 3: Embedding Generation (MIVAA Integration)
-      const embeddingResult = await this.executeStage(job, 'embedding', async () => {
+      const _embeddingResult = await this.executeStage(job, 'embedding', async () => {
         if (!config.transformation.embeddings.enabled) {
           return { skipped: true };
         }
@@ -661,7 +660,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
         // For now, return a mock result to maintain workflow compatibility
         // TODO: Implement proper embedding generation service
         return {
-          embeddings: embeddingInputs.map((input, index) => ({
+          embeddings: embeddingInputs.map((input, _index) => ({
             id: input.id,
             embedding: new Array(1536).fill(0), // Mock embedding vector
             metadata: input.metadata || {},
@@ -687,7 +686,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
       });
 
       // Stage 5: RAG Integration
-      const ragIntegrationResult = await this.executeStage(job, 'rag-integration', async () => {
+      const _ragIntegrationResult = await this.executeStage(job, 'rag-integration', async () => {
         job.status = 'rag-integrating';
         this.emit('jobProgress', job);
 
@@ -766,7 +765,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
   /**
    * Execute workflow from a specific stage
    */
-  private async executeWorkflowFromStage(jobId: string, fromStage: string): Promise<any> {
+  private async executeWorkflowFromStage(jobId: string, fromStage: string): Promise<unknown> {
     // Implementation for resuming from a specific stage
     // This would restore state and continue from the specified stage
     const appError = new Error(
@@ -875,7 +874,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
   private createWorkflowState(
     job: WorkflowJob,
     request: ProcessingRequest,
-    config: WorkflowConfig,
+    _config: WorkflowConfig,
   ): void {
     const state: WorkflowState = {
       jobId: job.id,
@@ -893,7 +892,7 @@ export class DocumentWorkflowOrchestrator extends EventEmitter {
   /**
    * Create a checkpoint for rollback
    */
-  private createCheckpoint(jobId: string, stage: string, data: any): void {
+  private createCheckpoint(jobId: string, stage: string, data: Record<string, unknown>): void {
     const state = this.stateStore.get(jobId);
     if (!state) return;
 

@@ -13,7 +13,7 @@ export interface MoodBoardItem {
     name: string;
     category: string;
     thumbnail_url?: string;
-    properties: any;
+    properties: unknown;
   };
 }
 

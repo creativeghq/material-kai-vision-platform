@@ -2,8 +2,6 @@ import { supabase } from '@/integrations/supabase/client';
 
 import { ErrorHandler } from '../utils/errorHandler';
 
-import { RagDocument } from './mivaaToRagTransformer';
-
 export interface EnhancedRAGRequest {
   query: string;
   context?: {
@@ -30,7 +28,7 @@ export interface EnhancedRAGResponse {
   };
   semanticAnalysis: {
     queryEmbedding: number[];
-    detectedEntities: Record<string, any>;
+    detectedEntities: Record<string, unknown>;
     queryComplexity: number;
     suggestedRefinements: string[];
   };
@@ -53,7 +51,7 @@ export interface KnowledgeResult {
   content: string;
   relevanceScore: number;
   source: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   pdfUrl?: string; // Link to original PDF on Supabase for additional details
   sourceUrl?: string; // General source URL (kept for backward compatibility)
 }
@@ -89,7 +87,7 @@ export interface MaterialKnowledgeEntry {
   extractionType: string;
   extractedKnowledge: string;
   confidence: number;
-  extractionContext: Record<string, any>;
+  extractionContext: Record<string, unknown>;
   sourceFields: string[];
   validationStatus: string;
   validatedBy?: string;
@@ -121,10 +119,10 @@ export interface QueryIntelligence {
   processedQuery: string;
   queryIntent: string;
   queryType: string;
-  entitiesDetected: Record<string, any>;
-  userContext: Record<string, any>;
-  sessionContext: Record<string, any>;
-  projectContext: Record<string, any>;
+  entitiesDetected: Record<string, unknown>;
+  userContext: Record<string, unknown>;
+  sessionContext: Record<string, unknown>;
+  projectContext: Record<string, unknown>;
   resultsReturned: number;
   userSatisfaction?: number;
   clickedResults: string[];
@@ -182,7 +180,7 @@ export class EnhancedRAGService {
         extractionType: item.extraction_type,
         extractedKnowledge: item.extracted_knowledge,
         confidence: item.confidence_score,
-        extractionContext: (item.extraction_context as Record<string, any>) || {},
+        extractionContext: (item.extraction_context as Record<string, unknown>) || {},
         sourceFields: item.source_fields || [],
         validationStatus: item.validation_status,
         validatedBy: item.validated_by,
@@ -342,10 +340,10 @@ export class EnhancedRAGService {
         processedQuery: item.processed_query,
         queryIntent: item.query_intent,
         queryType: item.query_type,
-        entitiesDetected: (item.entities_detected as Record<string, any>) || {},
-        userContext: (item.user_context as Record<string, any>) || {},
-        sessionContext: (item.session_context as Record<string, any>) || {},
-        projectContext: (item.project_context as Record<string, any>) || {},
+        entitiesDetected: (item.entities_detected as Record<string, unknown>) || {},
+        userContext: (item.user_context as Record<string, unknown>) || {},
+        sessionContext: (item.session_context as Record<string, unknown>) || {},
+        projectContext: (item.project_context as Record<string, unknown>) || {},
         resultsReturned: item.results_returned,
         userSatisfaction: item.user_satisfaction,
         clickedResults: item.clicked_results || [],

@@ -83,7 +83,7 @@ export interface DetectedObject {
   label: string;
   confidence: number;
   boundingBox: BoundingBox;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
 }
 
 export interface ClassificationResult {

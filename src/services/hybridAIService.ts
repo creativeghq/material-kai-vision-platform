@@ -17,7 +17,7 @@ export interface HybridRequest {
 
 export interface HybridResponse {
   success: boolean;
-  data: any;
+  data: unknown;
   provider: string;
   attempts: Array<{
     provider: string;
@@ -27,7 +27,7 @@ export interface HybridResponse {
     processing_time_ms: number;
   }>;
   final_score: number;
-  validation: any;
+  validation: unknown;
   total_processing_time_ms: number;
 }
 
@@ -69,9 +69,9 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
       .filter(p => p.available)
       .sort((a, b) => a.priority - b.priority);
 
-    let bestResult: any = null;
+    let bestResult: unknown = null;
     let bestScore = 0;
-    let bestValidation: any = null;
+    let bestValidation: unknown = null;
 
     for (const provider of sortedProviders) {
       if (attempts.length >= maxRetries) {
@@ -83,7 +83,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
       try {
         console.log(`Attempting ${request.type} with ${provider.name}`);
 
-        let result: any;
+        let result: unknown;
         switch (provider.name) {
           case 'mivaa':
             result = await HybridAIService.callMIVAA(request);
@@ -162,7 +162,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   }
 
   // Call hybrid analysis edge function
-  static async callHybridAnalysis(request: any): Promise<HybridResponse> {
+  static async callHybridAnalysis(request: HybridRequest): Promise<HybridResponse> {
     const { supabase } = await import('@/integrations/supabase/client');
 
     const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
@@ -177,7 +177,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   }
 
   // MIVAA API calls (primary provider)
-  private static async callMIVAA(request: HybridRequest): Promise<any> {
+  private static async callMIVAA(request: HybridRequest): Promise<HybridResponse> {
     const mivaaGatewayUrl = process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000';
     const mivaaApiKey = process.env.NEXT_PUBLIC_MIVAA_API_KEY;
     
@@ -203,7 +203,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 
     const systemPrompt = HybridAIService.getSystemPrompt(request.type);
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: request.prompt },
@@ -253,7 +253,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   }
 
   // Claude API calls (for client-side use)
-  private static async callClaude(request: HybridRequest): Promise<any> {
+  private static async callClaude(_request: HybridRequest): Promise<unknown> {
     // This would be called from edge function, not client
     throw new Error('Use callHybridAnalysis instead for client-side calls');
   }
@@ -293,7 +293,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   }
 
   // Simple validation - server-side validation now handles comprehensive checks
-  private static validateResponse(result: any, request: HybridRequest): any {
+  private static validateResponse(result: Record<string, unknown>, _request: HybridRequest): HybridResponse {
     // Basic validation for all request types - server now handles detailed validation
     const hasContent = result && (result.text || result.raw_response || result.image_url || Object.keys(result).length > 0);
     const hasError = result?.error || result?.status === 'error';
@@ -357,4 +357,4 @@ export const HybridAIServiceStatic = {
 };
 
 // Extend the class with static methods for backward compatibility
-(HybridAIService as any).processRequest = HybridAIServiceStatic.processRequest;
+(HybridAIService as unknown as { processRequest: typeof HybridAIServiceStatic.processRequest }).processRequest = HybridAIServiceStatic.processRequest;

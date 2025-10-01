@@ -11,7 +11,7 @@ interface DeviceDetectorServiceConfig extends ServiceConfig {
 }
 
 export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConfig> {
-  private deviceCapabilityCache: Map<string, any> = new Map();
+  private deviceCapabilityCache: Map<string, unknown> = new Map();
   private lastCacheUpdate: number = 0;
 
   protected constructor(config: DeviceDetectorServiceConfig) {
@@ -54,10 +54,10 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
   private async initializeWebGPUDetection(): Promise<void> {
     if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
       try {
-        const gpu = (navigator as any).gpu;
-        if (gpu && typeof gpu.requestAdapter === 'function') {
+        const gpu = (navigator as Record<string, unknown>).gpu;
+        if (gpu && typeof (gpu as Record<string, unknown>).requestAdapter === 'function') {
           // Test adapter availability during initialization
-          const adapter = await gpu.requestAdapter();
+          const adapter = await (gpu as Record<string, unknown>).requestAdapter();
           if (adapter && this.config.enableDeviceCapabilityCache) {
             this.deviceCapabilityCache.set('webgpu-adapter', adapter);
             this.lastCacheUpdate = Date.now();
@@ -122,9 +122,9 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
       }
 
       try {
-        const gpu = (navigator as any).gpu;
-        if (gpu && typeof gpu.requestAdapter === 'function') {
-          const adapter = await gpu.requestAdapter();
+        const gpu = (navigator as Record<string, unknown>).gpu;
+        if (gpu && typeof (gpu as Record<string, unknown>).requestAdapter === 'function') {
+          const adapter = await (gpu as Record<string, unknown>).requestAdapter();
           const result = !!adapter;
 
           // Cache the result if caching is enabled

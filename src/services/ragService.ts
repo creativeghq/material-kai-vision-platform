@@ -15,7 +15,7 @@ export interface RAGSearchResult {
   similarity_score: number;
   title: string;
   content: string;
-  metadata: any;
+  metadata: unknown;
 }
 
 export interface RAGResponse {
@@ -219,7 +219,7 @@ class RAGService {
   /**
    * Get training job status
    */
-  async getTrainingStatus(jobType: string = 'model_training'): Promise<any[]> {
+  async getTrainingStatus(jobType: string = 'model_training'): Promise<unknown[]> {
     const { data, error } = await supabase
       .from('processing_queue')
       .select('*')

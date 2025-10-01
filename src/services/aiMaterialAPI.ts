@@ -191,7 +191,7 @@ export class AIMaterialAPI {
   }
 
   // Get enhanced analytics for a user
-  static async getUserAnalytics(userId: string, timeRange = '30 days') {
+  static async getUserAnalytics(userId: string, _timeRange = '30 days') {
     try {
       const { data, error } = await supabase
         .from('analytics_events')

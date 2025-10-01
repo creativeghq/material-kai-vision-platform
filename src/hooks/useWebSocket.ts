@@ -186,7 +186,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
 export function useWebSocketSubscription(
   url: string,
   messageType: string,
-  onMessage: (payload: any) => void,
+  onMessage: (payload: unknown) => void,
   options: UseWebSocketOptions = {},
 ) {
   const { lastMessage } = useWebSocket(url, options);
@@ -206,7 +206,7 @@ export function useRealTimeStatus(
   entityId: string,
   options: UseWebSocketOptions = {},
 ) {
-  const [status, setStatus] = useState<any>(null);
+  const [status, setStatus] = useState<unknown>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const { send, isConnected } = useWebSocket(url, {

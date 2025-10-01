@@ -490,7 +490,7 @@ export class TextureGaborFilters {
   /**
    * Save filter parameters for later use
    */
-  public exportParameters(): any {
+  public exportParameters(): unknown {
     return {
       config: this.config,
       filterBank: {
@@ -503,10 +503,10 @@ export class TextureGaborFilters {
   /**
    * Load filter parameters from saved state
    */
-  public importParameters(params: any): void {
-    this.config = { ...this.config, ...params.config };
-    this.filterBank.orientations = new Float32Array(params.filterBank.orientations);
-    this.filterBank.frequencies = new Float32Array(params.filterBank.frequencies);
+  public importParameters(params: Record<string, unknown>): void {
+    this.config = { ...this.config, ...(params.config as Record<string, unknown>) };
+    this.filterBank.orientations = new Float32Array((params.filterBank as Record<string, unknown>).orientations as number[]);
+    this.filterBank.frequencies = new Float32Array((params.filterBank as Record<string, unknown>).frequencies as number[]);
     this.initializeFilterBank();
   }
 }

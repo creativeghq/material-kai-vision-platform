@@ -1,11 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import {
-  AppError,
   ValidationError,
-  NetworkError,
   APIError,
-  DatabaseError,
-  ExternalServiceError,
   ErrorLogger,
   errorLogger,
 } from '@/core/errors';
@@ -17,11 +13,7 @@ import {
   AgentExecutionMetadata,
 } from '@/types/materials';
 import {
-  isAgentExecutionData,
-  isSpatialAnalysisData,
-  isSuccessApiResponse,
-  isErrorApiResponse,
-  validateWithGuard,
+  validateWithGuard as _validateWithGuard,
   createValidationResult,
 } from '@/types/guards';
 import { UserPreferences } from '@/services/spaceformerAnalysisService';
@@ -115,8 +107,8 @@ export interface SpaceFormerResult {
   spatial_features: SpatialFeature[];
   layout_suggestions: LayoutSuggestion[];
   material_placements: MaterialPlacement[];
-  accessibility_analysis: any;
-  flow_optimization: any;
+  accessibility_analysis: Record<string, unknown>;
+  flow_optimization: Record<string, unknown>;
   reasoning_explanation: string;
   confidence_score: number;
   processing_time_ms: number;
@@ -407,7 +399,7 @@ export class IntegratedAIService {
   static async generateCompleteDesign(
     images: File[],
     roomType: string,
-    userPreferences: any = {},
+    userPreferences: Record<string, unknown> = {},
   ) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -512,7 +504,7 @@ export class IntegratedAIService {
   /**
    * Get comprehensive analytics across all AI systems
    */
-  static async getIntegratedAnalytics(timeRange = '30 days') {
+  static async getIntegratedAnalytics(_timeRange = '30 days') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {

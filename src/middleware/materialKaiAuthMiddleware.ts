@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
 // Define a minimal Database type for now
-type Database = any;
+type Database = Record<string, unknown>;
 
 // Material Kai API Key Data Interface
 export interface MaterialKaiKeyData {
@@ -173,7 +173,7 @@ export class MaterialKaiAuthMiddleware {
       // In production with database, this would query usage logs
 
       const now = new Date();
-      const oneMinuteAgo = new Date(now.getTime() - 60000);
+      const _oneMinuteAgo = new Date(now.getTime() - 60000);
 
       // For now, allow all requests (rate limiting will be implemented with database)
       return {

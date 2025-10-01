@@ -24,33 +24,23 @@ export interface HybridStyleResult {
 }
 
 // Database response interfaces for stored style analysis
-interface StoredStyleConfidence {
+interface _StoredStyleConfidence {
   primary_style?: string;
   confidence?: number;
   modernity_score?: number;
   luxury_level?: string;
 }
 
-interface StoredColorPalette {
+interface _StoredColorPalette {
   dominant_colors?: string[];
   color_harmony?: string;
   warmth_score?: number;
 }
 
-interface StoredTextureAnalysis {
+interface _StoredTextureAnalysis {
   texture?: string;
   finish?: string;
   pattern?: string;
-}
-
-interface StoredStyleAnalysisData {
-  material_id: string;
-  style_confidence: StoredStyleConfidence;
-  color_palette: StoredColorPalette;
-  texture_analysis: StoredTextureAnalysis;
-  room_suitability: Record<string, unknown>;
-  trend_score: number;
-  style_tags: string[];
 }
 
 /**
@@ -332,7 +322,7 @@ export class HybridStyleAnalysisService {
   /**
    * Get style recommendations based on room type
    */
-  async getStyleRecommendations(roomType: string, stylePreferences?: string[]): Promise<{
+  async getStyleRecommendations(roomType: string, _stylePreferences?: string[]): Promise<{
     recommendations: Array<{
       style: string;
       description: string;

@@ -509,7 +509,7 @@ export class DocumentVectorStoreService {
       console.log('Deleting document vectors', { documentId, workspaceId });
 
       const { error } = await supabase
-        .from(this.config.storage.tableName as any)
+        .from(this.config.storage.tableName as unknown as string)
         .delete()
         .eq('document_id', documentId)
         .eq('workspace_id', workspaceId);
@@ -546,7 +546,7 @@ export class DocumentVectorStoreService {
   private async getExistingChunkIds(documentId: string, workspaceId: string): Promise<Set<string>> {
     try {
       const { data, error } = await supabase
-        .from(this.config.storage.tableName as any)
+        .from(this.config.storage.tableName as unknown as string)
         .select('chunk_id')
         .eq('document_id', documentId)
         .eq('workspace_id', workspaceId);
@@ -560,7 +560,7 @@ export class DocumentVectorStoreService {
         return new Set();
       }
 
-      return new Set(data?.map(item => (item as any).chunk_id) || []);
+      return new Set(data?.map(item => (item as Record<string, unknown>).chunk_id as string) || []);
 
     } catch (error) {
       console.warn('Error fetching existing chunk IDs', {

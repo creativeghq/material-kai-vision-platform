@@ -15,7 +15,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { 
   Collapsible,
   CollapsibleContent,
@@ -292,7 +291,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                 <CollapsibleContent>
                   <CardContent className="pt-0">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {entry.metadata.processed_images.map((image: any, idx: number) => (
+                      {entry.metadata.processed_images.map((image: Record<string, unknown>, idx: number) => (
                         <div key={idx} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                           <div className="aspect-video bg-gray-100 flex items-center justify-center">
                             {image.storage_path ? (

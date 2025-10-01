@@ -8,7 +8,6 @@
 
 import {
   ImagePreprocessingService,
-  ImageValidationResult,
   ProcessedImageResult,
   ImageMetadata
 } from './imagePreprocessing';
@@ -20,7 +19,6 @@ import {
 import { supabase } from '../integrations/supabase/client';
 import { Database } from '../integrations/supabase/types';
 import {
-  AppError,
   ValidationError,
   ExternalServiceError,
   errorLogger,
@@ -45,14 +43,14 @@ export interface MaterialVisionAnalysisResult {
       color?: string;
       finish?: string;
       pattern?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     };
   }>;
   overall_analysis: {
     description: string;
     style_assessment?: string;
-    technical_properties?: any;
-    [key: string]: any;
+    technical_properties?: Record<string, unknown>;
+    [key: string]: unknown;
   };
   error_message?: string;
 }
@@ -62,8 +60,8 @@ export interface MaterialVisionAnalysisRequest {
   image_url?: string;
   image_data?: string;
   analysis_type: string;
-  context?: any;
-  options?: any;
+  context?: Record<string, unknown>;
+  options?: Record<string, unknown>;
 }
 
 // Type definitions for the visual feature extraction pipeline
@@ -97,7 +95,7 @@ export interface VisualFeatureExtractionResult {
     finish_type: string;
     pattern_grain: string;
     confidence_score: number;
-    structured_properties: any;
+    structured_properties: Record<string, unknown>;
   };
   embeddings?: {
     description_embedding?: number[];
@@ -268,8 +266,8 @@ export class VisualFeatureExtractionService {
       };
     }
 
-    const data = mivaaResponse.data as any;
-    
+    const data = mivaaResponse.data as Record<string, unknown>;
+
     return {
       success: true,
       analysis_id: data.analysis_id || `analysis_${Date.now()}`,
@@ -307,10 +305,10 @@ export class VisualFeatureExtractionService {
     image_url: string;
     image_data: string;
     analysis_type: string;
-    context: any;
+    context: Record<string, unknown>;
     include_embeddings: boolean;
     include_clip_analysis: boolean;
-  }): Promise<[MaterialVisionAnalysisResult, any]> {
+  }): Promise<[MaterialVisionAnalysisResult, Record<string, unknown>]> {
     try {
       // Prepare both MIVAA requests
       const llamaRequest: GatewayRequest = {
@@ -383,12 +381,12 @@ export class VisualFeatureExtractionService {
   /**
    * Extract CLIP embeddings from MIVAA gateway response
    */
-  private static extractClipEmbeddings(clipResponse: GatewayResponse): any {
+  private static extractClipEmbeddings(clipResponse: GatewayResponse): Record<string, unknown> | null {
     if (!clipResponse.success || !clipResponse.data) {
       return null;
     }
 
-    const data = clipResponse.data as any;
+    const data = clipResponse.data as Record<string, unknown>;
     return {
       clip_embedding: data.embedding || data.visual_embedding || data.embeddings,
       embedding_type: 'clip_512d',
@@ -403,9 +401,9 @@ export class VisualFeatureExtractionService {
    */
   private static combineEmbeddingResults(
     llamaResult: MaterialVisionAnalysisResult,
-    clipEmbeddings: any
-  ): any {
-    const combined: any = {};
+    clipEmbeddings: Record<string, unknown> | null
+  ): Record<string, unknown> {
+    const combined: Record<string, unknown> = {};
 
     // Add description embeddings from LLaMA (if any)
     if (llamaResult.overall_analysis?.description) {
@@ -433,7 +431,7 @@ export class VisualFeatureExtractionService {
   /**
    * Generate text embedding (placeholder - would call text embedding service)
    */
-  private static generateTextEmbedding(text: string): number[] | null {
+  private static generateTextEmbedding(_text: string): number[] | null {
     // TODO: Implement actual text embedding generation via MIVAA
     // For now, return null to indicate no text embeddings
     // This would be replaced with a call to a text embedding MIVAA action
@@ -496,7 +494,7 @@ export class VisualFeatureExtractionService {
       const embeddings = VisualFeatureExtractionService.combineEmbeddingResults(llamaResult, clipEmbeddings);
 
       // 5. Store visual analysis in database
-      const analysisId = await this.storeVisualAnalysis({
+      const _analysisId = await this.storeVisualAnalysis({
         material_id: request.material_id || llamaResult.analysis_id,
         llama_result: llamaResult,
         image_hash: preprocessedImage.hash,
@@ -632,13 +630,13 @@ export class VisualFeatureExtractionService {
       }
 
       const statusMap: Record<string, QueueProcessingStatus> = {};
-      
-      data?.forEach((item: any) => {
-        statusMap[item.id] = {
-          queue_id: item.id,
-          status: (item.status as any) || 'pending',
+
+      data?.forEach((item: Record<string, unknown>) => {
+        statusMap[item.id as string] = {
+          queue_id: item.id as string,
+          status: (item.status as string) || 'pending',
           processing_metadata: {
-            processing_time_ms: item.processing_time_ms || undefined
+            processing_time_ms: (item.processing_time_ms as number) || undefined
           }
         };
       });
@@ -696,8 +694,8 @@ export class VisualFeatureExtractionService {
 
   private static async checkExistingAnalysis(
     imageHash: string,
-    analysisType: string
-  ): Promise<any | null> {
+    _analysisType: string
+  ): Promise<unknown | null> {
     try {
       const { data, error } = await supabase
         .from('material_visual_analysis')
@@ -716,7 +714,7 @@ export class VisualFeatureExtractionService {
   }
 
   private static formatExistingAnalysisResult(
-    existingAnalysis: any,
+    existingAnalysis: Record<string, unknown>,
     extractionId: string,
     startTime: number
   ): VisualFeatureExtractionResult {
@@ -747,7 +745,7 @@ export class VisualFeatureExtractionService {
   }
 
   private static async generateEmbeddings(
-    llamaResult: MaterialVisionAnalysisResult
+    _llamaResult: MaterialVisionAnalysisResult
   ): Promise<{ description_embedding?: number[]; material_type_embedding?: number[]; clip_embedding?: number[]; }> {
     // Placeholder for embedding generation
     // This would integrate with embedding services (OpenAI, local models, etc.)
@@ -764,7 +762,7 @@ export class VisualFeatureExtractionService {
     image_hash: string;
     image_url?: string;
     image_dimensions: ImageMetadata;
-    embeddings?: any;
+    embeddings?: Record<string, unknown>;
     user_id: string;
   }): Promise<string> {
     const analysisData: Database['public']['Tables']['material_visual_analysis']['Insert'] = {
@@ -781,10 +779,10 @@ export class VisualFeatureExtractionService {
       llama_processing_time_ms: params.llama_result.processing_time_ms || null,
       source_image_hash: params.image_hash,
       source_image_url: params.image_url || null,
-      image_dimensions: params.image_dimensions as any,
-      description_embedding: params.embeddings?.description_embedding ? 
+      image_dimensions: params.image_dimensions as unknown as Record<string, unknown>,
+      description_embedding: params.embeddings?.description_embedding ?
         JSON.stringify(params.embeddings.description_embedding) : null,
-      material_type_embedding: params.embeddings?.material_type_embedding ? 
+      material_type_embedding: params.embeddings?.material_type_embedding ?
         JSON.stringify(params.embeddings.material_type_embedding) : null,
       clip_embedding: params.embeddings?.clip_embedding ? 
         JSON.stringify(params.embeddings.clip_embedding) : null,
@@ -811,10 +809,10 @@ export class VisualFeatureExtractionService {
   private static async updateMaterialsCatalog(
     materialId: string,
     llamaResult: MaterialVisionAnalysisResult,
-    embeddings?: any
+    embeddings?: Record<string, unknown>
   ): Promise<void> {
     try {
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         material_type: this.extractMaterialType(llamaResult),
         updated_at: new Date().toISOString(),
         analysis_summary: this.extractVisualCharacteristics(llamaResult),
@@ -898,7 +896,7 @@ export class VisualFeatureExtractionService {
     return JSON.stringify(result.overall_analysis || {});
   }
 
-  private static extractStructuredProperties(result: MaterialVisionAnalysisResult): any {
+  private static extractStructuredProperties(result: MaterialVisionAnalysisResult): Record<string, unknown> {
     return result.materials_detected?.[0]?.properties || {};
   }
 

@@ -1,8 +1,6 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
-import { ApiRegistry } from '../../config/apiConfig';
 
 import { MLResult } from './types';
-import { DeviceDetector } from './deviceDetector';
 
 export interface StyleAnalysisResult {
   primaryStyle: string;
@@ -346,8 +344,8 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
   /**
    * Extract visual features from image data
    */
-  private extractVisualFeatures(imageData: ImageData): any {
-    const { data, width, height } = imageData;
+  private extractVisualFeatures(imageData: ImageData): Record<string, unknown> {
+    const { data, width: _width, height: _height } = imageData;
 
     // Initialize feature accumulators
     let totalR = 0, totalG = 0, totalB = 0;
@@ -415,12 +413,12 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
   /**
    * Helper methods for color and pattern analysis
    */
-  private calculateColorVariance(data: Uint8ClampedArray): number {
+  private calculateColorVariance(_data: Uint8ClampedArray): number {
     // Simplified color variance calculation
     return Math.random() * 0.5 + 0.2; // Placeholder
   }
 
-  private estimateColorCount(data: Uint8ClampedArray): number {
+  private estimateColorCount(_data: Uint8ClampedArray): number {
     // Simplified color counting
     return Math.floor(Math.random() * 8) + 3; // Placeholder
   }
@@ -457,7 +455,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
     return Math.min(Math.max(warmth + 0.5, -1), 1);
   }
 
-  private analyzeColorHarmony(colors: Array<{r: number, g: number, b: number}>): string {
+  private analyzeColorHarmony(_colors: Array<{r: number, g: number, b: number}>): string {
     // Simplified color harmony analysis
     const harmonies = ['monochromatic', 'analogous', 'complementary', 'triadic', 'split-complementary'];
     return harmonies[Math.floor(Math.random() * harmonies.length)];

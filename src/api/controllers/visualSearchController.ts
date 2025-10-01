@@ -192,12 +192,12 @@ export class VisualSearchController {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Search by image error:', error);
       res.status(500).json({
         error: 'Internal server error during image search',
         code: 'INTERNAL_ERROR',
-        details: error.message
+        details: (error as Error).message
       });
     }
   };
@@ -426,12 +426,12 @@ export class VisualSearchController {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Search by properties error:', error);
       res.status(500).json({
         error: 'Internal server error during property search',
         code: 'INTERNAL_ERROR',
-        details: error.message
+        details: (error as Error).message
       });
     }
   };
@@ -442,7 +442,7 @@ export class VisualSearchController {
    */
   public getSearchAnalytics = async (req: Request, res: Response): Promise<void> => {
     try {
-      const requestData: SearchAnalyticsRequest = req.query as any;
+      const requestData: SearchAnalyticsRequest = req.query as unknown as SearchAnalyticsRequest;
 
       // Validate Supabase client
       if (!this.supabaseClient) {
@@ -490,12 +490,12 @@ export class VisualSearchController {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Search analytics error:', error);
       res.status(500).json({
         error: 'Internal server error during analytics retrieval',
         code: 'INTERNAL_ERROR',
-        details: error.message
+        details: (error as Error).message
       });
     }
   };
@@ -515,11 +515,11 @@ export class VisualSearchController {
       };
 
       res.status(200).json(health);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         service: 'visual-search-api',
         status: 'unhealthy',
-        error: error.message,
+        error: (error as Error).message,
         timestamp: new Date().toISOString()
       });
     }

@@ -8,7 +8,7 @@ export interface ModalityData {
   spectral?: Float32Array;
   thermal?: Float32Array;
   textual?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CrossModalFeatures {

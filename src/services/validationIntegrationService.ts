@@ -10,10 +10,7 @@ import {
 import {
   TransformationConfigSchema,
   TransformationJobRequestSchema,
-  PartialTransformationConfigSchema,
-  validateTransformationConfig,
   validatePartialTransformationConfig,
-  validateTransformationJobRequest,
 } from '../schemas/transformationValidation.js';
 
 // Type definitions for validation service
@@ -33,7 +30,7 @@ type ValidatedConfig = Record<string, unknown>;
 type ValidatedRequest = Record<string, unknown>;
 type ValidatedPartialConfig = Record<string, unknown>;
 
-interface ValidationWrapper<TArgs extends unknown[], TReturn> {
+interface ValidationWrapper<_TArgs extends unknown[], TReturn> {
   inputValidator?: (input: unknown) => Promise<unknown>;
   outputValidator?: (output: TReturn) => Promise<TReturn>;
   errorHandler?: (error: unknown) => TReturn | never;
@@ -95,7 +92,7 @@ export class ValidationIntegrationService {
 
       return validatedDocument;
     } catch (error) {
-      const processingTime = performance.now() - startTime;
+      const _processingTime = performance.now() - startTime;
 
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('mivaa-document-validation');
@@ -140,7 +137,7 @@ export class ValidationIntegrationService {
 
       return validatedConfig;
     } catch (error) {
-      const processingTime = performance.now() - startTime;
+      const _processingTime = performance.now() - startTime;
 
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('transformation-config-validation');
@@ -185,7 +182,7 @@ export class ValidationIntegrationService {
 
       return validatedRequest;
     } catch (error) {
-      const processingTime = performance.now() - startTime;
+      const _processingTime = performance.now() - startTime;
 
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('transformation-job-request-validation');

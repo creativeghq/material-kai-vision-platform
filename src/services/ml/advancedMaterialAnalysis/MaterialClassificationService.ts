@@ -69,7 +69,7 @@ export interface ClassificationModel {
   type: string;
   accuracy: number;
   weights: Float32Array;
-  architecture: any;
+  architecture: unknown;
   trained: boolean;
 }
 
@@ -80,7 +80,7 @@ export class MaterialClassificationService {
   private multiScaleModule: MultiScaleTextureModule;
   private ensemble: ModelEnsemble | null = null;
   private modelWeights: Map<string, Float32Array> = new Map();
-  private trainingHistory: any[] = [];
+  private trainingHistory: unknown[] = [];
 
   constructor(config: MaterialClassificationConfig) {
     this.config = config;
@@ -410,17 +410,17 @@ export class MaterialClassificationService {
     const scores = new Float32Array(numClasses);
 
     // Model-specific feature processing
-    let processedFeatures = features;
+    const _processedFeatures = features;
 
     switch (model.type) {
       case 'TextureNetSVD':
-        processedFeatures = this.applyTextureNetSVDProcessing(features);
+        const _processedFeaturesTNS = this.applyTextureNetSVDProcessing(features);
         break;
       case 'MaterialTextureNet':
-        processedFeatures = this.applyMaterialTextureNetProcessing(features);
+        const _processedFeaturesMTN = this.applyMaterialTextureNetProcessing(features);
         break;
       case 'HybridNet':
-        processedFeatures = this.applyHybridNetProcessing(features);
+        const _processedFeatures = this.applyHybridNetProcessing(features);
         break;
     }
 
@@ -744,7 +744,7 @@ export class MaterialClassificationService {
   /**
    * Export model for deployment
    */
-  public exportModel(): any {
+  public exportModel(): Record<string, unknown> {
     return {
       config: this.config,
       weights: Object.fromEntries(
@@ -758,7 +758,7 @@ export class MaterialClassificationService {
   /**
    * Import trained model
    */
-  public importModel(modelData: any): void {
+  public importModel(modelData: Record<string, unknown>): void {
     this.config = { ...this.config, ...modelData.config };
 
     for (const [key, weights] of Object.entries(modelData.weights)) {

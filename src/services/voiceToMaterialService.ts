@@ -123,7 +123,7 @@ class VoiceToMaterialService {
           }
         };
 
-        mediaRecorder.onerror = (event) => {
+        mediaRecorder.onerror = (_event) => {
           stream.getTracks().forEach(track => track.stop());
           reject(new Error('Recording failed'));
         };
@@ -154,7 +154,7 @@ class VoiceToMaterialService {
 
       // Validate context parameter
       const validContexts: Array<'search' | 'description' | 'properties' | 'general'> = ['search', 'description', 'properties', 'general'];
-      const validatedContext = validContexts.includes(context as any) ? context as 'search' | 'description' | 'properties' | 'general' : 'search';
+      const validatedContext = validContexts.includes(context as 'search' | 'description' | 'properties' | 'general') ? context as 'search' | 'description' | 'properties' | 'general' : 'search';
 
       return this.processVoiceInput({
         audio_data: audioData,
@@ -170,7 +170,7 @@ class VoiceToMaterialService {
   /**
    * Get voice search history for user
    */
-  async getVoiceSearchHistory(limit: number = 20): Promise<Record<string, unknown>[]> {
+  async getVoiceSearchHistory(_limit: number = 20): Promise<Record<string, unknown>[]> {
     try {
       // Note: 'search_analytics' table may not exist in current schema
       // This is a placeholder implementation that would need proper table setup

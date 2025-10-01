@@ -47,7 +47,7 @@ export class NetworkAccessControl {
   /**
    * Check if an IP address is allowed access
    */
-  async checkAccess(ipAddress: string, endpoint?: string): Promise<AccessControlCheck> {
+  async checkAccess(ipAddress: string, _endpoint?: string): Promise<AccessControlCheck> {
     try {
       // Refresh cache if needed
       await this.refreshRulesCache();

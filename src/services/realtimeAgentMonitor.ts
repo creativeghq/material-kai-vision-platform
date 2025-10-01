@@ -49,7 +49,7 @@ interface AgentStatus {
   [key: string]: unknown;
 }
 
-interface DatabaseAgent {
+interface _DatabaseAgent {
   id: string;
   status: string;
   updated_at: string;
@@ -76,7 +76,7 @@ interface SystemAlert {
 
 export class RealtimeAgentMonitor {
   private performanceOptimizer: AgentPerformanceOptimizer;
-  private listeners: Map<string, Function[]> = new Map();
+  private listeners: Map<string, ((...args: unknown[]) => void)[]> = new Map();
   private agentStatuses: Map<string, AgentStatus> = new Map();
   private systemAlerts: SystemAlert[] = [];
   private monitoringInterval: NodeJS.Timeout | null = null;
@@ -175,7 +175,7 @@ export class RealtimeAgentMonitor {
     console.log(`Task started: ${task.id} with agents:`, task.assigned_agents);
   }
 
-  private async handleTaskUpdated(newTask: any, oldTask: any): Promise<void> {
+  private async handleTaskUpdated(newTask: Record<string, unknown>, oldTask: Record<string, unknown>): Promise<void> {
     // Check if task completed or failed
     if (oldTask.status !== newTask.status) {
       if (newTask.status === 'completed') {
@@ -191,7 +191,7 @@ export class RealtimeAgentMonitor {
     }
   }
 
-  private async handleTaskCompleted(task: any): Promise<void> {
+  private async handleTaskCompleted(task: Record<string, unknown>): Promise<void> {
     const event: RealtimeEvent = {
       eventType: 'task_completed',
       taskId: task.id,
@@ -217,7 +217,7 @@ export class RealtimeAgentMonitor {
     console.log(`Task completed: ${task.id} in ${task.processing_time_ms}ms`);
   }
 
-  private async handleTaskFailed(task: any): Promise<void> {
+  private async handleTaskFailed(task: Record<string, unknown>): Promise<void> {
     const event: RealtimeEvent = {
       eventType: 'task_failed',
       taskId: task.id,
@@ -246,9 +246,9 @@ export class RealtimeAgentMonitor {
     console.log(`Task failed: ${task.id} - ${task.error_message}`);
   }
 
-  private async handleAgentReassignment(newTask: any, oldTask: any): Promise<void> {
-    const removedAgents = oldTask.assigned_agents.filter(
-      (agentId: string) => !newTask.assigned_agents.includes(agentId),
+  private async handleAgentReassignment(newTask: Record<string, unknown>, oldTask: Record<string, unknown>): Promise<void> {
+    const removedAgents = (oldTask.assigned_agents as string[]).filter(
+      (agentId: string) => !(newTask.assigned_agents as string[]).includes(agentId),
     );
     const addedAgents = newTask.assigned_agents.filter(
       (agentId: string) => !oldTask.assigned_agents.includes(agentId),
@@ -267,7 +267,7 @@ export class RealtimeAgentMonitor {
     console.log(`Task ${newTask.id} reassigned: removed ${removedAgents}, added ${addedAgents}`);
   }
 
-  private async handleAgentChange(payload: any): Promise<void> {
+  private async handleAgentChange(payload: Record<string, unknown>): Promise<void> {
     const { eventType, new: newRecord } = payload;
 
     if (eventType === 'UPDATE') {
@@ -428,14 +428,14 @@ export class RealtimeAgentMonitor {
   }
 
   // Public API methods
-  addEventListener(eventType: string, listener: Function): void {
+  addEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, []);
     }
     this.listeners.get(eventType)!.push(listener);
   }
 
-  removeEventListener(eventType: string, listener: Function): void {
+  removeEventListener(eventType: string, listener: (...args: unknown[]) => void): void {
     const listeners = this.listeners.get(eventType);
     if (listeners) {
       const index = listeners.indexOf(listener);
@@ -457,7 +457,7 @@ export class RealtimeAgentMonitor {
     return this.systemAlerts.slice(-count).reverse();
   }
 
-  getSystemMetrics(): Promise<any> {
+  getSystemMetrics(): Promise<unknown> {
     return this.performanceOptimizer.getSystemLoadMetrics();
   }
 

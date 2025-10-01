@@ -8,9 +8,7 @@
 
 import { createHash } from 'crypto';
 import {
-  AppError,
   ValidationError,
-  ExternalServiceError,
   errorLogger,
 } from '../core/errors';
 import { createErrorContext } from '../core/errors/utils';
@@ -369,7 +367,7 @@ export class ImagePreprocessingService {
    * Check if image format is supported
    */
   private static isFormatSupported(format: string): boolean {
-    return IMAGE_CONFIG.SUPPORTED_FORMATS.includes(format as any);
+    return IMAGE_CONFIG.SUPPORTED_FORMATS.includes(format as unknown as typeof IMAGE_CONFIG.SUPPORTED_FORMATS[number]);
   }
 
   /**
@@ -467,7 +465,7 @@ export class ImagePreprocessingService {
     buffer: Buffer,
     dimensions: { width: number; height: number },
     format: string,
-    quality: number
+    _quality: number
   ): Promise<{ buffer: Buffer; metadata: ImageMetadata }> {
     // This is a placeholder implementation
     // In a real implementation, you would use an image processing library

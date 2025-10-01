@@ -6,7 +6,7 @@
 export interface ModelParameter {
   type: 'string' | 'integer' | 'number' | 'boolean' | 'enum';
   required: boolean;
-  default?: any;
+  default?: unknown;
   min?: number;
   max?: number;
   options?: string[];
@@ -302,14 +302,14 @@ export class ModelParameterValidator {
    */
   static validateAndTransformParameters(
     modelId: string,
-    inputParameters: Record<string, any>,
-  ): Record<string, any> {
+    inputParameters: Record<string, unknown>,
+  ): Record<string, unknown> {
     const config = INTERIOR_DESIGN_MODELS[modelId];
     if (!config) {
       throw new Error(`Unknown model: ${modelId}`);
     }
 
-    const validatedParams: Record<string, any> = {};
+    const validatedParams: Record<string, unknown> = {};
     const errors: string[] = [];
 
     // Check required parameters
@@ -346,9 +346,9 @@ export class ModelParameterValidator {
    */
   private static validateParameter(
     name: string,
-    value: any,
+    value: unknown,
     config: ModelParameter,
-  ): any {
+  ): unknown {
     switch (config.type) {
       case 'string':
         if (typeof value !== 'string') {

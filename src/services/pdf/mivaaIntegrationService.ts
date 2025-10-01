@@ -95,7 +95,7 @@ export interface ImageData {
   format: string;
   width: number;
   height: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -374,13 +374,13 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
    */
   async extractContent(request: PdfExtractionRequest): Promise<{
     success: boolean;
-    data: any;
+    data: unknown;
     errors?: string[];
     warnings?: string[];
   }> {
     const errors: string[] = [];
     const warnings: string[] = [];
-    let extractedData: any = {};
+    let extractedData: Record<string, unknown> = {};
 
     try {
       switch (request.options.extractionType) {

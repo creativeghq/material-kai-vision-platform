@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,14 +17,14 @@ export const Auth: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn, signUp, resetPassword, user } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
-      navigate('/');
+      router.push('/');
     }
-  }, [user, navigate]);
+  }, [user, router]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export const Auth: React.FC = () => {
     const { error } = await signIn(email, password);
 
     if (!error) {
-      navigate('/');
+      router.push('/');
     }
 
     setIsLoading(false);
@@ -43,7 +43,7 @@ export const Auth: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signUp(email, password, displayName);
+    const { error: _error } = await signUp(email, password, displayName);
 
     setIsLoading(false);
   };

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { clientMLService, MLResult } from './clientMLService';
-import { serverMLService, ServerMLResult } from './serverMLService';
+import { serverMLService } from './serverMLService';
 import { DeviceDetector } from './deviceDetector';
 import { HuggingFaceService } from './huggingFaceService';
 
@@ -279,7 +279,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   private async processOnClient(
     files: File[],
     descriptions?: string[],
-    options?: HybridMLOptions,
+    _options?: HybridMLOptions,
   ): Promise<HybridMLResult> {
     const startTime = performance.now();
     const results = [];
@@ -408,7 +408,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   /**
    * Calculate average confidence from results
    */
-  private calculateAverageConfidence(results?: any[]): number {
+  private calculateAverageConfidence(results?: unknown[]): number {
     if (!results || results.length === 0) return 0;
 
     const confidences = results
@@ -430,7 +430,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     costImplications: string;
   }> {
     const decision = this.determineProcessingMethod(files, this.DEFAULT_OPTIONS);
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
+    const _totalSize = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
     const deviceInfo = await DeviceDetector.getDeviceInfo();
 
     const reasons = [decision.reason];
@@ -488,7 +488,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   /**
    * Analyze a single image using optimal processing method
    */
-  async analyzeImage(file: File, options: any = {}): Promise<HybridMLResult> {
+  async analyzeImage(file: File, options: Record<string, unknown> = {}): Promise<HybridMLResult> {
     const opts = { ...this.DEFAULT_OPTIONS, ...options };
     const processingDecision = this.determineProcessingMethod([file], opts);
 
@@ -513,7 +513,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   /**
    * Analyze image style
    */
-  async analyzeImageStyle(file: File, options: any = {}): Promise<HybridMLResult> {
+  async analyzeImageStyle(file: File, options: Record<string, unknown> = {}): Promise<HybridMLResult> {
     // For now, delegate to general image analysis
     return await this.analyzeImage(file, { ...options, analysisType: 'style' });
   }
@@ -521,7 +521,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   /**
    * Classify image
    */
-  async classifyImage(file: File, options: any = {}): Promise<HybridMLResult> {
+  async classifyImage(file: File, options: Record<string, unknown> = {}): Promise<HybridMLResult> {
     // For now, delegate to general image analysis
     return await this.analyzeImage(file, { ...options, analysisType: 'classification' });
   }

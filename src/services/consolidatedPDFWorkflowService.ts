@@ -8,14 +8,14 @@ interface WorkflowStep {
   status: 'pending' | 'running' | 'completed' | 'failed';
   progress?: number;
   details: string[];
-  metadata?: Record<string, any>;
-  result?: any;
+  metadata?: Record<string, unknown>;
+  result?: unknown;
   startTime?: Date;
   endTime?: Date;
   duration?: number;
   error?: string;
   logs?: string[];
-  icon?: any;
+  icon?: unknown;
 }
 
 interface WorkflowJob {
@@ -27,7 +27,7 @@ interface WorkflowJob {
   currentStepIndex: number;
   startTime: Date;
   endTime?: Date;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export type WorkflowEventCallback = (job: WorkflowJob) => void;
@@ -67,7 +67,7 @@ export interface ConsolidatedProcessingResult {
     imageMappingAccuracy: number;
     overallQuality: number;
   };
-  mivaaResult?: any; // MIVAA-specific result data
+  mivaaResult?: unknown; // MIVAA-specific result data
 }
 
 /**
@@ -260,8 +260,7 @@ export class ConsolidatedPDFWorkflowService {
       });
 
       // Step 2: File Upload
-      let uploadResult: any;
-      uploadResult = await this.executeStep(jobId, 'upload', async () => {
+      const uploadResult: unknown = await this.executeStep(jobId, 'upload', async () => {
         const fileName = `${Date.now()}-${file.name}`;
         const { data: { user } } = await supabase.auth.getUser();
         const fullPath = `${user!.id}/${fileName}`;
@@ -573,10 +572,10 @@ export class ConsolidatedPDFWorkflowService {
     stepId: string,
     stepFunction: () => Promise<{
       details: string[];
-      metadata?: any;
-      result?: any;
+      metadata?: unknown;
+      result?: unknown;
     }>,
-  ): Promise<{ details: string[]; metadata?: any; result?: any }> {
+  ): Promise<{ details: string[]; metadata?: unknown; result?: unknown }> {
     try {
       // Mark step as running
       this.updateJobStep(jobId, stepId, { status: 'running' });

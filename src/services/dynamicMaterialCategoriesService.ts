@@ -1,11 +1,9 @@
 /**
  * Dynamic Material Categories Service
- * 
+ *
  * Global service for fetching material categories and properties from the database
  * Replaces all hardcoded MATERIAL_CATEGORIES constants
  */
-
-import { createClient } from '@supabase/supabase-js';
 
 export interface MaterialCategory {
   key: string;
@@ -29,10 +27,10 @@ export interface MaterialProperty {
   displayName: string;
   description?: string;
   dataType: string;
-  validationRules?: any;
-  defaultValue?: any;
+  validationRules?: unknown;
+  defaultValue?: unknown;
   uiComponent?: string;
-  uiProps?: any;
+  uiProps?: unknown;
   displayOrder: number;
   isRequired: boolean;
   isSearchable: boolean;

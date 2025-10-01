@@ -4,32 +4,45 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 // Environment variables for Supabase configuration
-// These should be set in your deployment environment (GitHub Secrets, Vercel Environment Variables, etc.)
+// These should be set in your deployment environment (GitHub Secrets, Vercel Environment Variables, or Supabase)
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Validate required environment variables
-if (!SUPABASE_URL) {
-  throw new Error(
-    'Missing NEXT_PUBLIC_SUPABASE_URL environment variable. ' +
-    'Please set this in your deployment environment (GitHub Secrets, Vercel Environment Variables, etc.)',
-  );
-}
+// Use placeholder values during build time if environment variables are not available
+// This allows the build to complete, but the client will fail at runtime if not configured
+const isBuildTime = typeof window === 'undefined' && !SUPABASE_URL;
+const url = SUPABASE_URL || 'https://placeholder.supabase.co';
+const key = SUPABASE_PUBLISHABLE_KEY || 'placeholder-key';
 
-if (!SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error(
-    'Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable. ' +
-    'Please set this in your deployment environment (GitHub Secrets, Vercel Environment Variables, etc.)',
-  );
+// Validate required environment variables at runtime (not build time)
+function validateEnvironment() {
+  if (!SUPABASE_URL) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL environment variable. ' +
+      'Please set this in your deployment environment (GitHub Secrets, Vercel Environment Variables, or Supabase).',
+    );
+  }
+
+  if (!SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable. ' +
+      'Please set this in your deployment environment (GitHub Secrets, Vercel Environment Variables, or Supabase).',
+    );
+  }
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(url, key, {
   auth: {
-    storage: localStorage,
+    storage: typeof window !== 'undefined' ? localStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
   },
 });
+
+// Validate environment only at runtime (when window is defined)
+if (typeof window !== 'undefined' && !isBuildTime) {
+  validateEnvironment();
+}

@@ -6,7 +6,6 @@
 import { MaterialClassificationService } from '../advancedMaterialAnalysis/MaterialClassificationService';
 
 import { TextureNetSVD, TextureNetSVDConfig, SVDTextureFeatures } from './TextureNetSVD';
-import { TextureAttentionModule } from './TextureAttentionModule';
 
 export interface MaterialTextureResult {
   materialType: string;
@@ -188,7 +187,7 @@ export class MaterialTextureNet {
    * Analyze surface properties from texture features
    */
   private async analyzeSurfaceProperties(
-    svdResult: any,
+    svdResult: Record<string, unknown>,
     imageData: ImageData,
   ): Promise<MaterialTextureResult['surfaceProperties']> {
     const { svdFeatures, attentionWeights } = svdResult;
@@ -217,7 +216,7 @@ export class MaterialTextureNet {
    * Extract material-specific properties
    */
   private async extractMaterialProperties(
-    svdResult: any,
+    svdResult: Record<string, unknown>,
     materialType: string,
   ): Promise<MaterialTextureResult['materialProperties']> {
     const { svdFeatures } = svdResult;
@@ -241,7 +240,7 @@ export class MaterialTextureNet {
    */
   private async assessQuality(
     imageData: ImageData,
-    svdResult: any,
+    svdResult: Record<string, unknown>,
   ): Promise<MaterialTextureResult['qualityMetrics']> {
     const { width, height, data } = imageData;
 
@@ -349,7 +348,7 @@ export class MaterialTextureNet {
     return count > 0 ? sharpness / (count * 255) : 0;
   }
 
-  private calculateContrast(data: Uint8ClampedArray, width: number, height: number): number {
+  private calculateContrast(data: Uint8ClampedArray, _width: number, _height: number): number {
     let min = 255, max = 0;
 
     for (let i = 0; i < data.length; i += 4) {
@@ -474,8 +473,8 @@ export class MaterialTextureNet {
    */
   getModelMetrics(): {
     accuracy: number;
-    textureNetStats: any;
-    classificationStats: any;
+    textureNetStats: Record<string, unknown>;
+    classificationStats: Record<string, unknown>;
     materialCount: number;
   } {
     return {

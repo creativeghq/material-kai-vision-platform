@@ -19,10 +19,13 @@ import { useToast } from '@/hooks/use-toast';
 
 export const PDFKnowledgeDemo: React.FC = () => {
   const { toast } = useToast();
-  const [demoResults, setDemoResults] = useState<any[]>([]);
+  const [demoResults, setDemoResults] = useState<Record<string, unknown>[]>([]);
 
   // Sample PDF URL from your public folder for demonstration
-  const samplePdfUrl = `${window.location.origin}/test-materials.pdf`;
+  // Use empty string during SSR, will be set on client
+  const samplePdfUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/test-materials.pdf`
+    : '/test-materials.pdf';
 
   const addSampleEntry = async () => {
     try {
@@ -126,7 +129,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
               <strong>How it works:</strong> Add content to the knowledge base with a PDF URL.
-              When users search and find relevant content, they can click "View PDF Details"
+              When users search and find relevant content, they can click &quot;View PDF Details&quot;
               to access the original document for comprehensive information.
             </AlertDescription>
           </Alert>
@@ -215,7 +218,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
         {/* Add Knowledge Tab */}
         <TabsContent value="add">
           <AddKnowledgeEntry
-            onEntryAdded={(entry) => {
+            onEntryAdded={(_entry) => {
               toast({
                 title: 'Knowledge Entry Added',
                 description: 'Successfully added to the knowledge base with PDF link support',
@@ -266,7 +269,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
               <div>
                 <h4 className="font-semibold">Search & Access</h4>
                 <p className="text-sm text-muted-foreground">
-                  Users can search the extracted content and click "View PDF Details" for the full document
+                  Users can search the extracted content and click &quot;View PDF Details&quot; for the full document
                 </p>
               </div>
             </div>
@@ -276,3 +279,5 @@ export const PDFKnowledgeDemo: React.FC = () => {
     </div>
   );
 };
+
+export default PDFKnowledgeDemo;

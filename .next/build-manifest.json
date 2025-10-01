@@ -1,26 +1,88 @@
 {
   "polyfillFiles": [
-    "static/chunks/polyfills.js"
+    "static/chunks/polyfills-42372ed130431b0a.js"
   ],
-  "devFiles": [
-    "static/chunks/react-refresh.js"
-  ],
+  "devFiles": [],
   "ampDevFiles": [],
   "lowPriorityFiles": [
-    "static/development/_buildManifest.js",
-    "static/development/_ssgManifest.js"
+    "static/Nn1moz_LvSR3-2ikvFRAy/_buildManifest.js",
+    "static/Nn1moz_LvSR3-2ikvFRAy/_ssgManifest.js"
   ],
   "rootMainFiles": [],
   "pages": {
+    "/Auth": [
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/pages/Auth-5ed37079f4bbb98e.js"
+    ],
+    "/Index": [
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/288-d9c4ddf3cbc86d89.js",
+      "static/chunks/424-ca7471161a310844.js",
+      "static/chunks/278-b43fd3c1035ebe26.js",
+      "static/css/7e9e4fca63bfce53.css",
+      "static/chunks/pages/Index-94f2bfc7815a010c.js"
+    ],
+    "/MaterialSuggestions": [
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/288-d9c4ddf3cbc86d89.js",
+      "static/chunks/424-ca7471161a310844.js",
+      "static/chunks/339-3985eef34b123f56.js",
+      "static/chunks/278-b43fd3c1035ebe26.js",
+      "static/chunks/590-0885e243b1ed4b59.js",
+      "static/chunks/707-b5eed68100313db0.js",
+      "static/chunks/pages/MaterialSuggestions-b004e2aab3cc508d.js"
+    ],
+    "/NotFound": [
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/424-ca7471161a310844.js",
+      "static/chunks/pages/NotFound-b237bfb0ea648098.js"
+    ],
+    "/PDFKnowledgeDemo": [
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/288-d9c4ddf3cbc86d89.js",
+      "static/chunks/590-0885e243b1ed4b59.js",
+      "static/chunks/338-aa080d0ab3fef76a.js",
+      "static/chunks/pages/PDFKnowledgeDemo-04d87183089dfb0b.js"
+    ],
+    "/PDFProcessing": [
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/288-d9c4ddf3cbc86d89.js",
+      "static/chunks/10-62d2d137953bfc75.js",
+      "static/chunks/pages/PDFProcessing-b461b3e562ba7fe6.js"
+    ],
+    "/SearchHub": [
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/339-3985eef34b123f56.js",
+      "static/chunks/707-b5eed68100313db0.js",
+      "static/chunks/338-aa080d0ab3fef76a.js",
+      "static/chunks/pages/SearchHub-be97f25cc30d7ec8.js"
+    ],
     "/_app": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/_app.js"
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/css/ef46db3751d8e999.css",
+      "static/chunks/pages/_app-b44fcb7eb7d53895.js"
     ],
     "/_error": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/_error.js"
+      "static/chunks/webpack-2df7a8d27de1794c.js",
+      "static/chunks/framework-64ad27b21261a9ce.js",
+      "static/chunks/main-4b93a2a6add9a0ec.js",
+      "static/chunks/pages/_error-7a92967bea80186d.js"
     ]
   },
   "ampFirstPages": []

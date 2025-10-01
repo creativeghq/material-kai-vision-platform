@@ -217,7 +217,7 @@ export class ErrorReporter {
     let receivedValue: unknown = undefined;
 
     // Use type assertion to access properties safely
-    const issueAny = issue as any;
+    const issueAny = issue as Record<string, unknown>;
 
     switch (issue.code) {
       case 'invalid_type':

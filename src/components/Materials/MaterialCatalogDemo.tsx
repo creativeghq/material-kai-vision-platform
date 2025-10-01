@@ -295,7 +295,7 @@ export const MaterialCatalogDemo: React.FC = () => {
               <h4 className="font-semibold">✨ AI-Extracted Meta Fields</h4>
               <div className="space-y-1 text-sm text-muted-foreground">
                 <div>• Finish types (polished, matte, brushed)</div>
-                <div>• Size specifications (12x12", 24x24", etc.)</div>
+                <div>• Size specifications (12x12&quot;, 24x24&quot;, etc.)</div>
                 <div>• Installation methods (thinset, epoxy, fasteners)</div>
                 <div>• Application areas (floor, wall, countertop)</div>
                 <div>• R11 thermal ratings</div>
@@ -391,7 +391,7 @@ export const MaterialCatalogDemo: React.FC = () => {
           <div>
             <h4 className="font-semibold mb-2">1. Filter Materials</h4>
             <p className="text-sm text-muted-foreground">
-              Click the "Filters" button to access advanced filtering options. 
+              Click the &quot;Filters&quot; button to access advanced filtering options.
               Filter by category, finish, size, installation method, and application area.
             </p>
           </div>

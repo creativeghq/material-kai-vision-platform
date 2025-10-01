@@ -92,7 +92,7 @@ export class IntegratedWorkflowService {
     style?: string;
     materialIds?: string[];
   }): Promise<{
-    generationResult: any;
+    generationResult: unknown;
     enhancements: WorkflowEnhancement;
   }> {
     // Step 1: Generate 3D design
@@ -141,9 +141,9 @@ export class IntegratedWorkflowService {
     images?: File[];
     includeContext?: boolean;
   }): Promise<{
-    searchResults: any[];
+    searchResults: unknown[];
     aiContext?: string;
-    visualAnalysis?: any[];
+    visualAnalysis?: unknown[];
   }> {
     const searchPromises = [];
 
@@ -286,7 +286,7 @@ export class IntegratedWorkflowService {
 
   private async performNeRFReconstruction(
     imageUrls: string[],
-    materialMapping: any[],
+    materialMapping: unknown[],
   ): Promise<WorkflowEnhancement['nerfReconstruction'] | null> {
     try {
       const { data, error } = await supabase.functions.invoke('nerf-processor', {
@@ -326,7 +326,7 @@ export class IntegratedWorkflowService {
       if (error || !data?.success) return null;
 
       return {
-        relatedKnowledge: (data.results || []).map((result: any) => ({
+        relatedKnowledge: (data.results || []).map((result: Record<string, unknown>) => ({
           title: result.title,
           content: result.content,
           relevanceScore: result.similarity_score,
@@ -339,7 +339,7 @@ export class IntegratedWorkflowService {
     }
   }
 
-  private async analyzeImagesForKnowledge(images: File[], query: string): Promise<{ data: any[] }> {
+  private async analyzeImagesForKnowledge(images: File[], query: string): Promise<{ data: unknown[] }> {
     try {
       const analysisPromises = images.map(async (image) => {
         const result = await hybridMLService.analyzeImage(image, {
@@ -357,7 +357,7 @@ export class IntegratedWorkflowService {
       return {
         data: results
           .filter(r => r.status === 'fulfilled')
-          .map(r => (r as PromiseFulfilledResult<any>).value),
+          .map(r => (r as PromiseFulfilledResult<unknown>).value),
       };
     } catch (error) {
       console.error('Visual analysis failed:', error);
@@ -365,7 +365,7 @@ export class IntegratedWorkflowService {
     }
   }
 
-  private calculateRelevance(analysisData: any, query: string): number {
+  private calculateRelevance(analysisData: Record<string, unknown>, query: string): number {
     // Simple relevance calculation - can be enhanced with embeddings
     const queryWords = query.toLowerCase().split(' ');
     const analysisText = JSON.stringify(analysisData).toLowerCase();

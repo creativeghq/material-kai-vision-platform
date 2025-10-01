@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Database, Brain, Zap, Upload, Settings, Rocket, ArrowLeft, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ragService } from '@/services/ragService';
 
 export const RAGManagementPanel: React.FC = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [isTraining, setIsTraining] = useState(false);
   const [trainingStatus, setTrainingStatus] = useState<Record<string, unknown>[]>([]);
   const [newKnowledgeEntry, setNewKnowledgeEntry] = useState({
@@ -157,14 +157,14 @@ export const RAGManagementPanel: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => navigate('/')}
+                onClick={() => router.push('/')}
                 className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
               <Button
-                onClick={() => navigate('/admin')}
+                onClick={() => router.push('/admin')}
                 className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />

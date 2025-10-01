@@ -267,9 +267,9 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       }
 
       const usage = events?.reduce((acc, event) => {
-        const data = event.event_data as any;
-        const provider = data.provider || 'unknown';
-        const cost = data.cost || 0;
+        const data = event.event_data as Record<string, unknown>;
+        const provider = (data.provider as string) || 'unknown';
+        const cost = (data.cost as number) || 0;
 
         acc.totalCost += cost;
         acc.requestCount += 1;
@@ -291,7 +291,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       // Calculate daily spend
       const dailySpendMap = events?.reduce((acc, event) => {
         const date = event.created_at.split('T')[0];
-        const cost = (event.event_data as any).cost || 0;
+        const cost = (event.event_data as Record<string, unknown>).cost as number || 0;
         acc[date] = (acc[date] || 0) + cost;
         return acc;
       }, {} as Record<string, number>);

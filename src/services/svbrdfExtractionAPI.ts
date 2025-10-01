@@ -134,7 +134,7 @@ export class SVBRDFExtractionAPI {
       const timestamp = Date.now();
       const fileName = `${user.id}/${timestamp}/source_image.${file.name.split('.').pop()}`;
 
-      const { data, error } = await supabase.storage
+      const { data: _data, error } = await supabase.storage
         .from('material-images')
         .upload(fileName, file);
 
@@ -162,7 +162,7 @@ export class SVBRDFExtractionAPI {
   /**
    * Get extraction analytics
    */
-  static async getExtractionAnalytics(timeRange = '30 days') {
+  static async getExtractionAnalytics(_timeRange = '30 days') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {

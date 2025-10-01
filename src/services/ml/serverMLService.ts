@@ -1,5 +1,3 @@
-import { toast } from 'sonner';
-
 import { supabase } from '@/integrations/supabase/client';
 
 import { BaseService, ServiceConfig } from '../base/BaseService';
@@ -18,10 +16,10 @@ export interface ServerMLRequest {
 export interface ServerMLResult {
   success: boolean;
   job_id?: string;
-  results?: any[];
+  results?: unknown[];
   processing_time_ms?: number;
   error?: string;
-  data?: any;
+  data?: unknown;
   processingTime?: number;
   provider?: string;
   modelVersion?: string;
@@ -49,7 +47,7 @@ interface ServerMLServiceConfig extends ServiceConfig {
  * Service for server-side ML processing via Supabase Edge Functions
  */
 export class ServerMLService extends BaseService<ServerMLServiceConfig> {
-  private jobCache: Map<string, any> = new Map();
+  private jobCache: Map<string, unknown> = new Map();
   private uploadCache: Map<string, string> = new Map();
 
   protected constructor(config: ServerMLServiceConfig) {
@@ -78,14 +76,14 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
 
   protected async doHealthCheck(): Promise<void> {
     // Check Supabase connection
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user: _user }, error: userError } = await supabase.auth.getUser();
     if (userError) {
       throw new Error(`Supabase authentication failed: ${userError.message}`);
     }
 
     // Test storage access
     try {
-      const { data, error } = await supabase.storage.from('material-images').list('', { limit: 1 });
+      const { data: _data, error } = await supabase.storage.from('material-images').list('', { limit: 1 });
       if (error) {
         throw new Error(`Storage access failed: ${error.message}`);
       }
@@ -101,13 +99,13 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       if (error && !error.message.includes('health_check')) {
         throw new Error(`Edge function health check failed: ${error.message}`);
       }
-    } catch (error) {
+    } catch (_error) {
       // Edge function might not support health check, which is acceptable
     }
   }
 
   private async verifySupabaseConnection(): Promise<void> {
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const { data: { user: _user }, error } = await supabase.auth.getUser();
     if (error) {
       throw new Error(`Supabase connection failed: ${error.message}`);
     }
@@ -125,7 +123,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
   }
 
   private async verifyStorageAccess(): Promise<void> {
-    const { data, error } = await supabase.storage.from('material-images').list('', { limit: 1 });
+    const { data: _data, error } = await supabase.storage.from('material-images').list('', { limit: 1 });
     if (error) {
       throw new Error(`Storage access verification failed: ${error.message}`);
     }
@@ -365,7 +363,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
 
       if (job.status === 'completed') {
         // Get recognition results
-        const resultData = job.result as any;
+        const resultData = job.result as Record<string, unknown>;
         const fileIds = resultData?.results || [];
 
         if (fileIds.length > 0) {
@@ -427,7 +425,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
     jobId: string,
     onProgress?: (status: string) => void,
     timeoutMs: number = this.config.defaultTimeout,
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.executeOperation(async () => {
       if (!this.config.enableJobPolling) {
         throw new Error('Job polling is disabled');
@@ -542,8 +540,8 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
    */
   async analyzeAdvancedMaterialProperties(
     imageFile: File,
-    options: any = {},
-  ): Promise<any> {
+    options: Record<string, unknown> = {},
+  ): Promise<unknown> {
     return this.executeOperation(async () => {
       console.log('ServerML: Starting advanced material properties analysis');
 

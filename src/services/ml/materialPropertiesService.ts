@@ -8,11 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { BaseService, ServiceConfig } from '../base/BaseService';
 // Import standardized API response types
 import type {
-  MaterialApiResponse,
-  isSuccessfulResponse,
-  ValidationResult
+  MaterialApiResponse
 } from '@/types/unified-material-api';
-import type { Material } from '@/types/materials';
 
 export interface MaterialPropertiesServiceConfig extends ServiceConfig {
   defaultAnalysisType: 'thermal' | 'mechanical' | 'chemical' | 'optical' | 'comprehensive';
@@ -52,13 +49,13 @@ export interface MaterialPropertiesAnalysisData {
   /** Analyzed properties */
   properties: MaterialProperty[];
   /** Thermal analysis results */
-  thermalProperties?: Record<string, any>;
+  thermalProperties?: Record<string, unknown>;
   /** Mechanical analysis results */
-  mechanicalProperties?: Record<string, any>;
+  mechanicalProperties?: Record<string, unknown>;
   /** Chemical analysis results */
-  chemicalProperties?: Record<string, any>;
+  chemicalProperties?: Record<string, unknown>;
   /** Optical analysis results */
-  opticalProperties?: Record<string, any>;
+  opticalProperties?: Record<string, unknown>;
   /** Overall confidence score (0-1) */
   confidenceScore: number;
   /** Processing time in milliseconds */
@@ -77,7 +74,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   protected async doInitialize(): Promise<void> {
     // Validate Supabase connection
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user: _user } } = await supabase.auth.getUser();
       console.log('MaterialPropertiesService: Supabase connection validated');
     } catch (error) {
       console.warn('MaterialPropertiesService: Supabase connection issue:', error);
@@ -190,7 +187,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   /**
    * Get properties analysis results by ID
    */
-  async getAnalysisResults(analysisId: string): Promise<any> {
+  async getAnalysisResults(analysisId: string): Promise<unknown> {
     return this.executeOperation(async () => {
       const { data, error } = await supabase
         .from('material_style_analysis')
@@ -206,7 +203,7 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
   /**
    * List properties analyses for a user
    */
-  async listUserAnalyses(userId?: string): Promise<any[]> {
+  async listUserAnalyses(userId?: string): Promise<unknown[]> {
     return this.executeOperation(async () => {
       let query = supabase
         .from('material_style_analysis')

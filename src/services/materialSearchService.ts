@@ -5,7 +5,7 @@ export interface MaterialSearchResult {
   name: string;
   category: string;
   description?: string;
-  properties?: any;
+  properties?: unknown;
   images: Array<{
     id: string;
     url: string;
@@ -43,11 +43,11 @@ export class MaterialSearchService {
   async search(params: SearchParams): Promise<{
     success: boolean;
     data: MaterialSearchResult[];
-    metadata: any;
+    metadata: unknown;
     error?: string;
   }> {
     try {
-      const searchParams = new URLSearchParams({
+      const _searchParams = new URLSearchParams({
         q: params.query,
         search_type: params.searchType || 'hybrid',
         limit: (params.limit || 20).toString(),
@@ -96,7 +96,7 @@ export class MaterialSearchService {
   /**
    * Get search suggestions
    */
-  async getSuggestions(partial: string, limit: number = 10): Promise<{
+  async getSuggestions(partial: string, _limit: number = 10): Promise<{
     success: boolean;
     data: Array<{
       text: string;
@@ -138,7 +138,7 @@ export class MaterialSearchService {
   /**
    * Get material by ID using unified materials API
    */
-  async getMaterialById(materialId: string): Promise<{
+  async getMaterialById(_materialId: string): Promise<{
     success: boolean;
     data?: MaterialSearchResult;
     error?: string;
@@ -181,11 +181,11 @@ export class MaterialSearchService {
       imageType?: 'primary' | 'variant' | 'texture' | 'analysis' | 'reference';
       isFeatured?: boolean;
       displayOrder?: number;
-      metadata?: any;
+      metadata?: Record<string, unknown>;
     } = {}
   ): Promise<{
     success: boolean;
-    data?: any;
+    data?: unknown;
     error?: string;
   }> {
     try {
@@ -239,7 +239,7 @@ export class MaterialSearchService {
   async updateMetafieldValue(
     materialId: string,
     fieldId: string,
-    value: any,
+    value: unknown,
     options: {
       confidenceScore?: number;
       extractionMethod?: string;
@@ -247,7 +247,7 @@ export class MaterialSearchService {
     } = {}
   ): Promise<{
     success: boolean;
-    data?: any;
+    data?: unknown;
     error?: string;
   }> {
     try {

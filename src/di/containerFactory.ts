@@ -518,7 +518,7 @@ export class ContainerFactory {
     /**
      * Configure services for production environment
      */
-    private configureProductionServices(container: IServiceContainer): void {
+    private configureProductionServices(_container: IServiceContainer): void {
         // Production-specific optimizations
         // Could include connection pooling, caching, etc.
     }
@@ -526,7 +526,7 @@ export class ContainerFactory {
     /**
      * Configure services for test environment
      */
-    private configureTestServices(container: IServiceContainer): void {
+    private configureTestServices(_container: IServiceContainer): void {
         // Test-specific configurations
         // Mock services, in-memory databases, etc.
     }

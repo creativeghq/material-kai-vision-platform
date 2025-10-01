@@ -3,7 +3,6 @@ import type {
   Material,
   RecognitionResult,
   RecognitionRequest,
-  RecognitionResponse,
   UploadedFile,
   ProcessingJob,
 } from '@/types/materials';
@@ -72,14 +71,14 @@ function mapToRecognitionResult(dbResult: RecognitionResultRow): RecognitionResu
   };
 }
 
-function mapToUploadedFile(dbFile: any): UploadedFile {
+function mapToUploadedFile(dbFile: Record<string, unknown>): UploadedFile {
   return {
     ...dbFile,
     file_type: dbFile.file_type as 'image' | 'document' | '3d_model',
   };
 }
 
-function mapToProcessingJob(dbJob: any): ProcessingJob {
+function mapToProcessingJob(dbJob: Record<string, unknown>): ProcessingJob {
   return {
     ...dbJob,
     job_type: dbJob.job_type as 'recognition' | '3d_reconstruction' | 'batch_analysis',
@@ -167,7 +166,7 @@ export class MaterialRecognitionAPI {
       }
 
       // Trigger hybrid recognition process via edge function
-      const { data: processResult, error: processError } = await supabase.functions
+      const { data: _processResult, error: processError } = await supabase.functions
         .invoke('hybrid-material-analysis', {
           body: {
             file_id: uploadedFiles[0]?.id || '', // Use first file for single analysis
@@ -213,7 +212,7 @@ export class MaterialRecognitionAPI {
       throw new Error(`Failed to fetch job: ${jobError?.message}`);
     }
 
-    const fileIds = (job.input_data as any)?.file_ids || [];
+    const fileIds = (job.input_data as Record<string, unknown>)?.file_ids || [];
 
     if (!Array.isArray(fileIds) || fileIds.length === 0) {
       return [];
@@ -242,7 +241,7 @@ export class MaterialRecognitionAPI {
       .order('name');
 
     if (category && category !== 'all') {
-      query = query.eq('category', category as any);
+      query = query.eq('category', category);
     }
 
     const { data, error } = await query;

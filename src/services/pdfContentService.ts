@@ -34,7 +34,7 @@ export interface PDFProcessingResult {
   message: string;
   // Enhanced MIVAA-specific fields
   workflowJobId?: string;
-  mivaaProcessingResult?: any;
+  mivaaProcessingResult?: unknown;
   embeddingsGenerated?: number;
   chunksCreated?: number;
 }
@@ -185,11 +185,11 @@ export class PDFContentService {
 
       return (data || []).map(item => ({
         id: item.id,
-        originalFilename: (item.metadata as any)?.original_filename || 'Unknown',
+        originalFilename: (item.metadata as Record<string, unknown>)?.original_filename || 'Unknown',
         processingStatus: item.status || 'unknown',
-        materialCategories: (item.metadata as any)?.material_categories || [],
-        materialsDetected: (item.metadata as any)?.materials_identified_count || 0,
-        confidence: (item.metadata as any)?.confidence_score_avg || 0,
+        materialCategories: (item.metadata as Record<string, unknown>)?.material_categories || [],
+        materialsDetected: (item.metadata as Record<string, unknown>)?.materials_identified_count || 0,
+        confidence: (item.metadata as Record<string, unknown>)?.confidence_score_avg || 0,
         createdAt: item.created_at || new Date().toISOString(),
       }));
 
@@ -202,7 +202,7 @@ export class PDFContentService {
   /**
    * Get detailed information about a specific PDF
    */
-  static async getPDFDetails(processingId: string): Promise<any> {
+  static async getPDFDetails(processingId: string): Promise<Record<string, unknown>> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -224,7 +224,7 @@ export class PDFContentService {
       const { data: knowledgeData } = await supabase
         .from('enhanced_knowledge_base')
         .select('*')
-        .ilike('title', `%${(data.metadata as any)?.original_filename || 'Unknown'}%`)
+        .ilike('title', `%${(data.metadata as Record<string, unknown>)?.original_filename || 'Unknown'}%`)
         .eq('created_by', user.id)
         .single();
 
@@ -297,7 +297,7 @@ export class PDFContentService {
   /**
    * Search within processed PDFs
    */
-  static async searchPDFContent(query: string, limit = 10): Promise<any[]> {
+  static async searchPDFContent(query: string, limit = 10): Promise<unknown[]> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -333,7 +333,7 @@ export class PDFContentService {
     successfulProcessing: number;
     averageConfidence: number;
     totalMaterials: number;
-    recentActivity: any[];
+    recentActivity: unknown[];
   }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -352,8 +352,8 @@ export class PDFContentService {
 
       const totalPDFs = data.length;
       const successfulProcessing = data.filter(p => p.status === 'completed').length;
-      const averageConfidence = data.reduce((sum, p) => sum + ((p.metadata as any)?.confidence_score_avg || 0), 0) / totalPDFs || 0;
-      const totalMaterials = data.reduce((sum, p) => sum + ((p.metadata as any)?.materials_identified_count || 0), 0);
+      const averageConfidence = data.reduce((sum, p) => sum + ((p.metadata as Record<string, unknown>)?.confidence_score_avg as number || 0), 0) / totalPDFs || 0;
+      const totalMaterials = data.reduce((sum, p) => sum + ((p.metadata as Record<string, unknown>)?.materials_identified_count as number || 0), 0);
       const recentActivity = data
         .sort((a, b) => new Date(b.created_at || new Date().toISOString()).getTime() - new Date(a.created_at || new Date().toISOString()).getTime())
         .slice(0, 5);

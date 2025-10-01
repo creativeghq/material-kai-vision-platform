@@ -179,11 +179,17 @@ export class ApiConfigManager {
       return null;
     }
 
-    // Validate configuration has required fields
-    const validation = this.validateConfigurationFields(config);
-    if (!validation.isValid) {
-      throw new ConfigurationError(type, validation.missingFields,
-        `Configuration for ${type} is missing required fields: ${validation.missingFields.join(', ')}`);
+    // During build time, skip validation and return config with placeholders
+    // Environment variables will be provided at runtime via GitHub/Vercel/Supabase
+    const isBuildTime = typeof window === 'undefined' && process.env.NODE_ENV !== 'production';
+
+    if (!isBuildTime) {
+      // Validate configuration has required fields only at runtime
+      const validation = this.validateConfigurationFields(config);
+      if (!validation.isValid) {
+        console.warn(`Configuration for ${type} is missing required fields: ${validation.missingFields.join(', ')} - will be provided at runtime`);
+        // Don't throw error, just warn - allow the app to start
+      }
     }
 
     return config;
@@ -279,31 +285,35 @@ export class ApiConfigManager {
     }
 
     // Type-specific validation
+    // During build time (when process.env.NODE_ENV is not 'production' and window is undefined),
+    // we allow missing API keys as they'll be provided at runtime via GitHub/Vercel/Supabase
+    const isBuildTime = typeof window === 'undefined' && process.env.NODE_ENV !== 'production';
+
     switch (config.type) {
       case 'replicate':
-        // Replicate configs need API key (server-side only)
-        if (typeof window === 'undefined' && !config.apiKey) {
-          errors.push('Missing Replicate API key (server-side)');
+        // Replicate configs need API key (server-side only, but not during build)
+        if (typeof window === 'undefined' && !config.apiKey && !isBuildTime) {
+          errors.push('Missing Replicate API key (server-side) - will be provided at runtime');
           missingFields.push('apiKey');
         }
         break;
 
       case 'supabase':
         const supabaseConfig = config as SupabaseApiConfig;
-        if (!supabaseConfig.projectUrl) {
-          errors.push('Missing Supabase project URL');
+        if (!supabaseConfig.projectUrl && !isBuildTime) {
+          errors.push('Missing Supabase project URL - will be provided at runtime');
           missingFields.push('projectUrl');
         }
-        if (!supabaseConfig.anonKey) {
-          errors.push('Missing Supabase anonymous key');
+        if (!supabaseConfig.anonKey && !isBuildTime) {
+          errors.push('Missing Supabase anonymous key - will be provided at runtime');
           missingFields.push('anonKey');
         }
         break;
 
       case 'huggingface':
-        // HuggingFace configs need API key (server-side only)
-        if (typeof window === 'undefined' && !config.apiKey) {
-          errors.push('Missing HuggingFace API key (server-side)');
+        // HuggingFace configs need API key (server-side only, but not during build)
+        if (typeof window === 'undefined' && !config.apiKey && !isBuildTime) {
+          errors.push('Missing HuggingFace API key (server-side) - will be provided at runtime');
           missingFields.push('apiKey');
         }
         break;

@@ -175,7 +175,7 @@ export class ErrorHandler {
   /**
    * Wrap async functions with error handling
    */
-  static wrapAsync<T extends any[], R>(
+  static wrapAsync<T extends unknown[], R>(
     fn: (...args: T) => Promise<R>,
   ): (...args: T) => Promise<R> {
     return async (...args: T): Promise<R> => {

@@ -17,8 +17,6 @@ import {
   Settings,
   Cpu,
   Eye,
-  Camera,
-  Image,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -209,7 +207,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
     useVisualSearch: true,
     enableVisualSearch: true,
   });
-  const [searchMode, setSearchMode] = useState<'text' | 'visual' | 'hybrid'>('text');
+  const [_searchMode, _setSearchMode] = useState<'text' | 'visual' | 'hybrid'>('text');
   const [visualSearchResults, setVisualSearchResults] = useState<VisualSearchResults | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

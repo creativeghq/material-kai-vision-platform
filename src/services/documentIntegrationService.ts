@@ -289,7 +289,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
     }
   }
 
-  private async callMivaaService(request: DocumentProcessingRequest): Promise<any> {
+  private async callMivaaService(request: DocumentProcessingRequest): Promise<unknown> {
     // Route through the MIVAA gateway instead of direct service calls
     console.log('Calling MIVAA service through gateway for document processing...');
 
@@ -350,7 +350,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
     }
   }
 
-  private async integrateWithRAG(mivaaResponse: any, request: DocumentProcessingRequest): Promise<any> {
+  private async integrateWithRAG(mivaaResponse: unknown, request: DocumentProcessingRequest): Promise<unknown> {
     console.log('Integrating with RAG system...');
 
     // Use the existing RAG service for integration
@@ -373,8 +373,8 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
 
   private async storeProcessingResults(
     _processingId: string,
-    _mivaaResponse: any,
-    _ragIntegration: any,
+    _mivaaResponse: unknown,
+    _ragIntegration: unknown,
     _workspaceContext: WorkspaceContext,
   ): Promise<string> {
     // Store processing results in Supabase
@@ -388,7 +388,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
     return documentId;
   }
 
-  private calculateQualityMetrics(mivaaResponse: any): DocumentProcessingResult['qualityMetrics'] {
+  private calculateQualityMetrics(mivaaResponse: Record<string, unknown>): DocumentProcessingResult['qualityMetrics'] {
     return {
       extractionQuality: mivaaResponse.metadata?.extractionQuality || 0.8,
       chunkingQuality: 0.85, // Would be calculated based on chunk analysis
@@ -396,13 +396,13 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
     };
   }
 
-  private calculateStatistics(mivaaResponse: any, ragIntegration: any): DocumentProcessingResult['statistics'] {
+  private calculateStatistics(mivaaResponse: Record<string, unknown>, ragIntegration: Record<string, unknown>): DocumentProcessingResult['statistics'] {
     return {
       totalPages: mivaaResponse.metadata?.pages || 1,
       totalChunks: ragIntegration.chunks?.length || 0,
       totalTables: mivaaResponse.extractedTables?.length || 0,
       totalImages: mivaaResponse.extractedImages?.length || 0,
-      averageChunkSize: ragIntegration.chunks?.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / (ragIntegration.chunks?.length || 1) || 0,
+      averageChunkSize: Array.isArray(ragIntegration.chunks) ? ragIntegration.chunks.reduce((sum: number, chunk: unknown) => sum + ((chunk as Record<string, unknown>).content as string || '').length, 0) / (ragIntegration.chunks.length || 1) : 0,
     };
   }
 
@@ -446,10 +446,10 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
     }
   }
 
-  private createStandardError(code: string, message: string, originalError?: any): Error {
+  private createStandardError(code: string, message: string, originalError?: unknown): Error {
     const error = new Error(message);
-    (error as any).code = code;
-    (error as any).originalError = originalError;
+    (error as Record<string, unknown>).code = code;
+    (error as Record<string, unknown>).originalError = originalError;
     return error;
   }
 }

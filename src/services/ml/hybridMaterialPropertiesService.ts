@@ -1,7 +1,7 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { MLResult } from './types';
-import { MaterialAnalyzerService, MaterialAnalysisOptions, AdvancedMaterialAnalysisResult } from './materialAnalyzer';
+import { MaterialAnalyzerService, MaterialAnalysisOptions } from './materialAnalyzer';
 import { ServerMLService } from './serverMLService';
 
 interface HybridMaterialPropertiesServiceConfig extends ServiceConfig {

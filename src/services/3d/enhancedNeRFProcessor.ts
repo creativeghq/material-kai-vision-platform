@@ -65,10 +65,10 @@ export class EnhancedNeRFProcessor {
           source_image_urls: imageUrls,
           reconstruction_status: 'pending',
           metadata: {
-            options: options as any,
+            options: options as unknown,
             imageCount: imageUrls.length,
             startTime: new Date().toISOString(),
-          } as any,
+          } as unknown,
         })
         .select()
         .single();
@@ -138,13 +138,13 @@ export class EnhancedNeRFProcessor {
           quality_score: this.calculateOverallQuality(qualityMetrics),
           processing_time_ms: Date.now() - new Date().getTime(),
           metadata: {
-            options: options as any,
-            qualityMetrics: qualityMetrics as any,
-            materialInfo: materialInfo as any,
-            lightingInfo: lightingInfo as any,
-            cameraParams: cameraParams as any,
+            options: options as Record<string, unknown>,
+            qualityMetrics: qualityMetrics as Record<string, unknown>,
+            materialInfo: materialInfo as Record<string, unknown>,
+            lightingInfo: lightingInfo as Record<string, unknown>,
+            cameraParams: cameraParams as unknown,
             completedAt: new Date().toISOString(),
-          } as any,
+          } as unknown,
           updated_at: new Date().toISOString(),
         })
         .eq('id', jobId);
@@ -171,7 +171,7 @@ export class EnhancedNeRFProcessor {
     height: number;
     quality: number;
     timestamp?: string;
-    cameraSettings?: any;
+    cameraSettings?: Record<string, unknown>;
   }>> {
     const preprocessed = [];
 
@@ -206,7 +206,7 @@ export class EnhancedNeRFProcessor {
     return preprocessed;
   }
 
-  private async estimateCameraPoses(images: any[]): Promise<{
+  private async estimateCameraPoses(images: unknown[]): Promise<{
     intrinsics: {
       fx: number;
       fy: number;
@@ -244,8 +244,8 @@ export class EnhancedNeRFProcessor {
   }
 
   private async trainNeRFModel(
-    images: any[],
-    cameraParams: any,
+    images: unknown[],
+    cameraParams: Record<string, unknown>,
     options: NeRFProcessingOptions,
   ): Promise<{
     modelPath: string;
@@ -276,15 +276,15 @@ export class EnhancedNeRFProcessor {
     };
   }
 
-  private async generateOutputs(nerfModel: any, options: NeRFProcessingOptions): Promise<{
+  private async generateOutputs(nerfModel: unknown, options: NeRFProcessingOptions): Promise<{
     mesh?: string;
     pointCloud?: string;
     video?: string;
     images?: string[];
     model: string;
   }> {
-    const outputs: any = {
-      model: nerfModel.modelPath,
+    const outputs: Record<string, unknown> = {
+      model: (nerfModel as Record<string, unknown>).modelPath,
     };
 
     if (options.outputFormats.includes('mesh')) {
@@ -306,7 +306,7 @@ export class EnhancedNeRFProcessor {
     return outputs;
   }
 
-  private async generateMesh(nerfModel: any, optimize: boolean): Promise<string> {
+  private async generateMesh(_nerfModel: unknown, optimize: boolean): Promise<string> {
     // In a real implementation, this would:
     // 1. Use marching cubes or similar to extract mesh from NeRF
     // 2. Optionally optimize the mesh (decimation, smoothing)
@@ -322,19 +322,19 @@ export class EnhancedNeRFProcessor {
     return meshPath;
   }
 
-  private async generatePointCloud(nerfModel: any): Promise<string> {
+  private async generatePointCloud(_nerfModel: unknown): Promise<string> {
     // Generate point cloud by sampling the NeRF at various points
     const pointCloudPath = `/nerf_models/pointcloud_${Date.now()}.ply`;
     return pointCloudPath;
   }
 
-  private async generateVideo(nerfModel: any): Promise<string> {
+  private async generateVideo(_nerfModel: unknown): Promise<string> {
     // Generate video by rendering NeRF from interpolated camera path
     const videoPath = `/nerf_models/video_${Date.now()}.mp4`;
     return videoPath;
   }
 
-  private async generateImages(nerfModel: any): Promise<string[]> {
+  private async generateImages(_nerfModel: unknown): Promise<string[]> {
     // Generate novel view images
     const imagePaths = [];
     for (let i = 0; i < 36; i++) { // 10 degree increments
@@ -343,7 +343,7 @@ export class EnhancedNeRFProcessor {
     return imagePaths;
   }
 
-  private async assessQuality(nerfModel: any, originalImages: any[]): Promise<NeRFQualityMetrics> {
+  private async assessQuality(_nerfModel: unknown, _originalImages: unknown[]): Promise<NeRFQualityMetrics> {
     // In a real implementation, this would:
     // 1. Render images from original camera poses
     // 2. Compare with original images using PSNR, SSIM, LPIPS
@@ -359,7 +359,7 @@ export class EnhancedNeRFProcessor {
     };
   }
 
-  private async extractMaterials(nerfModel: any, meshPath?: string): Promise<NeRFMaterialInfo[]> {
+  private async extractMaterials(_nerfModel: unknown, meshPath?: string): Promise<NeRFMaterialInfo[]> {
     if (!meshPath) return [];
 
     // In a real implementation, this would:
@@ -386,7 +386,7 @@ export class EnhancedNeRFProcessor {
     ];
   }
 
-  private async analyzeLighting(nerfModel: any): Promise<NeRFLightingInfo> {
+  private async analyzeLighting(_nerfModel: unknown): Promise<NeRFLightingInfo> {
     // In a real implementation, this would:
     // 1. Analyze the NeRF's learned radiance field
     // 2. Decompose lighting into components
@@ -424,7 +424,7 @@ export class EnhancedNeRFProcessor {
     return (psnrNorm * 0.3 + ssimWeight * 0.4 + lpipsWeight * 0.3);
   }
 
-  async getNeRFReconstruction(jobId: string): Promise<any> {
+  async getNeRFReconstruction(jobId: string): Promise<Record<string, unknown>> {
     try {
       const { data, error } = await supabase
         .from('nerf_reconstructions')
@@ -440,7 +440,7 @@ export class EnhancedNeRFProcessor {
     }
   }
 
-  async listUserReconstructions(userId: string): Promise<any[]> {
+  async listUserReconstructions(userId: string): Promise<Record<string, unknown>[]> {
     try {
       const { data, error } = await supabase
         .from('nerf_reconstructions')

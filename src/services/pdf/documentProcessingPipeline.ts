@@ -246,7 +246,7 @@ export class DocumentProcessingPipeline {
   /**
    * Build workspace context for processing
    */
-  private async buildWorkspaceContext(documentId: string): Promise<WorkspaceContext> {
+  private async buildWorkspaceContext(_documentId: string): Promise<WorkspaceContext> {
     // This would typically integrate with workspace management systems
     // For now, return basic context
     return {

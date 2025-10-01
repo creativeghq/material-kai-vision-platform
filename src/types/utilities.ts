@@ -282,11 +282,11 @@ export type MaybePromise<T> = T | Promise<T>;
  * 
  * @template T - Function type
  */
-export type ReturnTypeAsync<T extends (...args: any[]) => any> = T extends (
-  ...args: any[]
+export type ReturnTypeAsync<T extends (...args: unknown[]) => unknown> = T extends (
+  ...args: unknown[]
 ) => Promise<infer R>
   ? R
-  : T extends (...args: any[]) => infer R
+  : T extends (...args: unknown[]) => infer R
   ? R
   : never;
 
@@ -734,7 +734,7 @@ export type FormSubmissionState = 'idle' | 'submitting' | 'success' | 'error';
 /**
  * Form field configuration for generic form handling.
  */
-export interface FormField<TValue = any> {
+export interface FormField<TValue = unknown> {
   /** Field name/key */
   name: string;
   /** Field label for display */

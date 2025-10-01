@@ -41,7 +41,7 @@ export interface EmbeddingGenerationConfig {
 export interface EmbeddingInput {
   id: string;
   text: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   priority?: 'low' | 'normal' | 'high';
 }
 
@@ -57,7 +57,7 @@ export interface EmbeddingOutput {
     promptTokens: number;
     totalTokens: number;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   processingTime: number;
   cached: boolean;
 }
@@ -411,7 +411,7 @@ export class EmbeddingGenerationService extends EventEmitter {
       recordRequest: (tokens: number): void => {
         requests.push({ timestamp: Date.now(), tokens });
       },
-      getWaitTime: (tokens: number): number => {
+      getWaitTime: (_tokens: number): number => {
         const now = Date.now();
         const oneMinuteAgo = now - 60000;
 
@@ -431,7 +431,7 @@ export class EmbeddingGenerationService extends EventEmitter {
   /**
    * Generate embedding with retry logic using MIVAA backend
    */
-  private async generateWithRetry(text: string): Promise<any> {
+  private async generateWithRetry(text: string): Promise<unknown> {
     let lastError: Error;
 
     for (let attempt = 1; attempt <= this.config.retry.maxAttempts; attempt++) {
@@ -526,7 +526,7 @@ export class EmbeddingGenerationService extends EventEmitter {
   /**
    * Cache embedding result
    */
-  private cacheEmbedding(text: string, result: any): void {
+  private cacheEmbedding(text: string, result: unknown): void {
     // Check cache size limit
     if (this.cache.size >= this.config.cache.maxSize) {
       this.evictLeastRecentlyUsed();

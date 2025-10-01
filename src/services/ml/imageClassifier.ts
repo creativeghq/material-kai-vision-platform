@@ -13,7 +13,7 @@ interface ImageClassifierServiceConfig extends ServiceConfig {
 }
 
 export class ImageClassifierService extends BaseService<ImageClassifierServiceConfig> {
-  private classifier: any = null;
+  private classifier: unknown = null;
 
   protected async doInitialize(): Promise<void> {
     try {
@@ -26,9 +26,9 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
         'image-classification',
         modelName,
         {
-          device: device as any, // Type assertion to handle device type mismatch
-          progress_callback: this.config.enableProgressCallback ? (progress: any) => {
-            console.log(`Image classifier loading: ${Math.round(progress.progress * 100)}%`);
+          device: device as unknown as string, // Type assertion to handle device type mismatch
+          progress_callback: this.config.enableProgressCallback ? (progress: Record<string, unknown>) => {
+            console.log(`Image classifier loading: ${Math.round((progress.progress as number) * 100)}%`);
           } : undefined,
         },
       );
