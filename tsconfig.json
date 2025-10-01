@@ -29,9 +29,7 @@
     /* Additional options */
     "allowJs": true,
     "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "types": [],
-    "typeRoots": []
+    "resolveJsonModule": true
   },
   "include": [
     "src",
