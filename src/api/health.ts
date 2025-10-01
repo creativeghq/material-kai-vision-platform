@@ -47,15 +47,14 @@ export interface ReadinessStatus {
  * Basic health check - returns if the service is running
  */
 export async function healthCheck(): Promise<HealthStatus> {
-  const startTime = Date.now();
   const timestamp = new Date().toISOString();
   const version = '1.0.0'; // Should come from package.json
   const uptime = process.uptime ? process.uptime() : 0;
 
-  const checks = {
-    database: 'unhealthy' as const,
-    memory: 'healthy' as const,
-    dependencies: 'healthy' as const,
+  const checks: HealthStatus['checks'] = {
+    database: 'unhealthy',
+    memory: 'healthy',
+    dependencies: 'healthy',
   };
 
   const details: HealthStatus['details'] = {};
@@ -170,7 +169,7 @@ export async function readinessCheck(): Promise<ReadinessStatus> {
  * Express.js compatible health endpoint
  */
 export function createHealthEndpoint() {
-  return async (req: any, res: any) => {
+  return async (_req: any, res: any) => {
     try {
       const health = await healthCheck();
       const statusCode = health.status === 'healthy' ? 200 : 
@@ -191,7 +190,7 @@ export function createHealthEndpoint() {
  * Express.js compatible readiness endpoint
  */
 export function createReadinessEndpoint() {
-  return async (req: any, res: any) => {
+  return async (_req: any, res: any) => {
     try {
       const readiness = await readinessCheck();
       const statusCode = readiness.ready ? 200 : 503;

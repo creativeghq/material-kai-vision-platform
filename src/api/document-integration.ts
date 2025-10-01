@@ -2,6 +2,7 @@ import { z, ZodError } from 'zod';
 
 import { DocumentWorkflowOrchestrator, ProcessingRequest, WorkflowJob, WorkflowStatus } from '../orchestrators/DocumentWorkflowOrchestrator';
 import { JWTAuthMiddleware, AuthenticatedRequest, AuthenticationResult } from '../middleware/jwtAuthMiddleware';
+import { ImageMetadata } from '../services/mivaaToRagTransformer';
 
 // Express types (would be imported from @types/express in real implementation)
 interface Request {
@@ -251,9 +252,18 @@ export class DocumentIntegrationController {
   private async authenticateRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       // Convert Express Request to AuthenticatedRequest format
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (typeof value === 'string') {
+          headers[key] = value;
+        } else if (Array.isArray(value)) {
+          headers[key] = value[0] || '';
+        }
+      }
+
       const authRequest: AuthenticatedRequest = {
-        headers: req.headers as Record<string, string>,
-        body: req.body,
+        headers,
+        body: (req.body as Record<string, unknown>) || {},
       };
 
       // Extract workspace ID if provided
@@ -441,8 +451,8 @@ export class DocumentIntegrationController {
             format: 'json' as const,
             rawData: JSON.stringify(table),
           })),
-          images: (mivaaDocument.images || []).map((image: { id: string; description?: string; extractedText?: string }) => {
-            const imageMetadata: Record<string, unknown> = {
+          images: (mivaaDocument.images || []).map((image: { id: string; description?: string; extractedText?: string }): ImageMetadata => {
+            const imageMetadata: ImageMetadata = {
               id: image.id,
               filename: image.id || 'unknown',
               position: {

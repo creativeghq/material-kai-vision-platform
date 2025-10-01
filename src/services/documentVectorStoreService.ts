@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { AppError } from '../utils/errorHandler';
 
 import { MivaaEmbeddingIntegration } from './mivaaEmbeddingIntegration';
+import { DEFAULT_EMBEDDING_CONFIG } from '../config/embeddingConfig';
+import { unifiedTextPreprocessor } from './textPreprocessor';
 
 /**
  * Document chunk interface for vector storage
@@ -242,14 +244,15 @@ export class DocumentVectorStoreService {
         try {
           // Generate embeddings for batch
           const embeddingStart = performance.now();
-          // Generate embeddings for each text in the batch
-          const embeddingPromises = batch.map(chunk =>
-            this.embeddingService.generateEmbedding({
-              text: chunk.content,
-              model: 'text-embedding-3-large',
-              dimensions: 1536,
-            }),
-          );
+          // Generate embeddings for each text in the batch using unified config
+          const embeddingPromises = batch.map(chunk => {
+            const preprocessedText = unifiedTextPreprocessor.preprocess(chunk.content);
+            return this.embeddingService.generateEmbedding({
+              text: preprocessedText,
+              model: DEFAULT_EMBEDDING_CONFIG.primary.name,
+              dimensions: DEFAULT_EMBEDDING_CONFIG.primary.dimensions,
+            });
+          });
 
           const embeddingResponses = await Promise.all(embeddingPromises);
           embeddingTime += performance.now() - embeddingStart;
@@ -274,8 +277,8 @@ export class DocumentVectorStoreService {
               metadata: {
                 ...chunk.metadata,
                 chunkIndex: chunk.chunkIndex,
-                embeddingModel: embeddingResponse.model || 'text-embedding-3-large',
-                dimensions: embeddingResponse.dimensions || 1536,
+                embeddingModel: embeddingResponse.model || DEFAULT_EMBEDDING_CONFIG.primary.name,
+                dimensions: embeddingResponse.dimensions || DEFAULT_EMBEDDING_CONFIG.primary.dimensions,
               },
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -405,12 +408,13 @@ export class DocumentVectorStoreService {
         limit: request.limit || this.config.search.defaultLimit,
       });
 
-      // Generate query embedding
+      // Generate query embedding using unified config
       const embeddingStart = performance.now();
+      const preprocessedQuery = unifiedTextPreprocessor.preprocess(request.query);
       const queryEmbeddingResponse = await this.embeddingService.generateEmbedding({
-        model: 'text-embedding-3-large',
-        dimensions: 1536,
-        text: request.query,
+        model: DEFAULT_EMBEDDING_CONFIG.primary.name,
+        dimensions: DEFAULT_EMBEDDING_CONFIG.primary.dimensions,
+        text: preprocessedQuery,
         // cache_ttl: 300 // Not part of EmbeddingRequest interface
       });
 

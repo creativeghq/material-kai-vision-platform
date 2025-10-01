@@ -4,15 +4,31 @@ import { EventEmitter } from 'events';
 
 import { Logger } from 'winston';
 
+// Import unified embedding configuration
+import {
+  DEFAULT_EMBEDDING_CONFIG,
+  UnifiedEmbeddingConfig,
+  EmbeddingModelConfig,
+  TextPreprocessor,
+  EmbeddingValidator,
+  EmbeddingCacheKey,
+  textPreprocessor
+} from '../config/embeddingConfig';
+
 /**
  * Configuration interface for the EmbeddingGenerationService
+ * Now extends the unified embedding configuration
  */
 export interface EmbeddingGenerationConfig {
+  // Unified embedding configuration
+  embedding: UnifiedEmbeddingConfig;
+
+  // Service-specific configuration
   mivaa: {
     gatewayUrl: string;
     apiKey: string;
     timeout?: number;
-    model?: string; // Optional model override for MIVAA
+    model?: string;
   };
   batch: {
     maxSize: number;
@@ -47,6 +63,7 @@ export interface EmbeddingInput {
 
 /**
  * Output interface for generated embeddings
+ * Enhanced with validation and normalization info
  */
 export interface EmbeddingOutput {
   id: string;
@@ -60,6 +77,11 @@ export interface EmbeddingOutput {
   metadata?: Record<string, unknown>;
   processingTime: number;
   cached: boolean;
+  // New validation fields
+  validated: boolean;
+  normalized: boolean;
+  preprocessedText?: string;
+  originalTextLength: number;
 }
 
 /**
@@ -94,6 +116,7 @@ interface CacheEntry {
   };
   timestamp: number;
   accessCount: number;
+  normalized?: boolean;
 }
 
 /**
@@ -141,7 +164,11 @@ export class EmbeddingGenerationService extends EventEmitter {
 
   constructor(config: EmbeddingGenerationConfig, logger: Logger) {
     super();
-    this.config = config;
+    this.config = {
+      ...config,
+      // Ensure we have the unified embedding config
+      embedding: config.embedding || DEFAULT_EMBEDDING_CONFIG
+    };
     this.logger = logger;
 
     // Initialize cache
@@ -153,23 +180,42 @@ export class EmbeddingGenerationService extends EventEmitter {
     // Initialize batch queue
     this.batchQueue = [];
 
-    this.logger.info('EmbeddingGenerationService initialized with MIVAA backend', {
+    this.logger.info('EmbeddingGenerationService initialized with unified config', {
       gatewayUrl: config.mivaa.gatewayUrl,
       batchSize: config.batch.maxSize,
       cacheEnabled: config.cache.enabled,
+      primaryModel: this.config.embedding.primary.name,
+      dimensions: this.config.embedding.primary.dimensions,
     });
   }
 
   /**
-   * Generate embedding for a single text input
+   * Generate embedding for a single text input with unified preprocessing
    */
   async generateEmbedding(input: EmbeddingInput): Promise<EmbeddingOutput> {
     const startTime = performance.now();
+    const originalTextLength = input.text.length;
 
     try {
+      // Validate input text
+      const validation = textPreprocessor.validate(input.text);
+      if (!validation.valid) {
+        throw new Error(`Text validation failed: ${validation.error}`);
+      }
+
+      // Preprocess text using unified configuration
+      const preprocessedText = textPreprocessor.preprocess(input.text);
+
+      // Generate cache key using unified strategy
+      const cacheKey = EmbeddingCacheKey.generate(
+        preprocessedText,
+        this.config.embedding.primary.name,
+        this.config.embedding.caching.keyStrategy
+      );
+
       // Check cache first
       if (this.config.cache.enabled) {
-        const cached = this.getCachedEmbedding(input.text);
+        const cached = this.getCachedEmbedding(cacheKey);
         if (cached) {
           this.metrics.cacheHits++;
           this.emit('cacheHit', { id: input.id, text: input.text });
@@ -180,16 +226,20 @@ export class EmbeddingGenerationService extends EventEmitter {
             dimensions: cached.dimensions,
             model: cached.model,
             usage: cached.usage,
-            metadata: input.metadata,
+            metadata: input.metadata || {},
             processingTime: performance.now() - startTime,
             cached: true,
+            validated: true,
+            normalized: cached.normalized || false,
+            preprocessedText,
+            originalTextLength,
           };
         }
         this.metrics.cacheMisses++;
       }
 
       // Estimate token count for rate limiting
-      const estimatedTokens = this.estimateTokenCount(input.text);
+      const estimatedTokens = this.estimateTokenCount(preprocessedText);
 
       // Check rate limits
       if (!this.rateLimiter.canMakeRequest(estimatedTokens)) {
@@ -202,15 +252,33 @@ export class EmbeddingGenerationService extends EventEmitter {
         }
       }
 
-      // Generate embedding with retry logic
-      const result = await this.generateWithRetry(input.text);
+      // Generate embedding with retry logic using preprocessed text
+      const result = await this.generateWithRetry(preprocessedText) as any;
+
+      // Validate and normalize embedding
+      const embeddingValidation = EmbeddingValidator.validateEmbedding(
+        result.data[0].embedding,
+        this.config.embedding.primary
+      );
+
+      if (!embeddingValidation.valid) {
+        throw new Error(`Embedding validation failed: ${embeddingValidation.error}`);
+      }
+
+      const finalEmbedding = embeddingValidation.normalized || result.data[0].embedding;
 
       // Record rate limit usage
       this.rateLimiter.recordRequest(result.usage.total_tokens);
 
-      // Cache the result
+      // Cache the result with validation info
       if (this.config.cache.enabled) {
-        this.cacheEmbedding(input.text, result);
+        this.cacheEmbedding(cacheKey, {
+          embedding: finalEmbedding,
+          dimensions: finalEmbedding.length,
+          model: result.model,
+          usage: result.usage,
+          normalized: embeddingValidation.normalized !== undefined
+        } as any);
       }
 
       // Update metrics
@@ -220,16 +288,21 @@ export class EmbeddingGenerationService extends EventEmitter {
 
       const output: EmbeddingOutput = {
         id: input.id,
-        embedding: result.data[0].embedding,
-        dimensions: result.data[0].embedding.length,
+        embedding: finalEmbedding,
+        dimensions: finalEmbedding.length,
         model: result.model,
         usage: {
           promptTokens: result.usage.prompt_tokens,
           totalTokens: result.usage.total_tokens,
         },
-        metadata: input.metadata,
+        metadata: input.metadata || {},
         processingTime: performance.now() - startTime,
         cached: false,
+        // New validation fields
+        validated: embeddingValidation.valid,
+        normalized: embeddingValidation.normalized !== undefined,
+        preprocessedText,
+        originalTextLength,
       };
 
       this.emit('embeddingGenerated', output);

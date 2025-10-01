@@ -4,6 +4,8 @@ import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { MLResult, TextEmbeddingResult, FeatureExtractionOptions } from './types';
 import { DeviceDetector } from './deviceDetector';
+import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
+import { unifiedTextPreprocessor } from '../textPreprocessor';
 
 /**
  * Configuration interface for TextEmbedderService
@@ -30,7 +32,8 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
     try {
       console.log('Initializing text embedding model...');
 
-      const modelName = this.config.modelName || 'mixedbread-ai/mxbai-embed-xsmall-v1';
+      // Use unified embedding configuration for consistency
+      const modelName = this.config.modelName || DEFAULT_EMBEDDING_CONFIG.primary.name;
       const device = this.config.device || DeviceDetector.getOptimalDevice();
 
       this.embedder = await pipeline(
@@ -175,7 +178,7 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
       version: '1.0.0',
       environment: 'development',
       enabled: true,
-      modelName: 'mixedbread-ai/mxbai-embed-xsmall-v1',
+      modelName: DEFAULT_EMBEDDING_CONFIG.primary.name,
       enableProgressCallback: true,
       defaultPooling: 'mean',
       defaultNormalize: true,

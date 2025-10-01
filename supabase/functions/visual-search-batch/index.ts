@@ -7,7 +7,7 @@ import {
   createSuccessResponse,
   createErrorResponse,
   createJSONResponse,
-} from '../_shared/types';
+} from '../_shared/types.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,

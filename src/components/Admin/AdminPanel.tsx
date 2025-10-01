@@ -287,20 +287,20 @@ export const AdminPanel: React.FC = () => {
                         <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">{event.event_type}</Badge>
                       </TableCell>
                       <TableCell>
-                        {event.event_data.final_score ?
-                          getScoreBadge(event.event_data.final_score) :
+                        {(event.event_data as Record<string, unknown>).final_score ?
+                          getScoreBadge((event.event_data as Record<string, unknown>).final_score as number) :
                           '-'
                         }
                       </TableCell>
                       <TableCell>
-                        {event.event_data.final_provider ?
-                          getProviderBadge(event.event_data.final_provider) :
+                        {(event.event_data as Record<string, unknown>).final_provider ?
+                          getProviderBadge((event.event_data as Record<string, unknown>).final_provider as string) :
                           '-'
                         }
                       </TableCell>
                       <TableCell>
-                        {event.event_data.processing_time_ms ?
-                          `${(event.event_data.processing_time_ms / 1000).toFixed(2)}s` :
+                        {(event.event_data as Record<string, unknown>).processing_time_ms ?
+                          `${((event.event_data as Record<string, unknown>).processing_time_ms as number / 1000).toFixed(2)}s` :
                           '-'
                         }
                       </TableCell>

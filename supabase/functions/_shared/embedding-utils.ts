@@ -64,8 +64,9 @@ export const MIVAA_CONFIG = {
   retryDelay: 1000,
 } as const;
 
+// Unified embedding configuration for consistency across platform
 export const EMBEDDING_CONFIG = {
-  model: getEnv('EMBEDDING_MODEL', 'text-embedding-3-small'),
+  model: getEnv('EMBEDDING_MODEL', 'text-embedding-ada-002'), // Changed to ada-002 for consistency
   dimensions: parseInt(getEnv('EMBEDDING_DIMENSIONS', '1536')),
   maxTokens: 8191,
   maxRetries: 3,

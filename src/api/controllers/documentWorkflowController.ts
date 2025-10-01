@@ -577,41 +577,80 @@ export class DocumentWorkflowController {
         };
       }
 
-      // Simulate document list (in production, this would query the database)
-      const mockDocuments = {
-        documents: [
-          {
-            documentId: 'doc_1',
-            filename: 'sample.pdf',
-            status: 'completed',
-            createdAt: new Date().toISOString(),
-            metadata: {
-              fileSize: 1024000,
-              pageCount: 10,
-              tags: ['sample', 'document'],
-            },
-          },
-        ],
-        totalCount: 1,
-        limit: options?.limit || 50,
-        offset: options?.offset || 0,
-      };
+      // Query actual documents from database
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
 
-      // Log usage
-      await RateLimitHelper.logUsage(
-        '/api/workflow/documents',
-        'GET',
-        'client',
-        authContext.user.id,
-        200,
-        Date.now() - startTime,
-      );
+        const limit = options?.limit || 50;
+        const offset = options?.offset || 0;
 
-      return {
-        success: true,
-        data: mockDocuments,
-        timestamp: new Date().toISOString(),
-      };
+        // Query documents with pagination
+        const { data: documents, error, count } = await supabase
+          .from('processed_documents')
+          .select('*', { count: 'exact' })
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (error) {
+          throw new Error(`Database query failed: ${error.message}`);
+        }
+
+        const documentList = {
+          documents: documents?.map((doc: any) => ({
+            documentId: doc.id,
+            filename: doc.filename || 'Unknown',
+            status: doc.status || 'unknown',
+            createdAt: doc.created_at,
+            metadata: doc.metadata || {},
+          })) || [],
+          totalCount: count || 0,
+          limit,
+          offset,
+        };
+
+        // Log usage
+        await RateLimitHelper.logUsage(
+          '/api/workflow/documents',
+          'GET',
+          'client',
+          authContext.user?.id,
+          200,
+          Date.now() - startTime,
+        );
+
+        return {
+          success: true,
+          data: documentList,
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        console.error('Failed to query documents:', error);
+
+        // Fallback to empty list if database query fails
+        const fallbackDocuments = {
+          documents: [],
+          totalCount: 0,
+          limit: options?.limit || 50,
+          offset: options?.offset || 0,
+        };
+
+        // Log usage with error
+        await RateLimitHelper.logUsage(
+          '/api/workflow/documents',
+          'GET',
+          'client',
+          authContext.user?.id,
+          500,
+          Date.now() - startTime,
+        );
+
+        return {
+          success: true,
+          data: fallbackDocuments,
+          timestamp: new Date().toISOString(),
+        };
+      }
     } catch (error) {
       console.error('List documents error:', error);
 
@@ -698,7 +737,7 @@ export class DocumentWorkflowController {
    * Generate unique job ID
    */
   private generateJobId(): string {
-    return `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `job_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**

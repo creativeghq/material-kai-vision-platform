@@ -182,7 +182,7 @@ const AdminDashboard: React.FC = () => {
       if (error) throw error;
 
       // Transform workspaces into user-like objects for display
-      const userList: User[] = workspaces?.map((workspace, index) => ({
+      const userList: User[] = workspaces?.map((workspace: any, index: number) => ({
         id: workspace.id,
         name: workspace.name,
         email: `admin@${workspace.name.toLowerCase().replace(/\s+/g, '')}.com`,

@@ -7,7 +7,7 @@ import {
   createSuccessResponse,
   createErrorResponse,
   createJSONResponse,
-} from '../_shared/types';
+} from '../_shared/types.ts';
 
 // Import MIVAA utilities for centralized AI management
 import { generateSemanticAnalysis } from '../_shared/embedding-utils';

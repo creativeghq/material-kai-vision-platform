@@ -52,8 +52,10 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     'models': true,
     'api-response': false,
   });
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+
+  // Suppress unused variable warning - this state is used by setters but not directly read
+  void showCompletionDialog;
 
   // Initialize workflow steps based on actual edge function implementation
   useEffect(() => {
@@ -418,16 +420,16 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-3">
               {/* Unified Models Section */}
-              <Collapsible
-                open={expandedSections['models'] ?? false}
+              {(<Collapsible
+                open={Boolean(expandedSections['models'])}
                 onOpenChange={() => toggleSection('models')}
               >
                 <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded border">
                   <div className="flex items-center gap-2">
-                    {expandedSections['models'] ?
+                    {(Boolean(expandedSections['models']) ?
                       <ChevronDown className="h-4 w-4" /> :
                       <ChevronRight className="h-4 w-4" />
-                    }
+                    ) as React.ReactNode}
                     <h4 className="font-medium text-sm text-muted-foreground">GENERATION MODELS</h4>
                   </div>
                   <Badge className="text-xs border border-gray-300 text-gray-600">
@@ -480,7 +482,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                     ))}
                   </div>
                 </CollapsibleContent>
-              </Collapsible>
+              </Collapsible>) as React.ReactNode}
 
               {/* API Response Section */}
               {apiResponse && (

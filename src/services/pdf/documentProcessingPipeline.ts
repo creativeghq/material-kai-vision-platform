@@ -6,6 +6,8 @@ import {
   TableData,
   ImageData,
 } from './mivaaIntegrationService';
+import { unifiedTextPreprocessor, TextPreprocessingResult } from '../textPreprocessor';
+import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
 
 /**
  * Text chunking configuration

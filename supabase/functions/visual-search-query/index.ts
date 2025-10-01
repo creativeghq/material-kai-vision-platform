@@ -6,7 +6,7 @@ import {
   createSuccessResponse,
   createErrorResponse,
   createJSONResponse,
-} from '../_shared/types';
+} from '../_shared/types.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -161,14 +161,38 @@ async function generateQueryVector(
     }
   }
 
-  // If text query provided, generate text embeddings (placeholder for future text embedding service)
+  // If text query provided, generate text embeddings using OpenAI
   if (queryInput.query_text) {
-    // This would integrate with a text embedding service
-    // For now, return a placeholder vector
-    const textVector = new Array(512).fill(0).map(() => Math.random() - 0.5);
+    try {
+      const openaiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: queryInput.query_text,
+          model: 'text-embedding-ada-002',
+        }),
+      });
+
+      if (openaiResponse.ok) {
+        const embeddingData = await openaiResponse.json();
+        const textVector = embeddingData.data[0].embedding;
+        return {
+          vector: textVector,
+          method: 'text_embedding'
+        };
+      }
+    } catch (error) {
+      console.error('Text embedding generation failed:', error);
+    }
+
+    // Fallback: return zero vector if embedding fails
+    const fallbackVector = new Array(1536).fill(0);
     return {
-      vector: textVector,
-      method: 'text_embedding'
+      vector: fallbackVector,
+      method: 'text_embedding_fallback'
     };
   }
 

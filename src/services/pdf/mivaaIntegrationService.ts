@@ -1,6 +1,8 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { DocumentProcessingPipeline } from './documentProcessingPipeline';
+import { unifiedTextPreprocessor } from '../textPreprocessor';
+import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
 
 /**
  * Configuration interface for Mivaa PDF Integration Service

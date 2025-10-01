@@ -98,7 +98,7 @@ export class MivaaGatewayController {
   /**
    * Health check endpoint for the MIVAA gateway
    */
-  public healthCheck = async (req: Request, res: Response): Promise<void> => {
+  public healthCheck = async (_req: Request, res: Response): Promise<void> => {
     const startTime = Date.now();
 
     try {

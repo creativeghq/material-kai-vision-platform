@@ -504,7 +504,7 @@ export class VisualSearchController {
    * Health check endpoint
    * GET /api/visual-search/health
    */
-  public healthCheck = async (req: Request, res: Response): Promise<void> => {
+  public healthCheck = async (_req: Request, res: Response): Promise<void> => {
     try {
       // Basic health check
       const health = {

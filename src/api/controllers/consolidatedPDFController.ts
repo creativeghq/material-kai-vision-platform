@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { MivaaIntegrationService, PdfExtractionRequest, defaultMivaaConfig } from '../../services/pdf/mivaaIntegrationService';
 import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
 import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAuthMiddleware';
+import { supabase } from '../../integrations/supabase/client';
 
 /**
  * Request/Response types for unified PDF API
@@ -268,21 +269,14 @@ export class RateLimitHelper {
       // Get rate limit for this endpoint
       const rateLimit = await apiGatewayService.getRateLimit(endpoint, clientIP, userId);
 
-      // TODO: Create api_usage_logs table migration before enabling this functionality
-      console.warn('Rate limiting is disabled - api_usage_logs table not found. Create database migration to enable this feature.');
-
-      // Temporary fallback: allow all requests (no rate limiting)
-      const recentRequests: unknown[] = [];
-      const error = null;
-
-      /* COMMENTED OUT UNTIL DATABASE MIGRATION IS CREATED:
+      // Query recent requests from database
+      const oneMinuteAgo = new Date(Date.now() - 60000);
       const { data: recentRequests, error } = await supabase
         .from('api_usage_logs')
         .select('id')
         .eq('request_path', endpoint)
         .gte('created_at', oneMinuteAgo.toISOString())
         .or(`ip_address.eq.${clientIP}${userId ? `,user_id.eq.${userId}` : ''}`);
-      */
 
       if (error) {
         console.error('Rate limit check error:', error);
@@ -320,49 +314,34 @@ export class RateLimitHelper {
    * Log API usage
    */
   static async logUsage(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _endpoint: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _method: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _clientIP: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _userId?: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _responseStatus?: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _responseTime?: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _rateLimitExceeded?: boolean,
+    endpoint: string,
+    method: string,
+    clientIP: string,
+    userId?: string,
+    responseStatus?: number,
+    responseTime?: number,
+    rateLimitExceeded?: boolean,
   ): Promise<void> {
     try {
-      // TODO: Create api_usage_logs table migration before enabling this functionality
-      console.warn('API usage logging is disabled - api_usage_logs table not found. Create database migration to enable this feature.');
-
-      // No-op until database migration is created
-      return;
-
-      /* COMMENTED OUT UNTIL DATABASE MIGRATION IS CREATED:
       await supabase
         .from('api_usage_logs')
         .insert({
-          endpoint_id: null, // Would need to lookup endpoint ID
           user_id: userId ?? null,
           ip_address: clientIP,
-          user_agent: navigator.userAgent,
           request_method: method,
           request_path: endpoint,
           response_status: responseStatus ?? null,
           response_time_ms: responseTime ?? null,
           is_internal_request: await apiGatewayService.isInternalIP(clientIP),
-          rate_limit_exceeded: rateLimitExceeded
+          rate_limit_exceeded: rateLimitExceeded ?? false
         });
-      */
     } catch (error) {
       console.error('Failed to log API usage:', error);
     }
   }
 }
+
+
 
 /**
  * Consolidated PDF Controller Class
@@ -471,7 +450,7 @@ export class ConsolidatedPDFController {
 
       // Check workspace access if workspace is specified
       if (request.workspaceId) {
-        const hasAccess = await this.checkWorkspaceAccess();
+        const hasAccess = await this.checkWorkspaceAccess(authContext.user.id, request.workspaceId);
         if (!hasAccess) {
           return {
             success: false,
@@ -539,23 +518,27 @@ export class ConsolidatedPDFController {
         // If this is a workflow request, create job tracking
         if (request.workspaceId) {
           const jobId = this.generateJobId();
-          const job = {
-            id: jobId,
+
+          // Create job in database
+          await this.createProcessingJob({
+            jobId,
             documentId: request.documentId,
             workspaceId: request.workspaceId,
-            status: 'completed' as const,
+            userId: authContext.user.id,
+            jobType: 'pdf_rag_processing',
             filename: file.name,
             fileSize: file.size,
-            userId: authContext.user.id,
             options: request.options,
-            metadata: request.metadata,
-            results: result,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            completedAt: new Date(),
-          };
+            metadata: request.metadata
+          });
 
-          this.activeJobs.set(jobId, job);
+          // Update job as completed
+          await this.updateProcessingJob(jobId, {
+            status: 'completed',
+            results: result,
+            completed_at: new Date().toISOString()
+          });
+
           result = { ...result, jobId };
         }
       } else if (request.options.enableFunctionalMetadata) {
@@ -569,7 +552,7 @@ export class ConsolidatedPDFController {
         };
         
         let jobId: string | undefined;
-        let job: ProcessingJob;
+        let job: ProcessingJob | undefined;
         
         try {
           // Create job tracking early for functional metadata processing
@@ -585,8 +568,8 @@ export class ConsolidatedPDFController {
               userId: authContext.user.id,
               options: request.options,
               metadata: request.metadata,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
             };
 
             this.activeJobs.set(jobId, job);
@@ -601,8 +584,8 @@ export class ConsolidatedPDFController {
           }
 
           // Check if functional metadata was actually extracted
-          const hasValidFunctionalMetadata = result.data?.functional_properties &&
-            Object.keys(result.data.functional_properties).length > 0;
+          const hasValidFunctionalMetadata = (result.data as any)?.functional_properties &&
+            Object.keys((result.data as any).functional_properties).length > 0;
 
           if (!hasValidFunctionalMetadata) {
             console.warn('Functional metadata extraction returned no results for document:', request.documentId);
@@ -620,8 +603,8 @@ export class ConsolidatedPDFController {
           if (jobId && job) {
             job.status = 'completed';
             job.results = result;
-            job.completedAt = new Date();
-            job.updatedAt = new Date();
+            job.completedAt = new Date().toISOString();
+            job.updatedAt = new Date().toISOString();
             this.activeJobs.set(jobId, job);
             result = { ...result, jobId };
           }
@@ -669,8 +652,8 @@ export class ConsolidatedPDFController {
               if (jobId && job) {
                 job.status = 'completed';
                 job.results = result;
-                job.completedAt = new Date();
-                job.updatedAt = new Date();
+                job.completedAt = new Date().toISOString();
+                job.updatedAt = new Date().toISOString();
                 this.activeJobs.set(jobId, job);
                 result = { ...result, jobId };
               }
@@ -756,7 +739,7 @@ export class ConsolidatedPDFController {
 
       // Check workspace access
       if (job.workspaceId) {
-        const hasAccess = await this.checkWorkspaceAccess();
+        const hasAccess = await this.checkWorkspaceAccess(authContext.user.id, job.workspaceId);
         if (!hasAccess) {
           return {
             success: false,
@@ -787,9 +770,9 @@ export class ConsolidatedPDFController {
           percentage,
         },
         timestamps: {
-          created: job.createdAt.toISOString(),
-          ...(job.startedAt && { started: job.startedAt.toISOString() }),
-          ...(job.completedAt && { completed: job.completedAt.toISOString() }),
+          created: job.createdAt,
+          ...(job.startedAt && { started: job.startedAt }),
+          ...(job.completedAt && { completed: job.completedAt }),
         },
       };
 
@@ -882,7 +865,7 @@ export class ConsolidatedPDFController {
       }
 
       // Check workspace access
-      const hasAccess = await this.checkWorkspaceAccess();
+      const hasAccess = await this.checkWorkspaceAccess(authContext.user.id, request.workspaceId || '');
       if (!hasAccess) {
         return {
           success: false,
@@ -1081,19 +1064,88 @@ export class ConsolidatedPDFController {
   /**
    * Private helper methods
    */
-  private async checkWorkspaceAccess(): Promise<boolean> {
+  private async checkWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
     try {
-      // In production, this would check workspace permissions
-      // For now, return true for authenticated users
-      return true;
+      const { data, error } = await supabase
+        .from('workspace_permissions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('workspace_id', workspaceId)
+        .eq('is_active', true)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error checking workspace access:', error);
+        return false;
+      }
+
+      return !!data;
     } catch (error) {
-      console.error('Workspace access check error:', error);
+      console.error('Failed to check workspace access:', error);
       return false;
     }
   }
 
+  /**
+   * Create processing job in database
+   */
+  private async createProcessingJob(jobData: {
+    jobId: string;
+    documentId: string;
+    workspaceId: string;
+    userId: string;
+    jobType: string;
+    filename?: string;
+    fileSize?: number;
+    options: any;
+    metadata?: any;
+  }): Promise<void> {
+    try {
+      await supabase
+        .from('processing_jobs')
+        .insert({
+          job_id: jobData.jobId,
+          document_id: jobData.documentId,
+          workspace_id: jobData.workspaceId,
+          user_id: jobData.userId,
+          job_type: jobData.jobType,
+          status: 'pending',
+          filename: jobData.filename,
+          file_size: jobData.fileSize,
+          options: jobData.options,
+          metadata: jobData.metadata
+        });
+    } catch (error) {
+      console.error('Failed to create processing job:', error);
+    }
+  }
+
+  /**
+   * Update processing job status
+   */
+  private async updateProcessingJob(jobId: string, updates: {
+    status?: string;
+    results?: any;
+    error_details?: any;
+    started_at?: string;
+    completed_at?: string;
+  }): Promise<void> {
+    try {
+      const updateData: any = { ...updates };
+
+      await supabase
+        .from('processing_jobs')
+        .update(updateData)
+        .eq('job_id', jobId);
+    } catch (error) {
+      console.error('Failed to update processing job:', error);
+    }
+  }
+
+
+
   private generateJobId(): string {
-    return `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `job_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private async fileToBuffer(file: File): Promise<Buffer> {

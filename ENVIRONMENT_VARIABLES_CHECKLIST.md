@@ -1,8 +1,8 @@
 # 🔑 Environment Variables Checklist
 ## Material Kai Vision Platform - Deployment Keys
 
-**Last Updated:** 2025-10-01  
-**Status:** Ready for Deployment
+**Last Updated:** 2025-10-01
+**Status:** ✅ **READY FOR DEPLOYMENT**
 
 ---
 
@@ -14,6 +14,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=[Get from Supabase Dashboard > Settings > API]
 SUPABASE_SERVICE_ROLE_KEY=[Get from Supabase Dashboard > Settings > API]
 ```
+**Note:** This is a Vite app, but uses `NEXT_PUBLIC_` prefix (handled by vite.config.ts)
+
 **Where to Set:**
 - ✅ **Vercel:** Project Settings > Environment Variables
 - ✅ **GitHub:** Repository Settings > Secrets and Variables > Actions
@@ -96,12 +98,12 @@ SENTRY_DSN=[Get from Sentry Dashboard]
 ## ✅ **Deployment Readiness Checklist**
 
 ### Critical (Must Have)
-- [ ] `NEXT_PUBLIC_SUPABASE_URL` - Set in Vercel & GitHub
-- [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Set in Vercel & GitHub  
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` - Set in Vercel & GitHub
-- [ ] `OPENAI_API_KEY` - Set in Vercel, GitHub & Supabase
-- [ ] `HUGGINGFACE_API_TOKEN` - Set in Vercel, GitHub & Supabase
-- [ ] `REPLICATE_API_TOKEN` - Set in Vercel, GitHub & Supabase
+- [ ] `NEXT_PUBLIC_SUPABASE_URL` - Set in Vercel & GitHub ⚠️ **REQUIRED**
+- [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Set in Vercel & GitHub ⚠️ **REQUIRED**
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` - Set in Vercel & GitHub ⚠️ **REQUIRED**
+- [ ] `OPENAI_API_KEY` - Set in Vercel, GitHub & Supabase ⚠️ **REQUIRED**
+- [ ] `HUGGINGFACE_API_TOKEN` - Set in Vercel, GitHub & Supabase ⚠️ **REQUIRED**
+- [ ] `REPLICATE_API_TOKEN` - Set in Vercel, GitHub & Supabase ⚠️ **REQUIRED**
 
 ### High Priority (Recommended)
 - [ ] `MIVAA_GATEWAY_URL` - Set in Vercel & Supabase

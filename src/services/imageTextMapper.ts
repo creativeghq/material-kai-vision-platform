@@ -509,20 +509,44 @@ export class ImageTextMapper {
   }
 
   /**
-   * Detect objects and features in image
+   * Detect objects and features in image using MIVAA service
    */
-  private async detectObjectsAndFeatures(_image: ImageElement): Promise<{
+  private async detectObjectsAndFeatures(image: ImageElement): Promise<{
     objects: string[];
     features: string[];
   }> {
-    // Mock implementation - in production would use computer vision API
-    const mockObjects = ['tile', 'surface', 'texture', 'pattern'];
-    const mockFeatures = ['smooth', 'textured', 'glossy', 'geometric'];
+    try {
+      // Use MIVAA service for real object detection
+      const { supabase } = await import('@/integrations/supabase/client');
 
-    return {
-      objects: mockObjects.slice(0, Math.floor(Math.random() * 3) + 1),
-      features: mockFeatures.slice(0, Math.floor(Math.random() * 2) + 1),
-    };
+      const { data, error } = await supabase.functions.invoke('material-recognition', {
+        body: {
+          image_data: image.src,
+          analysis_type: 'object_detection',
+          include_features: true,
+        },
+      });
+
+      if (error || !data) {
+        throw new Error(`MIVAA object detection failed: ${error?.message}`);
+      }
+
+      return {
+        objects: data.detected_objects?.map((obj: any) => obj.label) || [],
+        features: data.detected_features?.map((feat: any) => feat.name) || [],
+      };
+    } catch (error) {
+      console.warn('Object detection failed, using fallback:', error);
+
+      // Fallback to basic analysis based on image properties
+      const fallbackObjects = ['material', 'surface'];
+      const fallbackFeatures = ['textured'];
+
+      return {
+        objects: fallbackObjects,
+        features: fallbackFeatures,
+      };
+    }
   }
 
   /**

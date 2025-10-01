@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import { ErrorHandler } from '../utils/errorHandler';
+import { unifiedTextPreprocessor } from './textPreprocessor';
+import { DEFAULT_EMBEDDING_CONFIG, EmbeddingValidator } from '../config/embeddingConfig';
 
 export interface EnhancedRAGRequest {
   query: string;

@@ -263,10 +263,13 @@ export const Designer3DPage: React.FC = () => {
       const result = await apiService.executeSupabaseFunction('crewai-3d-generation', requestData);
       console.log('Generation response received:', result);
 
-      if (result.success && result.data?.generationId) {
+      // Type assertion for the response data
+      const responseData = result.data as { generationId?: string; generation_status?: string; image_urls?: string[] } | null;
+
+      if (result.success && responseData?.generationId) {
         if (isAdmin) {
           // Show workflow modal for admins
-          setCurrentGenerationId(result.data.generationId);
+          setCurrentGenerationId(responseData.generationId);
           setShowWorkflowModal(true);
           setIsGenerating(false);
           setIsUploading(false);
@@ -276,7 +279,7 @@ export const Designer3DPage: React.FC = () => {
             title: 'Generation Started',
             description: 'Your 3D interior is being generated. This may take a few minutes...',
           });
-          await pollForResults(result.data.generationId);
+          await pollForResults(responseData.generationId);
         }
       } else {
         throw new Error(result.error?.message || 'Failed to start generation');
@@ -317,19 +320,22 @@ export const Designer3DPage: React.FC = () => {
 
         console.log('Polling result:', data);
 
-        if (data && data.generation_status === 'completed' && data.image_urls && data.image_urls.length > 0) {
+        // Type assertion for the polling data
+        const pollingData = data as { generation_status?: string; image_urls?: string[] } | null;
+
+        if (pollingData && pollingData.generation_status === 'completed' && pollingData.image_urls && pollingData.image_urls.length > 0) {
           // Generation completed successfully
           console.log('🔍 DEBUG: Generation completed successfully');
           console.log('📊 Available models count:', filteredModels.length);
           console.log('📊 Available models:', filteredModels.map((m, i) => `${i}: ${m.name}`));
-          console.log('🖼️ Received image URLs count:', data.image_urls.length);
-          console.log('🖼️ Received image URLs:', data.image_urls);
-          console.log('📋 Full generation data:', data);
+          console.log('🖼️ Received image URLs count:', pollingData.image_urls.length);
+          console.log('🖼️ Received image URLs:', pollingData.image_urls);
+          console.log('📋 Full generation data:', pollingData);
 
           // Robust image-to-model mapping that handles sparse results
           // The backend should ideally include model metadata with each result,
           // but for now we implement a robust mapping strategy
-          const imagesWithModels = data.image_urls.map((url: string, index: number) => {
+          const imagesWithModels = pollingData.image_urls.map((url: string, index: number) => {
             // Strategy 1: Try to extract model info from URL if available
             let modelName = `Model ${index + 1}`;
             let detectedModel = null;
@@ -380,7 +386,7 @@ export const Designer3DPage: React.FC = () => {
           // Additional validation and logging
           console.log('🔍 Mapping validation:');
           console.log(`📊 Total models requested: ${filteredModels.length}`);
-          console.log(`🖼️ Total results received: ${data.image_urls.length}`);
+          console.log(`🖼️ Total results received: ${pollingData.image_urls?.length || 0}`);
           console.log(`✅ Successfully mapped: ${imagesWithModels.filter((img: unknown) => (img as { modelId?: string }).modelId).length}`);
           console.log(`⚠️ Fallback mappings: ${imagesWithModels.filter((img: unknown) => !(img as { modelId?: string }).modelId).length}`);
 
@@ -393,13 +399,13 @@ export const Designer3DPage: React.FC = () => {
 
           toast({
             title: 'Generation Complete!',
-            description: `Generated ${data.image_urls.length} interior designs successfully.`,
+            description: `Generated ${pollingData.image_urls?.length || 0} interior designs successfully.`,
           });
           return;
         }
 
-        if (data && data.generation_status === 'failed') {
-          throw new Error(data.error_message || 'Generation failed');
+        if (pollingData && pollingData.generation_status === 'failed') {
+          throw new Error((pollingData as { error_message?: string }).error_message || 'Generation failed');
         }
 
         // Still processing, continue polling
@@ -415,7 +421,7 @@ export const Designer3DPage: React.FC = () => {
         setIsUploading(false);
         toast({
           title: 'Generation Failed',
-          description: error.message || 'Generation failed during processing',
+          description: (error as Error).message || 'Generation failed during processing',
           variant: 'destructive',
         });
       }
@@ -613,7 +619,7 @@ export const Designer3DPage: React.FC = () => {
       </Card>
 
       {/* Results Grid */}
-      {generatedImages.length > 0 && (
+      {(generatedImages.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Generated Interior Designs</CardTitle>
@@ -638,7 +644,7 @@ export const Designer3DPage: React.FC = () => {
                         onLoad={() => {
                           console.log(`✅ Image ${index + 1} loaded successfully:`, image.url);
                         }}
-                        onError={(e) => {
+                        onError={(e: any) => {
                           console.error(`❌ Image ${index + 1} failed to load:`, {
                             url: image.url,
                             modelName: image.modelName,
@@ -668,7 +674,7 @@ export const Designer3DPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null) as React.ReactNode}
 
       {/* 3D Viewer */}
       {generatedImages.length > 0 && (
@@ -696,14 +702,14 @@ export const Designer3DPage: React.FC = () => {
               <div>
                 <h4 className="font-medium mb-1">Parsed Request</h4>
                 <p className="text-muted-foreground">
-                  Room: {generationData.parsed_request?.room_type || 'Auto-detected'}<br/>
-                  Style: {generationData.parsed_request?.style || 'Auto-detected'}
+                  Room: {(generationData as { parsed_request?: { room_type?: string; style?: string } })?.parsed_request?.room_type || 'Auto-detected'}<br/>
+                  Style: {(generationData as { parsed_request?: { room_type?: string; style?: string } })?.parsed_request?.style || 'Auto-detected'}
                 </p>
               </div>
               <div>
                 <h4 className="font-medium mb-1">Materials Used</h4>
                 <p className="text-muted-foreground">
-                  {generationData.matched_materials?.length || 0} materials matched from catalog
+                  {(generationData as { matched_materials?: unknown[] })?.matched_materials?.length || 0} materials matched from catalog
                 </p>
               </div>
               <div>
@@ -734,7 +740,7 @@ export const Designer3DPage: React.FC = () => {
           generationId={currentGenerationId}
           onComplete={(images) => {
             // Robust image-to-model mapping that handles sparse results
-            const imagesWithModels = images.map((url: string, index: number) => {
+            const imagesWithModels = (images as string[]).map((url: string, index: number) => {
               let modelName = `Model ${index + 1}`;
               let modelId = '';
               const resultIndex = index;
