@@ -115,9 +115,10 @@ class ConfigurationFactory implements ConfigFactory {
 
     // Storage overrides
     if (envVars.STORAGE_PROVIDER) {
-      overriddenConfig.externalDependencies.storage.provider = envVars.STORAGE_PROVIDER as 'local' | 's3' | 'gcs';
+      overriddenConfig.externalDependencies.storage.provider = envVars.STORAGE_PROVIDER as 'local' | 'supabase' | 's3' | 'gcs' | 'azure';
     }
 
+    // Legacy AWS S3 support (optional, not actively used - Supabase Storage is primary)
     if (envVars.AWS_S3_BUCKET) {
       overriddenConfig.externalDependencies.storage.bucket = envVars.AWS_S3_BUCKET;
     }

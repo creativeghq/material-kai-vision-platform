@@ -121,16 +121,14 @@
 | **Sentry Project** | GitHub Secrets | `SENTRY_PROJECT` | Sentry project slug | From Sentry project settings |
 | **LogRocket App ID** | Vercel | `LOGROCKET_APP_ID` | Session replay tracking | From LogRocket dashboard |
 
-#### Storage & Infrastructure (Optional)
+#### Additional Infrastructure (Optional)
 
 | Secret/Key | Where to Add | Environment Variable | Purpose | How to Generate/Obtain |
 |------------|--------------|---------------------|---------|------------------------|
-| **AWS Region** | Vercel, MIVAA | `AWS_REGION` | S3 bucket region | e.g., `us-east-1` |
-| **AWS S3 Bucket** | Vercel, MIVAA | `AWS_S3_BUCKET` | Storage bucket name | Your S3 bucket name |
-| **AWS Access Key ID** | MIVAA Deployment | `AWS_ACCESS_KEY_ID` | AWS authentication | From AWS IAM |
-| **AWS Secret Access Key** | MIVAA Deployment | `AWS_SECRET_ACCESS_KEY` | AWS authentication | From AWS IAM |
 | **Redis URL** | Optional | `REDIS_URL` or `CACHE_REDIS_URL` | Caching service | Redis connection string |
 | **Database URL** | MIVAA Deployment | `DATABASE_URL` | Direct database connection | PostgreSQL connection string |
+
+> **Note:** All file storage is handled by **Supabase Storage** (buckets: `material-images`, `pdf-documents`). AWS S3 is not required or used.
 
 #### SSL & Domain Configuration (Optional)
 
@@ -164,174 +162,247 @@
 - **Vercel Environment Variables** (for frontend deployment)
 - **Supabase Edge Functions Secrets** (for backend functions)
 
-#### Frontend Application (Set in Vercel)
+## ✅ GitHub Secrets
+**Location**: Repository → Settings → Secrets and variables → Actions
+
+### Required for Deployment
+- [ ] `SUPABASE_PROJECT_ID` - Supabase project reference
+- [ ] `SUPABASE_ACCESS_TOKEN` - Supabase CLI authentication
+- [ ] `VERCEL_TOKEN` - Vercel deployment automation
+- [ ] `VERCEL_ORG_ID` - Vercel organization ID
+- [ ] `VERCEL_PROJECT_ID` - Vercel project ID
+
+### Required for MIVAA Deployment
+- [ ] `DEPLOY_HOST` - Server IP/hostname
+- [ ] `DEPLOY_USER` - SSH username
+- [ ] `DEPLOY_SSH_KEY` - SSH private key
+- [ ] `SUPABASE_URL` - Supabase project URL
+- [ ] `SUPABASE_ANON_KEY` - Supabase anon key
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
+- [ ] `JWT_SECRET_KEY` - JWT signing secret
+- [ ] `ENCRYPTION_KEY` - Data encryption key
+
+### AI/ML API Keys
+- [ ] `OPENAI_API_KEY` - OpenAI API access
+- [ ] `ANTHROPIC_API_KEY` - Anthropic Claude access
+- [ ] `HUGGINGFACE_API_KEY` - HuggingFace models
+- [ ] `REPLICATE_API_TOKEN` - Replicate 3D models
+- [ ] `TOGETHER_API_KEY` - TogetherAI LLaMA Vision
+
+### Material Kai Platform
+- [ ] `MATERIAL_KAI_API_KEY` - Platform API key
+- [ ] `MATERIAL_KAI_API_URL` - Platform API endpoint
+- [ ] `MATERIAL_KAI_CLIENT_ID` - OAuth client ID
+- [ ] `MATERIAL_KAI_CLIENT_SECRET` - OAuth client secret
+- [ ] `MATERIAL_KAI_WEBHOOK_SECRET` - Webhook verification
+
+### Monitoring (Optional)
+- [ ] `SENTRY_DSN` - Sentry error tracking
+- [ ] `SENTRY_AUTH_TOKEN` - Sentry API token
+- [ ] `SENTRY_ORG` - Sentry organization
+- [ ] `SENTRY_PROJECT` - Sentry project
+
+### SSL/Domain (Optional)
+- [ ] `DOMAIN_NAME` - Custom domain
+- [ ] `ADMIN_EMAIL` - SSL certificate email
+
+---
+
+## ✅ Vercel Environment Variables
+**Location**: Project → Settings → Environment Variables
+
+### Core Configuration
+- [ ] `SUPABASE_URL` - Supabase project URL
+- [ ] `SUPABASE_ANON_KEY` - Supabase anon key
+- [ ] `NODE_ENV` - Environment (production/development)
+
+### MIVAA Integration
+- [ ] `MIVAA_GATEWAY_URL` - MIVAA service endpoint
+- [ ] `MIVAA_API_KEY` - MIVAA authentication
+- [ ] `VITE_MIVAA_SERVICE_URL` - Frontend MIVAA URL
+
+### Material Kai Platform
+- [ ] `VITE_MATERIAL_KAI_API_KEY` - Platform API key
+- [ ] `VITE_MATERIAL_KAI_API_URL` - Platform API URL
+
+### AI/ML Services (Frontend)
+- [ ] `VITE_OPENAI_API_KEY` - OpenAI API key
+- [ ] `VITE_HUGGINGFACE_API_KEY` - HuggingFace token
+- [ ] `VITE_REPLICATE_API_TOKEN` - Replicate token
+
+### Optional Services
+- [ ] `SENTRY_DSN` - Error tracking
+- [ ] `LOGROCKET_APP_ID` - Session replay
+
+---
+
+## ✅ Supabase Edge Functions Secrets
+**Location**: CLI command `supabase secrets set KEY_NAME value`
+
+### Required Secrets
 ```bash
-# Supabase Configuration
-SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key
+# MIVAA Integration
+supabase secrets set MIVAA_GATEWAY_URL "https://your-mivaa-url.com"
+supabase secrets set MIVAA_API_KEY "your-mivaa-api-key"
 
-# API Configuration
-VITE_OPENAI_API_KEY=your_openai_api_key
-VITE_HUGGINGFACE_API_KEY=your_huggingface_api_key
-VITE_REPLICATE_API_TOKEN=your_replicate_token
+# Database Access
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY "your-service-role-key"
 
-# MIVAA Service
-VITE_MIVAA_SERVICE_URL=http://localhost:8000
-VITE_MIVAA_API_KEY=your_mivaa_api_key
-
-# Material Kai API
-VITE_MATERIAL_KAI_API_URL=your_material_kai_api_url
-VITE_MATERIAL_KAI_API_KEY=mk_api_2024_your_secure_key
-
-# Development Settings
-NODE_ENV=development
-VITE_DEBUG=true
+# AI Services
+supabase secrets set OPENAI_API_KEY "your-openai-key"
 ```
 
-#### MIVAA PDF Extractor (Set in Deployment Platform)
+### Checklist
+- [ ] `MIVAA_GATEWAY_URL` - MIVAA service endpoint
+- [ ] `MIVAA_API_KEY` - MIVAA authentication
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` - Admin database access
+- [ ] `OPENAI_API_KEY` - OpenAI embeddings/chat
+
+### Optional Secrets
+- [ ] `USE_MIVAA_EMBEDDINGS` - Enable MIVAA embeddings (default: true)
+- [ ] `USE_MIVAA_CHAT` - Enable MIVAA chat (default: true)
+- [ ] `PDF_PROCESSING_TIMEOUT` - Timeout in ms (default: 300000)
+- [ ] `RATE_LIMIT_HEALTH_CHECK` - Health check rate limit (default: 60)
+- [ ] `RATE_LIMIT_PDF_EXTRACT` - PDF extract rate limit (default: 10)
+- [ ] `RATE_LIMIT_BATCH_PROCESS` - Batch process rate limit (default: 5)
+
+---
+
+## ✅ MIVAA Deployment Environment
+**Location**: Server environment variables or Docker secrets
+
+### Core Application
+- [ ] `ENVIRONMENT` - Environment name (production/staging/development)
+- [ ] `DEBUG` - Debug mode (false for production)
+- [ ] `LOG_LEVEL` - Logging level (ERROR/INFO/DEBUG)
+- [ ] `HOST` - Server host (0.0.0.0)
+- [ ] `PORT` - Server port (8000)
+
+### Database
+- [ ] `SUPABASE_URL` - Supabase project URL
+- [ ] `SUPABASE_ANON_KEY` - Supabase anon key
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
+- [ ] `DATABASE_URL` - Direct PostgreSQL connection (optional)
+
+### Authentication
+- [ ] `JWT_SECRET_KEY` - JWT signing secret
+- [ ] `JWT_ALGORITHM` - JWT algorithm (HS256)
+- [ ] `JWT_ISSUER` - JWT issuer (material-kai-platform)
+- [ ] `JWT_AUDIENCE` - JWT audience (mivaa-pdf-extractor)
+
+### AI/ML Services
+- [ ] `OPENAI_API_KEY` - OpenAI API key
+- [ ] `OPENAI_ORG_ID` - OpenAI organization (optional)
+- [ ] `OPENAI_PROJECT_ID` - OpenAI project (optional)
+- [ ] `ANTHROPIC_API_KEY` - Anthropic API key (optional)
+- [ ] `HUGGINGFACE_API_TOKEN` - HuggingFace token
+- [ ] `HUGGING_FACE_ACCESS_TOKEN` - Alternative HF token
+- [ ] `REPLICATE_API_KEY` - Replicate API key (optional)
+- [ ] `TOGETHER_API_KEY` - TogetherAI API key (optional)
+- [ ] `JINA_API_KEY` - Jina API key (optional)
+- [ ] `FIRECRAWL_API_KEY` - Firecrawl API key (optional)
+
+### Material Kai Platform
+- [ ] `MATERIAL_KAI_PLATFORM_URL` - Platform API URL
+- [ ] `MATERIAL_KAI_API_KEY` - Platform API key
+- [ ] `MATERIAL_KAI_WORKSPACE_ID` - Workspace ID
+
+### Security
+- [ ] `ENCRYPTION_KEY` - Data encryption key
+- [ ] `CORS_ORIGINS` - Allowed CORS origins
+- [ ] `RATE_LIMIT_PER_MINUTE` - Rate limit (default: 60)
+
+### Monitoring
+- [ ] `SENTRY_DSN` - Sentry error tracking
+- [ ] `SENTRY_ENVIRONMENT` - Sentry environment name
+
+### Performance (Optional)
+- [ ] `MAX_WORKERS` - Worker processes (default: 4)
+- [ ] `CACHE_TTL` - Cache TTL in seconds (default: 3600)
+- [ ] `DATABASE_POOL_SIZE` - DB pool size (default: 10)
+
+---
+
+## ✅ Supabase Dashboard Configuration
+**Location**: Supabase Dashboard → Settings
+
+### Authentication Settings
+- [ ] JWT Secret configured in Auth settings
+- [ ] CORS origins configured
+- [ ] Redirect URLs configured
+- [ ] Email templates customized (optional)
+
+### API Settings
+- [ ] Anon key copied
+- [ ] Service role key copied (keep secure!)
+- [ ] Project URL noted
+
+### Storage Settings
+- [ ] `material-images` bucket created
+- [ ] `pdf-documents` bucket created
+- [ ] Public access configured appropriately
+- [ ] Storage policies configured
+
+---
+
+## 🔒 Security Verification
+
+### Pre-Deployment Checklist
+- [ ] All secrets use strong, randomly generated values
+- [ ] No secrets are committed to git
+- [ ] No `.env` files in repository
+- [ ] Different secrets for dev/staging/production
+- [ ] Service role keys are only in secure locations
+- [ ] SSH keys are properly secured
+- [ ] API keys have appropriate rate limits
+
+### Post-Deployment Checklist
+- [ ] All deployments successful
+- [ ] Health checks passing
+- [ ] Error tracking configured
+- [ ] Logs show no authentication errors
+- [ ] API rate limits working
+- [ ] CORS configured correctly
+
+---
+
+## 🛠️ Quick Commands
+
+### Generate Secrets
 ```bash
-# Application Settings
-ENVIRONMENT=development
-DEBUG=true
-LOG_LEVEL=INFO
-HOST=0.0.0.0
-PORT=8000
+# JWT Secret
+openssl rand -hex 32
 
-# Database Configuration
-SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+# Material Kai API Key
+echo "mk_api_2024_$(openssl rand -hex 32)"
 
-# JWT Authentication
-JWT_SECRET_KEY=your_secure_jwt_secret_key_here
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+# Encryption Key
+openssl rand -hex 32
 
-# API Keys
-OPENAI_API_KEY=your_openai_api_key
-MATERIAL_KAI_API_URL=your_material_kai_api_url
-MATERIAL_KAI_API_KEY=your_material_kai_api_key
-
-# Security Settings
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173
-RATE_LIMIT_REQUESTS=100
-RATE_LIMIT_WINDOW=60
-
-# Performance Settings
-MAX_WORKERS=4
-CACHE_TTL=3600
+# SSH Key
+ssh-keygen -t ed25519 -C "deployment@materialkai.vision"
 ```
 
-### Optional Environment Variables
-
+### Set Supabase Secrets
 ```bash
-# Monitoring & Analytics
-SENTRY_DSN=your_sentry_dsn
-LOGROCKET_APP_ID=your_logrocket_app_id
-
-# Storage Configuration
-AWS_REGION=us-east-1
-AWS_S3_BUCKET=your_s3_bucket
-STORAGE_PROVIDER=local
-
-# Performance Tuning
-CACHE_REDIS_URL=redis://localhost:6379
-DATABASE_POOL_SIZE=10
-MAX_REQUEST_SIZE=52428800
+# Set all required secrets at once
+supabase secrets set \
+  MIVAA_GATEWAY_URL="https://your-mivaa-url.com" \
+  MIVAA_API_KEY="your-api-key" \
+  SUPABASE_SERVICE_ROLE_KEY="your-service-role-key" \
+  OPENAI_API_KEY="your-openai-key"
 ```
 
-## 🗄️ Database Setup
-
-### Supabase Configuration
-
-1. **Create Supabase Project**:
-   - Go to [supabase.com](https://supabase.com)
-   - Create new project
-   - Note your project URL and anon key
-
-2. **Configure Authentication**:
-   ```sql
-   -- Enable email authentication
-   -- Configure JWT settings in Supabase dashboard
-   ```
-
-3. **Database Schema**:
-   ```bash
-   # Currently no migrations in supabase/migrations/
-   # Manual schema setup required
-   ```
-
-### Required Database Tables
-
-The application expects these core tables:
-- `api_keys` - API key management
-- `materials_catalog` - Material data
-- `agent_ml_tasks` - ML task tracking
-- `material_metadata_fields` - Dynamic metadata
-- `documents` - Document storage
-- `embeddings` - Vector embeddings
-
-## 🔨 Development Setup
-
-### Frontend Development
-
+### Verify Secrets
 ```bash
-# Start development server
-npm run dev
+# List all Supabase secrets (values hidden)
+supabase secrets list
 
-# Build for production
-npm run build
+# Check GitHub secrets (via web UI only)
+# Go to: Repository → Settings → Secrets and variables → Actions
 
-# Preview production build
-npm run start
-
-# Run linting (currently broken - needs fix)
-npm run lint
-```
-
-### MIVAA Microservice Development
-
-```bash
-cd mivaa-pdf-extractor
-
-# Start development server
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Run tests
-python -m pytest tests/ -v
-
-# Run with Docker
-docker-compose up --build
-```
-
-## 🏗️ Production Configuration
-
-### Environment-Specific Settings
-
-#### Production (Set in Vercel Production Environment)
-```bash
-NODE_ENV=production
-VITE_DEBUG=false
-LOG_LEVEL=ERROR
-
-# Use production URLs
-SUPABASE_URL=https://your-prod-project.supabase.co
-VITE_MIVAA_SERVICE_URL=https://your-mivaa-service.com
-
-# Security hardening
-CORS_ORIGINS=https://your-domain.com
-RATE_LIMIT_REQUESTS=50
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
-```
-
-#### Staging (Set in Vercel Preview Environment)
-```bash
-NODE_ENV=staging
-VITE_DEBUG=true
-LOG_LEVEL=INFO
-
-# Use staging URLs
-SUPABASE_URL=https://your-staging-project.supabase.co
+# Check Vercel environment variables
+vercel env ls
 ```
 
 ### Security Considerations

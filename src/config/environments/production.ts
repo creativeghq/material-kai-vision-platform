@@ -108,9 +108,7 @@ export const productionConfig: AppConfig = {
       queryTimeout: 60000,
     },
     storage: {
-      provider: 's3',
-      bucket: process.env.AWS_S3_BUCKET || 'default-bucket',
-      region: process.env.AWS_REGION || 'us-east-1',
+      provider: 'supabase', // Using Supabase Storage (material-images, pdf-documents buckets)
       encryption: true,
     },
   },

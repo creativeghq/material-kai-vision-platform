@@ -104,7 +104,7 @@ export const ExternalDependenciesConfigSchema = z.object({
     queryTimeout: z.number().min(1000).max(300000), // 1s to 5min
   }),
   storage: z.object({
-    provider: z.enum(['local', 's3', 'gcs', 'azure']),
+    provider: z.enum(['local', 'supabase', 's3', 'gcs', 'azure']),
     bucket: z.string().optional(),
     region: z.string().optional(),
     encryption: z.boolean(),
