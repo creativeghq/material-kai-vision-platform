@@ -39,7 +39,7 @@ graph TB
 
 ### Production Environment Variables
 
-#### Frontend (.env.production)
+#### Frontend (Set in Vercel Production Environment)
 ```bash
 # Application
 NODE_ENV=production
@@ -62,7 +62,7 @@ VITE_REPLICATE_API_TOKEN=your_production_replicate_token
 VITE_ALLOWED_ORIGINS=https://your-domain.com
 ```
 
-#### MIVAA Service (.env.production)
+#### MIVAA Service (Set in Deployment Platform)
 ```bash
 # Application
 ENVIRONMENT=production
@@ -299,9 +299,8 @@ sudo chmod +x /usr/local/bin/docker-compose
 git clone https://github.com/your-org/material-kai-vision-platform.git
 cd material-kai-vision-platform/mivaa-pdf-extractor
 
-# Set up environment
-cp .env.production.example .env.production
-# Edit .env.production with your values
+# Set up environment variables in Vercel/GitHub/Supabase
+# All secrets are managed through platform secret managers
 
 # Deploy
 docker-compose -f docker-compose.prod.yml up -d
@@ -503,7 +502,7 @@ jobs:
 
 1. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments
-   - **Solution**: Use environment-specific .env files
+   - **Solution**: Configure environment-specific variables in Vercel (Production/Preview/Development)
 
 2. **CORS Errors**:
    - **Problem**: Frontend can't connect to backend

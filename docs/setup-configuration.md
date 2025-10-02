@@ -30,10 +30,8 @@
    ```
 
 3. **Environment Setup**:
-   ```bash
-   cp .env.example .env
-   # Configure your environment variables (see below)
-   ```
+   - Configure environment variables in GitHub Secrets, Supabase Dashboard, and Vercel
+   - **NEVER use .env files** - all secrets are managed through platform secret managers
 
 ## 🔧 Environment Variables
 
@@ -62,12 +60,11 @@
 | **Supabase** | Dashboard → Settings → Auth | JWT secret, CORS origins, redirect URLs |
 | **Vercel** | Project → Settings → Environment Variables | All `VITE_*` variables for frontend |
 | **GitHub** | Repository → Settings → Secrets and variables | All secrets for CI/CD actions |
-| **Docker/Server** | `.env.production` file | All backend environment variables |
-| **Local Development** | `.env` and `.env.local` files | Development versions of all variables |
+| **Supabase Edge Functions** | CLI: `supabase secrets set` | Backend function secrets |
 
 ### ⚠️ Critical Security Notes
 
-1. **NEVER commit secrets to Git** - Use `.env` files and add them to `.gitignore`
+1. **NEVER use .env files** - All secrets managed through GitHub, Vercel, and Supabase
 2. **Rotate exposed keys immediately** - If any key is accidentally committed
 3. **Use different keys for different environments** - Development vs Production
 4. **Limit key permissions** - Only grant necessary permissions
@@ -75,7 +72,12 @@
 
 ### Required Environment Variables
 
-#### Frontend Application (.env)
+**⚠️ IMPORTANT: We DO NOT use .env files. All environment variables are managed through:**
+- **GitHub Secrets** (for CI/CD)
+- **Vercel Environment Variables** (for frontend deployment)
+- **Supabase Edge Functions Secrets** (for backend functions)
+
+#### Frontend Application (Set in Vercel)
 ```bash
 # Supabase Configuration
 SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
@@ -99,7 +101,7 @@ NODE_ENV=development
 VITE_DEBUG=true
 ```
 
-#### MIVAA PDF Extractor (.env in mivaa-pdf-extractor/)
+#### MIVAA PDF Extractor (Set in Deployment Platform)
 ```bash
 # Application Settings
 ENVIRONMENT=development
@@ -219,7 +221,7 @@ docker-compose up --build
 
 ### Environment-Specific Settings
 
-#### Production (.env.production)
+#### Production (Set in Vercel Production Environment)
 ```bash
 NODE_ENV=production
 VITE_DEBUG=false
@@ -235,7 +237,7 @@ RATE_LIMIT_REQUESTS=50
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
 ```
 
-#### Staging (.env.staging)
+#### Staging (Set in Vercel Preview Environment)
 ```bash
 NODE_ENV=staging
 VITE_DEBUG=true
@@ -247,7 +249,7 @@ SUPABASE_URL=https://your-staging-project.supabase.co
 
 ### Security Considerations
 
-1. **Never commit .env files**
+1. **Never use .env files** - All secrets managed in GitHub/Vercel/Supabase
 2. **Use strong, unique JWT secrets**
 3. **Rotate API keys regularly**
 4. **Enable HTTPS in production**
@@ -279,7 +281,7 @@ Each service has its own configuration:
 
 ### 2. Missing Environment Variables
 **Issue**: Application fails to start due to missing env vars
-**Solution**: Ensure all required variables are set in .env file
+**Solution**: Ensure all required variables are set in GitHub Secrets, Vercel, or Supabase
 
 ### 3. CORS Errors
 **Issue**: Frontend can't connect to backend services

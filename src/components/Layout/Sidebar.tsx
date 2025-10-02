@@ -37,10 +37,11 @@ export const Sidebar: React.FC = () => {
         {navigationItems.map((item) => (
           <Button
             key={item.id}
+            variant={isActive(item.path) ? 'default' : 'ghost'}
             className={`w-full justify-start ${
               isActive(item.path)
-                ? 'bg-primary text-primary-foreground hover:bg-primary/80'
-                : 'bg-transparent hover:bg-accent hover:text-accent-foreground'
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'text-foreground hover:bg-accent hover:text-accent-foreground'
             }`}
             asChild
           >
