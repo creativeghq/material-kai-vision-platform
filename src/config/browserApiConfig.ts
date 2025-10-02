@@ -133,7 +133,7 @@ export const browserHuggingFaceConfig: HuggingFaceConfig = {
 export const browserSupabaseConfig: SupabaseConfig = {
   type: 'supabase',
   name: 'Supabase Edge Functions',
-  baseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  baseUrl: process.env.SUPABASE_URL || '',
   environment: 'development',
   timeout: 30000,
   retries: 3,

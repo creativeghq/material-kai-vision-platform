@@ -41,8 +41,8 @@
 
 | Secret/Key | Where to Add | Environment Variable | Purpose | How to Generate/Obtain |
 |------------|--------------|---------------------|---------|------------------------|
-| **Supabase Project URL** | Supabase Dashboard | `VITE_SUPABASE_URL` | Database connection | Auto-generated when creating Supabase project |
-| **Supabase Anon Key** | Supabase Dashboard → Settings → API | `VITE_SUPABASE_ANON_KEY` | Client-side database access | Copy from Supabase API settings |
+| **Supabase Project URL** | Supabase Dashboard | `SUPABASE_URL` | Database connection | Auto-generated when creating Supabase project |
+| **Supabase Anon Key** | Supabase Dashboard → Settings → API | `SUPABASE_ANON_KEY` | Client-side database access | Copy from Supabase API settings |
 | **Supabase Service Role Key** | Supabase Dashboard → Settings → API | `SUPABASE_SERVICE_ROLE_KEY` | Server-side admin access | Copy from Supabase API settings (⚠️ Keep secret) |
 | **JWT Secret** | Supabase Dashboard → Settings → Auth | `JWT_SECRET_KEY` | Token signing/verification | Generate: `openssl rand -hex 32` |
 | **Material Kai API Key** | Application Database | `VITE_MATERIAL_KAI_API_KEY` | Internal API authentication | Generate: `mk_api_2024_$(openssl rand -hex 32)` |
@@ -78,8 +78,8 @@
 #### Frontend Application (.env)
 ```bash
 # Supabase Configuration
-VITE_SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # API Configuration
 VITE_OPENAI_API_KEY=your_openai_api_key
@@ -226,7 +226,7 @@ VITE_DEBUG=false
 LOG_LEVEL=ERROR
 
 # Use production URLs
-VITE_SUPABASE_URL=https://your-prod-project.supabase.co
+SUPABASE_URL=https://your-prod-project.supabase.co
 VITE_MIVAA_SERVICE_URL=https://your-mivaa-service.com
 
 # Security hardening
@@ -242,7 +242,7 @@ VITE_DEBUG=true
 LOG_LEVEL=INFO
 
 # Use staging URLs
-VITE_SUPABASE_URL=https://your-staging-project.supabase.co
+SUPABASE_URL=https://your-staging-project.supabase.co
 ```
 
 ### Security Considerations

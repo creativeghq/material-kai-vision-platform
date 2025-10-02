@@ -46,8 +46,8 @@ NODE_ENV=production
 VITE_DEBUG=false
 
 # Supabase
-VITE_SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-VITE_SUPABASE_ANON_KEY=your_production_anon_key
+SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
+SUPABASE_ANON_KEY=your_production_anon_key
 
 # Services
 VITE_MIVAA_SERVICE_URL=https://your-mivaa-service.com
@@ -148,8 +148,8 @@ LOG_FILE=/var/log/mivaa/app.log
 2. **Configure Environment Variables**:
    ```bash
    # Set production environment variables
-   vercel env add VITE_SUPABASE_URL production
-   vercel env add VITE_SUPABASE_ANON_KEY production
+   vercel env add SUPABASE_URL production
+   vercel env add SUPABASE_ANON_KEY production
    vercel env add VITE_MIVAA_SERVICE_URL production
    # ... add all required variables
    ```

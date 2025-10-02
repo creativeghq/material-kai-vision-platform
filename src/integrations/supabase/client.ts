@@ -5,8 +5,8 @@ import type { Database } from './types';
 
 // Environment variables for Supabase configuration
 // These should be set in your deployment environment (GitHub Secrets, Vercel Environment Variables, or Supabase)
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_ANON_KEY;
 
 // Use placeholder values during build time if environment variables are not available
 // This allows the build to complete, but the client will fail at runtime if not configured
@@ -18,14 +18,14 @@ const key = SUPABASE_PUBLISHABLE_KEY || 'placeholder-key';
 function validateEnvironment() {
   if (!SUPABASE_URL) {
     throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL environment variable. ' +
+      'Missing SUPABASE_URL environment variable. ' +
       'Please set this in your deployment environment (GitHub Secrets, Vercel Environment Variables, or Supabase).',
     );
   }
 
   if (!SUPABASE_PUBLISHABLE_KEY) {
     throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable. ' +
+      'Missing SUPABASE_ANON_KEY environment variable. ' +
       'Please set this in your deployment environment (GitHub Secrets, Vercel Environment Variables, or Supabase).',
     );
   }

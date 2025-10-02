@@ -71,8 +71,8 @@ class DynamicMaterialCategoriesService {
 
   private constructor() {
     // Get environment variables
-    this.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    this.supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    this.supabaseUrl = process.env.SUPABASE_URL || '';
+    this.supabaseKey = process.env.SUPABASE_ANON_KEY || '';
     this.baseUrl = `${this.supabaseUrl}/functions/v1/get-material-categories`;
   }
 

@@ -34,7 +34,7 @@ export class SupabaseApiClient extends BaseApiClient<SupabaseParams, SupabaseRes
       this.supabaseKey = parts[1] || '';
     } else {
       // Fallback to environment variable for URL
-      this.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseConfig.projectUrl;
+      this.supabaseUrl = process.env.SUPABASE_URL || supabaseConfig.projectUrl;
       this.supabaseKey = apiKey;
     }
 

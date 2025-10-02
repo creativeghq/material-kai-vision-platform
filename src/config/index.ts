@@ -220,10 +220,10 @@ export class ApiConfigManager {
         const supabaseConfig = config as SupabaseApiConfig;
         // Public environment variables should always be available
         if (!supabaseConfig.projectUrl) {
-          missing.push('NEXT_PUBLIC_SUPABASE_URL');
+          missing.push('SUPABASE_URL');
         }
         if (!supabaseConfig.anonKey) {
-          missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+          missing.push('SUPABASE_ANON_KEY');
         }
       }
 
