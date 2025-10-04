@@ -2,14 +2,12 @@ import { createHash } from 'crypto';
 import { performance } from 'perf_hooks';
 import { EventEmitter } from 'events';
 
-import { Logger } from 'winston';
+// Note: Winston logger removed - using console for logging instead
 
 // Import unified embedding configuration
 import {
   DEFAULT_EMBEDDING_CONFIG,
   UnifiedEmbeddingConfig,
-  EmbeddingModelConfig,
-  TextPreprocessor,
   EmbeddingValidator,
   EmbeddingCacheKey,
   textPreprocessor
@@ -145,7 +143,7 @@ interface BatchQueueItem {
  */
 export class EmbeddingGenerationService extends EventEmitter {
   private readonly config: EmbeddingGenerationConfig;
-  private readonly logger: Logger;
+  private readonly logger: Console;
   private readonly cache: Map<string, CacheEntry>;
   private readonly rateLimiter: RateLimiter;
   private readonly batchQueue: BatchQueueItem[];
@@ -162,7 +160,7 @@ export class EmbeddingGenerationService extends EventEmitter {
     rateLimitHits: 0,
   };
 
-  constructor(config: EmbeddingGenerationConfig, logger: Logger) {
+  constructor(config: EmbeddingGenerationConfig, logger: Console = console) {
     super();
     this.config = {
       ...config,
@@ -606,13 +604,14 @@ export class EmbeddingGenerationService extends EventEmitter {
     }
 
     const key = this.getCacheKey(text);
+    const resultData = result as any;
     const entry: CacheEntry = {
-      embedding: result.data[0].embedding,
-      dimensions: result.data[0].embedding.length,
-      model: result.model,
+      embedding: resultData.data[0].embedding,
+      dimensions: resultData.data[0].embedding.length,
+      model: resultData.model,
       usage: {
-        promptTokens: result.usage.prompt_tokens,
-        totalTokens: result.usage.total_tokens,
+        promptTokens: resultData.usage.prompt_tokens,
+        totalTokens: resultData.usage.total_tokens,
       },
       timestamp: Date.now(),
       accessCount: 1,
@@ -745,6 +744,7 @@ export class EmbeddingGenerationService extends EventEmitter {
  * Default configuration for EmbeddingGenerationService
  */
 export const defaultEmbeddingConfig: EmbeddingGenerationConfig = {
+  embedding: DEFAULT_EMBEDDING_CONFIG,
   mivaa: {
     gatewayUrl: process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000',
     apiKey: process.env.NEXT_PUBLIC_MIVAA_API_KEY || '',

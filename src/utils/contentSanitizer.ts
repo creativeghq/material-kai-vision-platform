@@ -37,7 +37,7 @@ export const DEFAULT_SANITIZATION_CONFIG: Required<SanitizationConfig> = {
 // Validation schema for sanitization config
 export const sanitizationConfigSchema = z.object({
   allowedHtmlTags: z.array(z.string()).optional(),
-  allowedAttributes: z.record(z.array(z.string())).optional(),
+  allowedAttributes: z.record(z.string(), z.array(z.string())).optional(),
   removeScripts: z.boolean().optional(),
   removeIframes: z.boolean().optional(),
   removeObjects: z.boolean().optional(),
@@ -187,7 +187,7 @@ export class ContentSanitizer {
    * Sanitizes HTML attributes, keeping only allowed ones
    */
   private sanitizeAttributes(content: string): string {
-    return content.replace(/<([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (match, tagName, attributes) => {
+    return content.replace(/<([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (_match, tagName, attributes) => {
       const tag = tagName.toLowerCase();
       const allowedAttrs = this.config.allowedAttributes[tag] || [];
 
@@ -197,7 +197,7 @@ export class ContentSanitizer {
 
       // Parse and filter attributes
       const sanitizedAttrs = attributes.replace(/\s*([a-zA-Z-]+)\s*=\s*["']([^"']*)["']/g,
-        (attrMatch: string, attrName: string, attrValue: string) => {
+        (_attrMatch: string, attrName: string, attrValue: string) => {
           if (allowedAttrs.includes(attrName.toLowerCase())) {
             // Additional sanitization for specific attributes
             const sanitizedValue = this.sanitizeAttributeValue(attrName, attrValue);
@@ -235,7 +235,7 @@ export class ContentSanitizer {
    */
   private sanitizeUrls(content: string): string {
     // Remove javascript: and data: URLs from markdown links and images
-    return content.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (match, text, url) => {
+    return content.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (_match, text, url) => {
       const sanitizedUrl = this.sanitizeUrl(url);
       return `[${text}](${sanitizedUrl})`;
     });

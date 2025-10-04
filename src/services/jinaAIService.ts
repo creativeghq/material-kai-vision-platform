@@ -211,7 +211,7 @@ class JinaAIService {
       timeout?: number;
     } = {},
   ): Promise<JinaReaderResponse> {
-    const headers = this.getHeaders();
+    const headers = this.getHeaders() as Record<string, string>;
 
     if (options.returnFormat) {
       headers['X-Return-Format'] = options.returnFormat;
@@ -261,7 +261,7 @@ class JinaAIService {
       language?: string;
     } = {},
   ): Promise<JinaSearchResponse> {
-    const headers = this.getHeaders();
+    const headers = this.getHeaders() as Record<string, string>;
 
     if (options.site) {
       headers['X-Site'] = options.site;
@@ -447,7 +447,7 @@ class JinaAIService {
   private extractMaterialsFromContent(
     content: string,
     sourceUrl: string,
-    pageTitle: string,
+    _pageTitle: string,
     images: string[],
   ): MaterialData[] {
     const materials: MaterialData[] = [];

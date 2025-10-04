@@ -148,20 +148,20 @@ export type ButtonType = 'primary' | 'outline';
 
 export interface HeroAction {
   type: ButtonType;
-  icon: React.ComponentType;
+  icon: React.ComponentType<{ className?: string }>;
   text: string;
   path: string;
 }
 
 export interface FeatureCard {
   id: string;
-  icon: React.ComponentType;
+  icon: React.ComponentType<{ className?: string }>;
   iconColor: ColorVariant;
   badge: string;
   title: string;
   description: string;
   action: {
-    icon: React.ComponentType;
+    icon: React.ComponentType<{ className?: string }>;
     text: string;
     color: ColorVariant;
   };
@@ -170,7 +170,7 @@ export interface FeatureCard {
 
 export interface Metric {
   id: string;
-  icon: React.ComponentType;
+  icon: React.ComponentType<{ className?: string }>;
   iconColor: string;
   value: string;
   valueColor: ColorVariant;

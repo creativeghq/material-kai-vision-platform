@@ -36,8 +36,8 @@ export interface TextureScale {
 
 export class MultiScaleTextureModule {
   private config: ScaleConfig;
-  private attentionWeights: Float32Array[];
-  private fusionWeights: Float32Array;
+  private attentionWeights: Float32Array[] = [];
+  private fusionWeights: Float32Array = new Float32Array(0);
 
   constructor(config: ScaleConfig) {
     this.config = config;
@@ -113,7 +113,7 @@ export class MultiScaleTextureModule {
 
     } catch (error) {
       console.error('Error in multi-scale texture processing:', error);
-      throw new Error(`Multi-scale processing failed: ${error.message}`);
+      throw new Error(`Multi-scale processing failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -806,8 +806,8 @@ export class MultiScaleTextureModule {
    * Import module state from saved data
    */
   public importState(state: Record<string, unknown>): void {
-    this.config = { ...state.config };
+    this.config = { ...(state.config as ScaleConfig) };
     this.fusionWeights = new Float32Array(state.fusionWeights as ArrayLike<number>);
-    this.attentionWeights = state.attentionWeights.map((w: number[]) => new Float32Array(w));
+    this.attentionWeights = (state.attentionWeights as number[][]).map((w: number[]) => new Float32Array(w));
   }
 }

@@ -96,17 +96,17 @@ export class OCRService extends BaseService<OCRServiceConfig> {
 
       // Use browser's built-in text detection if available
       if ('TextDetector' in window) {
-        const textDetector = new (window as Record<string, unknown>).TextDetector();
-        const textResults = await (textDetector as Record<string, unknown>).detect(imageBitmap);
+        const textDetector = new ((window as any).TextDetector)();
+        const textResults = await (textDetector as any).detect(imageBitmap);
 
-        const blocks: TextBlock[] = (textResults as unknown[]).map((result: Record<string, unknown>) => ({
-          text: result.rawValue,
-          confidence: result.confidence || 0.8,
+        const blocks: TextBlock[] = (textResults as any[]).map((result: any) => ({
+          text: result.rawValue as string,
+          confidence: (result.confidence as number) || 0.8,
           bbox: result.boundingBox ? {
-            x: result.boundingBox.x,
-            y: result.boundingBox.y,
-            width: result.boundingBox.width,
-            height: result.boundingBox.height,
+            x: (result.boundingBox as any).x,
+            y: (result.boundingBox as any).y,
+            width: (result.boundingBox as any).width,
+            height: (result.boundingBox as any).height,
           } : undefined,
         }));
 

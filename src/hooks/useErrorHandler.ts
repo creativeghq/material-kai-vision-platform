@@ -5,7 +5,7 @@
  * that can't use error boundaries directly.
  */
 
-import React, { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export interface ErrorInfo {

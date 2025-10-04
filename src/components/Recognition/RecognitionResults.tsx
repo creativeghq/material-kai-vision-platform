@@ -71,64 +71,64 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
               {/* Material Image */}
               <div className="aspect-square bg-muted rounded-lg mb-3 overflow-hidden">
                 <img
-                  src={result.metadata?.legacy?.imageUrl || '/placeholder-image.jpg'}
-                  alt={result.metadata?.detectedName || 'Material'}
+                  src={(result as any).metadata?.legacy?.imageUrl || '/placeholder-image.jpg'}
+                  alt={(result as any).metadata?.detectedName || 'Material'}
                   className="w-full h-full object-cover"
                 />
               </div>
 
               {/* Material Info */}
               <div className="space-y-2">
-                <h4 className="font-medium text-sm">{result.metadata?.detectedName || 'Unknown Material'}</h4>
+                <h4 className="font-medium text-sm">{(result as any).metadata?.detectedName || 'Unknown Material'}</h4>
 
                 {/* Confidence Score */}
                 <div className="flex items-center justify-between">
                   <Badge
                     className={
-                      result.confidenceScore > 0.9 ? 'bg-green-100 text-green-800 hover:bg-green-100/80' :
-                      result.confidenceScore > 0.7 ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' :
+                      result.confidence > 0.9 ? 'bg-green-100 text-green-800 hover:bg-green-100/80' :
+                      result.confidence > 0.7 ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' :
                       'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
                     }
                   >
-                    {Math.round(result.confidenceScore * 100)}% match
+                    {Math.round(result.confidence * 100)}% match
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {result.processingTimeMs ? (result.processingTimeMs / 1000).toFixed(1) : '0.0'}s
+                    {(result as any).processingTimeMs ? ((result as any).processingTimeMs / 1000).toFixed(1) : '0.0'}s
                   </span>
                 </div>
 
                 {/* Material Properties */}
-                {result.propertiesDetected && (
+                {(result as any).propertiesDetected && (
                   <div className="space-y-1">
-                    {result.propertiesDetected.density && (
+                    {(result as any).propertiesDetected.density && (
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">Density:</span>
-                        <span>{result.propertiesDetected.density} g/cm³</span>
+                        <span>{(result as any).propertiesDetected.density} g/cm³</span>
                       </div>
                     )}
-                    {result.propertiesDetected.yieldStrength && (
+                    {(result as any).propertiesDetected.yieldStrength && (
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">Yield Strength:</span>
-                        <span>{result.propertiesDetected.yieldStrength} MPa</span>
+                        <span>{(result as any).propertiesDetected.yieldStrength} MPa</span>
                       </div>
                     )}
-                    {result.material?.name && (
+                    {(result as any).materialId && (
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">Material:</span>
-                        <span>{result.material.name}</span>
+                        <span>{(result as any).materialId}</span>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Enhanced Material Properties */}
-                {result.propertiesDetected?.customProperties && (
+                {(result as any).propertiesDetected?.customProperties && (
                   <div className="text-xs text-muted-foreground mb-2">
                     <span className="font-medium">Additional Properties Available</span>
                   </div>
                 )}
 
-                {result.material && (
+                {(result as any).materialId && (
                   <div className="text-xs text-success mb-2">
                     <span className="font-medium">Material Data Available</span>
                   </div>
@@ -141,7 +141,7 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                       <Star className="w-3 h-3" />
                     </Button>
                     <Button className="hover:bg-accent hover:text-accent-foreground h-7 w-7 p-0" title="Download material data"
-                            disabled={!result.material}>
+                            disabled={!(result as any).materialId}>
                       <Download className="w-3 h-3" />
                     </Button>
                   </div>

@@ -1,6 +1,12 @@
 // Module declarations for external libraries
 // This file provides TypeScript declarations for modules that don't have built-in types
 
+// CSS Modules
+declare module '*.module.css' {
+  const classes: { [key: string]: string };
+  export default classes;
+}
+
 
 
 declare module '@supabase/supabase-js' {

@@ -126,10 +126,10 @@ export const SystemPerformance: React.FC = () => {
       const errorRate = totalJobs > 0 ? (failedJobs.length / totalJobs) * 100 : 0;
 
       // AI model performance from analytics
-      const hybridEvents = analyticsData?.filter(e => e.event_type.includes('hybrid')) || [];
+      const hybridEvents = analyticsData?.filter((e: any) => e.event_type.includes('hybrid')) || [];
       let openaiCount = 0, claudeCount = 0, openaiTime = 0, claudeTime = 0;
 
-      hybridEvents.forEach(event => {
+      hybridEvents.forEach((event: any) => {
         const data = event.event_data as Record<string, unknown>;
         if (data?.final_provider === 'openai') {
           openaiCount++;

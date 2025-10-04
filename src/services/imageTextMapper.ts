@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { ImageElement, TextBlock } from './htmlDOMAnalyzer';
 import type { DocumentChunk } from './layoutAwareChunker';
 import { HybridMLService } from './ml/hybridMLService';
-import { OCRService } from './ml/ocrService';
+
 
 export interface ImageTextAssociation {
   id: string;
@@ -82,13 +82,10 @@ export interface MappingResult {
  */
 export class ImageTextMapper {
   private mlService: HybridMLService;
-  private ocrService: OCRService;
-  private associationCounter: number = 0;
 
   constructor() {
     // Initialize services with minimal configs to avoid further errors
     this.mlService = {} as unknown as HybridMLService; // Temporarily disable to fix build
-    this.ocrService = {} as unknown as OCRService; // Temporarily disable to fix build
   }
 
   /**
@@ -180,7 +177,7 @@ export class ImageTextMapper {
 
     } catch (error) {
       console.error('Image-text mapping error:', error);
-      throw new Error(`Mapping failed: ${error.message}`);
+      throw new Error(`Mapping failed: ${(error as any).message}`);
     }
   }
 
@@ -460,11 +457,7 @@ export class ImageTextMapper {
    */
   private async extractTextFromImage(image: ImageElement): Promise<string | undefined> {
     try {
-      // Convert image URL to blob for OCR processing
-      const response = await fetch(image.src);
-      const blob = await response.blob();
-      const _file = new File([blob], 'image.jpg', { type: blob.type });
-
+      // OCR processing temporarily disabled
       return 'OCR temporarily disabled'; // Temporarily return placeholder
     } catch (error) {
       console.warn(`OCR failed for image ${image.id}:`, error);
@@ -488,7 +481,7 @@ export class ImageTextMapper {
       const analysisResult = await this.mlService.analyzeMaterials([file]);
 
       return {
-        materialTypes: (analysisResult as Record<string, unknown>).results ? ((analysisResult as Record<string, unknown>).results as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => r.label as string) : [],
+        materialTypes: (analysisResult as unknown as Record<string, unknown>).results ? ((analysisResult as unknown as Record<string, unknown>).results as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => r.label as string) : [],
         colorAnalysis: {
           dominantColors: ['#8B4513', '#D2B48C'], // Mock colors
           colorScheme: 'warm',
@@ -872,7 +865,7 @@ export class ImageTextMapper {
         throw error;
       }
 
-      return data.map(row => this.convertKnowledgeEntryToAssociation(row));
+      return data.map((row: any) => this.convertKnowledgeEntryToAssociation(row));
     } catch (error) {
       console.error('Error retrieving document associations:', error);
       throw error;
@@ -883,17 +876,17 @@ export class ImageTextMapper {
    * Convert knowledge base entry to association format
    */
   private convertKnowledgeEntryToAssociation(row: Record<string, unknown>): ImageTextAssociation {
-    const metadata = row.metadata || {};
+    const metadata = (row.metadata as any) || {};
 
     return {
-      id: metadata.association_id || row.id,
-      imageId: metadata.image_id || '',
-      textBlockIds: metadata.text_block_ids || [],
-      chunkIds: metadata.chunk_ids || [],
-      associationType: metadata.association_type || 'proximity',
-      confidence: row.confidence_scores?.association || 0.5,
-      proximityScore: row.confidence_scores?.proximity || 0.5,
-      semanticScore: row.confidence_scores?.semantic || 0.5,
+      id: (metadata as any).association_id || row.id,
+      imageId: (metadata as any).image_id || '',
+      textBlockIds: (metadata as any).text_block_ids || [],
+      chunkIds: (metadata as any).chunk_ids || [],
+      associationType: (metadata as any).association_type || 'proximity',
+      confidence: (row.confidence_scores as any)?.association || 0.5,
+      proximityScore: (row.confidence_scores as any)?.proximity || 0.5,
+      semanticScore: (row.confidence_scores as any)?.semantic || 0.5,
       spatialRelationship: metadata.spatial_relationship || {
         direction: 'overlapping',
         distance: 0,
@@ -901,12 +894,12 @@ export class ImageTextMapper {
       },
       metadata: {
         imageType: 'material_sample',
-        textContext: row.content.substring(0, 200),
-        keywords: row.search_keywords || [],
-        materialReferences: metadata.material_references || [],
-        technicalTerms: metadata.technical_terms || [],
+        textContext: (row.content as string)?.substring(0, 200) || '',
+        keywords: (row.search_keywords as string[]) || [],
+        materialReferences: (metadata as any).material_references || [],
+        technicalTerms: (metadata as any).technical_terms || [],
       },
-      createdAt: row.created_at,
+      createdAt: (row.created_at as string) || '',
     };
   }
 }

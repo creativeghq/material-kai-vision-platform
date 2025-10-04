@@ -12,17 +12,8 @@ import {
   Leaf,
   Ruler
 } from 'lucide-react';
-import { 
+import {
   FunctionalMetadata,
-  SlipSafetyRatings,
-  SurfaceGlossReflectivity,
-  MechanicalPropertiesExtended,
-  ThermalProperties,
-  WaterMoistureResistance,
-  ChemicalHygieneResistance,
-  AcousticElectricalProperties,
-  EnvironmentalSustainability,
-  DimensionalAesthetic
 } from '@/types/materials';
 
 interface FunctionalMetadataDisplayProps {
@@ -44,7 +35,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   onCategoryClick,
 }) => {
   // Helper function to render safety ratings
-  const renderSlipSafetyRatings = (data: SlipSafetyRatings) => (
+  const renderSlipSafetyRatings = (data: any) => (
     <div className="space-y-2">
       {data.rValue && (
         <div className="flex items-center justify-between">
@@ -85,7 +76,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render surface gloss properties
-  const renderSurfaceGloss = (data: SurfaceGlossReflectivity) => (
+  const renderSurfaceGloss = (data: any) => (
     <div className="space-y-2">
       {data.glossLevel && (
         <div className="flex items-center justify-between">
@@ -109,7 +100,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render mechanical properties
-  const renderMechanicalProperties = (data: MechanicalPropertiesExtended) => (
+  const renderMechanicalProperties = (data: any) => (
     <div className="space-y-2">
       {data.mohsHardness && (
         <div className="flex items-center justify-between">
@@ -139,7 +130,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render thermal properties
-  const renderThermalProperties = (data: ThermalProperties) => (
+  const renderThermalProperties = (data: any) => (
     <div className="space-y-2">
       {data.thermalConductivity && (
         <div className="flex items-center justify-between">
@@ -171,7 +162,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render water resistance
-  const renderWaterResistance = (data: WaterMoistureResistance) => (
+  const renderWaterResistance = (data: any) => (
     <div className="space-y-2">
       {data.waterAbsorption && (
         <div className="space-y-1">
@@ -207,7 +198,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render chemical resistance
-  const renderChemicalResistance = (data: ChemicalHygieneResistance) => (
+  const renderChemicalResistance = (data: any) => (
     <div className="space-y-2">
       {data.chemicalResistance && (
         <div className="space-y-1">
@@ -250,7 +241,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render acoustic properties
-  const renderAcousticProperties = (data: AcousticElectricalProperties) => (
+  const renderAcousticProperties = (data: any) => (
     <div className="space-y-2">
       {data.acousticProperties && (
         <div className="space-y-1">
@@ -300,7 +291,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render environmental properties
-  const renderEnvironmentalProperties = (data: EnvironmentalSustainability) => (
+  const renderEnvironmentalProperties = (data: any) => (
     <div className="space-y-2">
       {data.vocEmissionRating && (
         <div className="space-y-1">
@@ -345,7 +336,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   );
 
   // Helper function to render dimensional properties
-  const renderDimensionalProperties = (data: DimensionalAesthetic) => (
+  const renderDimensionalProperties = (data: any) => (
     <div className="space-y-2">
       {data.edgeProperties?.rectifiedEdges !== undefined && (
         <div className="flex items-center justify-between">

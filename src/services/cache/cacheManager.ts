@@ -103,13 +103,13 @@ export class CacheManager {
    * Clean expired entries from all caches
    */
   cleanExpired(): { [K in keyof typeof globalCaches]: number } {
-    const results = {} as { [K in keyof typeof globalCaches]: number };
+    const results = {} as any;
 
     for (const [name, cache] of Object.entries(globalCaches)) {
-      results[name as keyof typeof globalCaches] = cache.cleanExpired();
+      results[name] = cache.cleanExpired();
     }
 
-    const totalCleaned = Object.values(results).reduce((sum, count) => sum + count, 0);
+    const totalCleaned = Object.values(results).reduce((sum: number, count: any) => sum + (count as number), 0);
     if (totalCleaned > 0) {
       console.log(`🧹 Cleaned ${totalCleaned} expired cache entries`);
     }
@@ -168,13 +168,13 @@ export class CacheManager {
    * Invalidate cache entries by pattern across all caches
    */
   invalidatePattern(pattern: string): { [K in keyof typeof globalCaches]: number } {
-    const results = {} as { [K in keyof typeof globalCaches]: number };
+    const results = {} as any;
 
     for (const [name, cache] of Object.entries(globalCaches)) {
-      results[name as keyof typeof globalCaches] = cache.invalidatePattern(pattern);
+      results[name] = cache.invalidatePattern(pattern);
     }
 
-    const totalInvalidated = Object.values(results).reduce((sum, count) => sum + count, 0);
+    const totalInvalidated = Object.values(results).reduce((sum: number, count: any) => sum + (count as number), 0);
     if (totalInvalidated > 0) {
       console.log(`🗑️ Invalidated ${totalInvalidated} cache entries matching pattern: ${pattern}`);
     }
@@ -223,8 +223,6 @@ export class CacheManager {
    */
   optimizeCaches(): void {
     console.log('🔧 Optimizing cache configurations...');
-
-    const metrics = this.getGlobalMetrics();
 
     // Log optimization suggestions
     Object.entries(globalCaches).forEach(([name, cache]) => {

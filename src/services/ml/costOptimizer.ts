@@ -61,7 +61,7 @@ interface CacheStrategy {
 
 export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
   private usageCache = new Map<string, UsageMetrics[]>();
-  private lastAnalysis = 0;
+  // private lastAnalysis = 0; // Currently unused
 
   protected constructor(config?: Partial<CostOptimizerServiceConfig>) {
     const defaultConfig: CostOptimizerServiceConfig = {
@@ -94,15 +94,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     super({ ...defaultConfig, ...config });
   }
 
-  // Getter for backward compatibility
-  private get budgetConfig(): CostConfig {
-    return {
-      monthlyBudget: this.getConfig().monthlyBudget,
-      warningThreshold: this.getConfig().warningThreshold,
-      emergencyThreshold: this.getConfig().emergencyThreshold,
-      costPerProvider: this.getConfig().costPerProvider,
-    };
-  }
+
 
   static createInstance(config?: Partial<CostOptimizerServiceConfig>): CostOptimizer {
     return new CostOptimizer(config);
@@ -118,7 +110,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
 
     // Initialize usage cache
     this.usageCache.clear();
-    this.lastAnalysis = 0;
+    // this.lastAnalysis = 0; // Currently unused
   }
 
   protected async doHealthCheck(): Promise<void> {
@@ -266,7 +258,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         return { totalCost: 0, requestCount: 0, byProvider: {}, dailySpend: [] };
       }
 
-      const usage = events?.reduce((acc, event) => {
+      const usage = events?.reduce((acc: any, event: any) => {
         const data = event.event_data as Record<string, unknown>;
         const provider = (data.provider as string) || 'unknown';
         const cost = (data.cost as number) || 0;
@@ -289,7 +281,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       });
 
       // Calculate daily spend
-      const dailySpendMap = events?.reduce((acc, event) => {
+      const dailySpendMap = events?.reduce((acc: any, event: any) => {
         const date = event.created_at.split('T')[0];
         const cost = (event.event_data as Record<string, unknown>).cost as number || 0;
         acc[date] = (acc[date] || 0) + cost;

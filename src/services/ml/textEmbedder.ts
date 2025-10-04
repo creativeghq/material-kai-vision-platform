@@ -5,7 +5,6 @@ import { BaseService, ServiceConfig } from '../base/BaseService';
 import { MLResult, TextEmbeddingResult, FeatureExtractionOptions } from './types';
 import { DeviceDetector } from './deviceDetector';
 import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
-import { unifiedTextPreprocessor } from '../textPreprocessor';
 
 /**
  * Configuration interface for TextEmbedderService
@@ -23,7 +22,7 @@ export interface TextEmbedderServiceConfig extends ServiceConfig {
  * Provides text embedding generation capabilities with standardized service patterns
  */
 export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> {
-  private embedder: unknown = null;
+  private embedder: any = null;
 
   /**
    * Initialize the text embedding service
@@ -40,7 +39,7 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
         'feature-extraction',
         modelName,
         {
-          device: device as unknown as string, // Type assertion for device compatibility
+          device: device as any, // Type assertion for device compatibility
           progress_callback: this.config.enableProgressCallback ? (progress: Record<string, unknown>) => {
             console.log(`Text embedder loading: ${Math.round((progress.progress as number) * 100)}%`);
           } : undefined,
@@ -196,9 +195,7 @@ export class TextEmbedderService extends BaseService<TextEmbedderServiceConfig> 
       ...config,
     };
 
-    const instance = TextEmbedderService.getInstance<TextEmbedderService>();
-    instance.config = defaultConfig;
-    return instance;
+    return new TextEmbedderService(defaultConfig);
   }
 }
 

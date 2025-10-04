@@ -2,7 +2,8 @@ import { performance } from 'perf_hooks';
 import { createHash } from 'crypto';
 
 import { DocumentChunk, DocumentChunkingService, ChunkingStrategy } from './documentChunkingService';
-import { MivaaEmbeddingIntegration, EmbeddingRequest } from './mivaaEmbeddingIntegration';
+import { EmbeddingGenerationService, EmbeddingInput } from './embeddingGenerationService';
+import { RagDocument, RagMetadata } from '../types/rag';
 
 /**
  * Mivaa document structure from PDF extractor
@@ -84,56 +85,9 @@ export interface MivaaDocumentMetadata {
   processingVersion: string;
 }
 
-/**
- * RAG-compatible document structure
- */
-export interface RagDocument {
-  id: string;
-  title: string;
-  content: string;
-  chunks: DocumentChunk[];
-  metadata: RagMetadata;
-  workspace: string;
-  embeddings?: {
-    document: number[];
-    chunks: Array<{
-      chunkId: string;
-      embedding: number[];
-    }>;
-  };
-  tables: ProcessedTableData[];
-  images: ProcessedImageData[];
-  structure: DocumentStructure;
-  quality: QualityMetrics;
-}
+// RagDocument interface moved to src/types/rag.ts for unified usage across the application
 
-/**
- * RAG metadata structure
- */
-export interface RagMetadata {
-  source: string;
-  sourceType: 'mivaa-pdf';
-  originalFilename: string;
-  extractedAt: Date;
-  transformedAt: Date;
-  workspaceId: string;
-  documentId: string;
-  version: string;
-  language: string;
-  author?: string;
-  subject?: string;
-  pages: number;
-  processingStats: {
-    totalChunks: number;
-    totalTables: number;
-    totalImages: number;
-    averageChunkSize: number;
-    extractionQuality: number;
-    transformationQuality: number;
-  };
-  tags: string[];
-  categories: string[];
-}
+// RagMetadata interface moved to src/types/rag.ts for unified usage across the application
 
 /**
  * Processed table data for RAG
@@ -274,7 +228,7 @@ export interface TransformationResult {
  */
 export class MivaaToRagTransformer {
   private readonly chunkingService: DocumentChunkingService;
-  private readonly embeddingService?: MivaaEmbeddingIntegration;
+  private readonly embeddingService?: EmbeddingGenerationService;
   private readonly defaultConfig: TransformationConfig = {
     chunking: {
       type: 'hybrid',
@@ -313,7 +267,7 @@ export class MivaaToRagTransformer {
 
   constructor(
     chunkingService: DocumentChunkingService,
-    embeddingService?: MivaaEmbeddingIntegration,
+    embeddingService?: EmbeddingGenerationService,
   ) {
     this.chunkingService = chunkingService;
     this.embeddingService = embeddingService || undefined;
@@ -632,7 +586,8 @@ export class MivaaToRagTransformer {
     lines.forEach((line, index) => {
       const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
       if (headerMatch) {
-        const _level = headerMatch[1].length;
+        // Header level for future use
+        headerMatch[1].length;
         const title = headerMatch[2].trim();
         headers.push(title);
 
@@ -781,11 +736,13 @@ export class MivaaToRagTransformer {
   private findRelatedChunks(chunks: DocumentChunk[], position: { page: number }): DocumentChunk[] {
     // Simple heuristic: find chunks that might be on the same page
     const pageSize = 1000; // Approximate characters per page
-    const _targetPosition = position.page * pageSize;
+    // Target position for future use
+    position.page * pageSize;
 
     return chunks.filter(chunk => {
       const chunkStart = chunk.position.startIndex;
-      const _chunkEnd = chunk.position.endIndex;
+      // Chunk end for future use
+      chunk.position.endIndex;
       const chunkPage = Math.floor(chunkStart / pageSize);
 
       return Math.abs(chunkPage - position.page) <= 1;
@@ -902,19 +859,18 @@ export class MivaaToRagTransformer {
 
     // Generate document-level embedding
     if (config.embeddings.generateDocumentEmbedding) {
-      const documentInput: EmbeddingRequest = {
-        id: 'document',
+      const documentInput: EmbeddingInput = {
+        id: `doc_${createHash('md5').update(content).digest('hex').substring(0, 8)}`,
         text: content.substring(0, 8000), // Limit for embedding model
-        metadata: { type: 'document' },
       };
 
       const documentEmbedding = await this.embeddingService.generateEmbedding(documentInput);
-      embeddings.document = documentEmbedding.embeddings[0];
+      embeddings.document = documentEmbedding.embedding;
     }
 
     // Generate chunk embeddings
     if (config.embeddings.generateChunkEmbeddings) {
-      const chunkInputs: EmbeddingRequest[] = chunks.map(chunk => ({
+      const chunkInputs: EmbeddingInput[] = chunks.map(chunk => ({
         id: chunk.id,
         text: chunk.content,
         metadata: { type: 'chunk', chunkIndex: chunk.metadata.chunkIndex },
@@ -922,7 +878,7 @@ export class MivaaToRagTransformer {
 
       const chunkEmbeddings = await this.embeddingService.generateBatchEmbeddings(chunkInputs);
 
-      embeddings.chunks = chunkEmbeddings.embeddings.map((embedding: number[], index: number) => ({
+      embeddings.chunks = (chunkEmbeddings as any).map((embedding: number[], index: number) => ({
         chunkId: chunks[index]?.id || `chunk-${index}`,
         embedding: embedding,
       }));
@@ -937,8 +893,8 @@ export class MivaaToRagTransformer {
   private calculateQualityMetrics(
     mivaaDocument: MivaaDocument,
     chunks: DocumentChunk[],
-    tables: ProcessedTableData[],
-    images: ProcessedImageData[],
+    _tables: ProcessedTableData[],
+    _images: ProcessedImageData[],
     config: TransformationConfig,
   ): QualityMetrics {
     const warnings: string[] = [];

@@ -1,4 +1,4 @@
-import React from 'react';
+// import React from 'react'; // Not needed for functional components
 
 import { Layout } from '@/components/Layout/Layout';
 import { MaterialSuggestionsPanel } from '@/components/Admin/MaterialSuggestionsPanel';

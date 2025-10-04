@@ -187,7 +187,7 @@ export class MaterialTextureNet {
    * Analyze surface properties from texture features
    */
   private async analyzeSurfaceProperties(
-    svdResult: Record<string, unknown>,
+    svdResult: { svdFeatures: SVDTextureFeatures; attentionWeights: Float32Array },
     imageData: ImageData,
   ): Promise<MaterialTextureResult['surfaceProperties']> {
     const { svdFeatures, attentionWeights } = svdResult;
@@ -216,7 +216,7 @@ export class MaterialTextureNet {
    * Extract material-specific properties
    */
   private async extractMaterialProperties(
-    svdResult: Record<string, unknown>,
+    svdResult: { svdFeatures: SVDTextureFeatures },
     materialType: string,
   ): Promise<MaterialTextureResult['materialProperties']> {
     const { svdFeatures } = svdResult;
@@ -240,7 +240,7 @@ export class MaterialTextureNet {
    */
   private async assessQuality(
     imageData: ImageData,
-    svdResult: Record<string, unknown>,
+    svdResult: { svdFeatures: SVDTextureFeatures },
   ): Promise<MaterialTextureResult['qualityMetrics']> {
     const { width, height, data } = imageData;
 

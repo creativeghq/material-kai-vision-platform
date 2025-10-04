@@ -319,25 +319,25 @@ export const SVBRDFExtractionPage: React.FC = () => {
                           <div>
                             <span className="text-muted-foreground">Material Type:</span>
                             <span className="ml-2 font-medium capitalize">
-                              {extraction.extracted_properties.material_type}
+                              {(extraction.extracted_properties as any).material_type}
                             </span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Surface:</span>
                             <span className="ml-2 font-medium capitalize">
-                              {extraction.extracted_properties.surface_category}
+                              {(extraction.extracted_properties as any).surface_category}
                             </span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Roughness:</span>
                             <span className="ml-2 font-medium">
-                              {extraction.extracted_properties.roughness?.toFixed(2)}
+                              {((extraction.extracted_properties as any).roughness as number)?.toFixed(2)}
                             </span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Metallic:</span>
                             <span className="ml-2 font-medium">
-                              {extraction.extracted_properties.metallic?.toFixed(2)}
+                              {((extraction.extracted_properties as any).metallic as number)?.toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -394,7 +394,7 @@ export const SVBRDFExtractionPage: React.FC = () => {
                     </div>
                     <div>
                       <p className="font-medium">
-                        {item.extracted_properties?.material_type || 'Material'} extraction
+                        {(item.extracted_properties as any)?.material_type || 'Material'} extraction
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {new Date(item.created_at).toLocaleDateString()}

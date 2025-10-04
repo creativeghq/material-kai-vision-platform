@@ -141,7 +141,6 @@ graph TD
 - **Export Formats**: Multiple 3D file format support
 
 #### Advanced 3D Features
-- **NeRF Reconstruction**: Neural Radiance Fields for 3D reconstruction
 - **SVBRDF Extraction**: Material appearance parameter extraction
 - **CrewAI Integration**: Multi-agent 3D generation workflow
 - **Real-time Preview**: Interactive 3D model preview
@@ -355,7 +354,7 @@ The admin panel provides comprehensive system management through multiple tabs:
 - **Enhanced RAG Search**: `enhanced-rag-search`
 - **3D Generation**: `crewai-3d-generation`
 - **Material Scraper**: `material-scraper`
-- **NeRF Processor**: `nerf-processor`
+
 - **SVBRDF Extractor**: `svbrdf-extractor`
 
 ### External API Integrations

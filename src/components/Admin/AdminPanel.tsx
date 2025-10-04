@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 // import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-import { RAGManagementPanel } from './RAGManagementPanel';
+// RAGManagementPanel removed - functionality consolidated into IntegratedRAGManagement
 import { MetadataFieldsManagement } from './MetadataFieldsManagement';
 import { AITestingPanel } from './AITestingPanel';
 
@@ -423,7 +423,13 @@ export const AdminPanel: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="rag" className="space-y-4">
-          <RAGManagementPanel />
+          {/* RAGManagementPanel functionality moved to IntegratedRAGManagement */}
+          <div className="text-center p-8">
+            <p className="text-muted-foreground">
+              RAG Management functionality has been consolidated into the Integrated RAG Management panel.
+              Please use the main RAG interface for all RAG operations.
+            </p>
+          </div>
         </TabsContent>
 
         <TabsContent value="metadata" className="space-y-4">

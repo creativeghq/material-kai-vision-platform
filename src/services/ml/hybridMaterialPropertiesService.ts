@@ -2,7 +2,7 @@ import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { MLResult } from './types';
 import { MaterialAnalyzerService, MaterialAnalysisOptions } from './materialAnalyzer';
-import { ServerMLService } from './serverMLService';
+import { unifiedMLService } from './unifiedMLService';
 
 interface HybridMaterialPropertiesServiceConfig extends ServiceConfig {
   preferServerForComprehensive: boolean;
@@ -21,7 +21,6 @@ interface HybridMaterialPropertiesServiceConfig extends ServiceConfig {
 
 export class HybridMaterialPropertiesService extends BaseService<HybridMaterialPropertiesServiceConfig> {
   private clientAnalyzer: MaterialAnalyzerService | null = null;
-  private serverML: ServerMLService | null = null;
   private analysisCache: Map<string, { result: MLResult; timestamp: number }> = new Map();
 
   protected constructor(config: HybridMaterialPropertiesServiceConfig) {
@@ -35,11 +34,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
       'initialize-client-analyzer',
     );
 
-    // Initialize server ML service
-    await this.executeOperation(
-      () => this.initializeServerML(),
-      'initialize-server-ml',
-    );
+    // Server ML is now handled by unifiedMLService - no separate initialization needed
 
     // Verify both services are functional
     await this.executeOperation(
@@ -50,8 +45,8 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
 
   protected async doHealthCheck(): Promise<void> {
     // Check if services are properly initialized
-    if (!this.clientAnalyzer || !this.serverML) {
-      throw new Error('Services not properly initialized');
+    if (!this.clientAnalyzer) {
+      throw new Error('Client analyzer not properly initialized');
     }
 
     // Basic health check - services exist and are ready
@@ -75,14 +70,9 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
     await this.clientAnalyzer.initialize();
   }
 
-  private async initializeServerML(): Promise<void> {
-    this.serverML = ServerMLService.createInstance();
-    await this.serverML.initialize();
-  }
-
   private async verifyServicesHealth(): Promise<void> {
-    if (!this.clientAnalyzer || !this.serverML) {
-      throw new Error('Services not properly initialized');
+    if (!this.clientAnalyzer) {
+      throw new Error('Client analyzer not properly initialized');
     }
 
     // Services exist and have been created successfully
@@ -179,11 +169,20 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
   }
 
   private async performServerAnalysis(imageFile: File, options: MaterialAnalysisOptions): Promise<MLResult> {
-    if (!this.serverML) {
-      throw new Error('Server ML service not initialized');
-    }
+    // Use unified ML service for server-side analysis
+    const result = await unifiedMLService.analyzeMaterial(imageFile, undefined, {
+      preferServerSide: true,
+      analysisType: 'comprehensive',
+      ...options
+    });
 
-    return await this.serverML.analyzeAdvancedMaterialProperties(imageFile, options);
+    return {
+      success: result.success,
+      data: result.data,
+      confidence: result.confidence,
+      processingTime: result.processingTime,
+      error: result.success ? undefined : 'Server analysis failed'
+    };
   }
 
   private async performClientAnalysis(imageFile: File, options: MaterialAnalysisOptions): Promise<MLResult> {
@@ -228,13 +227,14 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
     }
 
     // Add confidence assessment if not present
-    if (typeof result.data.confidence === 'undefined') {
-      result.data.confidence = 0.8; // Default confidence
+    const resultData = result.data as any;
+    if (typeof resultData.confidence === 'undefined') {
+      resultData.confidence = 0.8; // Default confidence
     }
 
     // Check if confidence meets threshold
-    if (result.data.confidence < this.config.minConfidenceThreshold) {
-      result.data.qualityWarning = 'Low confidence result';
+    if (resultData.confidence < this.config.minConfidenceThreshold) {
+      resultData.qualityWarning = 'Low confidence result';
     }
 
     return result;
@@ -243,7 +243,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
   getStatus(): { clientSupported: boolean; serverAvailable: boolean; features: string[] } {
     return {
       clientSupported: !!this.clientAnalyzer,
-      serverAvailable: !!this.serverML,
+      serverAvailable: true, // Always available through unifiedMLService
       features: [
         'Advanced Material Properties',
         'Physical Characteristics',
@@ -287,10 +287,6 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
     options: MaterialAnalysisOptions = { analysisDepth: 'comprehensive', focusAreas: [] },
   ): Promise<MLResult> {
     return this.executeOperation(async () => {
-      if (!this.serverML) {
-        throw new Error('Server ML service not initialized');
-      }
-
       return await this.performServerAnalysis(imageFile, options);
     }, 'force-server-analysis');
   }

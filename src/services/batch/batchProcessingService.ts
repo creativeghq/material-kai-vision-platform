@@ -1,8 +1,10 @@
 import { EventEmitter } from 'events';
 
-import { DocumentChunkingService } from '../documentChunkingService';
-import { MivaaEmbeddingIntegration } from '../mivaaEmbeddingIntegration';
-import { ValidationIntegrationService } from '../validationIntegrationService';
+// Services are passed as constructor parameters but not currently used in implementation
+// import { DocumentChunkingService } from '../documentChunkingService';
+// import { EmbeddingGenerationService } from '../embeddingGenerationService';
+// import { MivaaEmbeddingIntegration } from '../mivaaEmbeddingIntegration';
+// import { ValidationIntegrationService } from '../validationIntegrationService';
 
 import { BatchJobQueue, BatchJob, JobResult, JobPriority, QueueConfig } from './batchJobQueue';
 
@@ -207,9 +209,7 @@ const DEFAULT_CONFIG: BatchProcessingConfig = {
 export class BatchProcessingService extends EventEmitter {
   private config: BatchProcessingConfig;
   private jobQueue: BatchJobQueue;
-  private validationService: ValidationIntegrationService;
-  private chunkingService: DocumentChunkingService;
-  private embeddingService: MivaaEmbeddingIntegration;
+
   private logger: Logger;
   private performanceMetrics: PerformanceMetrics;
   private activeBatches: Map<string, BatchProgress>;
@@ -217,19 +217,19 @@ export class BatchProcessingService extends EventEmitter {
   private resourcePool: Map<string, unknown>;
   private isInitialized: boolean;
 
+
+
   constructor(
-    validationService: ValidationIntegrationService,
-    chunkingService: DocumentChunkingService,
-    embeddingService: MivaaEmbeddingIntegration,
+    _validationService: any, // ValidationIntegrationService - not currently used
+    _chunkingService: any, // DocumentChunkingService - not currently used
+    _embeddingService: any, // MivaaEmbeddingIntegration - not currently used
     config: Partial<BatchProcessingConfig> = {},
     logger?: Logger,
   ) {
     super();
 
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.validationService = validationService;
-    this.chunkingService = chunkingService;
-    this.embeddingService = embeddingService;
+    // Services are passed as parameters but not stored as they're not used in current implementation
     this.logger = logger || {
       info: (msg: string) => console.log(`[BatchProcessing] ${msg}`),
       error: (msg: string) => console.error(`[BatchProcessing] ${msg}`),
@@ -542,268 +542,20 @@ export class BatchProcessingService extends EventEmitter {
     });
   }
 
-  /**
-   * Process validation job
-   */
-  private async processValidationJob(job: BatchJob): Promise<{ validationResults: Array<{ documentId: string; isValid: boolean; errors: string[] }> }> {
-    const payload = job.payload as { batchId: string; documents: Array<{ id: string; [key: string]: unknown }>; options: Record<string, unknown> };
-    const { batchId, documents } = payload;
 
-    this.updateBatchProgress(batchId, {
-      stage: 'validating',
-      progress: 10,
-      currentOperation: 'Validating documents',
-    });
 
-    const validationResults = [];
 
-    for (let i = 0; i < documents.length; i++) {
-      const document = documents[i];
-      if (!document) continue;
 
-      try {
-        const validatedDocument = await this.validationService.validateMivaaDocument(
-          document,
-          { partial: false, sanitize: true, trackPerformance: true },
-        );
-        const isValid = !!validatedDocument;
 
-        validationResults.push({
-          documentId: document.id,
-          isValid,
-          errors: isValid ? [] : ['Content validation failed'],
-        });
 
-        this.updateBatchProgress(batchId, {
-          progress: 10 + (i / documents.length) * 20,
-          currentDocument: i + 1,
-          currentOperation: `Validating document ${i + 1}/${documents.length}`,
-        });
-      } catch (error) {
-        validationResults.push({
-          documentId: document.id,
-          isValid: false,
-          errors: [error instanceof Error ? error.message : String(error)],
-        });
-      }
-    }
 
-    return { validationResults };
-  }
 
-  /**
-   * Process chunking job
-   */
-  private async processChunkingJob(job: BatchJob): Promise<{ batchId: string; chunkingResults: Array<{ documentId: string; chunks: Array<{ id: string; content: string; metadata: Record<string, unknown> }>; error?: string }> }> {
-    const payload = job.payload as { batchId: string; documents: Array<{ id: string; content: string; processingOptions?: { chunkingStrategy?: string }; [key: string]: unknown }> };
-    const { batchId, documents } = payload;
 
-    this.updateBatchProgress(batchId, {
-      stage: 'chunking',
-      progress: 30,
-      currentOperation: 'Chunking documents',
-    });
 
-    const chunkingResults = [];
 
-    for (let i = 0; i < documents.length; i++) {
-      const document = documents[i];
-      if (!document) continue;
 
-      try {
-        const strategy = document.processingOptions?.chunkingStrategy || this.config.services.chunking.strategy;
 
-        const documentInput = {
-          id: document.id,
-          content: document.content,
-          metadata: {
-            source: 'batch-processing',
-            workspaceId: 'default',
-            documentId: document.id,
-          },
-        } as import('../documentChunkingService').DocumentInput;
 
-        const chunks = await this.chunkingService.chunkDocument(
-          documentInput,
-          {
-            type: strategy as 'semantic',
-            maxChunkSize: this.config.services.chunking.chunkSize,
-            overlapSize: this.config.services.chunking.overlap,
-            preserveStructure: true,
-          },
-        );
-
-        chunkingResults.push({
-          documentId: document.id,
-          chunks: chunks.chunks.map((chunk, index: number) => ({
-            id: `${document.id}_chunk_${index}`,
-            content: chunk.content,
-            metadata: {
-              ...chunk.metadata,
-              documentId: document.id,
-              chunkIndex: index,
-            },
-          })),
-        });
-
-        this.updateBatchProgress(batchId, {
-          progress: 30 + (i / documents.length) * 30,
-          currentDocument: i + 1,
-          currentOperation: `Chunking document ${i + 1}/${documents.length}`,
-        });
-      } catch (error) {
-        chunkingResults.push({
-          documentId: document.id,
-          error: error instanceof Error ? error.message : String(error),
-          chunks: [],
-        });
-      }
-    }
-
-    return { batchId, chunkingResults };
-  }
-
-  /**
-   * Process embedding job
-   */
-  private async processEmbeddingJob(job: BatchJob): Promise<{ batchId: string; embeddingResults: Array<{ chunkId: string; embedding: number[] | null; metadata?: Record<string, unknown>; error?: string }> }> {
-    const payload = job.payload as { batchId: string; chunkingJobId: string };
-    const { batchId, chunkingJobId } = payload;
-
-    this.updateBatchProgress(batchId, {
-      stage: 'embedding',
-      progress: 60,
-      currentOperation: 'Generating embeddings',
-    });
-
-    // Get chunking results from previous job
-    const chunkingJob = this.jobQueue.getJob(chunkingJobId);
-    if (!chunkingJob) {
-      throw new Error('Chunking job not found');
-    }
-
-    // Process embeddings in batches
-    const embeddingResults: Array<{ chunkId: string; embedding: number[] | null; metadata?: Record<string, unknown>; error?: string }> = [];
-    const allChunks: Array<{ id: string; content: string; metadata?: Record<string, unknown> }> = [];
-
-    // Collect all chunks from chunking results
-    // This would need to be implemented based on how job results are stored
-
-    // Generate embeddings in batches
-    const batchSize = this.config.services.embedding.batchSize;
-    for (let i = 0; i < allChunks.length; i += batchSize) {
-      const chunkBatch = allChunks.slice(i, i + batchSize);
-
-      try {
-        const texts = chunkBatch.map(chunk => chunk.content);
-        const firstText = texts[0];
-        if (!firstText) {
-          throw new Error('No text content found in chunk batch');
-        }
-
-        const result = await this.embeddingService.generateEmbedding({
-          model: 'text-embedding-3-large',
-          dimensions: 1536,
-          text: firstText,
-        });
-
-        if (result.embedding && result.embedding.length > 0) {
-          chunkBatch.forEach((chunk) => {
-            embeddingResults.push({
-              chunkId: chunk.id,
-              embedding: result.embedding,
-              metadata: chunk.metadata || {},
-            });
-          });
-        } else {
-          // Handle embedding generation failure
-          chunkBatch.forEach(chunk => {
-            embeddingResults.push({
-              chunkId: chunk.id,
-              error: 'Failed to generate embedding',
-              embedding: null,
-            });
-          });
-        }
-
-        this.updateBatchProgress(batchId, {
-          progress: 60 + ((i + chunkBatch.length) / allChunks.length) * 30,
-          currentOperation: `Generated embeddings for ${i + chunkBatch.length}/${allChunks.length} chunks`,
-        });
-      } catch (error) {
-        // Handle embedding errors
-        chunkBatch.forEach(chunk => {
-          embeddingResults.push({
-            chunkId: chunk.id,
-            error: error instanceof Error ? error.message : String(error),
-            embedding: null,
-          });
-        });
-      }
-    }
-
-    return { batchId, embeddingResults };
-  }
-
-  /**
-   * Process finalization job
-   */
-  private async processFinalizationJob(job: BatchJob): Promise<{ success: boolean; batchId: string; summary: Record<string, unknown> }> {
-    const payload = job.payload as { batchId: string };
-    const { batchId } = payload;
-
-    this.updateBatchProgress(batchId, {
-      stage: 'finalizing',
-      progress: 90,
-      currentOperation: 'Finalizing batch processing',
-    });
-
-    // Collect all results and create final batch result
-    const batchResult: BatchProcessingResult = {
-      batchId,
-      status: 'completed',
-      totalDocuments: 0,
-      processedDocuments: 0,
-      failedDocuments: 0,
-      results: [],
-      metrics: {
-        totalProcessingTime: 0,
-        averageDocumentTime: 0,
-        throughputPerMinute: 0,
-        memoryUsage: process.memoryUsage().heapUsed,
-        errorRate: 0,
-      },
-      createdAt: new Date(),
-      completedAt: new Date(),
-    };
-
-    // Store final result
-    this.batchResults.set(batchId, batchResult);
-
-    // Update progress to completed
-    this.updateBatchProgress(batchId, {
-      stage: 'completed',
-      progress: 100,
-      currentOperation: 'Batch processing completed',
-    });
-
-    // Clean up active batch
-    this.activeBatches.delete(batchId);
-
-    // Emit completion event
-    this.emit('batchCompleted', { batchId, result: batchResult });
-
-    return {
-      success: true,
-      batchId,
-      summary: {
-        totalDocuments: batchResult.totalDocuments,
-        processedDocuments: batchResult.processedDocuments,
-        failedDocuments: batchResult.failedDocuments,
-        processingTime: batchResult.metrics.totalProcessingTime,
-      },
-    };
-  }
 
   /**
    * Handle job completion

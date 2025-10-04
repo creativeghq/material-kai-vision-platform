@@ -91,14 +91,15 @@ export const MaterialSuggestionsPanel: React.FC = () => {
       // From PDF knowledge base
       if (data.results?.knowledgeBase) {
         data.results.knowledgeBase.forEach((item: Record<string, unknown>) => {
-          if (item.metadata?.material_categories) {
-            item.metadata.material_categories.forEach((category: string) => {
+          const metadata = item.metadata as any;
+          if (metadata?.material_categories && Array.isArray(metadata.material_categories)) {
+            metadata.material_categories.forEach((category: string) => {
               formattedSuggestions.push({
                 name: category,
-                category: item.metadata.content_type || 'pdf_content',
-                confidence: item.confidence || 0.8,
+                category: (metadata.content_type as string) || 'pdf_content',
+                confidence: (item.confidence as number) || 0.8,
                 source: 'pdf_knowledge',
-                properties: item.metadata,
+                properties: metadata as Record<string, unknown>,
               });
             });
           }
@@ -109,11 +110,11 @@ export const MaterialSuggestionsPanel: React.FC = () => {
       if (data.results?.materials) {
         data.results.materials.forEach((item: Record<string, unknown>) => {
           formattedSuggestions.push({
-            name: item.title,
-            category: item.category || 'material',
-            confidence: item.confidence || 0.7,
+            name: (item.title as string) || '',
+            category: (item.category as string) || 'material',
+            confidence: (item.confidence as number) || 0.7,
             source: 'catalog',
-            properties: item.properties,
+            properties: (item.properties as Record<string, unknown>) || {},
           });
         });
       }

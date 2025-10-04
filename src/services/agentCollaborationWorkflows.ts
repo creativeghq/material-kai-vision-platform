@@ -464,7 +464,7 @@ export class AgentCollaborationWorkflows {
 
     if (error) return false;
 
-    return tasks?.some(task => {
+    return tasks?.some((task: any) => {
       const taskData = JSON.parse(String(task.input_data || '{}'));
       return taskData?.stepId === stepId && task.task_status === 'completed';
     }) || false;
@@ -478,7 +478,7 @@ export class AgentCollaborationWorkflows {
 
     if (error) return false;
 
-    return tasks?.some(task => {
+    return tasks?.some((task: any) => {
       const taskData = JSON.parse(String(task.input_data || '{}'));
       return taskData?.stepId === stepId &&
         ['processing', 'completed'].includes(task.task_status);
@@ -493,7 +493,7 @@ export class AgentCollaborationWorkflows {
 
     if (error) return false;
 
-    return tasks?.every(task => task.task_status === 'completed') || false;
+    return tasks?.every((task: any) => task.task_status === 'completed') || false;
   }
 
   private async completeCollaborationTask(parentTaskId: string): Promise<void> {

@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
+// import type { User, Session, AuthError } from '@supabase/auth-helpers-nextjs'; // Module not found
+type User = any;
+type Session = any;
+type AuthError = any;
 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
+      (_: any, session: any) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -41,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

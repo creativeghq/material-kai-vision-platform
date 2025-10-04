@@ -343,8 +343,8 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       // Check cache first
       if (this.config.enableCaching && this.jobCache.has(jobId)) {
         const cachedJob = this.jobCache.get(jobId);
-        if (Date.now() - cachedJob.timestamp < this.config.cacheExpirationMs) {
-          if (cachedJob.status === 'completed') {
+        if (Date.now() - (cachedJob as any).timestamp < this.config.cacheExpirationMs) {
+          if ((cachedJob as any).status === 'completed') {
             return cachedJob;
           }
         }
@@ -364,7 +364,7 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
       if (job.status === 'completed') {
         // Get recognition results
         const resultData = job.result as Record<string, unknown>;
-        const fileIds = resultData?.results || [];
+        const fileIds = (resultData?.results as any[]) || [];
 
         if (fileIds.length > 0) {
           const { data: results, error: resultsError } = await supabase
@@ -444,13 +444,13 @@ export class ServerMLService extends BaseService<ServerMLServiceConfig> {
             const result = await this.getRecognitionResults(jobId);
 
             if (onProgress) {
-              onProgress(result.status);
+              onProgress((result as any).status);
             }
 
-            if (result.status === 'completed') {
+            if ((result as any).status === 'completed') {
               resolve(result);
-            } else if (result.status === 'failed') {
-              reject(new Error(result.error_message || 'Job failed'));
+            } else if ((result as any).status === 'failed') {
+              reject(new Error((result as any).error_message || 'Job failed'));
             } else {
               // Still processing, poll again
               setTimeout(poll, this.config.pollInterval);

@@ -89,7 +89,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
       }
 
       // Transform the data to match the expected interface
-      const transformedPages: ScrapingPage[] = (pagesData || []).map(page => ({
+      const transformedPages: ScrapingPage[] = (pagesData || []).map((page: any) => ({
         id: page.id,
         url: page.url,
         status: page.status,

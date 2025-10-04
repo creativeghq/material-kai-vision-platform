@@ -313,7 +313,7 @@ export class ConsolidatedPDFWorkflowService {
         if (!user) throw new Error('User not authenticated');
 
         const processingRequest = {
-          fileUrl: uploadResult.result?.publicUrl,
+          fileUrl: (uploadResult as any).result?.publicUrl,
           filename: file.name,
           options: {
             chunkSize: options.chunkSize || 1000,
@@ -409,8 +409,8 @@ export class ConsolidatedPDFWorkflowService {
             'Search indexing completed',
           ],
           metadata: {
-            knowledgeEntryId: mivaaResult.result?.knowledgeEntryId,
-            documentId: mivaaResult.result?.documentId,
+            knowledgeEntryId: (mivaaResult as any).result?.knowledgeEntryId,
+            documentId: (mivaaResult as any).result?.documentId,
             storageCompleted: true,
           },
         };
@@ -418,7 +418,7 @@ export class ConsolidatedPDFWorkflowService {
 
       // Step 8: Quality Assessment
       await this.executeStep(jobId, 'quality-assessment', async () => {
-        const confidence = mivaaResult.result?.confidence || 0;
+        const confidence = (mivaaResult as any).result?.confidence || 0;
 
         return {
           details: [
@@ -446,123 +446,8 @@ export class ConsolidatedPDFWorkflowService {
     }
   }
 
-  /**
-   * Execute legacy ConvertAPI-based processing workflow
-   */
-  private async executeLegacyWorkflow(
-    jobId: string,
-    file: File,
-    _options: ConsolidatedProcessingOptions,
-  ) {
-    try {
-      const job = this.jobs.get(jobId);
-      if (!job) return;
 
-      // Step 1: Authentication
-      await this.executeStep(jobId, 'auth', async () => {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) throw new Error('User not authenticated');
-        return {
-          details: [`Authenticated user: ${user.email}`, `User ID: ${user.id}`],
-          metadata: { userId: user.id, email: user.email },
-        };
-      });
 
-      // Step 2: File Upload
-      await this.executeStep(jobId, 'upload', async () => {
-        const fileName = `${Date.now()}-${file.name}`;
-        const { data: { user } } = await supabase.auth.getUser();
-        const fullPath = `${user!.id}/${fileName}`;
-
-        const { error } = await supabase.storage
-          .from('pdf-documents')
-          .upload(fullPath, file);
-
-        if (error) throw new Error(`Upload failed: ${error.message}`);
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('pdf-documents')
-          .getPublicUrl(fullPath);
-
-        return {
-          details: [
-            `File uploaded: ${fullPath}`,
-            `File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
-            'Public URL generated',
-          ],
-          metadata: {
-            fileName: fullPath,
-            fileSize: file.size,
-            publicUrl,
-          },
-          result: { publicUrl, fileName: fullPath },
-        };
-      });
-
-      // Step 3: Validation
-      await this.executeStep(jobId, 'validation', async () => {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return {
-          details: [
-            'PDF structure validated',
-            'Content accessibility confirmed',
-            'No encryption detected',
-          ],
-          metadata: {
-            isValidPDF: true,
-            pageCount: 'estimated',
-            hasText: true,
-          },
-        };
-      });
-
-      // Step 4: ConvertAPI Conversion
-      await this.executeStep(jobId, 'convertapi-conversion', async () => {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return {
-          details: [
-            'Calling ConvertAPI PDF to HTML conversion service',
-            'Parameters: EmbedCss=true, EmbedImages=false, PageRange=1-10',
-            'Processing document with layout preservation',
-            'Conversion request completed successfully',
-          ],
-          metadata: {
-            service: 'ConvertAPI',
-            conversion: 'PDF to HTML',
-            embedCss: true,
-            embedImages: false,
-          },
-        };
-      });
-
-      // Step 5: HTML Content Extraction
-      await this.executeStep(jobId, 'html-extraction', async () => {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        return {
-          details: [
-            'Prioritizing URL download for clean HTML content',
-            'Detected HTML content source type',
-            'Successfully extracted clean HTML content',
-            'HTML content length: Estimated 15,000+ characters',
-          ],
-          metadata: {
-            extractionMethod: 'url_download_preferred',
-            htmlContentLength: 15000,
-            contentClean: true,
-          },
-        };
-      });
-
-      // Continue with remaining legacy steps...
-      // (Implementation would continue with the remaining ConvertAPI workflow steps)
-
-      console.log(`Legacy PDF workflow completed successfully for: ${file.name}`);
-
-    } catch (error) {
-      console.error('Legacy PDF workflow error:', error);
-      throw error;
-    }
-  }
 
   /**
    * Execute a single workflow step with error handling

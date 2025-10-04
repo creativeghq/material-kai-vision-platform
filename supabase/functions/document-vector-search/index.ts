@@ -113,7 +113,7 @@ async function performSemanticSearch(
 
   let query = supabase
     .rpc('vector_similarity_search', {
-      query_embedding: `[${embedding.join(',')}]`,
+      query_embedding_text: `[${embedding.join(',')}]`,
       match_threshold: threshold,
       match_count: limit,
     });
@@ -138,95 +138,7 @@ async function performSemanticSearch(
   }));
 }
 
-async function performKeywordSearch(
-  query: string,
-  documentTypes: string[],
-  limit: number,
-): Promise<SearchResult[]> {
-
-  let queryBuilder = supabase
-    .from('documents')
-    .select(`
-      id,
-      title,
-      content,
-      document_type,
-      metadata,
-      file_path,
-      page_number,
-      section
-    `)
-    .textSearch('content', query, {
-      type: 'websearch',
-      config: 'english',
-    })
-    .limit(limit);
-
-  if (documentTypes.length > 0) {
-    queryBuilder = queryBuilder.in('document_type', documentTypes);
-  }
-
-  const { data, error } = await queryBuilder;
-
-  if (error) {
-    console.error('Keyword search error:', error);
-    throw new Error(`Keyword search failed: ${error.message}`);
-  }
-
-  return (data || []).map((item: any) => ({
-    document_id: item.id,
-    title: item.title || 'Untitled',
-    content_snippet: item.content?.substring(0, 300) + '...',
-    similarity_score: 0.8, // Default score for keyword matches
-    document_type: item.document_type || 'unknown',
-    metadata: item.metadata || {},
-    file_path: item.file_path,
-    page_number: item.page_number,
-    section: item.section,
-  }));
-}
-
-async function performHybridSearch(
-  query: string,
-  embedding: number[],
-  documentTypes: string[],
-  limit: number,
-  threshold: number,
-): Promise<SearchResult[]> {
-
-  // Perform both searches in parallel
-  const [semanticResults, keywordResults] = await Promise.all([
-    performSemanticSearch(embedding, documentTypes, Math.ceil(limit * 0.7), threshold),
-    performKeywordSearch(query, documentTypes, Math.ceil(limit * 0.5)),
-  ]);
-
-  // Combine and deduplicate results
-  const combinedResults = new Map<string, SearchResult>();
-
-  // Add semantic results with higher weight
-  semanticResults.forEach(result => {
-    combinedResults.set(result.document_id, {
-      ...result,
-      similarity_score: result.similarity_score * 1.1, // Boost semantic scores
-    });
-  });
-
-  // Add keyword results, merging with existing if found
-  keywordResults.forEach(result => {
-    const existing = combinedResults.get(result.document_id);
-    if (existing) {
-      // Combine scores for documents found in both searches
-      existing.similarity_score = Math.max(existing.similarity_score, result.similarity_score * 0.9);
-    } else {
-      combinedResults.set(result.document_id, result);
-    }
-  });
-
-  // Sort by similarity score and return top results
-  return Array.from(combinedResults.values())
-    .sort((a, b) => b.similarity_score - a.similarity_score)
-    .slice(0, limit);
-}
+// Removed keyword and hybrid search functions - vector search only
 
 async function logSearchEvent(request: SearchRequest, results: SearchResult[], processingTime: number) {
   if (!request.user_id) return;
@@ -264,27 +176,11 @@ async function processDocumentSearch(request: SearchRequest): Promise<VectorSear
 
     let results: SearchResult[] = [];
 
-    switch (request.search_type) {
-      case 'semantic': {
-        const embedding = await generateQueryEmbedding(request.query);
-        results = await performSemanticSearch(embedding, documentTypes, limit, threshold);
-        break;
-      }
+    // Only semantic (vector) search - no fallbacks
+    const embedding = await generateQueryEmbedding(request.query);
+    results = await performSemanticSearch(embedding, documentTypes, limit, threshold);
 
-      case 'keyword': {
-        results = await performKeywordSearch(request.query, documentTypes, limit);
-        break;
-      }
-
-      case 'hybrid': {
-        const embedding = await generateQueryEmbedding(request.query);
-        results = await performHybridSearch(request.query, embedding, documentTypes, limit, threshold);
-        break;
-      }
-
-      default:
-        throw new Error(`Unsupported search type: ${request.search_type}`);
-    }
+    console.log(`Vector search completed: ${results.length} results found`);
 
     const processingTime = Date.now() - startTime;
 

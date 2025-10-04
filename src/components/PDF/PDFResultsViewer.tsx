@@ -485,7 +485,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
         <TabsContent value="review" className="space-y-4">
           <PDFReviewWorkflow
             processingId={processingId}
-            tiles={tiles}
+            tiles={tiles as any}
             onWorkflowComplete={(results) => {
               toast({
                 title: 'Workflow Complete',

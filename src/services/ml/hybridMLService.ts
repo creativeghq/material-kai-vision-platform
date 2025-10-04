@@ -51,7 +51,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
   protected async doInitialize(): Promise<void> {
     // Initialize dependent services
     try {
-      const huggingFaceService = HuggingFaceService.getInstance<HuggingFaceService>();
+      const huggingFaceService = new HuggingFaceService({} as any);
       await huggingFaceService.initialize();
     } catch (error) {
       console.warn('HuggingFace service initialization failed:', error);
@@ -88,7 +88,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
 
     // Check dependent services
     const clientStatus = clientMLService.getStatus();
-    if (!clientStatus.initialized && !this.config.preferServerSide) {
+    if (!(clientStatus as any).initialized && !this.config.preferServerSide) {
       throw new Error('Client ML service not initialized and server preference not set');
     }
 
@@ -244,7 +244,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    */
   private async processOnServer(
     files: File[],
-    descriptions?: string[],
+    _descriptions?: string[], // Currently unused
     options?: HybridMLOptions,
   ): Promise<HybridMLResult> {
     const startTime = performance.now();
@@ -299,7 +299,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
 
         // Fallback to HuggingFace if client confidence is low
         console.log('Client confidence low, trying HuggingFace...');
-        const huggingFaceService = HuggingFaceService.getInstance<HuggingFaceService>();
+        const huggingFaceService = new HuggingFaceService({} as any);
         await huggingFaceService.initialize();
 
         const [materialResults, styleResults] = await Promise.all([
@@ -412,7 +412,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     if (!results || results.length === 0) return 0;
 
     const confidences = results
-      .map(r => r.confidence_score || r.confidence || 0)
+      .map(r => (r as any).confidence_score || (r as any).confidence || 0)
       .filter(c => typeof c === 'number');
 
     return confidences.length > 0
@@ -429,8 +429,8 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
     estimatedTime: string;
     costImplications: string;
   }> {
-    const decision = this.determineProcessingMethod(files, this.DEFAULT_OPTIONS);
-    const _totalSize = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
+    const decision = await this.determineProcessingMethod(files, this.DEFAULT_OPTIONS);
+    // const _totalSize = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024); // Currently unused
     const deviceInfo = await DeviceDetector.getDeviceInfo();
 
     const reasons = [decision.reason];
@@ -490,7 +490,7 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
    */
   async analyzeImage(file: File, options: Record<string, unknown> = {}): Promise<HybridMLResult> {
     const opts = { ...this.DEFAULT_OPTIONS, ...options };
-    const processingDecision = this.determineProcessingMethod([file], opts);
+    const processingDecision = await this.determineProcessingMethod([file], opts);
 
     try {
       switch (processingDecision.method) {
@@ -543,11 +543,11 @@ export class HybridMLService extends BaseService<HybridMLServiceConfig> {
       recommendations.push('Consider using server-side processing for better performance');
     }
 
-    if (!clientStatus.initialized) {
+    if (!(clientStatus as any).initialized) {
       recommendations.push('Client-side models are still loading');
     }
 
-    if (clientStatus.initialized && deviceInfo.supportsWebGPU) {
+    if ((clientStatus as any).initialized && deviceInfo.supportsWebGPU) {
       recommendations.push('All systems ready for optimal processing');
     }
 

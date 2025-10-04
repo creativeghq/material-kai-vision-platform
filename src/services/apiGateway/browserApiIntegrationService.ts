@@ -61,8 +61,16 @@ export class BrowserApiIntegrationService {
     if (!client) {
       return {
         success: false,
-        error: 'Replicate client not available',
-        metadata: { provider: 'replicate', timestamp: new Date().toISOString() },
+        error: {
+          message: 'Replicate client not available',
+          code: 'CLIENT_NOT_AVAILABLE',
+          retryable: false,
+        },
+        metadata: {
+          apiType: 'replicate',
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+        },
       };
     }
 
@@ -83,8 +91,16 @@ export class BrowserApiIntegrationService {
     if (!client) {
       return {
         success: false,
-        error: 'Hugging Face client not available',
-        metadata: { provider: 'huggingface', timestamp: new Date().toISOString() },
+        error: {
+          message: 'Hugging Face client not available',
+          code: 'CLIENT_NOT_AVAILABLE',
+          retryable: false,
+        },
+        metadata: {
+          apiType: 'huggingface',
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+        },
       };
     }
 
@@ -105,8 +121,16 @@ export class BrowserApiIntegrationService {
     if (!client) {
       return {
         success: false,
-        error: 'Supabase client not available',
-        metadata: { provider: 'supabase', timestamp: new Date().toISOString() },
+        error: {
+          message: 'Supabase client not available',
+          code: 'CLIENT_NOT_AVAILABLE',
+          retryable: false,
+        },
+        metadata: {
+          apiType: 'supabase',
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+        },
       };
     }
 
@@ -154,8 +178,16 @@ export class BrowserApiIntegrationService {
 
     return {
       success: false,
-      error: 'No suitable models available for interior design generation',
-      metadata: { timestamp: new Date().toISOString() },
+      error: {
+        message: 'No suitable models available for interior design generation',
+        code: 'NO_MODELS_AVAILABLE',
+        retryable: false,
+      },
+      metadata: {
+        apiType: 'interior-design',
+        timestamp: new Date().toISOString(),
+        requestId: crypto.randomUUID(),
+      },
     };
   }
 
@@ -178,8 +210,17 @@ export class BrowserApiIntegrationService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to process image',
-        metadata: { provider: 'supabase', timestamp: new Date().toISOString() },
+        error: {
+          message: error instanceof Error ? error.message : 'Failed to process image',
+          code: 'IMAGE_PROCESSING_ERROR',
+          details: error instanceof Error ? { stack: error.stack } : undefined,
+          retryable: true,
+        },
+        metadata: {
+          apiType: 'supabase',
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+        },
       };
     }
   }

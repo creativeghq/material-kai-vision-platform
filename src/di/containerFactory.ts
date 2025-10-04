@@ -117,15 +117,15 @@ export class ContainerFactory {
             },
         });
 
-        // Register MivaaEmbeddingIntegration service with health check
+        // Register EmbeddingGenerationService (consolidated from MivaaEmbeddingIntegration)
         container.register({
             identifier: 'IEmbeddingGenerationService',
             factory: () => {
                 // Dynamic import would require async factory, using require for now
                 // TODO: Consider refactoring to async factory pattern if needed
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-                const { MivaaEmbeddingIntegration } = require('../services/mivaaEmbeddingIntegration');
-                return new MivaaEmbeddingIntegration();
+                const { EmbeddingGenerationService, defaultEmbeddingConfig } = require('../services/embeddingGenerationService');
+                return new EmbeddingGenerationService(defaultEmbeddingConfig);
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['Logger'],

@@ -57,7 +57,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
         const gpu = (navigator as Record<string, unknown>).gpu;
         if (gpu && typeof (gpu as Record<string, unknown>).requestAdapter === 'function') {
           // Test adapter availability during initialization
-          const adapter = await (gpu as Record<string, unknown>).requestAdapter();
+          const adapter = await (gpu as any).requestAdapter();
           if (adapter && this.config.enableDeviceCapabilityCache) {
             this.deviceCapabilityCache.set('webgpu-adapter', adapter);
             this.lastCacheUpdate = Date.now();
@@ -83,7 +83,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
   public getOptimalDevice(): DeviceType {
     // Check cache first if enabled
     if (this.isCacheValid() && this.deviceCapabilityCache.has('optimal-device')) {
-      return this.deviceCapabilityCache.get('optimal-device');
+      return this.deviceCapabilityCache.get('optimal-device') as DeviceType;
     }
 
     // Check for WebGPU availability, fallback to configured fallback device
@@ -106,7 +106,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     return this.executeOperation(async () => {
       // Check cache first if enabled
       if (this.isCacheValid() && this.deviceCapabilityCache.has('webgpu-support')) {
-        return this.deviceCapabilityCache.get('webgpu-support');
+        return this.deviceCapabilityCache.get('webgpu-support') as boolean;
       }
 
       if (!this.config.enableWebGPUDetection) {
@@ -124,7 +124,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
       try {
         const gpu = (navigator as Record<string, unknown>).gpu;
         if (gpu && typeof (gpu as Record<string, unknown>).requestAdapter === 'function') {
-          const adapter = await (gpu as Record<string, unknown>).requestAdapter();
+          const adapter = await (gpu as any).requestAdapter();
           const result = !!adapter;
 
           // Cache the result if caching is enabled
@@ -162,7 +162,7 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     return this.executeOperation(async () => {
       // Check cache first if enabled
       if (this.isCacheValid() && this.deviceCapabilityCache.has('device-info-full')) {
-        return this.deviceCapabilityCache.get('device-info-full');
+        return this.deviceCapabilityCache.get('device-info-full') as { supportsWebGPU: boolean; optimalDevice: DeviceType; userAgent: string; };
       }
 
       const supportsWebGPU = await this.checkWebGPUSupport();

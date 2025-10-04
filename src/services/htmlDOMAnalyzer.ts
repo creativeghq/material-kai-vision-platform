@@ -147,7 +147,7 @@ export class HTMLDOMAnalyzer {
 
     } catch (error) {
       console.error('HTML DOM analysis error:', error);
-      throw new Error(`HTML analysis failed: ${error.message}`);
+      throw new Error(`HTML analysis failed: ${(error as any).message}`);
     }
   }
 
@@ -812,7 +812,7 @@ export class HTMLDOMAnalyzer {
             elementTypes: {},
           },
         },
-        elements: (data.layout_elements as unknown as unknown[]) || [],
+        elements: (data.layout_elements as any) || [],
         images: [],
         tables: [],
         textBlocks: [],

@@ -384,9 +384,10 @@ export class MaterialEmbeddingSpace {
     });
   }
 
-  private normalizeEmbedding(embedding: Float32Array): Float32Array {
+  private normalizeEmbedding(embedding: Float32Array): Float32Array<ArrayBuffer> {
     const norm = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-    return norm > 0 ? embedding.map(val => val / norm) : embedding;
+    const result = norm > 0 ? new Float32Array(embedding.map(val => val / norm)) : new Float32Array(embedding);
+    return result as Float32Array<ArrayBuffer>;
   }
 
   private computeCosineSimilarity(a: Float32Array, b: Float32Array): number {
@@ -451,12 +452,12 @@ export class MaterialEmbeddingSpace {
     return centroids;
   }
 
-  private computeClusterCentroid(embeddings: MaterialEmbedding[]): Float32Array {
+  private computeClusterCentroid(embeddings: MaterialEmbedding[]): Float32Array<ArrayBuffer> {
     if (embeddings.length === 0) {
-      return new Float32Array(this.config.embeddingDim);
+      return new Float32Array(this.config.embeddingDim) as Float32Array<ArrayBuffer>;
     }
 
-    const centroid = new Float32Array(this.config.embeddingDim);
+    const centroid = new Float32Array(this.config.embeddingDim) as Float32Array<ArrayBuffer>;
 
     embeddings.forEach(embedding => {
       for (let i = 0; i < centroid.length; i++) {

@@ -9,15 +9,6 @@ export { FunctionalMetadataCard } from './FunctionalMetadataCard';
 export { EnhancedFunctionalMetadataCard } from './EnhancedFunctionalMetadataCard';
 
 // Export types for convenience
-export type { 
+export type {
   FunctionalMetadata,
-  SlipSafetyRatings,
-  SurfaceGlossReflectivity,
-  MechanicalPropertiesExtended,
-  ThermalProperties,
-  WaterMoistureResistance,
-  ChemicalHygieneResistance,
-  AcousticElectricalProperties,
-  EnvironmentalSustainability,
-  DimensionalAesthetic,
 } from '@/types/materials';

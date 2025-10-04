@@ -1,7 +1,8 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+// import type { SupabaseClient } from '@supabase/supabase-js'; // Currently unused
 
 // Define a minimal Database type for now
-type Database = Record<string, unknown>;
+// type Database = Record<string, unknown>; // Currently unused
+type SupabaseClientType = any;
 
 // Material Kai API Key Data Interface
 export interface MaterialKaiKeyData {
@@ -47,7 +48,7 @@ export interface RateLimitInfo {
  * (when the migration is applied).
  */
 export class MaterialKaiAuthMiddleware {
-  private supabase: SupabaseClient<Database>;
+  // private supabase: SupabaseClientType; // Currently unused
 
   // Hardcoded Material Kai API keys for immediate deployment
   private readonly HARDCODED_KEYS: Record<string, MaterialKaiKeyData> = {
@@ -72,8 +73,8 @@ export class MaterialKaiAuthMiddleware {
     },
   };
 
-  constructor(supabase: SupabaseClient<Database>) {
-    this.supabase = supabase;
+  constructor(_supabase: SupabaseClientType) {
+    // this.supabase = supabase; // Currently unused
   }
 
   /**
@@ -173,7 +174,7 @@ export class MaterialKaiAuthMiddleware {
       // In production with database, this would query usage logs
 
       const now = new Date();
-      const _oneMinuteAgo = new Date(now.getTime() - 60000);
+      // const _oneMinuteAgo = new Date(now.getTime() - 60000); // Currently unused
 
       // For now, allow all requests (rate limiting will be implemented with database)
       return {
@@ -321,7 +322,7 @@ export class MaterialKaiAuthMiddleware {
 }
 
 // Export a factory function for creating the middleware
-export function createMaterialKaiAuthMiddleware(supabase: SupabaseClient<Database>): MaterialKaiAuthMiddleware {
+export function createMaterialKaiAuthMiddleware(supabase: SupabaseClientType): MaterialKaiAuthMiddleware {
   return new MaterialKaiAuthMiddleware(supabase);
 }
 

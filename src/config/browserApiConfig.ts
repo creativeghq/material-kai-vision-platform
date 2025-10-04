@@ -5,7 +5,7 @@
  * without requiring Node.js modules like 'fs' or 'path'.
  */
 
-import { z } from 'zod';
+// import { z } from 'zod'; // Currently unused
 
 // Basic API configuration types
 export interface BrowserApiConfig {
@@ -174,5 +174,5 @@ export function getBrowserApiConfigSummary(): Record<string, unknown> {
   return browserApiRegistry.getConfigSummary();
 }
 
-// Export types
-export type { BrowserApiConfig, ReplicateConfig, HuggingFaceConfig, SupabaseConfig };
+// Export types - commented out to avoid conflicts
+// export type { BrowserApiConfig, ReplicateConfig, HuggingFaceConfig, SupabaseConfig };

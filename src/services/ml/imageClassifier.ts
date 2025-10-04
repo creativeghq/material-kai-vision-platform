@@ -26,7 +26,7 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
         'image-classification',
         modelName,
         {
-          device: device as unknown as string, // Type assertion to handle device type mismatch
+          device: device as any, // Type assertion to handle device type mismatch
           progress_callback: this.config.enableProgressCallback ? (progress: Record<string, unknown>) => {
             console.log(`Image classifier loading: ${Math.round((progress.progress as number) * 100)}%`);
           } : undefined,
@@ -49,7 +49,7 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
 
       // Perform a simple health check by checking if the classifier is available
       // We don't run an actual classification to avoid unnecessary computation
-      if (!(typeof this.classifier === 'function' || (this.classifier && typeof this.classifier.call === 'function'))) {
+      if (!(typeof this.classifier === 'function' || (this.classifier && typeof (this.classifier as any).call === 'function'))) {
         throw new Error('Image classifier is not callable');
       }
     } catch (error) {
@@ -66,7 +66,7 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
         throw new Error('Image classifier not available');
       }
 
-      const results = await this.classifier(imageSource) as ImageClassificationResult[];
+      const results = await (this.classifier as any)(imageSource) as ImageClassificationResult[];
 
       return {
         success: true,
@@ -131,4 +131,4 @@ export class ImageClassifierService extends BaseService<ImageClassifierServiceCo
 }
 
 // Export singleton instance for backward compatibility
-export const imageClassifierService = ImageClassifierService.getInstance<ImageClassifierService>();
+export const imageClassifierService = new ImageClassifierService({} as any);

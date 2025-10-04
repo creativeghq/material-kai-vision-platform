@@ -228,16 +228,16 @@ export class FunctionalMetadataApiService {
 
     // Use the existing makeRequest method through reflection/composition
     // Note: This requires accessing the private makeRequest method
-    const response = await (this.mivaaService as Record<string, unknown>).makeRequest(endpoint, {
+    const response = await ((this.mivaaService as unknown as Record<string, unknown>).makeRequest as any)(endpoint, {
       method: 'POST',
       body: JSON.stringify({
         file_path: request.documentId,
         options: request.options,
       }),
-    }) as unknown;
+    }) as any;
 
-    if (!response.ok) {
-      throw new Error(`Enhanced images extraction failed: ${response.status} ${response.statusText}`);
+    if (!(response as any).ok) {
+      throw new Error(`Enhanced images extraction failed: ${(response as any).status} ${(response as any).statusText}`);
     }
 
     return await response.json() as FunctionalMetadataResponse;

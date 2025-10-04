@@ -211,5 +211,5 @@ export function validateWithGuard<T>(
   if (guard(value)) {
     return createValidationResult(true, value);
   }
-  return createValidationResult(false, undefined, [errorMessage]);
+  return createValidationResult(false, undefined as T, [errorMessage]);
 }

@@ -139,18 +139,20 @@ interface RAGDocument {
 - Advanced filtering options
 - Export capabilities
 
-### 3. MivaaEmbeddingIntegration
+### 3. EmbeddingGenerationService
 
-**Location**: `src/services/mivaaEmbeddingIntegration.ts`
+**Location**: `src/services/embeddingGenerationService.ts`
 
-**Purpose**: Embedding generation and management integration
+**Purpose**: Consolidated embedding generation service with MIVAA integration
 
 **Features**:
-- Embedding generation coordination
+- MIVAA gateway integration for embedding generation
+- Advanced caching and batch processing
+- Rate limiting and retry logic
 - Vector storage management
 - Similarity calculations
-- Performance monitoring
-- Quality assurance
+- Performance monitoring and metrics
+- Quality assurance and validation
 
 ## 🎯 RAG Components
 

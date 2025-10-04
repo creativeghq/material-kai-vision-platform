@@ -88,7 +88,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     const actualSearchType = detectQueryType(query);
 
     try {
-      let _searchResults: SearchResult[];
+      // let _searchResults: SearchResult[]; // Currently unused
 
       let materialSearchResponse;
 
@@ -404,7 +404,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                             {field.display_name}: {field.value_text || field.value_number || String(field.value_boolean)}
                           </Badge>
                         ))}
-                        {result.properties && (
+                        {(result as any).properties && (
                           <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
                             Properties Available
                           </Badge>

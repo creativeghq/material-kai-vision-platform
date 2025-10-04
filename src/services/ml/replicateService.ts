@@ -106,7 +106,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       const replicateConfig = apiRegistry.getApiConfigByType('replicate');
 
       if (replicateConfig) {
-        const envConfig = replicateConfig.environment[this.config.environment];
+        const envConfig = (replicateConfig.environment as any)[this.config.environment];
         return envConfig?.apiKey || null;
       }
 
@@ -174,7 +174,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       }
 
       return {
-        depth_map: result.output,
+        depth_map: result.output as string,
         confidence: 0.9,
         min_depth: 0.1,
         max_depth: 10.0,
@@ -229,7 +229,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
         throw new Error(`Image enhancement failed: ${result.error}`);
       }
 
-      return result.output;
+      return result.output as string;
     }, 'enhanceImageQuality');
   }
 
@@ -251,7 +251,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
         throw new Error(`Background removal failed: ${result.error}`);
       }
 
-      return result.output;
+      return result.output as string;
     }, 'removeBackground');
   }
 
@@ -277,7 +277,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
           return this.fallbackMaterialAnalysis(imageUrl);
         }
 
-        return result.output;
+        return result.output as MaterialProperties;
       } catch (error) {
         console.error('Material property analysis failed:', error);
         return this.fallbackMaterialAnalysis(imageUrl);
@@ -295,7 +295,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     options: Record<string, unknown> = {},
   ): Promise<string | string[]> {
     return this.executeOperation(async () => {
-      const _startTime = Date.now();
+      // const _startTime = Date.now(); // Unused for now
 
       // Get model configuration
       const modelConfig = INTERIOR_DESIGN_MODELS[modelId];
@@ -332,7 +332,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       // Track usage for interior design
       this.usageTracker.set('interior-design', (this.usageTracker.get('interior-design') || 0) + 1);
 
-      return result.output;
+      return result.output as string | string[];
     }, 'generateInteriorDesign');
   }
 
@@ -381,7 +381,7 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     summary: { total: number; successful: number; failed: number; successRate: number };
   }> {
     return this.executeOperation(async () => {
-      const results: Record<string, unknown> = {};
+      const results: Record<string, { success: boolean; output?: unknown; error?: string; processingTime: number }> = {};
       const modelIds = Object.keys(INTERIOR_DESIGN_MODELS);
 
       console.log(`Testing ${modelIds.length} interior design models...`);
@@ -401,10 +401,10 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
         } catch (error) {
           results[modelId] = {
             success: false,
-            error: error.message,
+            error: (error as Error).message,
             processingTime: Date.now() - startTime,
           };
-          console.log(`❌ ${modelId}: ${error.message}`);
+          console.log(`❌ ${modelId}: ${(error as Error).message}`);
         }
       }
 
@@ -490,7 +490,13 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     status: 'working' | 'failing' | 'untested';
     lastTested?: string;
   }> {
-    const models: Record<string, unknown> = {};
+    const models: Record<string, {
+      name: string;
+      description: string;
+      capabilities: string[];
+      status: 'working' | 'failing' | 'untested';
+      lastTested?: string;
+    }> = {};
 
     for (const [modelId, config] of Object.entries(INTERIOR_DESIGN_MODELS)) {
       models[modelId] = {

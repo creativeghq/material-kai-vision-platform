@@ -122,17 +122,18 @@ const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
   useWebSocketSubscription(
     process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080',
     'job_queue_update',
-    (data: WebSocketJobUpdateData) => {
-      if (data.type === 'job_updated') {
+    (data: unknown) => {
+      const typedData = data as WebSocketJobUpdateData;
+      if (typedData.type === 'job_updated') {
         setJobs(prev => prev.map(job =>
-          job.id === data.job?.id ? { ...job, ...data.job } : job,
+          job.id === typedData.job?.id ? { ...job, ...typedData.job } : job,
         ));
-      } else if (data.type === 'job_added') {
-        setJobs(prev => data.job ? [data.job, ...prev] : prev);
-      } else if (data.type === 'job_removed') {
-        setJobs(prev => prev.filter(job => job.id !== data.jobId));
-      } else if (data.type === 'stats_updated') {
-        setStats(data.stats || null);
+      } else if (typedData.type === 'job_added') {
+        setJobs(prev => typedData.job ? [typedData.job, ...prev] : prev);
+      } else if (typedData.type === 'job_removed') {
+        setJobs(prev => prev.filter(job => job.id !== typedData.jobId));
+      } else if (typedData.type === 'stats_updated') {
+        setStats(typedData.stats || null);
       }
     },
   );

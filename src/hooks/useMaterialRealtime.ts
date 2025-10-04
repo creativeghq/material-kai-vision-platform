@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { MaterialRealtimeService, MaterialChangePayload, MaterialSubscriptionCallbacks } from '../services/realtime/materialRealtimeService';
-import { supabase } from '../lib/supabase';
+// import { supabase } from '../lib/supabase'; // Fixed: Using window.supabase instead
 
 interface UseMaterialRealtimeOptions {
   materialId?: string;
@@ -35,9 +35,9 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
   useEffect(() => {
     // Initialize service
     const service = new MaterialRealtimeService({
-      supabaseUrl: supabase.supabaseUrl,
-      supabaseAnonKey: supabase.supabaseKey,
-      authToken: supabase.auth.session()?.access_token
+      supabaseUrl: (window as any).supabase?.supabaseUrl || '',
+      supabaseAnonKey: (window as any).supabase?.supabaseKey || '',
+      authToken: (window as any).supabase?.auth?.session()?.access_token
     });
 
     const callbacks: MaterialSubscriptionCallbacks = {
@@ -47,7 +47,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
         if (payload.new) {
           setMaterialData((prev: Record<string, unknown> | null) => ({
             ...(prev || {}),
-            ...payload.new
+            ...(payload.new as Record<string, unknown>)
           }));
         }
         

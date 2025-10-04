@@ -1,15 +1,42 @@
 import {
   Material,
   MaterialCategory,
-  MaterialMetadata,
-  ChemicalComposition,
   MATERIAL_CATEGORIES,
-  isMaterialCategory,
-  isValidFinish,
-  isValidSize,
-  isValidInstallationMethod,
-  isValidApplication,
 } from '@/types/materials';
+
+// Helper validation functions
+function isMaterialCategory(category: string): category is MaterialCategory {
+  return Object.values(MaterialCategory).includes(category as MaterialCategory);
+}
+
+function isValidFinish(finish: string, category: MaterialCategory): boolean {
+  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+  return categoryData ? (categoryData.finish as unknown as string[]).includes(finish) : false;
+}
+
+function isValidSize(size: string, category: MaterialCategory): boolean {
+  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+  return categoryData ? (categoryData.size as unknown as string[]).includes(size) : false;
+}
+
+function isValidInstallationMethod(method: string, category: MaterialCategory): boolean {
+  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+  return categoryData ? (categoryData.installationMethod as unknown as string[]).includes(method) : false;
+}
+
+function isValidApplication(application: string, category: MaterialCategory): boolean {
+  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+  return categoryData ? (categoryData.application as unknown as string[]).includes(application) : false;
+}
+
+// Material metadata interface
+interface MaterialMetadata {
+  finish?: string;
+  size?: string;
+  installationMethod?: string;
+  application?: string;
+  [key: string]: any;
+}
 
 /**
  * Validation result interface
@@ -178,11 +205,11 @@ export function validateMaterialMetadata(
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
-  const categoryDef = MATERIAL_CATEGORIES[category];
+  const categoryDef = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
 
   // Validate finish
   if (metadata.finish) {
-    if (!isValidFinish(category, metadata.finish)) {
+    if (!isValidFinish(metadata.finish, category)) {
       errors.push({
         field: 'metadata.finish',
         message: `Invalid finish "${metadata.finish}" for category "${category}". Valid options: ${categoryDef.finish.join(', ')}`,
@@ -199,7 +226,7 @@ export function validateMaterialMetadata(
 
   // Validate size
   if (metadata.size) {
-    if (!isValidSize(category, metadata.size)) {
+    if (!isValidSize(metadata.size, category)) {
       errors.push({
         field: 'metadata.size',
         message: `Invalid size "${metadata.size}" for category "${category}". Valid options: ${categoryDef.size.join(', ')}`,
@@ -216,7 +243,7 @@ export function validateMaterialMetadata(
 
   // Validate installation method
   if (metadata.installationMethod) {
-    if (!isValidInstallationMethod(category, metadata.installationMethod)) {
+    if (!isValidInstallationMethod(metadata.installationMethod, category)) {
       errors.push({
         field: 'metadata.installationMethod',
         message: `Invalid installation method "${metadata.installationMethod}" for category "${category}". Valid options: ${categoryDef.installationMethod.join(', ')}`,
@@ -233,7 +260,7 @@ export function validateMaterialMetadata(
 
   // Validate application
   if (metadata.application) {
-    if (!isValidApplication(category, metadata.application)) {
+    if (!isValidApplication(metadata.application, category)) {
       errors.push({
         field: 'metadata.application',
         message: `Invalid application "${metadata.application}" for category "${category}". Valid options: ${categoryDef.application.join(', ')}`,
@@ -401,10 +428,10 @@ export function validateExtractedAIData(
       severity: 'warning',
     });
   } else {
-    const metadata = extractedData.processing_metadata;
-    
+    const metadata = extractedData.processing_metadata as any;
+
     // Check extraction confidence
-    if (metadata.confidence !== undefined) {
+    if (metadata?.confidence !== undefined) {
       if (typeof metadata.confidence !== 'number' || metadata.confidence < 0 || metadata.confidence > 1) {
         errors.push({
           field: 'processing_metadata.confidence',
@@ -421,8 +448,8 @@ export function validateExtractedAIData(
     }
 
     // Check for extracted meta fields
-    if (metadata.extracted_meta) {
-      const metaValidation = validateExtractedMetaFields(metadata.extracted_meta, expectedCategory);
+    if (metadata?.extracted_meta) {
+      const metaValidation = validateExtractedMetaFields(metadata.extracted_meta as any, expectedCategory);
       errors.push(...metaValidation.errors);
       warnings.push(...metaValidation.warnings);
     } else {
@@ -436,9 +463,9 @@ export function validateExtractedAIData(
 
   // Validate material identification
   if (extractedData.material_identification) {
-    const materialId = extractedData.material_identification;
-    
-    if (!materialId.primary_material) {
+    const materialId = extractedData.material_identification as any;
+
+    if (!materialId?.primary_material) {
       errors.push({
         field: 'material_identification.primary_material',
         message: 'Primary material identification is required',
@@ -446,13 +473,13 @@ export function validateExtractedAIData(
       });
     }
 
-    if (!materialId.category) {
+    if (!materialId?.category) {
       errors.push({
         field: 'material_identification.category',
         message: 'Material category identification is required',
         severity: 'error',
       });
-    } else if (!isMaterialCategory(materialId.category)) {
+    } else if (!isMaterialCategory(materialId.category as string)) {
       errors.push({
         field: 'material_identification.category',
         message: `Invalid material category: ${materialId.category}`,
@@ -461,7 +488,7 @@ export function validateExtractedAIData(
     }
 
     // Check consistency with expected category
-    if (expectedCategory && materialId.category !== expectedCategory) {
+    if (expectedCategory && materialId?.category !== expectedCategory) {
       warnings.push({
         field: 'material_identification.category',
         message: `Detected category "${materialId.category}" differs from expected "${expectedCategory}"`,
@@ -496,11 +523,11 @@ export function validateExtractedMetaFields(
     return { isValid: true, errors, warnings };
   }
 
-  const categoryDef = MATERIAL_CATEGORIES[category];
+  const categoryDef = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
 
   // Validate finish
   if (extractedMeta.finish) {
-    if (!isValidFinish(category, extractedMeta.finish)) {
+    if (!isValidFinish(extractedMeta.finish as string, category)) {
       errors.push({
         field: 'extracted_meta.finish',
         message: `Invalid finish "${extractedMeta.finish}" for category "${category}". Valid options: ${categoryDef.finish.join(', ')}`,
@@ -511,7 +538,7 @@ export function validateExtractedMetaFields(
 
   // Validate size
   if (extractedMeta.size) {
-    if (!isValidSize(category, extractedMeta.size)) {
+    if (!isValidSize(extractedMeta.size as string, category)) {
       errors.push({
         field: 'extracted_meta.size',
         message: `Invalid size "${extractedMeta.size}" for category "${category}". Valid options: ${categoryDef.size.join(', ')}`,
@@ -522,7 +549,7 @@ export function validateExtractedMetaFields(
 
   // Validate installation method
   if (extractedMeta.installation_method) {
-    if (!isValidInstallationMethod(category, extractedMeta.installation_method)) {
+    if (!isValidInstallationMethod(extractedMeta.installation_method as string, category)) {
       errors.push({
         field: 'extracted_meta.installation_method',
         message: `Invalid installation method "${extractedMeta.installation_method}" for category "${category}". Valid options: ${categoryDef.installationMethod.join(', ')}`,
@@ -533,7 +560,7 @@ export function validateExtractedMetaFields(
 
   // Validate application
   if (extractedMeta.application) {
-    if (!isValidApplication(category, extractedMeta.application)) {
+    if (!isValidApplication(extractedMeta.application as string, category)) {
       errors.push({
         field: 'extracted_meta.application',
         message: `Invalid application "${extractedMeta.application}" for category "${category}". Valid options: ${categoryDef.application.join(', ')}`,
@@ -604,14 +631,14 @@ export function validateAndSuggestCorrections(
         break;
       case 'metadata.finish':
         if (material.category && isMaterialCategory(material.category)) {
-          const categoryDef = MATERIAL_CATEGORIES[material.category];
-          suggestions.push(`For ${material.category}, try these finishes: ${categoryDef.finish.slice(0, 3).join(', ')}`);
+          const categoryDef = MATERIAL_CATEGORIES[material.category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+          suggestions.push(`For ${material.category}, try these finishes: ${(categoryDef?.finish as unknown as string[])?.slice(0, 3).join(', ')}`);
         }
         break;
       case 'metadata.size':
         if (material.category && isMaterialCategory(material.category)) {
-          const categoryDef = MATERIAL_CATEGORIES[material.category];
-          suggestions.push(`For ${material.category}, try these sizes: ${categoryDef.size.slice(0, 3).join(', ')}`);
+          const categoryDef = MATERIAL_CATEGORIES[material.category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+          suggestions.push(`For ${material.category}, try these sizes: ${(categoryDef?.size as unknown as string[])?.slice(0, 3).join(', ')}`);
         }
         break;
     }
@@ -705,7 +732,7 @@ export function checkExtractionCompleteness(
   missingFields: string[];
   presentFields: string[];
 } {
-  const extractedMeta = extractedData.processing_metadata?.extracted_meta || {};
+  const extractedMeta = (extractedData.processing_metadata as any)?.extracted_meta || {};
   const presentFields = expectedFields.filter(field => 
     extractedMeta[field] && 
     extractedMeta[field] !== '' && 
@@ -742,7 +769,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = meta.finish.toLowerCase().trim();
       if (normalized !== meta.finish) {
         meta.finish = normalized;
-        changes.push(`Normalized finish: "${rawData.processing_metadata.extracted_meta.finish}" → "${normalized}"`);
+        changes.push(`Normalized finish: "${(rawData.processing_metadata as any)?.extracted_meta?.finish}" → "${normalized}"`);
       }
     }
 
@@ -751,7 +778,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = meta.size.trim().replace(/\s+/g, ' ');
       if (normalized !== meta.size) {
         meta.size = normalized;
-        changes.push(`Normalized size: "${rawData.processing_metadata.extracted_meta.size}" → "${normalized}"`);
+        changes.push(`Normalized size: "${(rawData.processing_metadata as any)?.extracted_meta?.size}" → "${normalized}"`);
       }
     }
 
@@ -760,7 +787,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = meta.installation_method.toLowerCase().trim();
       if (normalized !== meta.installation_method) {
         meta.installation_method = normalized;
-        changes.push(`Normalized installation method: "${rawData.processing_metadata.extracted_meta.installation_method}" → "${normalized}"`);
+        changes.push(`Normalized installation method: "${(rawData.processing_metadata as any)?.extracted_meta?.installation_method}" → "${normalized}"`);
       }
     }
 
@@ -769,7 +796,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = meta.application.toLowerCase().trim();
       if (normalized !== meta.application) {
         meta.application = normalized;
-        changes.push(`Normalized application: "${rawData.processing_metadata.extracted_meta.application}" → "${normalized}"`);
+        changes.push(`Normalized application: "${(rawData.processing_metadata as any)?.extracted_meta?.application}" → "${normalized}"`);
       }
     }
 
@@ -778,7 +805,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = normalizeR11Rating(meta.r11);
       if (normalized !== meta.r11) {
         meta.r11 = normalized;
-        changes.push(`Normalized R11 rating: "${rawData.processing_metadata.extracted_meta.r11}" → "${normalized}"`);
+        changes.push(`Normalized R11 rating: "${(rawData.processing_metadata as any)?.extracted_meta?.r11}" → "${normalized}"`);
       }
     }
 
@@ -791,7 +818,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       
       if (JSON.stringify(normalized) !== JSON.stringify(meta.metal_types)) {
         meta.metal_types = normalized;
-        changes.push(`Normalized metal types: ${JSON.stringify(rawData.processing_metadata.extracted_meta.metal_types)} → ${JSON.stringify(normalized)}`);
+        changes.push(`Normalized metal types: ${JSON.stringify((rawData.processing_metadata as any)?.extracted_meta?.metal_types)} → ${JSON.stringify(normalized)}`);
       }
     }
   }
@@ -836,19 +863,19 @@ export function createMaterialFromExtractedData(
   const material: Partial<Material> = {
     id: additionalInfo.id,
     name: additionalInfo.name,
-    category: sanitized.material_identification?.category as MaterialCategory,
-    description: sanitized.material_identification?.description,
-    properties: sanitized.properties || {},
+    category: (sanitized.material_identification as any)?.category as MaterialCategory,
+    description: (sanitized.material_identification as any)?.description,
+    properties: (sanitized.properties as any) || {},
     standards: [],
-    embedding: sanitized.embedding,
+    // embedding: sanitized.embedding, // Not part of Material interface
     createdAt: now,
     updatedAt: now,
     metadata: {
-      ...sanitized.processing_metadata?.extracted_meta,
+      ...(sanitized.processing_metadata as any)?.extracted_meta,
       additionalProperties: {
-        extractionMethod: sanitized.processing_metadata?.method,
-        extractionConfidence: sanitized.processing_metadata?.confidence,
-        modelVersion: sanitized.processing_metadata?.model_version,
+        extractionMethod: (sanitized.processing_metadata as any)?.method,
+        extractionConfidence: (sanitized.processing_metadata as any)?.confidence,
+        modelVersion: (sanitized.processing_metadata as any)?.model_version,
       },
     },
   };
@@ -860,14 +887,14 @@ export function createMaterialFromExtractedData(
   }
 
   if (additionalInfo.createdBy) {
-    material.createdBy = additionalInfo.createdBy;
+    (material as any).createdBy = additionalInfo.createdBy;
   }
 
   // Add composition separately to avoid type issues
-  if (sanitized.material_identification?.composition) {
-    material.composition = {
-      elements: sanitized.material_identification.composition,
-    } as ChemicalComposition;
+  if ((sanitized.material_identification as any)?.composition) {
+    (material as any).composition = {
+      elements: (sanitized.material_identification as any).composition,
+    };
   }
 
   return material;

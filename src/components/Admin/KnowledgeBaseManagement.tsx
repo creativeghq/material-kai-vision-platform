@@ -77,7 +77,7 @@ const KnowledgeBaseManagement: React.FC = () => {
 
       if (error) throw error;
       // Handle potential null values from database and map fields to KnowledgeEntry interface
-      const processedData = (data || []).map(entry => ({
+      const processedData = (data || []).map((entry: any) => ({
         id: entry.id,
         title: entry.name || '',
         content: entry.description || '',
@@ -406,7 +406,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 onFiltersChange={setFunctionalPropertyFilters}
                 availableMaterials={entries.map(entry => ({
                   id: entry.id,
-                  functionalMetadata: (entry.metadata as Record<string, unknown>)?.functional_metadata
+                  functionalMetadata: (entry.metadata as any)?.functional_metadata
                 }))}
                 displayMode="compact"
                 isLoading={loading}

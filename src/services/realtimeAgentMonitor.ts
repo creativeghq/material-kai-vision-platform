@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-import { AgentPerformanceOptimizer } from './agentPerformanceOptimizer';
+import { AgentPerformanceOptimizer, type AgentPerformanceMetrics } from './agentPerformanceOptimizer';
 
 interface RealtimeEvent {
   eventType: 'task_started' | 'task_completed' | 'task_failed' | 'agent_status_change' | 'system_alert';
@@ -32,15 +32,7 @@ interface SystemAlert {
   timestamp: string;
 }
 
-interface AgentPerformanceMetrics {
-  successRate: number;
-  averageProcessingTime: number;
-  taskCount: number;
-  errorRate: number;
-  lastUpdated: string;
-  customMetrics?: Record<string, number>;
-  tags?: string[];
-}
+// AgentPerformanceMetrics interface now imported from agentPerformanceOptimizer.ts
 
 interface AgentStatus {
   agentId: string;
@@ -52,11 +44,7 @@ interface AgentStatus {
   configuration?: Record<string, any>;
 }
 
-interface _DatabaseAgent {
-  id: string;
-  status: string;
-  updated_at: string;
-}
+// DatabaseAgent interface removed - not needed for current implementation
 
 interface TaskRecord {
   id: string;
@@ -104,7 +92,7 @@ export class RealtimeAgentMonitor {
           schema: 'public',
           table: 'agent_tasks',
         },
-        (payload) => this.handleTaskChange(payload),
+        (payload: any) => this.handleTaskChange(payload),
       )
       .on(
         'postgres_changes',
@@ -113,7 +101,7 @@ export class RealtimeAgentMonitor {
           schema: 'public',
           table: 'agent_tasks', // TODO: Update to 'material_agents' when table is created
         },
-        (payload) => this.handleAgentChange(payload),
+        (payload: any) => this.handleAgentChange(payload),
       )
       .subscribe();
 
@@ -130,11 +118,11 @@ export class RealtimeAgentMonitor {
       'assigned_agents' in record &&
       'priority' in record &&
       'status' in record &&
-      typeof (record as Record<string, unknown>).id === 'string' &&
-      typeof (record as Record<string, unknown>).task_type === 'string' &&
-      Array.isArray((record as Record<string, unknown>).assigned_agents) &&
-      typeof (record as Record<string, unknown>).priority === 'string' &&
-      typeof (record as Record<string, unknown>).status === 'string'
+      typeof (record as any).id === 'string' &&
+      typeof (record as any).task_type === 'string' &&
+      Array.isArray((record as any).assigned_agents) &&
+      typeof (record as any).priority === 'string' &&
+      typeof (record as any).status === 'string'
     );
   }
 
@@ -148,7 +136,7 @@ export class RealtimeAgentMonitor {
                  this.isTaskRecord(newRecord) && this.isTaskRecord(oldRecord)) {
         await this.handleTaskUpdated(newRecord, oldRecord);
       } else if (eventType === 'DELETE' && oldRecord && this.isTaskRecord(oldRecord)) {
-        await this.handleTaskCompleted(oldRecord);
+        await this.handleTaskCompleted(oldRecord as any);
       }
     } catch (error) {
       console.error('Error handling task change:', error);
@@ -181,7 +169,7 @@ export class RealtimeAgentMonitor {
     console.log(`Task started: ${task.id} with agents:`, task.assigned_agents);
   }
 
-  private async handleTaskUpdated(newTask: Record<string, unknown>, oldTask: Record<string, unknown>): Promise<void> {
+  private async handleTaskUpdated(newTask: any, oldTask: any): Promise<void> {
     // Check if task completed or failed
     if (oldTask.status !== newTask.status) {
       if (newTask.status === 'completed') {
@@ -200,21 +188,21 @@ export class RealtimeAgentMonitor {
   private async handleTaskCompleted(task: Record<string, unknown>): Promise<void> {
     const event: RealtimeEvent = {
       eventType: 'task_completed',
-      taskId: task.id,
+      taskId: task.id as string,
       timestamp: new Date().toISOString(),
       data: {
-        processingTime: task.processing_time_ms,
-        assignedAgents: task.assigned_agents,
+        processingTime: task.processing_time_ms as number,
+        assignedAgents: task.assigned_agents as string[],
       },
     };
 
     this.emitEvent(event);
 
     // Update agent performance metrics
-    for (const agentId of task.assigned_agents) {
+    for (const agentId of task.assigned_agents as string[]) {
       await this.performanceOptimizer.updateAgentPerformance(agentId, {
         success: true,
-        processingTime: task.processing_time_ms,
+        processingTime: task.processing_time_ms as number,
       });
 
       await this.updateAgentStatus(agentId, 'idle', []);
@@ -226,38 +214,38 @@ export class RealtimeAgentMonitor {
   private async handleTaskFailed(task: Record<string, unknown>): Promise<void> {
     const event: RealtimeEvent = {
       eventType: 'task_failed',
-      taskId: task.id,
+      taskId: task.id as string,
       timestamp: new Date().toISOString(),
       data: {
-        errorMessage: task.error_message,
-        assignedAgents: task.assigned_agents,
+        errorMessage: task.error_message as string,
+        assignedAgents: task.assigned_agents as string[],
       },
     };
 
     this.emitEvent(event);
 
     // Update agent performance metrics
-    for (const agentId of task.assigned_agents) {
+    for (const agentId of task.assigned_agents as string[]) {
       await this.performanceOptimizer.updateAgentPerformance(agentId, {
         success: false,
-        errorMessage: task.error_message,
+        errorMessage: task.error_message as string,
       });
 
       await this.updateAgentStatus(agentId, 'error', []);
     }
 
     // Emit system alert for failed task
-    this.emitSystemAlert('warning', `Task failed: ${task.error_message}`, task.assigned_agents[0], task.id);
+    this.emitSystemAlert('warning', `Task failed: ${task.error_message}`, (task.assigned_agents as string[])[0], task.id as string);
 
     console.log(`Task failed: ${task.id} - ${task.error_message}`);
   }
 
-  private async handleAgentReassignment(newTask: Record<string, unknown>, oldTask: Record<string, unknown>): Promise<void> {
+  private async handleAgentReassignment(newTask: any, oldTask: any): Promise<void> {
     const removedAgents = (oldTask.assigned_agents as string[]).filter(
       (agentId: string) => !(newTask.assigned_agents as string[]).includes(agentId),
     );
-    const addedAgents = newTask.assigned_agents.filter(
-      (agentId: string) => !oldTask.assigned_agents.includes(agentId),
+    const addedAgents = (newTask.assigned_agents as string[]).filter(
+      (agentId: string) => !(oldTask.assigned_agents as string[]).includes(agentId),
     );
 
     // Update statuses for removed agents
@@ -279,11 +267,11 @@ export class RealtimeAgentMonitor {
     if (eventType === 'UPDATE') {
       const event: RealtimeEvent = {
         eventType: 'agent_status_change',
-        agentId: newRecord.id,
+        agentId: (newRecord as any).id,
         timestamp: new Date().toISOString(),
         data: {
-          status: newRecord.status,
-          performance: newRecord.performance_metrics,
+          status: (newRecord as any).status,
+          performance: (newRecord as any).performance_metrics,
         },
       };
 
@@ -296,15 +284,13 @@ export class RealtimeAgentMonitor {
     
     // Create a default performance metrics object that matches the interface
     const defaultMetrics: AgentPerformanceMetrics = {
-      responseTime: 0,
-      throughput: 0,
-      errorRate: 0,
-      memoryUsage: 0,
-      cpuUsage: 0,
+      agentId: agentId,
+      taskCompletionRate: 0,
       averageProcessingTime: 0,
-      successRate: 0,
-      taskCount: 0,
-      lastUpdated: new Date().toISOString()
+      errorRate: 0,
+      specializations: [],
+      loadFactor: 0,
+      lastActiveTime: new Date().toISOString(),
     };
     
     // Ensure all required fields are present by merging with defaults

@@ -136,7 +136,7 @@ export const AIStudioPage: React.FC = () => {
       const designResults = await IntegratedAIService.generateCompleteDesign(
         uploadedFiles,
         roomType,
-        userPreferences,
+        userPreferences as Record<string, unknown>,
       );
 
       clearInterval(progressInterval);

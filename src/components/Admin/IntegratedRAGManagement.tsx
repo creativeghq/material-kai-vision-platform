@@ -32,7 +32,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { ragService } from '@/services/ragService';
+import { ragKnowledgeService as ragService } from '@/services/ragKnowledgeService';
 import {
   EnhancedRAGService,
   type EnhancedRAGRequest,
@@ -85,7 +85,7 @@ export const IntegratedRAGManagement: React.FC = () => {
   const loadTrainingStatus = async () => {
     try {
       const status = await ragService.getTrainingStatus();
-      setTrainingStatus(status);
+      setTrainingStatus(status as Record<string, unknown>[]);
     } catch (error) {
       console.error('Failed to load training status:', error);
     }
@@ -602,11 +602,11 @@ export const IntegratedRAGManagement: React.FC = () => {
 
                                   <div className="flex items-center gap-2">
                                     <Badge className="bg-secondary text-secondary-foreground">{result.source}</Badge>
-                                    {result.metadata?.tags && (
-                                      result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
+                                    {(result.metadata?.tags && Array.isArray(result.metadata.tags)) ?
+                                      (result.metadata.tags as string[]).slice(0, 3).map((tag: string, i: number) => (
                                         <Badge key={i} className="border border-border bg-background text-foreground">{tag}</Badge>
-                                      ))
-                                    )}
+                                      )) : null
+                                    }
                                   </div>
                                 </CardContent>
                               </Card>
@@ -742,7 +742,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                     <label className="text-sm font-medium">Content Type</label>
                     <Select
                       value={newKnowledgeEntry.content_type}
-                      onValueChange={(value: string) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value }))}
+                      onValueChange={(value: string) => setNewKnowledgeEntry(prev => ({ ...prev, content_type: value as any }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -872,14 +872,14 @@ export const IntegratedRAGManagement: React.FC = () => {
                         {trainingStatus.slice(0, 5).map((job, index) => (
                           <div key={index} className="flex items-center justify-between p-3 border rounded">
                             <div>
-                              <p className="font-medium">{job.job_type}</p>
+                              <p className="font-medium">{job.job_type as string}</p>
                               <p className="text-sm text-muted-foreground">
-                                {new Date(job.created_at).toLocaleString()}
+                                {new Date(job.created_at as string).toLocaleString()}
                               </p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${getStatusColor(job.status)}`} />
-                              <Badge className="border border-border bg-background text-foreground">{job.status}</Badge>
+                              <div className={`w-2 h-2 rounded-full ${getStatusColor(job.status as string)}`} />
+                              <Badge className="border border-border bg-background text-foreground">{job.status as string}</Badge>
                             </div>
                           </div>
                         ))}

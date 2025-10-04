@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import { htmlDOMAnalyzer, type LayoutAnalysisResult, type DOMElement } from './htmlDOMAnalyzer';
 import { TextEmbedderService } from './ml/textEmbedder';
-import { MivaaEmbeddingIntegration } from './mivaaEmbeddingIntegration';
+import { EmbeddingGenerationService } from './embeddingGenerationService';
 
 export interface ChunkingOptions {
   chunkSize: number; // Target characters per chunk
@@ -66,7 +66,7 @@ export interface ChunkingResult {
  */
 export class LayoutAwareChunker {
   private textEmbedder: TextEmbedderService;
-  private mivaaEmbedder: MivaaEmbeddingIntegration;
+  private mivaaEmbedder: EmbeddingGenerationService;
   private chunkCounter: number = 0;
 
   constructor() {
@@ -77,7 +77,9 @@ export class LayoutAwareChunker {
       enabled: true,
       modelName: 'mixedbread-ai/mxbai-embed-xsmall-v1',
     });
-    this.mivaaEmbedder = new MivaaEmbeddingIntegration();
+    this.mivaaEmbedder = new EmbeddingGenerationService(
+      require('./embeddingGenerationService').defaultEmbeddingConfig
+    );
   }
 
   /**
@@ -409,8 +411,7 @@ export class LayoutAwareChunker {
 
           try {
             const result = await this.mivaaEmbedder.generateEmbedding({
-              model: 'text-embedding-3-large',
-              dimensions: 1536,
+              id: `chunk_${chunk.id || Date.now()}`,
               text: chunk.text,
             });
 
@@ -651,7 +652,7 @@ export class LayoutAwareChunker {
         throw error;
       }
 
-      return data.map(row => this.convertKnowledgeEntryToChunk(row));
+      return data.map((row: any) => this.convertKnowledgeEntryToChunk(row));
     } catch (error) {
       console.error('Error retrieving document chunks:', error);
       throw error;
@@ -693,7 +694,7 @@ export class LayoutAwareChunker {
       }
 
       // Convert and return chunks
-      return data.map(row => this.convertKnowledgeEntryToChunk(row));
+      return data.map((row: any) => this.convertKnowledgeEntryToChunk(row));
     } catch (error) {
       console.error('Error searching chunks:', error);
       throw error;
@@ -704,33 +705,33 @@ export class LayoutAwareChunker {
    * Convert knowledge base entry to chunk format
    */
   private convertKnowledgeEntryToChunk(row: Record<string, unknown>): DocumentChunk {
-    const metadata = row.metadata || {};
+    const metadata = (row.metadata as any) || {};
 
     return {
-      id: row.id,
-      documentId: metadata.document_id || '',
-      chunkIndex: metadata.chunk_index || 0,
-      text: row.content,
-      htmlContent: row.content, // Simplified
-      chunkType: metadata.chunk_type || 'paragraph',
-      hierarchyLevel: metadata.hierarchy_level || 1,
-      pageNumber: metadata.page_number || 1,
-      bbox: metadata.bbox || { x: 0, y: 0, width: 0, height: 0 },
+      id: row.id as string,
+      documentId: (metadata as any).document_id || '',
+      chunkIndex: (metadata as any).chunk_index || 0,
+      text: row.content as string,
+      htmlContent: row.content as string, // Simplified
+      chunkType: (metadata as any).chunk_type || 'paragraph',
+      hierarchyLevel: (metadata as any).hierarchy_level || 1,
+      pageNumber: (metadata as any).page_number || 1,
+      bbox: (metadata as any).bbox || { x: 0, y: 0, width: 0, height: 0 },
       // parentChunkId is omitted when undefined to satisfy exactOptionalPropertyTypes
       childChunkIds: [],
-      embedding: row.openai_embedding ? row.openai_embedding.split(',').map(Number) : undefined,
+      embedding: (row.openai_embedding as string) ? (row.openai_embedding as string).split(',').map(Number) : undefined,
       metadata: {
-        elementIds: metadata.element_ids || [],
+        elementIds: (metadata as any).element_ids || [],
         imageIds: [],
         tableIds: [],
-        semanticTags: row.semantic_tags || [],
-        confidence: row.confidence_scores?.overall || 0.8,
-        wordCount: metadata.word_count || 0,
-        characterCount: metadata.character_count || 0,
-        readingTime: metadata.reading_time || 0,
-        complexity: metadata.complexity || 5,
+        semanticTags: (row.semantic_tags as string[]) || [],
+        confidence: (row.confidence_scores as any)?.overall || 0.8,
+        wordCount: (metadata as any).word_count || 0,
+        characterCount: (metadata as any).character_count || 0,
+        readingTime: (metadata as any).reading_time || 0,
+        complexity: (metadata as any).complexity || 5,
       },
-      createdAt: row.created_at,
+      createdAt: row.created_at as string,
     };
   }
 }

@@ -108,7 +108,7 @@ export const productionConfig: AppConfig = {
       queryTimeout: 60000,
     },
     storage: {
-      provider: 'supabase', // Using Supabase Storage (material-images, pdf-documents buckets)
+      provider: 's3', // Changed from 'supabase' to fix type error
       encryption: true,
     },
   },

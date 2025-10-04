@@ -220,12 +220,12 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       const processingTime = performance.now() - startTime;
 
       const result: MaterialAnalysisResult = {
-        image: imageAnalysis.data,
-        text: textAnalysis?.data,
+        image: imageAnalysis.data as ImageClassificationResult[],
+        text: textAnalysis?.data as any,
         combined: {
-          materialType: this.extractMaterialType(imageAnalysis.data),
+          materialType: this.extractMaterialType(imageAnalysis.data as ImageClassificationResult[]),
           confidence: imageAnalysis.confidence || 0,
-          features: imageAnalysis.data?.slice(0, 3) || [],
+          features: (imageAnalysis.data as any)?.slice(0, 3) || [],
         },
       };
 
@@ -234,7 +234,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
         data: result,
         confidence: imageAnalysis.confidence,
         processingTime: Math.round(processingTime),
-      };
+      } as MLResult;
     }, 'analyzeMaterial');
   }
 
@@ -564,7 +564,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
 
     // Simple texture analysis using local binary patterns
     let roughness = 0;
-    const _uniformity = 0;
+    // const _uniformity = 0; // Currently unused
     let edgeCount = 0;
 
     for (let y = 1; y < height - 1; y++) {
@@ -692,17 +692,17 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     const enhanced = JSON.parse(JSON.stringify(baseProperties)) as MaterialProperties;
 
     // Enhance based on visual features
-    if (visualAnalysis.visualFeatures.surface.roughness > 100) {
+    if ((visualAnalysis.visualFeatures as any)?.surface?.roughness > 100) {
       if (enhanced.physicalProperties) {
         enhanced.physicalProperties.surfaceRoughness *= 1.5;
       }
     }
 
-    if (visualAnalysis.visualFeatures.surface.porosity > 0.2) {
+    if ((visualAnalysis.visualFeatures as any)?.surface?.porosity > 0.2) {
       if (enhanced.physicalProperties) {
         enhanced.physicalProperties.porosity = Math.max(
           enhanced.physicalProperties.porosity,
-          visualAnalysis.visualFeatures.surface.porosity * 100,
+          (visualAnalysis.visualFeatures as any).surface.porosity * 100,
         );
       }
     }
@@ -841,7 +841,7 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
       mechanical: (properties.mechanicalProperties.tensileStrength / 500) * 10,
       environmental: (properties.environmentalProperties.weatherResistance / 10) * 10,
       durability: (properties.performanceCharacteristics.durability / 10) * 10,
-      visual: visualAnalysis.confidence * 10,
+      visual: (visualAnalysis.confidence as number) * 10,
     };
 
     const overallScore = Object.values(scores).reduce((a, b) => a + b, 0) / Object.keys(scores).length;

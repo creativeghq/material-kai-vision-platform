@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { RecognitionResult } from '@/types/materials';
 
-import { hybridMLService } from './ml/hybridMLService';
+import { unifiedMLService } from './ml/unifiedMLService';
 
 export interface WorkflowEnhancement {
   ocrExtraction?: {
@@ -16,12 +16,7 @@ export interface WorkflowEnhancement {
     metallicMapUrl: string;
     extractionQuality: number;
   };
-  nerfReconstruction?: {
-    reconstructionId: string;
-    modelFileUrl: string;
-    meshFileUrl: string;
-    qualityScore: number;
-  };
+
   ragKnowledge?: {
     relatedKnowledge: Array<{
       title: string;
@@ -53,25 +48,25 @@ export class IntegratedWorkflowService {
 
     const enhancementPromises = recognitionResults.map(async (result, index) => {
       const file = files[index];
-      const resultId = result.id;
+      const resultId = (result as any).id || result.materialId;
 
       // Initialize enhancement object
       enhancements[resultId] = {};
 
       // OCR extraction for all materials
-      const ocrPromise = this.performOCRExtraction(file, result.name)
+      const ocrPromise = this.performOCRExtraction(file, (result as any).name || 'unknown')
         .then(ocr => { if (ocr) enhancements[resultId].ocrExtraction = ocr; })
         .catch(err => console.warn('OCR failed:', err));
 
       // SVBRDF extraction for high-confidence materials
       const svbrdfPromise = result.confidence > 0.8
-        ? this.performSVBRDFExtraction(file, result.name)
+        ? this.performSVBRDFExtraction(file, (result as any).name || 'unknown')
           .then(svbrdf => { if (svbrdf) enhancements[resultId].svbrdfMaps = svbrdf; })
           .catch(err => console.warn('SVBRDF failed:', err))
         : Promise.resolve();
 
       // Knowledge search for material context
-      const knowledgePromise = this.searchMaterialKnowledge(result.name)
+      const knowledgePromise = this.searchMaterialKnowledge((result as any).name || 'unknown')
         .then(knowledge => { if (knowledge) enhancements[resultId].ragKnowledge = knowledge; })
         .catch(err => console.warn('Knowledge search failed:', err));
 
@@ -85,7 +80,7 @@ export class IntegratedWorkflowService {
 
   /**
    * Enhanced 3D Generation Workflow
-   * Combines 3D generation with NeRF reconstruction and material mapping
+   * Combines 3D generation with material mapping
    */
   async enhanced3DGeneration(prompt: string, options: {
     roomType?: string;
@@ -113,22 +108,8 @@ export class IntegratedWorkflowService {
 
     if (error) throw error;
 
-    // Step 2: NeRF reconstruction if images are generated
+    // Step 2: Material enhancements
     const enhancements: WorkflowEnhancement = {};
-
-    if (generationResult.image_urls && generationResult.image_urls.length > 0) {
-      try {
-        const nerfResult = await this.performNeRFReconstruction(
-          generationResult.image_urls,
-          generationResult.matched_materials || [],
-        );
-        if (nerfResult) {
-          enhancements.nerfReconstruction = nerfResult;
-        }
-      } catch (error) {
-        console.warn('NeRF reconstruction failed:', error);
-      }
-    }
 
     return { generationResult, enhancements };
   }
@@ -161,7 +142,7 @@ export class IntegratedWorkflowService {
     searchPromises.push(textSearchPromise);
 
     // Visual analysis if images provided
-    let visualAnalysisPromise = Promise.resolve({ data: null });
+    let visualAnalysisPromise: Promise<{ data: unknown[] | null }> = Promise.resolve({ data: null });
     if (context?.images && context.images.length > 0) {
       visualAnalysisPromise = this.analyzeImagesForKnowledge(context.images, query);
     }
@@ -188,16 +169,18 @@ export class IntegratedWorkflowService {
   // Private helper methods
 
   private async performHybridRecognition(files: File[]): Promise<RecognitionResult[]> {
-    const mlResult = await hybridMLService.analyzeMaterials(files);
+    const batchInput = files.map(file => ({ file }));
+    const mlResults = await unifiedMLService.batchProcess(batchInput);
 
-    if (!mlResult.success || !mlResult.data) {
+    if (!mlResults || mlResults.length === 0) {
       throw new Error('Material recognition failed');
     }
 
     // Convert ML results to RecognitionResult format
     return files.map((file, i) => {
-      const analysisData = Array.isArray(mlResult.data) ? mlResult.data[i] : mlResult.data;
-      const materialData = analysisData?.combined || analysisData || {};
+      const mlResult = mlResults[i]?.result;
+      const analysisData = mlResult?.data || {};
+      const materialData = (analysisData as any)?.combined || analysisData || {};
 
       return {
         id: `hybrid-${Date.now()}-${i}`,
@@ -205,19 +188,33 @@ export class IntegratedWorkflowService {
         material_id: materialData.materialType || 'unknown',
         confidence_score: materialData.confidence || 0,
         detection_method: 'combined' as const,
-        ai_model_version: `${mlResult.processingMethod}-v1.0`,
+        ai_model_version: `${mlResult?.processingMethod || 'unified'}-v1.0`,
         properties_detected: materialData,
-        processing_time_ms: mlResult.processingTime || 0,
+        processing_time_ms: mlResult?.processingTime || 0,
         user_verified: false,
         created_at: new Date().toISOString(),
 
-        // Legacy properties
+        // RecognitionResult interface properties
         materialId: materialData.materialType || 'unknown',
-        name: materialData.classification || 'Unknown Material',
         confidence: materialData.confidence || 0,
+        matchedMaterial: {
+          id: materialData.materialType || 'unknown',
+          name: materialData.classification || 'Unknown Material',
+          description: 'AI-detected material',
+          category: materialData.category || 'unknown',
+          properties: materialData,
+          metadata: {},
+          standards: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        extractedProperties: materialData,
+
+        // Additional properties
+        name: materialData.classification || 'Unknown Material',
         imageUrl: URL.createObjectURL(file),
         metadata: { properties: materialData },
-        processingTime: mlResult.processingTime || 0,
+        processingTime: mlResult?.processingTime || 0,
       };
     });
   }
@@ -284,33 +281,7 @@ export class IntegratedWorkflowService {
     }
   }
 
-  private async performNeRFReconstruction(
-    imageUrls: string[],
-    materialMapping: unknown[],
-  ): Promise<WorkflowEnhancement['nerfReconstruction'] | null> {
-    try {
-      const { data, error } = await supabase.functions.invoke('nerf-processor', {
-        body: {
-          sourceImageUrls: imageUrls,
-          reconstructionQuality: 'medium',
-          generateMesh: true,
-          materialMapping,
-        },
-      });
 
-      if (error || !data?.success) return null;
-
-      return {
-        reconstructionId: data.reconstructionId,
-        modelFileUrl: data.modelFileUrl || '',
-        meshFileUrl: data.meshFileUrl || '',
-        qualityScore: data.qualityScore || 0,
-      };
-    } catch (error) {
-      console.error('NeRF reconstruction failed:', error);
-      return null;
-    }
-  }
 
   private async searchMaterialKnowledge(materialName: string): Promise<WorkflowEnhancement['ragKnowledge'] | null> {
     try {
@@ -342,14 +313,14 @@ export class IntegratedWorkflowService {
   private async analyzeImagesForKnowledge(images: File[], query: string): Promise<{ data: unknown[] }> {
     try {
       const analysisPromises = images.map(async (image) => {
-        const result = await hybridMLService.analyzeImage(image, {
+        const result = await unifiedMLService.analyzeMaterial(image, undefined, {
           analysisType: 'comprehensive',
           includeContext: true,
         });
 
         return {
           imageAnalysis: result.data,
-          relevanceToQuery: this.calculateRelevance(result.data, query),
+          relevanceToQuery: this.calculateRelevance(result.data as Record<string, unknown>, query),
         };
       });
 

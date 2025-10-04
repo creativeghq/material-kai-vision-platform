@@ -1,21 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { MoodBoard } from '@/types/materials';
-
-export interface MoodBoardItem {
-  id: string;
-  moodboard_id: string;
-  material_id: string;
-  notes?: string;
-  position: number;
-  added_at: string;
-  material?: {
-    id: string;
-    name: string;
-    category: string;
-    thumbnail_url?: string;
-    properties: unknown;
-  };
-}
+import type { MoodBoard, MoodBoardItem } from '@/types/materials';
 
 export interface CreateMoodBoardData {
   title: string;
@@ -48,7 +32,7 @@ class MoodBoardAPI {
 
     if (error) throw error;
 
-    return data.map(board => ({
+    return data.map((board: any) => ({
       id: board.id,
       userId: board.user_id,
       title: board.title,
@@ -254,7 +238,7 @@ class MoodBoardAPI {
     const { data, error } = await query;
     if (error) throw error;
 
-    return data.map(board => ({
+    return data.map((board: any) => ({
       id: board.id,
       userId: board.user_id,
       title: board.title,

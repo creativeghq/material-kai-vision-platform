@@ -16,7 +16,8 @@ export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 export class CircuitBreaker {
   private state: CircuitBreakerState = 'CLOSED';
   private failureCount = 0;
-  private lastFailureTime = 0;
+  // private _lastFailureTime = 0; // Currently unused
+
   private nextAttemptTime = 0;
   private readonly options: CircuitBreakerOptions;
 
@@ -58,7 +59,7 @@ export class CircuitBreaker {
 
   private onFailure(): void {
     this.failureCount++;
-    this.lastFailureTime = Date.now();
+    // this._lastFailureTime = Date.now(); // Currently unused
 
     if (this.failureCount >= this.options.failureThreshold) {
       this.state = 'OPEN';

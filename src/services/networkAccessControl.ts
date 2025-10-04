@@ -300,21 +300,21 @@ export class NetworkAccessControl {
     }
 
     const totalRequests = usageLogs.length;
-    const internalRequests = usageLogs.filter(log => log.is_internal_request).length;
+    const internalRequests = usageLogs.filter((log: any) => log.is_internal_request).length;
     const externalRequests = totalRequests - internalRequests;
-    const blockedRequests = usageLogs.filter(log => log.rate_limit_exceeded).length;
+    const blockedRequests = usageLogs.filter((log: any) => log.rate_limit_exceeded).length;
 
     // Calculate top IPs
-    const ipCounts = usageLogs.reduce((acc, log) => {
+    const ipCounts = usageLogs.reduce((acc: any, log: any) => {
       const ip = log.ip_address.toString();
       acc[ip] = (acc[ip] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     const topIPs = Object.entries(ipCounts)
-      .sort(([, a], [, b]) => b - a)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
       .slice(0, 10)
-      .map(([ip, requests]) => ({ ip, requests }));
+      .map(([ip, requests]) => ({ ip, requests: requests as number }));
 
     return {
       totalRequests,

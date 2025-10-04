@@ -23,25 +23,25 @@ export interface HybridStyleResult {
   error?: string;
 }
 
-// Database response interfaces for stored style analysis
-interface _StoredStyleConfidence {
-  primary_style?: string;
-  confidence?: number;
-  modernity_score?: number;
-  luxury_level?: string;
-}
+// Database response interfaces for stored style analysis (currently unused)
+// interface _StoredStyleConfidence {
+//   primary_style?: string;
+//   confidence?: number;
+//   modernity_score?: number;
+//   luxury_level?: string;
+// }
 
-interface _StoredColorPalette {
-  dominant_colors?: string[];
-  color_harmony?: string;
-  warmth_score?: number;
-}
+// interface _StoredColorPalette {
+//   dominant_colors?: string[];
+//   color_harmony?: string;
+//   warmth_score?: number;
+// }
 
-interface _StoredTextureAnalysis {
-  texture?: string;
-  finish?: string;
-  pattern?: string;
-}
+// interface _StoredTextureAnalysis {
+//   texture?: string;
+//   finish?: string;
+//   pattern?: string;
+// }
 
 /**
  * Hybrid style analysis service that combines client-side processing with AI insights
@@ -172,7 +172,7 @@ export class HybridStyleAnalysisService {
         const processingTime = performance.now() - startTime;
         return {
           success: true,
-          analysis: result.data,
+          analysis: result.data as any,
           processingMethod: 'client',
           processingTime: Math.round(processingTime),
         };
@@ -219,7 +219,7 @@ export class HybridStyleAnalysisService {
       const processingTime = performance.now() - startTime;
       return {
         success: result.success,
-        analysis: result.data,
+        analysis: result.data as any,
         processingMethod: 'client' as const,
         processingTime: Math.round(processingTime),
         ...(result.error && { error: result.error }),

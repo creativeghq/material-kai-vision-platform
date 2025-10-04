@@ -139,7 +139,7 @@ export class ServiceContainer implements IServiceContainer {
       maxResolutionDepth: options.maxResolutionDepth ?? 50,
       enableHealthChecks: options.enableHealthChecks ?? false,
       healthCheckInterval: options.healthCheckInterval ?? 30000,
-      logger: options.logger,
+      logger: options.logger as any,
       developmentMode: options.developmentMode ?? false,
     };
 

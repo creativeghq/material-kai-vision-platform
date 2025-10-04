@@ -10,28 +10,14 @@ interface HuggingFaceServiceConfig extends ServiceConfig {
 }
 
 // Specific output types for different model responses
-interface _ClassificationOutput {
-  label: string;
-  score: number;
-}
-
-interface _EmbeddingOutput {
-  embedding?: number[];
-  embeddings?: number[][];
-}
-
-interface _TextOutput {
-  generated_text: string;
-}
-
-interface _EmbeddingResult {
-  embeddings: number[][];
-  model: string;
-  usage: {
-    prompt_tokens: number;
-    total_tokens: number;
-  };
-}
+// interface EmbeddingResult {
+//   embeddings: number[][];
+//   model: string;
+//   usage: {
+//     prompt_tokens: number;
+//     total_tokens: number;
+//   };
+// }
 
 interface ClassificationResult {
   label: string;
@@ -99,7 +85,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       const hfConfig = apiRegistryInstance.getApiConfigByType('huggingface');
 
       if (hfConfig) {
-        const envConfig = hfConfig.environment[this.config.environment];
+        const envConfig = (hfConfig.environment as any)[this.config.environment];
         return envConfig?.apiKey || null;
       }
 
@@ -149,7 +135,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
     return this.executeOperation(async () => {
       const model = options.defaultModel || HuggingFaceService.MODELS.TEXT_EMBEDDING;
       const result = await this.callHuggingFaceAPI(model, { inputs: text });
-      return result.embeddings || result;
+      return (result as any).embeddings || result;
     }, 'generateTextEmbedding');
   }
 
@@ -162,7 +148,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       const processedInput = await this.processImageInput(imageData);
       const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
       return {
-        features: result.features || result,
+        features: (result as any).features || result,
         model,
       };
     }, 'extractImageFeatures');
@@ -188,7 +174,7 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       const model = options.defaultModel || HuggingFaceService.MODELS.OCR_PROCESSING;
       const processedInput = await this.processImageInput(imageData);
       const result = await this.callHuggingFaceAPI(model, { inputs: processedInput });
-      return result.generated_text || result.text || '';
+      return (result as any).generated_text || (result as any).text || '';
     }, 'processOCR');
   }
 
@@ -273,8 +259,8 @@ export class HuggingFaceService extends BaseService<HuggingFaceServiceConfig> {
       }));
     }
 
-    if (result.label && typeof result.score === 'number') {
-      return [{ label: result.label, score: result.score }];
+    if ((result as any).label && typeof (result as any).score === 'number') {
+      return [{ label: (result as any).label, score: (result as any).score }];
     }
 
     return [];

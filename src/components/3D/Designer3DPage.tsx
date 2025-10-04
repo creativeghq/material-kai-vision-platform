@@ -616,7 +616,7 @@ export const Designer3DPage: React.FC = () => {
       </Card>
 
       {/* Results Grid */}
-      {generatedImages.length > 0 && (
+      {(generatedImages.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Generated Interior Designs</CardTitle>
@@ -639,7 +639,7 @@ export const Designer3DPage: React.FC = () => {
                         onLoad={() => {
                           console.log(`✅ Image ${index + 1} loaded successfully:`, image.url);
                         }}
-                        onError={(e: any) => {
+                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
                           console.error(`❌ Image ${index + 1} failed to load:`, {
                             url: image.url,
                             modelName: image.modelName,
@@ -669,7 +669,7 @@ export const Designer3DPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null) as any}
 
       {/* 3D Viewer */}
       {generatedImages.length > 0 && (

@@ -170,7 +170,7 @@ export class AgentSpecializationManager {
 
       // Score each agent for this task
       const agentScores = await Promise.all(
-        agents.map(agent => this.scoreAgentForTask(agent as Record<string, unknown>, taskType, requirements)),
+        agents.map((agent: any) => this.scoreAgentForTask(agent as Record<string, unknown>, taskType, requirements)),
       );
 
       // Sort by score and take top agents
@@ -193,7 +193,7 @@ export class AgentSpecializationManager {
    */
   private async scoreAgentForTask(
     agent: Record<string, unknown>,
-    taskType: string,
+    _taskType: string,
     requirements: {
       mlOperations: string[];
       knowledgeDomains: string[];

@@ -15,15 +15,15 @@ const PDFProcessing = () => {
 
   useEffect(() => {
     // Subscribe to workflow updates
-    const unsubscribe = consolidatedPDFWorkflowService.subscribe((job) => {
-      setWorkflowJobs(prev => {
+    const unsubscribe = consolidatedPDFWorkflowService.subscribe((job: any) => {
+      setWorkflowJobs((prev: WorkflowJob[]) => {
         const filtered = prev.filter(j => j.id !== job.id);
         return [job, ...filtered];
       });
     });
 
     // Load existing jobs
-    setWorkflowJobs(consolidatedPDFWorkflowService.getAllJobs());
+    setWorkflowJobs(consolidatedPDFWorkflowService.getAllJobs() as WorkflowJob[]);
 
     return () => {
       unsubscribe();

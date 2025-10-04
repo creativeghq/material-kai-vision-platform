@@ -33,6 +33,31 @@ export interface StyleAnalysisOptions {
   targetRooms?: string[];
 }
 
+export interface VisualFeatures {
+  warmth: number;
+  saturation: number;
+  brightness: number;
+  edgeSharpness: number;
+  colorVariance: number;
+  colorCount: number;
+  metallic: number;
+  patternComplexity: number;
+  roughness: number;
+  glossiness: number;
+  naturalness: number;
+  comfort: number;
+  durability: number;
+  cleanliness: number;
+  calmness: number;
+  softness: number;
+  practicality: number;
+  moisture_resistance: number;
+  hygiene: number;
+  professionalism: number;
+  focus: number;
+  ornamental: number;
+}
+
 export interface StyleAnalysisServiceConfig extends ServiceConfig {
   maxImageSize?: number;
   enableAdvancedFeatures?: boolean;
@@ -344,7 +369,7 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
   /**
    * Extract visual features from image data
    */
-  private extractVisualFeatures(imageData: ImageData): Record<string, unknown> {
+  private extractVisualFeatures(imageData: ImageData): VisualFeatures {
     const { data, width: _width, height: _height } = imageData;
 
     // Initialize feature accumulators
@@ -435,8 +460,9 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
     return edgeCount / pixelCount > 0.1 ? 0.7 : 0.3;
   }
 
-  private extractDominantColors(imageData: ImageData, count: number): Array<{r: number, g: number, b: number}> {
+  private extractDominantColors(_imageData: ImageData, count: number): Array<{r: number, g: number, b: number}> {
     // Simplified dominant color extraction
+    // TODO: Implement actual color clustering algorithm using imageData
     const colors = [];
     for (let i = 0; i < count; i++) {
       colors.push({

@@ -127,17 +127,17 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       const processingTime = Date.now() - startTime;
 
       // Calculate quality metrics
-      const qualityMetrics = this.calculateQualityMetrics(mivaaResponse);
+      const qualityMetrics = this.calculateQualityMetrics(mivaaResponse as Record<string, unknown>);
 
       // Calculate statistics
-      const statistics = this.calculateStatistics(mivaaResponse, ragIntegration);
+      const statistics = this.calculateStatistics(mivaaResponse as Record<string, unknown>, ragIntegration as Record<string, unknown>);
 
       const result: DocumentProcessingResult = {
         success: true,
         processingId,
         documentId,
-        mivaaResponse,
-        ragIntegration,
+        mivaaResponse: mivaaResponse as any,
+        ragIntegration: ragIntegration as any,
         processingTime,
         statistics,
         qualityMetrics,
@@ -361,7 +361,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
       embeddings: [],
       chunks: [
         {
-          content: mivaaResponse.markdownContent,
+          content: (mivaaResponse as any).markdownContent,
           metadata: {
             source: request.file.name,
             workspaceId: request.workspaceContext.workspaceId,
@@ -390,7 +390,7 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
 
   private calculateQualityMetrics(mivaaResponse: Record<string, unknown>): DocumentProcessingResult['qualityMetrics'] {
     return {
-      extractionQuality: mivaaResponse.metadata?.extractionQuality || 0.8,
+      extractionQuality: (mivaaResponse.metadata as any)?.extractionQuality || 0.8,
       chunkingQuality: 0.85, // Would be calculated based on chunk analysis
       overallQuality: 0.82, // Weighted average of all quality metrics
     };
@@ -398,10 +398,10 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
 
   private calculateStatistics(mivaaResponse: Record<string, unknown>, ragIntegration: Record<string, unknown>): DocumentProcessingResult['statistics'] {
     return {
-      totalPages: mivaaResponse.metadata?.pages || 1,
-      totalChunks: ragIntegration.chunks?.length || 0,
-      totalTables: mivaaResponse.extractedTables?.length || 0,
-      totalImages: mivaaResponse.extractedImages?.length || 0,
+      totalPages: (mivaaResponse.metadata as any)?.pages || 1,
+      totalChunks: (ragIntegration.chunks as any)?.length || 0,
+      totalTables: (mivaaResponse.extractedTables as any)?.length || 0,
+      totalImages: (mivaaResponse.extractedImages as any)?.length || 0,
       averageChunkSize: Array.isArray(ragIntegration.chunks) ? ragIntegration.chunks.reduce((sum: number, chunk: unknown) => sum + ((chunk as Record<string, unknown>).content as string || '').length, 0) / (ragIntegration.chunks.length || 1) : 0,
     };
   }
@@ -448,8 +448,8 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
 
   private createStandardError(code: string, message: string, originalError?: unknown): Error {
     const error = new Error(message);
-    (error as Record<string, unknown>).code = code;
-    (error as Record<string, unknown>).originalError = originalError;
+    (error as unknown as Record<string, unknown>).code = code;
+    (error as unknown as Record<string, unknown>).originalError = originalError;
     return error;
   }
 }

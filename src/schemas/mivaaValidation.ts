@@ -21,9 +21,7 @@ const TableDataSchema = z.object({
   rows: z.array(z.array(z.string())).min(1, 'At least one row is required'),
   position: PositionSchema,
   confidence: z.number().min(0, 'Confidence must be non-negative').max(1, 'Confidence must not exceed 1'),
-  format: z.enum(['csv', 'json', 'markdown'], {
-    errorMap: () => ({ message: 'Format must be csv, json, or markdown' }),
-  }),
+  format: z.enum(['csv', 'json', 'markdown']),
   rawData: z.string().optional(),
 });
 
@@ -155,7 +153,7 @@ export function validateMivaaDocument(data: unknown): {
     };
   }
 
-  const errors = result.error.errors.map(error => ({
+  const errors = result.error.issues.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
@@ -207,7 +205,7 @@ export function validatePartialMivaaDocument(data: unknown): {
     };
   }
 
-  const errors = result.error.errors.map((error: z.ZodIssue) => ({
+  const errors = result.error.issues.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,

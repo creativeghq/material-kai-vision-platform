@@ -199,30 +199,8 @@ export async function withRetry<T>(
   throw lastError;
 }
 
-// API Client Factory
-export class ApiClientFactory {
-  private static clients = new Map<string, StandardizedApiClient>();
-
-  static registerClient(key: string, client: StandardizedApiClient): void {
-    this.clients.set(key, client);
-  }
-
-  static getClient<TParams, TResponse>(
-    apiType: string,
-    modelId?: string,
-  ): StandardizedApiClient<TParams, TResponse> | null {
-    const key = modelId ? `${apiType}:${modelId}` : apiType;
-    return this.clients.get(key) as StandardizedApiClient<TParams, TResponse> || null;
-  }
-
-  static getAllClients(): Map<string, StandardizedApiClient> {
-    return new Map(this.clients);
-  }
-
-  static clearClients(): void {
-    this.clients.clear();
-  }
-}
+// NOTE: API Client Factory has been moved to apiClientFactory.ts
+// Use the CentralizedApiClientFactory singleton instead
 
 // Utility types for better TypeScript support
 export type ApiClientFor<T extends ApiConfig> = T extends { type: infer _U }

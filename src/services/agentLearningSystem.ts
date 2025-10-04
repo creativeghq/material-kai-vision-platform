@@ -279,20 +279,20 @@ export class AgentLearningSystem {
       const learningProgress: Record<string, unknown> = {};
 
       // Calculate updated metrics
-      const totalTasks = (learningProgress.total_tasks || 0);
-      const successfulTasks = (learningProgress.successful_tasks || 0);
+      const totalTasks = (learningProgress.total_tasks as number || 0) + 1;
+      const successfulTasks = (learningProgress.successful_tasks as number || 0) + (mlTask.status === 'completed' ? 1 : 0);
 
       const updatedMetrics = {
         ...currentMetrics,
         task_completion_rate: totalTasks > 0 ? successfulTasks / totalTasks : 0,
         average_processing_time: this.updateAverageProcessingTime(
-          currentMetrics.average_processing_time || 0,
+          (currentMetrics.average_processing_time as number) || 0,
           mlTask.processingTimeMs || 0,
           totalTasks,
         ),
         ml_task_accuracy: this.calculateMLAccuracy(mlTask),
         last_task_timestamp: new Date().toISOString(),
-        total_ml_tasks: (currentMetrics.total_ml_tasks || 0) + 1,
+        total_ml_tasks: (currentMetrics.total_ml_tasks as number || 0) + 1,
       };
 
       await supabase

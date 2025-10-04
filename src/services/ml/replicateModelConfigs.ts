@@ -326,7 +326,7 @@ export class ModelParameterValidator {
         try {
           validatedParams[paramName] = this.validateParameter(paramName, inputValue, paramConfig);
         } catch (error) {
-          errors.push(`Parameter '${paramName}': ${error.message}`);
+          errors.push(`Parameter '${paramName}': ${(error as Error).message}`);
         }
       } else if (paramConfig.default !== undefined) {
         // Use default value
@@ -345,7 +345,7 @@ export class ModelParameterValidator {
    * Validate a single parameter
    */
   private static validateParameter(
-    name: string,
+    _name: string,
     value: unknown,
     config: ModelParameter,
   ): unknown {
@@ -360,7 +360,7 @@ export class ModelParameterValidator {
         return value;
 
       case 'integer':
-        const intValue = parseInt(value);
+        const intValue = parseInt(value as string);
         if (isNaN(intValue)) {
           throw new Error(`Expected integer, got ${typeof value}`);
         }
@@ -373,7 +373,7 @@ export class ModelParameterValidator {
         return intValue;
 
       case 'number':
-        const numValue = parseFloat(value);
+        const numValue = parseFloat(value as string);
         if (isNaN(numValue)) {
           throw new Error(`Expected number, got ${typeof value}`);
         }
@@ -398,7 +398,7 @@ export class ModelParameterValidator {
         if (!config.options) {
           throw new Error('Enum parameter missing options');
         }
-        if (!config.options.includes(value)) {
+        if (!config.options.includes(value as string)) {
           throw new Error(`Must be one of: ${config.options.join(', ')}`);
         }
         return value;

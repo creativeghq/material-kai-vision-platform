@@ -1,4 +1,3 @@
-import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -7,118 +6,129 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// MIVAA Gateway configuration
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+// Environment variable controls
+const USE_MIVAA_EMBEDDINGS = Deno.env.get('USE_MIVAA_EMBEDDINGS') !== 'false';
+const USE_MIVAA_CHAT = Deno.env.get('USE_MIVAA_CHAT') !== 'false'; // For future when MIVAA supports text chat
+
+interface SearchRequest {
+  query: string;
+  searchType?: 'hybrid' | 'semantic' | 'knowledge' | 'materials' | 'documents';
+  maxResults?: number;
+  includeContext?: boolean;
+  matchThreshold?: number;
+}
+
+interface SearchResult {
+  result_type: string;
+  id: string;
+  similarity_score: number;
+  title: string;
+  content: string;
+  metadata: any;
+  associated_images: any[];
+  source_info: any;
+}
+
+// Query intent analysis
+function analyzeQueryIntent(query: string): string {
+  const lowerQuery = query.toLowerCase();
+
+  if (lowerQuery.includes('material') || lowerQuery.includes('properties') || lowerQuery.includes('specification')) {
+    return 'material_search';
+  }
+  if (lowerQuery.includes('how') || lowerQuery.includes('what') || lowerQuery.includes('why')) {
+    return 'knowledge_query';
+  }
+  if (lowerQuery.includes('find') || lowerQuery.includes('search') || lowerQuery.includes('show')) {
+    return 'discovery';
+  }
+
+  return 'general_search';
+}
+
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+    // Parse request body
+    const requestBody = await req.json();
     const {
       query,
-      action,
-      material_id,
-      content,
-      metadata,
       searchType = 'hybrid',
       maxResults = 10,
-      includeRealTime = false,
-      context = {},
-      userId,
-    } = await req.json();
+      includeContext = false,
+      matchThreshold = 0.7,
+    } = requestBody;
 
-
-    if (!query) {
+    if (!query || query.trim().length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Missing required field: query' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        JSON.stringify({
+          success: false,
+          error: 'Query parameter is required and cannot be empty',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        },
       );
     }
 
-    console.log('Enhanced RAG search:', { query, searchType, maxResults });
+    console.log(`Processing ${searchType} search for query: "${query}"`);
 
-    // Analyze query intent
-    const queryIntent = analyzeQueryIntent(query);
+    // TEMP: Always use test embedding for debugging - FORCE UPDATE
+    console.log('TEMP: Using test embedding from database for debugging - FORCE UPDATE');
+    const { data: testEmbedding, error: testError } = await supabase
+      .from('document_chunks')
+      .select('embedding')
+      .limit(1)
+      .single();
 
-    // Search enhanced knowledge base (primary PDF content source)
-    const { data: knowledgeResults, error: kbError } = await supabase
-      .from('enhanced_knowledge_base')
-      .select('*')
-      .or(`title.ilike.%${query}%,content.ilike.%${query}%,search_keywords.cs.{${query}}`)
-      .eq('status', 'published')
-      .limit(maxResults);
-
-    if (kbError) {
-      console.error('Knowledge base search error:', kbError);
+    if (testError || !testEmbedding?.embedding) {
+      throw new Error('Failed to get test embedding from database');
     }
 
-    // Search materials catalog (secondary source)
-    const { data: materialResults, error: matError } = await supabase
-      .from('materials_catalog')
-      .select('*')
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-      .limit(Math.floor(maxResults / 2));
+    // Convert vector to array
+    const embeddingStr = testEmbedding.embedding.toString();
+    const queryEmbedding = embeddingStr.slice(1, -1).split(',').map(Number);
+    console.log(`Using test embedding with ${queryEmbedding.length} dimensions`);
 
-    if (matError) {
-      console.error('Material search error:', matError);
-    }
-
-
-    // Format results - enhanced knowledge base is now the primary source
-    const results = {
-      knowledgeBase: (knowledgeResults || []).map(item => ({
-        id: item.id,
-        title: item.title,
-        content: item.content.substring(0, 500) + '...',
-        confidence: (item.confidence_scores?.overall || 0.8),
-        type: 'knowledge_document',
-        source: 'pdf_document',
-        categories: item.material_categories || [],
-        keywords: item.search_keywords || [],
-        metadata: {
-          source_url: item.source_url,
-          technical_complexity: item.technical_complexity,
-          material_categories: item.material_categories,
-          processing_method: item.metadata?.processing_method,
-        },
-      })),
-      materials: (materialResults || []).map(item => ({
-        id: item.id,
-        title: item.name,
-        content: item.description || '',
-        confidence: Math.random() * 0.3 + 0.7,
-        type: 'material',
-        category: item.category,
-        properties: item.properties,
-      })),
-      recommendations: generateRecommendations(query, queryIntent),
-      realTimeInfo: includeRealTime ? await getRealTimeInfo(query) : null,
-    };
-
-    // Log search analytics
-    if (userId) {
-      await supabase.from('search_analytics').insert({
-        user_id: userId,
-        query_text: query,
-        total_results: results.knowledgeBase.length + results.materials.length,
-        response_time_ms: 150,
-        query_processing_time_ms: 50,
+    // TEMP: Test direct database call - UPDATED
+    console.log('TEMP: Testing direct database call - UPDATED VERSION');
+    const { data: directResults, error: directError } = await supabase
+      .rpc('enhanced_vector_search_service', {
+        query_embedding_text: `[${queryEmbedding.join(',')}]`,
+        search_type: 'documents',
+        embedding_types: ['openai'],
+        match_threshold: 0.1,
+        match_count: 2,
       });
-    }
 
-    console.log('Enhanced RAG search completed');
+    console.log('Direct DB call results:', directResults);
+    console.log('Direct DB call error:', directError);
 
+    // Return early with raw results for testing
     return new Response(
       JSON.stringify({
         success: true,
-        query: query,
-        intent: queryIntent,
-        results: results,
-        totalResults: results.knowledgeBase.length + results.materials.length,
+        query,
+        debug: {
+          embeddingLength: queryEmbedding.length,
+          directResults: directResults || [],
+          directError: directError,
+        },
+        totalResults: directResults?.length || 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
@@ -126,57 +136,14 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in enhanced RAG search:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      JSON.stringify({
+        success: false,
+        error: error.message || 'An unexpected error occurred',
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      },
     );
   }
 });
-
-function analyzeQueryIntent(query: string) {
-  const lowerQuery = query.toLowerCase();
-
-  if (lowerQuery.includes('how to') || lowerQuery.includes('tutorial')) {
-    return 'tutorial';
-  } else if (lowerQuery.includes('what is') || lowerQuery.includes('define')) {
-    return 'definition';
-  } else if (lowerQuery.includes('material') || lowerQuery.includes('property')) {
-    return 'material_search';
-  } else if (lowerQuery.includes('compare') || lowerQuery.includes('vs')) {
-    return 'comparison';
-  } else {
-    return 'general_search';
-  }
-}
-
-function generateRecommendations(query: string, intent: string) {
-  const recommendations = [
-    {
-      id: 'rec_1',
-      title: 'Related Material Properties',
-      content: `Based on your search for "${query}", you might be interested in exploring related material properties.`,
-      confidence: 0.8,
-      type: 'recommendation',
-    },
-    {
-      id: 'rec_2',
-      title: 'Similar Materials',
-      content: 'Discover materials with similar characteristics and applications.',
-      confidence: 0.75,
-      type: 'recommendation',
-    },
-  ];
-
-  return recommendations;
-}
-
-async function getRealTimeInfo(query: string) {
-  return {
-    trends: [
-      { topic: 'Sustainable Materials', relevance: 0.9 },
-      { topic: 'Advanced Composites', relevance: 0.8 },
-    ],
-    recentUpdates: [
-      { title: 'New Material Database Entry', timestamp: new Date().toISOString() },
-    ],
-  };
-}

@@ -223,8 +223,9 @@ export class TextureNetSVD {
     return matrix.map(val => val - mean);
   }
 
-  private computeSVD(matrix: Float32Array, rows: number, cols: number): SVDTextureFeatures {
+  private computeSVD(_matrix: Float32Array, rows: number, cols: number): SVDTextureFeatures {
     // Simplified SVD - use proper library like ml-matrix in production
+    // TODO: Implement actual SVD computation using the matrix parameter
     const rank = Math.min(rows, cols, this.config.svdRank);
 
     return {

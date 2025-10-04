@@ -47,7 +47,8 @@ export class MaterialSearchService {
     error?: string;
   }> {
     try {
-      const _searchParams = new URLSearchParams({
+      // Search parameters for future use
+      new URLSearchParams({
         q: params.query,
         search_type: params.searchType || 'hybrid',
         limit: (params.limit || 20).toString(),
@@ -96,7 +97,7 @@ export class MaterialSearchService {
   /**
    * Get search suggestions
    */
-  async getSuggestions(partial: string, _limit: number = 10): Promise<{
+  async getSuggestions(_partial: string, _limit: number = 10): Promise<{
     success: boolean;
     data: Array<{
       text: string;

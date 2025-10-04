@@ -77,7 +77,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
       }));
 
       // Count knowledge entries with embeddings
-      const entriesWithEmbeddings = knowledgeData?.filter(entry =>
+      const entriesWithEmbeddings = knowledgeData?.filter((entry: any) =>
         entry.embedding,
       ).length || 0;
 

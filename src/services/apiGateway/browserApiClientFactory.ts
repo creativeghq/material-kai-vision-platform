@@ -5,16 +5,14 @@
  * without requiring Node.js modules.
  */
 
-import { 
-  browserApiRegistry, 
+import {
   getBrowserApiConfig,
-  type BrowserApiConfig,
   type ReplicateConfig,
   type HuggingFaceConfig,
-  type SupabaseConfig 
+  type SupabaseConfig
 } from '../../config/browserApiConfig';
 
-import { StandardizedApiClient, StandardizedApiResponse } from './standardizedApiClient';
+import { StandardizedApiResponse } from './standardizedApiClient';
 
 // Simple browser-compatible API clients
 class BrowserReplicateApiClient {
@@ -33,7 +31,7 @@ class BrowserReplicateApiClient {
     guidance_scale?: number;
   }): Promise<StandardizedApiResponse> {
     try {
-      const apiKey = import.meta.env.VITE_REPLICATE_API_TOKEN;
+      const apiKey = (import.meta as any).env?.VITE_REPLICATE_API_TOKEN;
       if (!apiKey) {
         throw new Error('Replicate API key not configured');
       }
@@ -70,19 +68,26 @@ class BrowserReplicateApiClient {
         success: true,
         data,
         metadata: {
-          model: params.model,
-          provider: 'replicate',
+          apiType: 'replicate',
+          modelId: params.model,
           timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
         },
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'REPLICATE_API_ERROR',
+          details: error instanceof Error ? { stack: error.stack } : undefined,
+          retryable: true,
+        },
         metadata: {
-          model: params.model,
-          provider: 'replicate',
+          apiType: 'replicate',
+          modelId: params.model,
           timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
         },
       };
     }
@@ -109,7 +114,7 @@ class BrowserHuggingFaceApiClient {
     prompt: string;
   }): Promise<StandardizedApiResponse> {
     try {
-      const apiKey = import.meta.env.VITE_HUGGINGFACE_API_TOKEN;
+      const apiKey = (import.meta as any).env?.VITE_HUGGINGFACE_API_TOKEN;
       if (!apiKey) {
         throw new Error('Hugging Face API key not configured');
       }
@@ -136,19 +141,26 @@ class BrowserHuggingFaceApiClient {
         success: true,
         data: { image_url: imageUrl },
         metadata: {
-          model: params.model,
-          provider: 'huggingface',
+          apiType: 'huggingface',
+          modelId: params.model,
           timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
         },
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'HUGGINGFACE_API_ERROR',
+          details: error instanceof Error ? { stack: error.stack } : undefined,
+          retryable: true,
+        },
         metadata: {
-          model: params.model,
-          provider: 'huggingface',
+          apiType: 'huggingface',
+          modelId: params.model,
           timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
         },
       };
     }
@@ -175,8 +187,8 @@ class BrowserSupabaseApiClient {
     payload: Record<string, unknown>;
   }): Promise<StandardizedApiResponse> {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
+      const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
       if (!supabaseUrl || !supabaseKey) {
         throw new Error('Supabase configuration not found');
@@ -200,19 +212,26 @@ class BrowserSupabaseApiClient {
         success: true,
         data,
         metadata: {
-          function: params.functionName,
-          provider: 'supabase',
+          apiType: 'supabase',
+          modelId: params.functionName,
           timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
         },
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'SUPABASE_FUNCTION_ERROR',
+          details: error instanceof Error ? { stack: error.stack } : undefined,
+          retryable: true,
+        },
         metadata: {
-          function: params.functionName,
-          provider: 'supabase',
+          apiType: 'supabase',
+          modelId: params.functionName,
           timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
         },
       };
     }

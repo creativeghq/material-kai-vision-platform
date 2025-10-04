@@ -123,7 +123,7 @@ granularity = "detailed"
 **New Admin Capabilities:**
 - **Model Debugging Panel**: [`ModelDebuggingPanel`](src/components/Admin/ModelDebuggingPanel.tsx:1) enhancements
 - **AI Testing Interface**: [`AITestingPanel`](src/components/Admin/AITestingPanel.tsx:1) multi-modal testing
-- **RAG Management**: [`RAGManagementPanel`](src/components/Admin/RAGManagementPanel.tsx:1) multi-modal indexing
+- **RAG Management**: [`IntegratedRAGManagement`](src/components/Admin/IntegratedRAGManagement.tsx:1) consolidated multi-modal indexing
 
 ### 3.4 Accessibility & Responsive Design
 **Requirements:**

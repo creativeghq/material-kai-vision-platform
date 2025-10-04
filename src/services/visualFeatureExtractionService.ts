@@ -12,7 +12,6 @@ import {
   ImageMetadata
 } from './imagePreprocessing';
 import {
-  MivaaGatewayController,
   GatewayRequest,
   GatewayResponse
 } from '../api/mivaa-gateway';
@@ -170,8 +169,6 @@ export interface QueueProcessingStatus {
  * LLaMA vision analysis, embedding generation, and database storage.
  */
 export class VisualFeatureExtractionService {
-  private static mivaaGateway = new MivaaGatewayController();
-  private static imagePreprocessing = new ImagePreprocessingService();
 
   /**
    * Call MIVAA analysis service directly
@@ -270,29 +267,29 @@ export class VisualFeatureExtractionService {
 
     return {
       success: true,
-      analysis_id: data.analysis_id || `analysis_${Date.now()}`,
-      model_used: data.model_used || 'llama-3.2-vision',
+      analysis_id: (data.analysis_id as string) || `analysis_${Date.now()}`,
+      model_used: (data.model_used as string) || 'llama-3.2-vision',
       processing_time_ms: mivaaResponse.metadata.processingTime,
       cost_info: {
-        cost: data.cost_info?.cost || 0,
-        tokens_used: data.cost_info?.tokens_used
+        cost: (data.cost_info as any)?.cost || 0,
+        tokens_used: (data.cost_info as any)?.tokens_used
       },
-      materials_detected: data.materials_detected || [{
-        material_type: data.material_type || 'unknown',
-        confidence: data.confidence || 0,
+      materials_detected: (data.materials_detected as any[]) || [{
+        material_type: (data.material_type as string) || 'unknown',
+        confidence: (data.confidence as number) || 0,
         properties: {
-          texture: data.texture,
-          color: data.color,
-          finish: data.finish,
-          pattern: data.pattern,
-          ...data.properties
+          texture: data.texture as string,
+          color: data.color as string,
+          finish: data.finish as string,
+          pattern: data.pattern as string,
+          ...(data.properties as Record<string, unknown> || {})
         }
       }],
       overall_analysis: {
-        description: data.description || data.overall_analysis?.description || '',
-        style_assessment: data.style_assessment || data.overall_analysis?.style_assessment,
-        technical_properties: data.technical_properties || data.overall_analysis?.technical_properties,
-        ...data.overall_analysis
+        description: (data.description as string) || (data.overall_analysis as any)?.description || '',
+        style_assessment: (data.style_assessment as string) || (data.overall_analysis as any)?.style_assessment,
+        technical_properties: (data.technical_properties as Record<string, unknown>) || (data.overall_analysis as any)?.technical_properties,
+        ...(data.overall_analysis as Record<string, unknown> || {})
       }
     };
   }
@@ -353,7 +350,7 @@ export class VisualFeatureExtractionService {
       const clipEmbeddings = clipResponse?.success ?
         this.extractClipEmbeddings(clipResponse) : null;
 
-      return [llamaResult, clipEmbeddings];
+      return [llamaResult, clipEmbeddings || {}];
 
     } catch (error) {
       errorLogger.logError(error as Error, {
@@ -374,7 +371,7 @@ export class VisualFeatureExtractionService {
         error_message: error instanceof Error ? error.message : 'Parallel analysis failed'
       };
 
-      return [failedResult, null];
+      return [failedResult, {}];
     }
   }
 
@@ -399,25 +396,31 @@ export class VisualFeatureExtractionService {
   /**
    * Combine embeddings from LLaMA and CLIP sources
    */
-  private static combineEmbeddingResults(
+  private static async combineEmbeddingResults(
     llamaResult: MaterialVisionAnalysisResult,
     clipEmbeddings: Record<string, unknown> | null
-  ): Record<string, unknown> {
+  ): Promise<Record<string, unknown>> {
     const combined: Record<string, unknown> = {};
 
     // Add description embeddings from LLaMA (if any)
     if (llamaResult.overall_analysis?.description) {
       // Generate description embedding from LLaMA text output
-      combined.description_embedding = this.generateTextEmbedding(
+      const descriptionEmbedding = await this.generateTextEmbedding(
         llamaResult.overall_analysis.description
       );
+      if (descriptionEmbedding) {
+        combined.description_embedding = descriptionEmbedding;
+      }
     }
 
     // Add material type embedding
     if (llamaResult.materials_detected?.[0]?.material_type) {
-      combined.material_type_embedding = this.generateTextEmbedding(
+      const materialTypeEmbedding = await this.generateTextEmbedding(
         llamaResult.materials_detected[0].material_type
       );
+      if (materialTypeEmbedding) {
+        combined.material_type_embedding = materialTypeEmbedding;
+      }
     }
 
     // Add CLIP visual embeddings
@@ -425,17 +428,51 @@ export class VisualFeatureExtractionService {
       combined.clip_embedding = clipEmbeddings.clip_embedding;
     }
 
-    return Object.keys(combined).length > 0 ? combined : undefined;
+    return Object.keys(combined).length > 0 ? combined : {} as Record<string, unknown>;
   }
 
   /**
-   * Generate text embedding (placeholder - would call text embedding service)
+   * Generate text embedding using the existing EmbeddingGenerationService
    */
-  private static generateTextEmbedding(_text: string): number[] | null {
-    // TODO: Implement actual text embedding generation via MIVAA
-    // For now, return null to indicate no text embeddings
-    // This would be replaced with a call to a text embedding MIVAA action
-    return null;
+  private static async generateTextEmbedding(text: string): Promise<number[] | null> {
+    try {
+      // Use MIVAA gateway for text embedding generation
+      const response = await fetch(`${process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000'}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MIVAA_API_KEY || ''}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Material-Kai-Vision-Platform-VisualFeatureExtraction/1.0',
+        },
+        body: JSON.stringify({
+          action: 'batch_embedding',
+          payload: {
+            texts: [text],
+            options: {
+              model: 'text-embedding-ada-002', // Use OpenAI text embedding model
+              normalize: true,
+              batch_size: 1,
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn(`Text embedding generation failed: ${response.status}`);
+        return null;
+      }
+
+      const result = await response.json();
+      if (!result.success || !result.data?.embeddings?.[0]?.embedding) {
+        console.warn('Text embedding generation returned no data');
+        return null;
+      }
+
+      return result.data.embeddings[0].embedding;
+    } catch (error) {
+      console.warn('Text embedding generation error:', error);
+      return null; // Gracefully handle errors by returning null
+    }
   }
 
   /**
@@ -445,7 +482,7 @@ export class VisualFeatureExtractionService {
     request: VisualFeatureExtractionRequest
   ): Promise<VisualFeatureExtractionResult> {
     const startTime = Date.now();
-    const extractionId = `extract_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const extractionId = `extract_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     try {
       // 1. Validate and preprocess image
@@ -466,7 +503,7 @@ export class VisualFeatureExtractionService {
       );
 
       if (existingAnalysis) {
-        return this.formatExistingAnalysisResult(existingAnalysis, extractionId, startTime);
+        return this.formatExistingAnalysisResult(existingAnalysis as Record<string, unknown>, extractionId, startTime);
       }
 
       // 3. Perform parallel MIVAA analysis (LLaMA vision + CLIP embeddings)
@@ -491,10 +528,10 @@ export class VisualFeatureExtractionService {
       }
 
       // 4. Combine embeddings from parallel sources
-      const embeddings = VisualFeatureExtractionService.combineEmbeddingResults(llamaResult, clipEmbeddings);
+      const embeddings = await VisualFeatureExtractionService.combineEmbeddingResults(llamaResult, clipEmbeddings);
 
       // 5. Store visual analysis in database
-      const _analysisId = await this.storeVisualAnalysis({
+      await this.storeVisualAnalysis({
         material_id: request.material_id || llamaResult.analysis_id,
         llama_result: llamaResult,
         image_hash: preprocessedImage.hash,
@@ -632,9 +669,15 @@ export class VisualFeatureExtractionService {
       const statusMap: Record<string, QueueProcessingStatus> = {};
 
       data?.forEach((item: Record<string, unknown>) => {
+        const status = item.status as string;
+        const validStatus: 'pending' | 'processing' | 'completed' | 'failed' =
+          ['pending', 'processing', 'completed', 'failed'].includes(status)
+            ? status as 'pending' | 'processing' | 'completed' | 'failed'
+            : 'pending';
+
         statusMap[item.id as string] = {
           queue_id: item.id as string,
-          status: (item.status as string) || 'pending',
+          status: validStatus,
           processing_metadata: {
             processing_time_ms: (item.processing_time_ms as number) || undefined
           }
@@ -721,20 +764,20 @@ export class VisualFeatureExtractionService {
     return {
       success: true,
       extraction_id: extractionId,
-      material_id: existingAnalysis.material_id,
+      material_id: (existingAnalysis.material_id as string) || 'unknown',
       visual_analysis: {
-        material_type: existingAnalysis.material_type || 'unknown',
-        surface_texture: existingAnalysis.surface_texture || '',
-        color_description: existingAnalysis.color_description || '',
-        finish_type: existingAnalysis.finish_type || '',
-        pattern_grain: existingAnalysis.pattern_grain || '',
-        confidence_score: existingAnalysis.llama_confidence_score || 0,
-        structured_properties: existingAnalysis.structural_properties || {},
+        material_type: (existingAnalysis.material_type as string) || 'unknown',
+        surface_texture: (existingAnalysis.surface_texture as string) || '',
+        color_description: (existingAnalysis.color_description as string) || '',
+        finish_type: (existingAnalysis.finish_type as string) || '',
+        pattern_grain: (existingAnalysis.pattern_grain as string) || '',
+        confidence_score: (existingAnalysis.llama_confidence_score as number) || 0,
+        structured_properties: (existingAnalysis.structural_properties as Record<string, unknown>) || {},
       },
       processing_metadata: {
         processing_time_ms: Date.now() - startTime,
-        image_hash: existingAnalysis.source_image_hash || '',
-        llama_model_version: existingAnalysis.llama_model_version || '',
+        image_hash: (existingAnalysis.source_image_hash as string) || '',
+        llama_model_version: (existingAnalysis.llama_model_version as string) || '',
         pipeline_version: '1.0.0'
       },
       cost_info: {
@@ -744,17 +787,7 @@ export class VisualFeatureExtractionService {
     };
   }
 
-  private static async generateEmbeddings(
-    _llamaResult: MaterialVisionAnalysisResult
-  ): Promise<{ description_embedding?: number[]; material_type_embedding?: number[]; clip_embedding?: number[]; }> {
-    // Placeholder for embedding generation
-    // This would integrate with embedding services (OpenAI, local models, etc.)
-    return {
-      description_embedding: [], // TODO: Generate from description
-      material_type_embedding: [], // TODO: Generate from material type
-      clip_embedding: [] // TODO: Generate using CLIP model
-    };
-  }
+
 
   private static async storeVisualAnalysis(params: {
     material_id: string;
@@ -773,18 +806,18 @@ export class VisualFeatureExtractionService {
       finish_type: this.extractFinishType(params.llama_result),
       pattern_grain: this.extractPatternGrain(params.llama_result),
       visual_characteristics: this.extractVisualCharacteristics(params.llama_result),
-      structural_properties: this.extractStructuredProperties(params.llama_result),
+      structural_properties: this.extractStructuredProperties(params.llama_result) as Database['public']['Tables']['material_visual_analysis']['Insert']['structural_properties'],
       llama_confidence_score: this.extractConfidenceScore(params.llama_result),
       llama_model_version: params.llama_result.model_used || 'llama-3.2-vision',
       llama_processing_time_ms: params.llama_result.processing_time_ms || null,
       source_image_hash: params.image_hash,
       source_image_url: params.image_url || null,
-      image_dimensions: params.image_dimensions as unknown as Record<string, unknown>,
+      image_dimensions: params.image_dimensions as unknown as Database['public']['Tables']['material_visual_analysis']['Insert']['image_dimensions'],
       description_embedding: params.embeddings?.description_embedding ?
         JSON.stringify(params.embeddings.description_embedding) : null,
       material_type_embedding: params.embeddings?.material_type_embedding ?
         JSON.stringify(params.embeddings.material_type_embedding) : null,
-      clip_embedding: params.embeddings?.clip_embedding ? 
+      clip_embedding: params.embeddings?.clip_embedding ?
         JSON.stringify(params.embeddings.clip_embedding) : null,
       created_by: params.user_id,
       processing_status: 'completed'
@@ -819,9 +852,9 @@ export class VisualFeatureExtractionService {
         visual_analysis_confidence: this.extractConfidenceScore(llamaResult)
       };
 
-      // Add embeddings if available
+      // Add embeddings if available - use embedding_1536 for consistency
       if (embeddings?.clip_embedding) {
-        updateData.visual_embedding_512 = JSON.stringify(embeddings.clip_embedding);
+        updateData.embedding_1536 = embeddings.clip_embedding;
       }
 
       await supabase

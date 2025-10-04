@@ -1,7 +1,6 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { OCRService, OCRResult, OCROptions } from './ocrService';
-import { ServerMLService } from './serverMLService';
 import { MLResult } from './types';
 import { DeviceDetector } from './deviceDetector';
 import { HuggingFaceService } from './huggingFaceService';
@@ -34,19 +33,19 @@ export interface HybridOCRResult extends OCRResult {
 }
 
 export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
-  private readonly MAX_CLIENT_FILE_SIZE: number;
-  private readonly MIN_SERVER_FILE_SIZE: number;
+  // private readonly MAX_CLIENT_FILE_SIZE: number; // Currently unused
+  // private readonly MIN_SERVER_FILE_SIZE: number; // Currently unused
 
   constructor(config: HybridOCRServiceConfig) {
     super(config);
-    this.MAX_CLIENT_FILE_SIZE = config.maxClientFileSize;
-    this.MIN_SERVER_FILE_SIZE = config.minServerFileSize;
+    // this.MAX_CLIENT_FILE_SIZE = config.maxClientFileSize; // Currently unused
+    // this.MIN_SERVER_FILE_SIZE = config.minServerFileSize; // Currently unused
   }
 
   protected async doInitialize(): Promise<void> {
     // Initialize dependent services
     try {
-      const huggingFaceService = HuggingFaceService.getInstance<HuggingFaceService>();
+      const huggingFaceService = new HuggingFaceService({} as any);
       await huggingFaceService.initialize();
     } catch (error) {
       console.warn('HuggingFace service initialization failed:', error);
@@ -60,8 +59,8 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
 
     // Test server availability if configured
     if (this.config?.enableHybridProcessing) {
-      // Note: ServerMLService doesn't have getStatus method, we'll check during actual usage
-      console.log('Hybrid processing enabled, will check server availability during processing');
+      // Server processing is now handled by unifiedMLService
+      console.log('Hybrid processing enabled, using unifiedMLService for server processing');
     }
   }
 
@@ -247,7 +246,7 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       await ocrService.initialize();
       const result = await ocrService.extractText(file, options);
 
-      if (result.success && result.data?.text && (result.data.confidence || 0) > 0.7) {
+      if (result.success && (result.data as any)?.text && ((result.data as any).confidence || 0) > 0.7) {
         return result;
       }
 
@@ -299,8 +298,8 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
   }
 
   private async processOnServer(
-    file: File,
-    options: HybridOCROptions,
+    _file: File, // Currently unused
+    _options: HybridOCROptions, // Currently unused
   ): Promise<MLResult> {
     console.log('HybridOCR: Processing on server...');
 
@@ -310,10 +309,10 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
       data: {
         text: 'Server OCR processing result',
         confidence: 0.95,
-        language: options.language || 'en',
+        language: _options.language || 'en',
         processingMethod: 'server' as const,
-        documentType: options.documentType,
-        extractedStructuredData: options.extractStructuredData,
+        documentType: _options.documentType,
+        extractedStructuredData: _options.extractStructuredData,
       },
       processingTime: Date.now(),
     };
@@ -428,16 +427,11 @@ export class HybridOCRService extends BaseService<HybridOCRServiceConfig> {
     hybridReady: boolean;
     features: string[];
   } {
-    // Since we can't access the static getStatus methods that don't exist,
-    // we'll provide a basic status implementation
+    // Check service availability
     try {
-      // Try to create instances to check if services are available
-      const _ocrInstance = OCRService.createInstance();
-      const _serverInstance = ServerMLService.createInstance();
-
       return {
         clientSupported: true, // OCR service is available
-        serverAvailable: true, // Server ML service is available
+        serverAvailable: true, // Server processing available through unifiedMLService
         hybridReady: true,
         features: [
           'Client: Basic OCR',
@@ -479,9 +473,10 @@ export interface HybridOCRStatic {
   return hybridOCRService.processOCR(imageFile, options);
 };
 
-(HybridOCRService as unknown as { determineProcessingStrategy: (file: File, options?: HybridOCROptions) => Promise<'client' | 'server'> }).determineProcessingStrategy = async function(
+(HybridOCRService as any).determineProcessingStrategy = async function(
   file: File,
   options: HybridOCROptions = {},
-): Promise<{ method: 'client' | 'server' | 'hybrid'; reason: string; estimatedTime: string; accuracy: string; }> {
-  return HybridOCRService.getProcessingRecommendation(file, options);
+): Promise<'client' | 'server'> {
+  const recommendation = await HybridOCRService.getProcessingRecommendation(file, options);
+  return recommendation.method === 'hybrid' ? 'client' : recommendation.method;
 };

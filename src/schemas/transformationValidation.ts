@@ -25,9 +25,7 @@ const ChunkSizeConfigSchema = z.object({
  * Validation schema for embedding configuration
  */
 const EmbeddingConfigSchema = z.object({
-  model: z.enum(['text-embedding-ada-002', 'text-embedding-3-small', 'text-embedding-3-large'], {
-    errorMap: () => ({ message: 'Invalid embedding model' }),
-  }),
+  model: z.enum(['text-embedding-ada-002', 'text-embedding-3-small', 'text-embedding-3-large']),
   dimensions: z.number().int().min(256, 'Dimensions must be at least 256').max(3072, 'Dimensions cannot exceed 3072').optional(),
   batchSize: z.number().int().min(1, 'Batch size must be at least 1').max(100, 'Batch size cannot exceed 100').default(10),
   timeout: z.number().int().min(5000, 'Timeout must be at least 5 seconds').max(300000, 'Timeout cannot exceed 5 minutes').default(30000),
@@ -37,9 +35,7 @@ const EmbeddingConfigSchema = z.object({
  * Validation schema for output format configuration
  */
 const OutputFormatSchema = z.object({
-  format: z.enum(['json', 'jsonl', 'csv'], {
-    errorMap: () => ({ message: 'Format must be json, jsonl, or csv' }),
-  }),
+  format: z.enum(['json', 'jsonl', 'csv']),
   includeMetadata: z.boolean().default(true),
   includeEmbeddings: z.boolean().default(true),
   compression: z.enum(['none', 'gzip', 'brotli']).default('none'),
@@ -157,7 +153,7 @@ export function validateTransformationConfig(data: unknown): {
     };
   }
 
-  const errors = result.error.errors.map((error: z.ZodIssue) => ({
+  const errors = result.error.issues.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
@@ -215,7 +211,7 @@ export function validatePartialTransformationConfig(data: unknown): {
     };
   }
 
-  const errors = result.error.errors.map((error: z.ZodIssue) => ({
+  const errors = result.error.issues.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,
@@ -266,7 +262,7 @@ export function validateTransformationJobRequest(data: unknown): {
     };
   }
 
-  const errors = result.error.errors.map((error: z.ZodIssue) => ({
+  const errors = result.error.issues.map((error: z.ZodIssue) => ({
     path: error.path.join('.'),
     message: error.message,
     code: error.code,

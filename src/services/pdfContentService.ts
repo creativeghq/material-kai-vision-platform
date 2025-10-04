@@ -112,9 +112,6 @@ export class PDFContentService {
           includeImages: options.includeImages ?? true,
           generateEmbeddings: options.generateEmbeddings ?? true,
           enableSemanticAnalysis: options.enableSemanticAnalysis ?? true,
-          useMivaaProcessing: true, // Always use MIVAA for processing
-
-
         };
 
         const workflowService = new ConsolidatedPDFWorkflowService();
@@ -139,7 +136,7 @@ export class PDFContentService {
           },
           message: 'PDF processing started successfully with MIVAA workflow',
           workflowJobId: jobId,
-          mivaaProcessingResult: null,
+          mivaaProcessingResult: undefined,
           embeddingsGenerated: 0,
           chunksCreated: 0,
         };
@@ -196,7 +193,7 @@ export class PDFContentService {
         throw error;
       }
 
-      return (data || []).map(item => ({
+      return (data || []).map((item: any) => ({
         id: item.id,
         originalFilename: (item.metadata as Record<string, unknown>)?.original_filename || 'Unknown',
         processingStatus: item.status || 'unknown',
@@ -270,7 +267,7 @@ export class PDFContentService {
         const { error: kbDeleteError } = await supabase
           .from('enhanced_knowledge_base')
           .delete()
-          .eq('id', details.knowledge.id);
+          .eq('id', (details.knowledge as any).id);
 
         if (kbDeleteError) {
           console.error('Error deleting knowledge base entry:', kbDeleteError);
@@ -289,8 +286,8 @@ export class PDFContentService {
       }
 
       // Delete file from storage
-      if (details.processing.file_url) {
-        const fileName = details.processing.file_url.split('/').pop();
+      if ((details.processing as any).file_url) {
+        const fileName = (details.processing as any).file_url.split('/').pop();
         if (fileName) {
           await supabase.storage
             .from('pdf-documents')
@@ -370,11 +367,11 @@ export class PDFContentService {
       }
 
       const totalPDFs = data.length;
-      const successfulProcessing = data.filter(p => p.status === 'completed').length;
-      const averageConfidence = data.reduce((sum, p) => sum + ((p.metadata as Record<string, unknown>)?.confidence_score_avg as number || 0), 0) / totalPDFs || 0;
-      const totalMaterials = data.reduce((sum, p) => sum + ((p.metadata as Record<string, unknown>)?.materials_identified_count as number || 0), 0);
+      const successfulProcessing = data.filter((p: any) => p.status === 'completed').length;
+      const averageConfidence = data.reduce((sum: any, p: any) => sum + ((p.metadata as Record<string, unknown>)?.confidence_score_avg as number || 0), 0) / totalPDFs || 0;
+      const totalMaterials = data.reduce((sum: any, p: any) => sum + ((p.metadata as Record<string, unknown>)?.materials_identified_count as number || 0), 0);
       const recentActivity = data
-        .sort((a, b) => new Date(b.created_at || new Date().toISOString()).getTime() - new Date(a.created_at || new Date().toISOString()).getTime())
+        .sort((a: any, b: any) => new Date(b.created_at || new Date().toISOString()).getTime() - new Date(a.created_at || new Date().toISOString()).getTime())
         .slice(0, 5);
 
       return {

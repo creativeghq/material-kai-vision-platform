@@ -11,7 +11,7 @@ The Material Kai Vision Platform is a comprehensive AI-powered material recognit
 - **Database**: Supabase (PostgreSQL) with real-time capabilities
 - **Microservices**: MIVAA PDF Extractor (FastAPI/Python)
 - **AI/ML**: Multiple AI providers (OpenAI, HuggingFace, Replicate)
-- **3D Processing**: NeRF reconstruction and SVBRDF extraction
+- **3D Processing**: SVBRDF extraction and AI-powered 3D generation
 - **Authentication**: JWT-based with Supabase Auth
 
 ## 📚 Documentation Structure
@@ -76,7 +76,7 @@ This documentation is organized into the following sections:
 - Performance optimization and coordination
 
 #### 🎯 [3D Processing Services](./services-3d-processing.md)
-- NeRF reconstruction and SVBRDF extraction
+- SVBRDF extraction and material analysis
 - 3D model generation and material mapping
 - CrewAI integration for 3D workflows
 - Supabase Edge Functions for 3D processing

@@ -208,25 +208,25 @@ export async function getMaterialCategoriesAsync(): Promise<DynamicMaterialCateg
 export async function getAllMaterialFinishes(): Promise<string[]> {
   const properties = await getMaterialProperties();
   const finishProperty = properties.find(prop => prop.key === 'finish');
-  return finishProperty?.validationRules?.examples || ['matte', 'glossy', 'satin', 'textured', 'smooth', 'brushed', 'polished'];
+  return (finishProperty?.validationRules as any)?.examples || ['matte', 'glossy', 'satin', 'textured', 'smooth', 'brushed', 'polished'];
 }
 
 export async function getAllMaterialSizes(): Promise<string[]> {
   const properties = await getMaterialProperties();
   const sizeProperty = properties.find(prop => prop.key === 'size');
-  return sizeProperty?.validationRules?.examples || ['small', 'medium', 'large', 'custom', 'standard', 'oversized'];
+  return (sizeProperty?.validationRules as any)?.examples || ['small', 'medium', 'large', 'custom', 'standard', 'oversized'];
 }
 
 export async function getAllMaterialInstallationMethods(): Promise<string[]> {
   const properties = await getMaterialProperties();
   const installProperty = properties.find(prop => prop.key === 'installation_method');
-  return installProperty?.validationRules?.examples || ['adhesive', 'mechanical', 'welded', 'screwed', 'nailed', 'clipped', 'interlocking'];
+  return (installProperty?.validationRules as any)?.examples || ['adhesive', 'mechanical', 'welded', 'screwed', 'nailed', 'clipped', 'interlocking'];
 }
 
 export async function getAllMaterialApplications(): Promise<string[]> {
   const properties = await getMaterialProperties();
   const appProperty = properties.find(prop => prop.key === 'application');
-  return appProperty?.validationRules?.examples || ['interior', 'exterior', 'industrial', 'decorative', 'structural', 'functional'];
+  return (appProperty?.validationRules as any)?.examples || ['interior', 'exterior', 'industrial', 'decorative', 'structural', 'functional'];
 }
 
 // User preferences for material selection
@@ -245,12 +245,35 @@ export interface UserPreferences {
   };
 }
 
-export interface NeRFData {
-  reconstruction_id: string;
-  vertices: number[];
-  faces: number[];
-  textures: Record<string, unknown>;
+// MoodBoard interface for material collections
+export interface MoodBoard {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  isPublic: boolean;
+  items: MoodBoardItem[];
+  createdAt: Date;
+  updatedAt: Date;
 }
+
+export interface MoodBoardItem {
+  id: string;
+  moodboard_id: string;
+  material_id: string;
+  notes?: string;
+  position: number;
+  added_at: string;
+  material?: {
+    id: string;
+    name: string;
+    category: string;
+    thumbnail_url?: string;
+    properties: Record<string, unknown>;
+  };
+}
+
+
 
 export interface MaterialData {
   material_id: string;

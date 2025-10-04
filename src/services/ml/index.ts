@@ -1,4 +1,8 @@
-// Main ML services exports
+// Main ML services exports - CONSOLIDATED
+export { unifiedMLService, UnifiedMLService } from './unifiedMLService';
+export type { UnifiedMLServiceConfig, UnifiedMLOptions, UnifiedMLResult } from './unifiedMLService';
+
+// Legacy ML services exports (DEPRECATED - use UnifiedMLService instead)
 export { clientMLService, ClientMLService } from './clientMLService';
 export { serverMLService, ServerMLService } from './serverMLService';
 export { hybridMLService, HybridMLService } from './hybridMLService';
@@ -54,24 +58,21 @@ export {
 } from './serverMLService';
 
 // Import for utility functions
-import { hybridMLService } from './hybridMLService';
+import { unifiedMLService } from './unifiedMLService';
 
 /**
  * Quick access to the recommended ML service for most use cases
  * This intelligently chooses between client and server processing
+ *
+ * UPDATED: Now uses the new UnifiedMLService instead of hybridMLService
  */
-export const mlService = hybridMLService;
-
-/**
- * Utility function to get ML service recommendations
- */
-export function getMLRecommendation(files: File[]) {
-  return hybridMLService.getProcessingRecommendation(files);
-}
+export const mlService = unifiedMLService;
 
 /**
  * Utility function to check all ML services status
+ *
+ * UPDATED: Now uses the new UnifiedMLService
  */
 export function getMLStatus() {
-  return hybridMLService.getStatus();
+  return unifiedMLService.getStatus();
 }

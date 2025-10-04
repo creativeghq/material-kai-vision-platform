@@ -271,7 +271,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       // Assign points to nearest centroid
-      const clusters = centroids.map(() => ({ centroid: [], points: [] as number[][] }));
+      const clusters = centroids.map(() => ({ centroid: [] as number[], points: [] as number[][] }));
 
       for (const point of points) {
         let minDistance = Infinity;
@@ -377,7 +377,7 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
   private categorizeColors(colors: Color[]): ColorCategory[] {
     return colors.map(color => {
       const { h, s, v } = color.hsv;
-      const categories = [];
+      const categories: ColorCategory[] = [];
 
       // Temperature classification
       if ((h >= 0 && h <= 60) || (h >= 300 && h <= 360)) {
@@ -491,9 +491,19 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
 
   // Utility methods
   private async loadImageData(file: File): Promise<ImageData> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      if (!this.canvas || !this.ctx) {
+        reject(new Error('Canvas not available'));
+        return;
+      }
+
       const img = new Image();
       img.onload = () => {
+        if (!this.canvas || !this.ctx) {
+          reject(new Error('Canvas not available'));
+          return;
+        }
+
         this.canvas.width = Math.min(img.width, 400);
         this.canvas.height = Math.min(img.height, 400);
         this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
@@ -614,7 +624,6 @@ export class ColorAnalysisEngine extends BaseService<ColorAnalysisServiceConfig>
 
   private calculateColorBalance(colors: Color[]): number {
     // Simplified balance calculation
-    const _total = colors.reduce((sum, color) => sum + color.percentage, 0);
     const ideal = 1 / colors.length;
     const variance = colors.reduce((sum, color) => sum + Math.abs(color.percentage - ideal), 0);
     return Math.max(0, 1 - variance);

@@ -181,14 +181,14 @@ export class SVBRDFExtractionAPI {
 
       const analytics = {
         total_extractions: data.length,
-        successful_extractions: data.filter(e => e.extraction_status === 'completed').length,
-        failed_extractions: data.filter(e => e.extraction_status === 'failed').length,
+        successful_extractions: data.filter((e: any) => e.extraction_status === 'completed').length,
+        failed_extractions: data.filter((e: any) => e.extraction_status === 'failed').length,
         average_processing_time: data
-          .filter(e => e.processing_time_ms)
-          .reduce((acc, e) => acc + (e.processing_time_ms || 0), 0) / data.filter(e => e.processing_time_ms).length || 0,
+          .filter((e: any) => e.processing_time_ms)
+          .reduce((acc: any, e: any) => acc + (e.processing_time_ms || 0), 0) / data.filter((e: any) => e.processing_time_ms).length || 0,
         average_confidence: data
-          .filter(e => e.confidence_score)
-          .reduce((acc, e) => acc + (e.confidence_score || 0), 0) / data.filter(e => e.confidence_score).length || 0,
+          .filter((e: any) => e.confidence_score)
+          .reduce((acc: any, e: any) => acc + (e.confidence_score || 0), 0) / data.filter((e: any) => e.confidence_score).length || 0,
         material_types: this.analyzeMaterialTypes(data),
         surface_categories: this.analyzeSurfaceCategories(data),
       };

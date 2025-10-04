@@ -296,7 +296,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                           <div className="aspect-video bg-gray-100 flex items-center justify-center">
                             {image.storage_path ? (
                               <img
-                                src={image.storage_path}
+                                src={(image.storage_path as string) || ''}
                                 alt={`Extracted image ${idx + 1}`}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
@@ -310,7 +310,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                           </div>
                           <div className="p-3">
                             <p className="text-xs text-muted-foreground">
-                              {image.caption || `Image ${idx + 1}`}
+                              {(image.caption as string) || `Image ${idx + 1}`}
                             </p>
                             {hasMetadata && metadataVisible && (
                               <div className="mt-2 pt-2 border-t">

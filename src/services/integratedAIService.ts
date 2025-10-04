@@ -6,7 +6,6 @@ import {
   errorLogger,
 } from '@/core/errors';
 import {
-  NeRFData,
   MaterialData,
   SpatialAnalysisData,
   AgentExecutionData,
@@ -14,7 +13,7 @@ import {
 } from '@/types/materials';
 import {
   validateWithGuard as _validateWithGuard,
-  createValidationResult,
+  isAgentExecutionResult,
 } from '@/types/guards';
 import { UserPreferences } from '@/services/spaceformerAnalysisService';
 
@@ -38,7 +37,7 @@ export interface MaterialAgentInputData {
   image_data?: File;
   analysis_type?: string;
   room_type?: string;
-  nerf_data?: NeRFData | null;
+
   material_data?: MaterialData | null;
   spatial_analysis?: SpatialAnalysisData | null;
   user_preferences?: UserPreferences;
@@ -68,7 +67,7 @@ export interface MaterialAgentResult {
 // SpaceFormer Services
 export interface SpaceFormerRequest {
   user_id: string;
-  nerf_reconstruction_id?: string;
+
   room_type: string;
   room_dimensions?: Record<string, unknown>;
   user_preferences?: UserPreferences;
@@ -175,13 +174,10 @@ export class MaterialAgentOrchestratorAPI {
 
       // Validate coordinated_result if present
       if (result.coordinated_result && result.coordinated_result.data) {
-        const validationResult = createValidationResult(
-          result.coordinated_result.data,
-          isAgentExecutionData
-        );
-        
-        if (!validationResult.success) {
-          console.warn('Invalid agent execution data structure:', validationResult.error);
+        const isValid = isAgentExecutionResult(result.coordinated_result.data);
+
+        if (!isValid) {
+          console.warn('Invalid agent execution data structure:', result.coordinated_result.data);
           // Don't throw - log warning but continue with response
         }
       }
@@ -206,21 +202,17 @@ export class MaterialAgentOrchestratorAPI {
    */
   static async getAvailableAgents() {
     try {
-      // TODO: Update when material_agents table is created
-      // For now, return empty array as the table doesn't exist in current schema
-      return [];
+      const { data, error } = await supabase
+        .from('material_agents')
+        .select('*')
+        .eq('status', 'active')
+        .order('agent_name');
 
-      // const { data, error } = await supabase
-      //   .from('material_agents')
-      //   .select('*')
-      //   .eq('status', 'active')
-      //   .order('agent_name');
+      if (error) {
+        throw error;
+      }
 
-      // if (error) {
-      //   throw error;
-      // }
-
-      // return data || [];
+      return data || [];
     } catch (error) {
       console.error('Error fetching agents:', error);
       throw error;
@@ -358,11 +350,10 @@ export class SpaceFormerAPI {
   }
 
   /**
-   * Analyze room with integrated NeRF and SVBRDF data
+   * Analyze room with integrated SVBRDF data
    */
   static async analyzeRoomComplete(
     roomType: string,
-    nerfReconstructionId?: string,
     svbrdfExtractionIds?: string[],
     userPreferences?: UserPreferences,
   ): Promise<SpaceFormerResult> {
@@ -376,7 +367,7 @@ export class SpaceFormerAPI {
       const request: SpaceFormerRequest = {
         user_id: user.id,
         room_type: roomType,
-        nerf_reconstruction_id: nerfReconstructionId,
+
         user_preferences: userPreferences,
         constraints: {
           svbrdf_extraction_ids: svbrdfExtractionIds,
@@ -408,17 +399,10 @@ export class IntegratedAIService {
       }
 
       const results = {
-        nerfReconstruction: null,
-        svbrdfExtractions: [],
+        svbrdfExtractions: [] as any[],
         spatialAnalysis: null,
         crewaiCoordination: null,
       };
-
-      // Step 1: NeRF Reconstruction (if multiple images)
-      if (images.length >= 3) {
-        const { NeRFProcessingAPI } = await import('./nerfProcessingAPI');
-        results.nerfReconstruction = await NeRFProcessingAPI.uploadImagesAndReconstruct(images);
-      }
 
       // Step 2: SVBRDF Material Extraction (for each image)
       if (images.length > 0) {
@@ -436,27 +420,25 @@ export class IntegratedAIService {
         }
       }
 
-      // Step 3: SpaceFormer Spatial Analysis
+      // Step 2: SpaceFormer Spatial Analysis
       results.spatialAnalysis = await SpaceFormerAPI.analyzeRoomComplete(
         roomType,
-        results.nerfReconstruction?.reconstruction_id,
         results.svbrdfExtractions.map(e => e.extraction_id),
         userPreferences,
-      );
+      ) as any;
 
-      // Step 4: Material Agent Orchestrator Coordination and Final Recommendations
+      // Step 3: Material Agent Orchestrator Coordination and Final Recommendations
       results.crewaiCoordination = await MaterialAgentOrchestratorAPI.executeTask({
         user_id: user.id,
         task_type: 'comprehensive_design',
         input_data: {
           room_type: roomType,
-          nerf_data: results.nerfReconstruction,
-          material_data: results.svbrdfExtractions,
+          material_data: results.svbrdfExtractions as any,
           spatial_analysis: results.spatialAnalysis,
           user_preferences: userPreferences,
         },
         priority: 1,
-      });
+      }) as any;
 
       return results;
     } catch (error) {
@@ -511,15 +493,13 @@ export class IntegratedAIService {
         throw new Error('User not authenticated');
       }
 
-      const [nerfStats, svbrdfStats, spatialStats, taskStats] = await Promise.allSettled([
-        supabase.from('nerf_reconstructions').select('*').eq('user_id', user.id),
+      const [svbrdfStats, spatialStats, taskStats] = await Promise.allSettled([
         supabase.from('svbrdf_extractions').select('*').eq('user_id', user.id),
         supabase.from('spatial_analysis').select('*').eq('user_id', user.id),
         supabase.from('agent_tasks').select('*').eq('user_id', user.id),
       ]);
 
       return {
-        nerf_reconstructions: nerfStats.status === 'fulfilled' ? nerfStats.value.data?.length || 0 : 0,
         svbrdf_extractions: svbrdfStats.status === 'fulfilled' ? svbrdfStats.value.data?.length || 0 : 0,
         spatial_analyses: spatialStats.status === 'fulfilled' ? spatialStats.value.data?.length || 0 : 0,
         agent_tasks: taskStats.status === 'fulfilled' ? taskStats.value.data?.length || 0 : 0,

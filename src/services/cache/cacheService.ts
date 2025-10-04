@@ -156,7 +156,6 @@ export class CacheService {
    */
   cleanExpired(): number {
     let cleaned = 0;
-    const now = Date.now();
 
     for (const [key, entry] of this.cache.entries()) {
       if (this.isExpired(entry)) {

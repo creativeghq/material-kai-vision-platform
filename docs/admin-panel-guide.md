@@ -244,11 +244,13 @@ interface PDFAdminFeatures {
 - **Quality Scoring**: Assess content quality
 - **Expert Validation**: Expert review workflows
 
-### 2. RAGManagementPanel
+### 2. IntegratedRAGManagement
 
-**Location**: `src/components/Admin/RAGManagementPanel.tsx`
+**Location**: `src/components/Admin/IntegratedRAGManagement.tsx`
 
-**Purpose**: RAG system configuration and optimization
+**Purpose**: Consolidated RAG system configuration, optimization, and training
+
+**Note**: RAGManagementPanel has been consolidated into IntegratedRAGManagement for better functionality and reduced duplication.
 
 **RAG Management**:
 - **Document Index Status**: Vector database health

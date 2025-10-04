@@ -403,9 +403,9 @@ export class JWTAuthMiddleware {
    */
   static extractWorkspaceId(request: AuthenticatedRequest): string | undefined {
     // Try to get workspace ID from various sources
-    return request.body?.workspaceId ||
-           request.headers['x-workspace-id'] ||
-           request.headers['X-Workspace-Id'];
+    return (request.body?.workspaceId as string) ||
+           (request.headers['x-workspace-id'] as string) ||
+           (request.headers['X-Workspace-Id'] as string);
   }
 
   /**

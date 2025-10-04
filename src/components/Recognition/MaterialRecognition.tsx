@@ -58,10 +58,10 @@ export const MaterialRecognition: React.FC = () => {
 
       // Merge enhancements into recognition results
       const enhancedResults = recognitionResults.map(result => {
-        const enhancement = enhancements[result.id];
+        const enhancement = enhancements[(result as any).id];
         if (enhancement) {
           const enhancedMetadata = {
-            ...result.metadata,
+            ...(result as any).metadata,
             properties: {
               ...(enhancement.ocrExtraction && {
                 extracted_text: enhancement.ocrExtraction.extractedText,

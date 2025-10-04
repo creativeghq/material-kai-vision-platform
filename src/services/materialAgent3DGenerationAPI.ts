@@ -182,30 +182,30 @@ export class MaterialAgent3DGenerationAPI {
       let totalQualityScore = 0;
       let qualityCount = 0;
 
-      data?.forEach(event => {
+      data?.forEach((event: any) => {
         const eventData = event.event_data as Record<string, unknown>;
 
         // Processing time
         if (eventData.processing_time_ms) {
-          totalProcessingTime += eventData.processing_time_ms;
+          totalProcessingTime += (eventData.processing_time_ms as number);
         }
 
         // Quality score
         if (eventData.quality_score) {
-          totalQualityScore += eventData.quality_score;
+          totalQualityScore += (eventData.quality_score as number);
           qualityCount++;
         }
 
         // Room types
         if (eventData.room_type) {
-          analytics.popular_room_types[eventData.room_type] =
-            (analytics.popular_room_types[eventData.room_type] || 0) + 1;
+          analytics.popular_room_types[eventData.room_type as string] =
+            (analytics.popular_room_types[eventData.room_type as string] || 0) + 1;
         }
 
         // Styles
         if (eventData.style) {
-          analytics.popular_styles[eventData.style] =
-            (analytics.popular_styles[eventData.style] || 0) + 1;
+          analytics.popular_styles[eventData.style as string] =
+            (analytics.popular_styles[eventData.style as string] || 0) + 1;
         }
       });
 

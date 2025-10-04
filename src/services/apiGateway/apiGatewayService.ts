@@ -320,7 +320,7 @@ class ApiGatewayService {
     const { data, error } = await query;
 
     if (error) throw error;
-    return (data || []).map(log => ({
+    return (data || []).map((log: any) => ({
       ...log,
       ip_address: String(log.ip_address || ''),
     })) as ApiUsageLog[];

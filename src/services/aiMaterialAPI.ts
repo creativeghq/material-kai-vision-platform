@@ -222,7 +222,7 @@ export class AIMaterialAPI {
       let totalConfidence = 0;
       let confidenceCount = 0;
 
-        data?.forEach(event => {
+        data?.forEach((event: any) => {
         const eventData = event.event_data as Record<string, unknown>;
 
         switch (event.event_type) {

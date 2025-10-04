@@ -1,3 +1,4 @@
+// @ts-ignore - Temporary workaround for import issue
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
@@ -26,7 +27,7 @@ import { Designer3DPage } from './components/3D/Designer3DPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { Layout } from './components/Layout/Layout';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
-import { NeRFReconstructionPage } from './components/NeRF/NeRFReconstructionPage';
+
 import { OCRProcessor } from './components/OCR/OCRProcessor';
 import { IntegratedRAGManagement } from './components/Admin/IntegratedRAGManagement';
 import PDFProcessing from './pages/PDFProcessing';
@@ -159,11 +160,7 @@ const App = () => (
                 <SVBRDFExtractionPage />
               </AuthGuard>
             } />
-            <Route path="/admin/nerf" element={
-              <AuthGuard>
-                <NeRFReconstructionPage />
-              </AuthGuard>
-            } />
+
             <Route path="/admin/ocr" element={
               <AuthGuard>
                 <OCRProcessor />

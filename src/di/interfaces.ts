@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { RagDocument } from '../types/rag';
 
 // ============================================================================
 // COMMON TYPES AND INTERFACES
@@ -359,52 +360,11 @@ export interface IMivaaDocumentMetadata {
   processingVersion: string;
 }
 
-/**
- * RAG-compatible document structure
- */
-export interface IRagDocument {
-  id: string;
-  title: string;
-  content: string;
-  chunks: IDocumentChunk[];
-  metadata: IRagMetadata;
-  workspace: string;
-  embeddings?: {
-    document: number[];
-    chunks: Array<{
-      chunkId: string;
-      embedding: number[];
-    }>;
-  };
-  tables?: IProcessedTableData[];
-  images?: IProcessedImageData[];
-  structure?: IDocumentStructure;
-  quality?: IQualityMetrics;
-}
+// IRagDocument interface replaced by unified RagDocument in src/types/rag.ts
+// Use: import { RagDocument } from '../types/rag';
 
-/**
- * RAG metadata interface
- */
-export interface IRagMetadata {
-  source: IMivaaDocumentMetadata;
-  transformation: {
-    timestamp: string;
-    version: string;
-    strategy: string;
-  };
-  processing: {
-    chunksGenerated: number;
-    tablesProcessed: number;
-    imagesProcessed: number;
-    totalProcessingTime: number;
-  };
-  quality: {
-    overallScore: number;
-    contentQuality: number;
-    structurePreservation: number;
-    metadataCompleteness: number;
-  };
-}
+// IRagMetadata interface replaced by unified RagMetadata in src/types/rag.ts
+// Use: import { RagMetadata } from '../types/rag';
 
 /**
  * Processed table data interface
@@ -495,7 +455,7 @@ export interface ITransformationConfig {
  * Transformation result interface
  */
 export interface ITransformationResult {
-  ragDocument: IRagDocument;
+  ragDocument: RagDocument;
   metrics: {
     processingTime: number;
     chunksGenerated: number;
@@ -542,7 +502,7 @@ export interface IMivaaToRagTransformerService extends IBaseService {
    */
   calculateQualityMetrics(
     mivaaDocument: IMivaaDocument,
-    ragDocument: IRagDocument
+    ragDocument: RagDocument
   ): IQualityMetrics;
 }
 

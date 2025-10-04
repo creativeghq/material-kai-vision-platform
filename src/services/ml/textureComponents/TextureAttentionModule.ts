@@ -29,11 +29,11 @@ export interface TextureFeatureMap {
 
 export class TextureAttentionModule {
   private config: AttentionConfig;
-  private queryWeights: Float32Array;
-  private keyWeights: Float32Array;
-  private valueWeights: Float32Array;
-  private outputWeights: Float32Array;
-  private positionEmbeddings: Float32Array;
+  private queryWeights: Float32Array = new Float32Array(0);
+  private keyWeights: Float32Array = new Float32Array(0);
+  private valueWeights: Float32Array = new Float32Array(0);
+  private outputWeights: Float32Array = new Float32Array(0);
+  private positionEmbeddings: Float32Array = new Float32Array(0);
 
   constructor(config: AttentionConfig) {
     this.config = config;
@@ -121,7 +121,7 @@ export class TextureAttentionModule {
 
     } catch (error) {
       console.error('Error in texture attention processing:', error);
-      throw new Error(`Texture attention processing failed: ${error.message}`);
+      throw new Error(`Texture attention processing failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

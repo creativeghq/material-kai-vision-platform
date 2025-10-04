@@ -35,14 +35,10 @@ export interface CrossModalConfig {
 export class CrossModalLearning {
   private config: CrossModalConfig;
   private modalityEncoders: Map<string, Float32Array>;
-  private crossAttentionWeights: Float32Array;
-  private fusionNetwork: Float32Array;
 
   constructor(config: CrossModalConfig) {
     this.config = config;
     this.modalityEncoders = new Map();
-    this.crossAttentionWeights = new Float32Array(config.attentionHeads * 4); // 4 modalities
-    this.fusionNetwork = new Float32Array(config.fusedDim);
     this.initializeEncoders();
   }
 

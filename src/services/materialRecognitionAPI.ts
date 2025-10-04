@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type {
   Material,
+  MaterialProperties,
   RecognitionResult,
   RecognitionRequest,
   UploadedFile,
@@ -40,6 +41,7 @@ interface RecognitionResultRow {
 function mapToMaterial(dbMaterial: MaterialsRow): Material {
   return {
     ...dbMaterial,
+    description: dbMaterial.description || '',
     properties: (dbMaterial.properties as MaterialProperties) || {},
     standards: [],
     metadata: {
@@ -55,25 +57,31 @@ function mapToMaterial(dbMaterial: MaterialsRow): Material {
 
 function mapToRecognitionResult(dbResult: RecognitionResultRow): RecognitionResult {
   return {
-    ...dbResult,
-    // Legacy properties for backward compatibility
     materialId: dbResult.material_id || '',
-    name: dbResult.material?.name || 'Unknown Material',
     confidence: dbResult.confidence_score,
-    imageUrl: '',
-    metadata: {
-      color: '',
-      finish: '',
-      brand: '',
-      properties: dbResult.properties_detected || {},
+    matchedMaterial: {
+      id: dbResult.material_id || '',
+      name: 'Unknown Material',
+      description: '',
+      category: 'unknown',
+      properties: {},
+      metadata: {},
+      standards: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
-    processingTime: dbResult.processing_time_ms || 0,
+    extractedProperties: (dbResult.properties_detected as Record<string, unknown>) || {},
   };
 }
 
 function mapToUploadedFile(dbFile: Record<string, unknown>): UploadedFile {
   return {
     ...dbFile,
+    id: (dbFile.id as string) || '',
+    user_id: (dbFile.user_id as string) || '',
+    file_name: (dbFile.file_name as string) || '',
+    file_size: (dbFile.file_size as number) || 0,
+    storage_path: (dbFile.storage_path as string) || '',
     file_type: dbFile.file_type as 'image' | 'document' | '3d_model',
   };
 }
@@ -81,6 +89,10 @@ function mapToUploadedFile(dbFile: Record<string, unknown>): UploadedFile {
 function mapToProcessingJob(dbJob: Record<string, unknown>): ProcessingJob {
   return {
     ...dbJob,
+    id: (dbJob.id as string) || '',
+    user_id: (dbJob.user_id as string) || '',
+    input_data: (dbJob.input_data as Record<string, unknown>) || {},
+    status: (dbJob.status as 'pending' | 'processing' | 'completed' | 'failed') || 'pending',
     job_type: dbJob.job_type as 'recognition' | '3d_reconstruction' | 'batch_analysis',
   };
 }
@@ -170,8 +182,8 @@ export class MaterialRecognitionAPI {
         .invoke('hybrid-material-analysis', {
           body: {
             file_id: uploadedFiles[0]?.id || '', // Use first file for single analysis
-            analysis_type: request.options?.extractProperties ? 'properties_only' : 'comprehensive',
-            include_similar: request.options?.includeSimilarMaterials || false,
+            analysis_type: request.options?.extract_properties ? 'properties_only' : 'comprehensive',
+            include_similar: request.options?.include_similar_materials || false,
             minimum_score: 0.7,
             max_retries: 2,
           },

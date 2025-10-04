@@ -130,7 +130,7 @@ export class DocumentChunkingService {
 
   private readonly SENTENCE_ENDINGS = /[.!?]+\s+/g;
   private readonly PARAGRAPH_BREAKS = /\n\s*\n/g;
-  private readonly HEADER_PATTERN = /^#{1,6}\s+.+$/gm;
+
 
   /**
    * Chunk a document using the specified strategy
@@ -571,7 +571,6 @@ export class DocumentChunkingService {
     const averageChunkSize = chunks.reduce((sum, chunk) => sum + chunk.content.length, 0) / chunksGenerated;
 
     // Calculate overlap efficiency (how much content is actually overlapped)
-    const _totalContent = chunks.reduce((sum, chunk) => sum + chunk.content.length, 0);
     const uniqueContent = new Set(chunks.map(chunk => chunk.hash)).size;
     const overlapEfficiency = uniqueContent / chunksGenerated;
 
@@ -621,8 +620,8 @@ export class DocumentChunkingService {
 
   private createChunkingError(code: string, message: string, originalError?: unknown): Error {
     const error = new Error(message);
-    (error as Record<string, unknown>).code = code;
-    (error as Record<string, unknown>).originalError = originalError;
+    (error as unknown as Record<string, unknown>).code = code;
+    (error as unknown as Record<string, unknown>).originalError = originalError;
     return error;
   }
 }

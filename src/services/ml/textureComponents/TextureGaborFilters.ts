@@ -37,12 +37,16 @@ export interface TextureResponse {
 
 export class TextureGaborFilters {
   private config: GaborFilterConfig;
-  private filterBank: GaborFilterBank;
-  private gradients: Map<string, Float32Array>;
+  private filterBank: GaborFilterBank = {
+    filters: [],
+    orientations: new Float32Array(0),
+    frequencies: new Float32Array(0),
+    responses: [],
+    energyMaps: []
+  };
 
   constructor(config: GaborFilterConfig) {
     this.config = config;
-    this.gradients = new Map();
     this.initializeFilterBank();
   }
 
@@ -200,7 +204,7 @@ export class TextureGaborFilters {
 
     } catch (error) {
       console.error('Error applying Gabor filter bank:', error);
-      throw new Error(`Gabor filter processing failed: ${error.message}`);
+      throw new Error(`Gabor filter processing failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

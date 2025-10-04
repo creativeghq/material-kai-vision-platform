@@ -21,13 +21,9 @@ const sampleMaterials: Material[] = [
       thermalConductivity: 2.9,
       flexuralModulus: 15.0,
     },
-    composition: {
-      elements: { 'CaCO3': 95, 'MgCO3': 3, 'SiO2': 2 },
-    },
     standards: ['ASTM C503', 'EN 12058', 'ISO 10545'],
     createdAt: '2025-09-01T10:00:00Z',
     updatedAt: '2025-09-03T15:30:00Z',
-    createdBy: 'ai-extraction-system',
     metadata: {
       finish: 'polished',
       size: '24x24"',
@@ -57,7 +53,6 @@ const sampleMaterials: Material[] = [
     standards: ['ASTM C648', 'EN 14411', 'ISO 13006'],
     createdAt: '2025-09-02T14:20:00Z',
     updatedAt: '2025-09-03T16:45:00Z',
-    createdBy: 'ai-extraction-system',
     metadata: {
       finish: 'matte',
       size: '30x30"',
@@ -84,13 +79,9 @@ const sampleMaterials: Material[] = [
       yieldStrength: 310,
       tensileStrength: 620,
     },
-    composition: {
-      elements: { 'Fe': 68, 'Cr': 18, 'Ni': 10, 'Mo': 3, 'C': 0.03 },
-    },
     standards: ['ASTM A240', 'EN 10088-2', 'JIS G4305'],
     createdAt: '2025-09-01T08:30:00Z',
     updatedAt: '2025-09-03T12:15:00Z',
-    createdBy: 'ai-extraction-system',
     metadata: {
       finish: 'brushed',
       size: '12x12"',
@@ -118,13 +109,9 @@ const sampleMaterials: Material[] = [
       thermalConductivity: 0.17,
       flexuralModulus: 12.0,
     },
-    composition: {
-      elements: { 'Cellulose': 45, 'Lignin': 25, 'Hemicellulose': 25, 'Extractives': 5 },
-    },
     standards: ['NWFA', 'ASTM D2394', 'EN 13489'],
     createdAt: '2025-08-30T16:45:00Z',
     updatedAt: '2025-09-03T11:20:00Z',
-    createdBy: 'ai-extraction-system',
     metadata: {
       finish: 'natural',
       size: '18x18"',
@@ -153,7 +140,6 @@ const sampleMaterials: Material[] = [
     standards: ['LEED Certified', 'Green Building Standard'],
     createdAt: '2025-09-01T13:15:00Z',
     updatedAt: '2025-09-03T14:30:00Z',
-    createdBy: 'ai-extraction-system',
     metadata: {
       finish: 'polished',
       size: 'sheets',

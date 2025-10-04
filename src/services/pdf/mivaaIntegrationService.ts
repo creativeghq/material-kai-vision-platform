@@ -1,8 +1,7 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { DocumentProcessingPipeline } from './documentProcessingPipeline';
-import { unifiedTextPreprocessor } from '../textPreprocessor';
-import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
+import { ProcessingPipelineResult } from '../../types/rag';
 
 /**
  * Configuration interface for Mivaa PDF Integration Service
@@ -100,43 +99,9 @@ export interface ImageData {
   metadata?: Record<string, unknown>;
 }
 
-/**
- * RAG-ready document structure
- */
-export interface RagDocument {
-  id: string;
-  content: string;
-  metadata: {
-    source: string;
-    type: 'text' | 'table' | 'image';
-    pageNumber?: number;
-    chunkIndex?: number;
-    extractedAt: Date;
-    workspace?: {
-      projectId?: string;
-      userId?: string;
-      tags?: string[];
-    };
-  };
-  embeddings?: number[];
-  vector?: number[];
-}
+// RagDocument interface moved to src/types/rag.ts for unified usage across the application
 
-/**
- * Processing pipeline result
- */
-export interface ProcessingPipelineResult {
-  documentId: string;
-  ragDocuments: RagDocument[];
-  summary: {
-    totalChunks: number;
-    textChunks: number;
-    tableChunks: number;
-    imageChunks: number;
-    processingTime: number;
-  };
-  errors?: string[];
-}
+// ProcessingPipelineResult interface moved to src/types/rag.ts for unified usage across the application
 
 /**
  * Mivaa API response interfaces
@@ -175,6 +140,8 @@ interface MivaaImagesResponse {
     processing_time: number;
   };
 }
+
+// MivaaMetadata type removed - using undefined for metadata field instead
 
 /**
  * Mivaa PDF Integration Service
@@ -337,6 +304,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
         const gatewayPayload = {
+          baseUrl: this.baseUrl,
           endpoint: endpoint,
           method: options.method || 'GET',
           headers: {
@@ -382,22 +350,73 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   }> {
     const errors: string[] = [];
     const warnings: string[] = [];
-    let extractedData: Record<string, unknown> = {};
+    let extractedData: ExtractionResult['data'] = {};
 
     try {
       switch (request.options.extractionType) {
-        case 'markdown':
-          extractedData = await this.extractMarkdown(request);
+        case 'markdown': {
+          const response = await this.extractMarkdown(request);
+          extractedData = { markdown: response.markdown, metadata: undefined };
           break;
-        case 'tables':
-          extractedData = await this.extractTables(request);
+        }
+        case 'tables': {
+          const response = await this.extractTables(request);
+          extractedData = {
+            tables: response.tables.map(table => ({
+              id: `table_${table.table_index}`,
+              pageNumber: table.page_number,
+              csvData: table.csv_data,
+              rowCount: 0, // TODO: Calculate from CSV data
+              columnCount: 0, // TODO: Calculate from CSV data
+              headers: [], // TODO: Extract from CSV data
+            })),
+            metadata: undefined
+          };
           break;
-        case 'images':
-          extractedData = await this.extractImages(request);
+        }
+        case 'images': {
+          const response = await this.extractImages(request);
+          extractedData = {
+            images: response.images.map(image => ({
+              id: `image_${image.page_number}`,
+              pageNumber: image.page_number,
+              base64Data: image.image_data,
+              format: image.format,
+              width: image.width,
+              height: image.height,
+              description: '', // TODO: Add image description
+              imageBuffer: Buffer.from(image.image_data, 'base64'), // Convert base64 to Buffer
+            })),
+            metadata: undefined
+          };
           break;
-        case 'all':
-          extractedData = await this.extractAll(request);
+        }
+        case 'all': {
+          const response = await this.extractAll(request);
+          extractedData = {
+            markdown: response.markdown.markdown,
+            tables: response.tables.tables.map(table => ({
+              id: `table_${table.table_index}`,
+              pageNumber: table.page_number,
+              csvData: table.csv_data,
+              rowCount: 0,
+              columnCount: 0,
+              headers: [],
+            })),
+            images: response.images.images.map(image => ({
+              id: `image_${image.page_number}`,
+              pageNumber: image.page_number,
+              base64Data: image.image_data,
+              format: image.format,
+              width: image.width,
+              height: image.height,
+              description: '',
+              imageBuffer: Buffer.from(image.image_data, 'base64'), // Convert base64 to Buffer
+            })),
+            metadata: undefined,
+          };
           break;
+        }
         default:
           throw new Error(`Unsupported extraction type: ${request.options.extractionType}`);
       }
@@ -436,7 +455,12 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         documentId: request.documentId,
         status: extractionResult.success ? 'success' : 'failed',
         extractionType: request.options.extractionType,
-        data: extractionResult.data,
+        data: extractionResult.data as {
+          markdown?: string;
+          tables?: TableData[];
+          images?: ImageData[];
+          metadata?: DocumentMetadata;
+        },
         processingTime: Date.now() - startTime,
         ...(extractionResult.errors && { errors: extractionResult.errors }),
         ...(extractionResult.warnings && { warnings: extractionResult.warnings }),

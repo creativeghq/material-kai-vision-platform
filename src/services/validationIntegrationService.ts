@@ -92,7 +92,7 @@ export class ValidationIntegrationService {
 
       return validatedDocument;
     } catch (error) {
-      const _processingTime = performance.now() - startTime;
+      // const _processingTime = performance.now() - startTime;
 
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('mivaa-document-validation');
@@ -104,7 +104,7 @@ export class ValidationIntegrationService {
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value,
+          value: error.value as string | number | boolean | null | undefined,
         }));
 
         throw new ValidationError(
@@ -137,7 +137,7 @@ export class ValidationIntegrationService {
 
       return validatedConfig;
     } catch (error) {
-      const _processingTime = performance.now() - startTime;
+      // const _processingTime = performance.now() - startTime;
 
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('transformation-config-validation');
@@ -149,7 +149,7 @@ export class ValidationIntegrationService {
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value,
+          value: error.value as string | number | boolean | null | undefined,
         }));
 
         throw new ValidationError(
@@ -182,7 +182,7 @@ export class ValidationIntegrationService {
 
       return validatedRequest;
     } catch (error) {
-      const _processingTime = performance.now() - startTime;
+      // const _processingTime = performance.now() - startTime;
 
       if (error instanceof z.ZodError) {
         const errorReporter = new ErrorReporter('transformation-job-request-validation');
@@ -194,7 +194,7 @@ export class ValidationIntegrationService {
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value,
+          value: error.value as string | number | boolean | null | undefined,
         }));
 
         throw new ValidationError(
@@ -237,7 +237,7 @@ export class ValidationIntegrationService {
           path: error.field || 'unknown',
           message: error.message,
           code: error.code,
-          value: error.value,
+          value: error.value as string | number | boolean | null | undefined,
         }));
 
         throw new ValidationError(

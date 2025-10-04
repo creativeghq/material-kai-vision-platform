@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-import { hybridMLService } from './ml/hybridMLService';
+import { unifiedMLService } from './ml/unifiedMLService';
 import { hybridMaterialPropertiesService } from './ml/hybridMaterialPropertiesService';
 import { MLResult } from './ml/types';
 import { MaterialAnalysisOptions } from './ml/materialAnalyzer';
@@ -156,7 +156,7 @@ export class AgentMLCoordinator {
       ? this.base64ToFile(imageFile, 'material-image.jpg')
       : imageFile as File;
 
-    return await hybridMLService.analyzeImage(file, (options as Record<string, unknown>) || {});
+    return await unifiedMLService.analyzeMaterial(file, undefined, (options as Record<string, unknown>) || {});
   }
 
   /**
@@ -196,7 +196,7 @@ export class AgentMLCoordinator {
       ? this.base64ToFile(imageFile, 'style-analysis.jpg')
       : imageFile as File;
 
-    return await hybridMLService.analyzeImageStyle(file, { analysisType: analysisType as string });
+    return await unifiedMLService.analyzeMaterial(file, undefined, { analysisType: analysisType as string });
   }
 
   /**
@@ -213,7 +213,7 @@ export class AgentMLCoordinator {
       ? this.base64ToFile(imageFile, 'classification.jpg')
       : imageFile as File;
 
-    return await hybridMLService.classifyImage(file, { categories: categories as string[] });
+    return await unifiedMLService.classifyImage(file, { categories: categories as string[] });
   }
 
   /**
@@ -357,7 +357,7 @@ export class AgentMLCoordinator {
 
       if (error || !data) return [];
 
-      return data.map(item => ({
+      return data.map((item: any) => ({
         id: item.id,
         agentTaskId: String(item.agent_task_id || ''),
         mlOperationType: item.ml_operation_type as AgentMLTask['mlOperationType'],

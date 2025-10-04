@@ -166,45 +166,45 @@ export const PDFKnowledgeDemo: React.FC = () => {
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <Database className="h-4 w-4" />
-                            <h3 className="font-semibold">{result.title}</h3>
+                            <h3 className="font-semibold">{(result as any).title}</h3>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-green-500" />
                             <span className="text-sm text-muted-foreground">
-                              {(result.relevanceScore * 100).toFixed(1)}%
+                              {((result as any).relevanceScore * 100).toFixed(1)}%
                             </span>
                           </div>
                         </div>
 
                         <p className="text-sm text-muted-foreground mb-3">
-                          {result.content.length > 300
-                            ? `${result.content.substring(0, 300)}...`
-                            : result.content
+                          {((result as any).content as string).length > 300
+                            ? `${((result as any).content as string).substring(0, 300)}...`
+                            : (result as any).content
                           }
                         </p>
 
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary">{result.source}</Badge>
-                            {result.metadata?.tags && (
-                              result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
+                            <Badge variant="secondary">{(result as any).source}</Badge>
+                            {(result as any).metadata?.tags && (
+                              (result as any).metadata.tags.slice(0, 3).map((tag: string, i: number) => (
                                 <Badge key={i} variant="outline">{tag}</Badge>
                               ))
                             )}
                           </div>
 
                           {/* PDF Link for additional details */}
-                          {result.pdfUrl && (
+                          {(result.pdfUrl) ? (
                             <Button
                               variant="outline"
                               size="sm"
                               className="flex items-center gap-1"
-                              onClick={() => window.open(result.pdfUrl, '_blank')}
+                              onClick={() => window.open(result.pdfUrl as string, '_blank')}
                             >
                               <ExternalLink className="h-3 w-3" />
                               View PDF Details
                             </Button>
-                          )}
+                          ) : null}
                         </div>
                       </CardContent>
                     </Card>

@@ -1,4 +1,4 @@
-import { createClient, RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { useState, useEffect, useCallback } from 'react';
 
 export interface MaterialRealtimeConfig {
@@ -27,8 +27,8 @@ export interface MaterialSubscriptionCallbacks {
 }
 
 export class MaterialRealtimeService {
-  private supabase: unknown;
-  private channels: Map<string, RealtimeChannel> = new Map();
+  private supabase: ReturnType<typeof createClient>;
+  private channels: Map<string, any> = new Map();
   private isConnected: boolean = false;
   private callbacks: MaterialSubscriptionCallbacks = {};
   private reconnectAttempts: number = 0;
@@ -177,7 +177,7 @@ export class MaterialRealtimeService {
         table: 'materials_catalog',
         ...(materialId && { filter: `id=eq.${materialId}` })
       },
-      (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      (payload: any) => {
         console.log('Material Realtime: Material catalog change:', payload);
 
         const changePayload: MaterialChangePayload = {
@@ -222,11 +222,11 @@ export class MaterialRealtimeService {
         table: 'material_images',
         ...(materialId && { filter: `material_id=eq.${materialId}` })
       },
-      (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      (payload: any) => {
         console.log('Material Realtime: Material images change:', payload);
 
         const changePayload: MaterialChangePayload = {
-          eventType: payload.eventType as unknown as 'INSERT' | 'UPDATE' | 'DELETE',
+          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
           table: 'material_images',
           old: payload.old,
           new: payload.new,
@@ -276,11 +276,11 @@ export class MaterialRealtimeService {
         table: 'material_metafield_values',
         ...(filter && { filter })
       },
-      (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      (payload: any) => {
         console.log('Material Realtime: Material metafield change:', payload);
 
         const changePayload: MaterialChangePayload = {
-          eventType: payload.eventType as unknown as 'INSERT' | 'UPDATE' | 'DELETE',
+          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
           table: 'material_metafield_values',
           old: payload.old,
           new: payload.new,
@@ -323,11 +323,11 @@ export class MaterialRealtimeService {
         table: 'material_relationships',
         ...(filter && { filter })
       },
-      (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+      (payload: any) => {
         console.log('Material Realtime: Material relationships change:', payload);
 
         const changePayload: MaterialChangePayload = {
-          eventType: payload.eventType as unknown as 'INSERT' | 'UPDATE' | 'DELETE',
+          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
           table: 'material_relationships',
           old: payload.old,
           new: payload.new,

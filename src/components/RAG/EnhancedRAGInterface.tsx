@@ -449,7 +449,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">{result.source}</span>
                             {result.metadata?.tags && (
-                              result.metadata.tags.slice(0, 3).map((tag: string, i: number) => (
+                              (result.metadata as any).tags.slice(0, 3).map((tag: string, i: number) => (
                                 <span key={i} className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{tag}</span>
                               ))
                             )}

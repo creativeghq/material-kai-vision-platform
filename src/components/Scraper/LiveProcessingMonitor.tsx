@@ -69,14 +69,14 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
       const now = new Date();
       const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
 
-      const recentCompletions = pages.filter(page =>
+      const recentCompletions = pages.filter((page: any) =>
         page.completed_at && new Date(page.completed_at) > last5Minutes,
       );
 
       const pagesPerMinute = recentCompletions.length;
-      const completedPages = pages.filter(page => page.status === 'completed');
+      const completedPages = pages.filter((page: any) => page.status === 'completed');
       const avgProcessingTime = completedPages.length > 0
-        ? completedPages.reduce((sum, page) => {
+        ? completedPages.reduce((sum: any, page: any) => {
             if (page.completed_at && page.started_at) {
               const processingTime = new Date(page.completed_at).getTime() - new Date(page.started_at).getTime();
               return sum + processingTime;
@@ -99,7 +99,7 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
       }
 
       // Format recent activity
-      const recentActivity = pages.slice(0, 5).map(page => ({
+      const recentActivity = pages.slice(0, 5).map((page: any) => ({
         url: page.url || 'Unknown URL',
         status: page.status || 'unknown',
         materialsFound: page.materials_found || 0,

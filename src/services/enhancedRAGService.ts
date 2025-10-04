@@ -1,8 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import { ErrorHandler } from '../utils/errorHandler';
-import { unifiedTextPreprocessor } from './textPreprocessor';
-import { DEFAULT_EMBEDDING_CONFIG, EmbeddingValidator } from '../config/embeddingConfig';
+// Note: Embedding config imports removed as they're not used in this service
 
 export interface EnhancedRAGRequest {
   query: string;
@@ -152,10 +151,11 @@ export class EnhancedRAGService {
 
       return data as EnhancedRAGResponse;
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Enhanced RAG search failed',
-        { query: request.query, searchType: request.searchType, originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        query: request.query,
+        searchType: request.searchType,
+        operation: 'Enhanced RAG search failed'
+      });
       throw ragError;
     }
   }
@@ -176,7 +176,7 @@ export class EnhancedRAGService {
         throw error;
       }
 
-      return data.map(item => ({
+      return data.map((item: any) => ({
         id: item.id,
         materialId: item.material_id,
         extractionType: item.extraction_type,
@@ -191,10 +191,10 @@ export class EnhancedRAGService {
         updatedAt: item.updated_at,
       }));
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Material knowledge fetch failed',
-        { materialId, originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        materialId,
+        operation: 'Material knowledge fetch failed'
+      });
       throw ragError;
     }
   }
@@ -248,9 +248,7 @@ export class EnhancedRAGService {
           language: entry.language || 'en',
           reading_level: entry.readingLevel,
           technical_complexity: entry.technicalComplexity,
-          openai_embedding: analysisData?.openai_embedding,
-          huggingface_embedding: analysisData?.huggingface_embedding,
-          custom_embedding: analysisData?.custom_embedding,
+          embedding_1536: analysisData?.openai_embedding || analysisData?.custom_embedding,
           confidence_scores: analysisData?.confidence_scores,
           search_keywords: analysisData?.search_keywords,
           created_by: user.id,
@@ -266,10 +264,10 @@ export class EnhancedRAGService {
 
       return data;
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Knowledge entry addition failed',
-        { entryTitle: entry.title, originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        entryTitle: entry.title,
+        operation: 'Knowledge entry addition failed'
+      });
       throw ragError;
     }
   }
@@ -290,7 +288,7 @@ export class EnhancedRAGService {
         throw error;
       }
 
-      return data.map(item => ({
+      return data.map((item: any) => ({
         id: item.id,
         sourceId: item.source_id,
         targetId: item.target_id,
@@ -306,10 +304,10 @@ export class EnhancedRAGService {
         updatedAt: item.updated_at,
       }));
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Knowledge relationships fetch failed',
-        { entryId, originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        entryId,
+        operation: 'Knowledge relationships fetch failed'
+      });
       throw ragError;
     }
   }
@@ -335,7 +333,7 @@ export class EnhancedRAGService {
         throw error;
       }
 
-      return data.map(item => ({
+      return data.map((item: any) => ({
         id: item.id,
         userId: item.user_id,
         originalQuery: item.original_query,
@@ -352,10 +350,9 @@ export class EnhancedRAGService {
         createdAt: item.created_at,
       }));
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Query history fetch failed',
-        { originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        operation: 'Query history fetch failed'
+      });
       throw ragError;
     }
   }
@@ -402,10 +399,10 @@ export class EnhancedRAGService {
 
       return { success: true };
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Feedback submission failed',
-        { satisfaction: feedback.satisfaction, originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        satisfaction: feedback.satisfaction,
+        operation: 'Feedback submission failed'
+      });
       throw ragError;
     }
   }
@@ -437,15 +434,15 @@ export class EnhancedRAGService {
       // Calculate insights
       const totalSearches = data.length;
       const avgSatisfaction = data
-        .filter(s => s.satisfaction_rating)
-        .reduce((sum, s) => sum + s.satisfaction_rating, 0) /
-        data.filter(s => s.satisfaction_rating).length || 0;
+        .filter((s: any) => s.satisfaction_rating)
+        .reduce((sum: number, s: any) => sum + s.satisfaction_rating, 0) /
+        data.filter((s: any) => s.satisfaction_rating).length || 0;
 
       const avgResponseTime = data
-        .reduce((sum, s) => sum + (s.response_time_ms || 0), 0) / data.length || 0;
+        .reduce((sum: number, s: any) => sum + (s.response_time_ms || 0), 0) / data.length || 0;
 
       const topQueries = data
-        .reduce((acc, search) => {
+        .reduce((acc: any, search: any) => {
           acc[search.query_text] = (acc[search.query_text] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
@@ -461,10 +458,9 @@ export class EnhancedRAGService {
         searchHistory: data.slice(0, 50), // Recent searches
       };
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Search analytics fetch failed',
-        { originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        operation: 'Search analytics fetch failed'
+      });
       throw ragError;
     }
   }
@@ -509,10 +505,10 @@ export class EnhancedRAGService {
 
       return data;
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Material knowledge extraction failed',
-        { materialId, originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        materialId,
+        operation: 'Material knowledge extraction failed'
+      });
       throw ragError;
     }
   }
@@ -542,10 +538,9 @@ export class EnhancedRAGService {
 
       return { success: true };
     } catch (error) {
-      const ragError = ErrorHandler.createValidationError(
-        'Knowledge validation failed',
-        { originalError: (error as Error).message },
-      );
+      const ragError = ErrorHandler.handleError(error, {
+        operation: 'Knowledge validation failed'
+      });
       throw ragError;
     }
   }

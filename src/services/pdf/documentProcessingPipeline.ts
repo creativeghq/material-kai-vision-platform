@@ -1,13 +1,10 @@
 import {
   MivaaIntegrationConfig,
   ExtractionResult,
-  RagDocument,
-  ProcessingPipelineResult,
   TableData,
   ImageData,
 } from './mivaaIntegrationService';
-import { unifiedTextPreprocessor, TextPreprocessingResult } from '../textPreprocessor';
-import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
+import { RagDocument, ProcessingPipelineResult } from '../../types/rag';
 
 /**
  * Text chunking configuration
@@ -155,22 +152,25 @@ export class DocumentProcessingPipeline {
       for (let j = 0; j < chunks.length; j++) {
         const chunk = chunks[j];
 
-        ragDocuments.push({
-          id: `${documentId}_text_${i}_${j}`,
-          content: chunk,
-          metadata: {
-            source: documentId,
-            type: 'text',
-            pageNumber: section.pageNumber,
-            chunkIndex: j,
-            extractedAt: new Date(),
-            workspace: workspaceContext ? {
-              projectId: workspaceContext.projectId,
-              userId: workspaceContext.userId,
-              tags: workspaceContext.tags,
-            } : undefined,
-          },
-        });
+        // Apply workspace enhancements if context is provided
+        const enhancedContent = workspaceContext
+          ? await this.applyWorkspaceEnhancements(chunk, workspaceContext)
+          : chunk;
+
+        const ragDocument = this.createRagDocument(
+          `${documentId}_text_${i}_${j}`,
+          enhancedContent,
+          documentId,
+          'text',
+          section.pageNumber,
+          j,
+          workspaceContext
+        );
+
+        // Validate the document before adding
+        if (this.validateRagDocument(ragDocument)) {
+          ragDocuments.push(ragDocument);
+        }
       }
     }
 
@@ -191,21 +191,15 @@ export class DocumentProcessingPipeline {
       // Convert CSV to structured text
       const structuredText = this.convertTableToStructuredText(table);
 
-      ragDocuments.push({
-        id: `${documentId}_table_${table.id}`,
-        content: structuredText,
-        metadata: {
-          source: documentId,
-          type: 'table',
-          pageNumber: table.pageNumber,
-          extractedAt: new Date(),
-          workspace: workspaceContext ? {
-            projectId: workspaceContext.projectId,
-            userId: workspaceContext.userId,
-            tags: workspaceContext.tags,
-          } : undefined,
-        },
-      });
+      ragDocuments.push(this.createRagDocument(
+        `${documentId}_table_${table.id}`,
+        structuredText,
+        documentId,
+        'table',
+        table.pageNumber,
+        undefined,
+        workspaceContext
+      ));
     }
 
     return ragDocuments;
@@ -225,21 +219,15 @@ export class DocumentProcessingPipeline {
       // Create descriptive text for the image
       const imageDescription = this.generateImageDescription(image);
 
-      ragDocuments.push({
-        id: `${documentId}_image_${image.id}`,
-        content: imageDescription,
-        metadata: {
-          source: documentId,
-          type: 'image',
-          pageNumber: image.pageNumber,
-          extractedAt: new Date(),
-          workspace: workspaceContext ? {
-            projectId: workspaceContext.projectId,
-            userId: workspaceContext.userId,
-            tags: workspaceContext.tags,
-          } : undefined,
-        },
-      });
+      ragDocuments.push(this.createRagDocument(
+        `${documentId}_image_${image.id}`,
+        imageDescription,
+        documentId,
+        'image',
+        image.pageNumber,
+        undefined,
+        workspaceContext
+      ));
     }
 
     return ragDocuments;
@@ -433,6 +421,57 @@ export class DocumentProcessingPipeline {
       tableChunks,
       imageChunks,
       processingTime,
+    };
+  }
+
+  /**
+   * Create a proper RagDocument from simple document data
+   */
+  private createRagDocument(
+    id: string,
+    content: string,
+    documentId: string,
+    type: 'text' | 'table' | 'image',
+    pageNumber?: number,
+    chunkIndex?: number,
+    workspaceContext?: WorkspaceContext
+  ): RagDocument {
+    return {
+      id,
+      title: `Document ${documentId} - ${type} ${pageNumber ? `Page ${pageNumber}` : ''}`,
+      content,
+      chunks: [], // Will be populated by chunking service if needed
+      metadata: {
+        source: documentId,
+        sourceType: 'mivaa-pdf',
+        originalFilename: documentId,
+        extractedAt: new Date(),
+        transformedAt: new Date(),
+        workspaceId: workspaceContext?.projectId || 'default',
+        documentId,
+        version: '1.0.0',
+        language: 'en',
+        pages: 1,
+        processingStats: {
+          totalChunks: 1,
+          totalTables: type === 'table' ? 1 : 0,
+          totalImages: type === 'image' ? 1 : 0,
+          averageChunkSize: content.length,
+          extractionQuality: 0.9,
+          transformationQuality: 0.9,
+        },
+        tags: workspaceContext?.tags || [],
+        categories: [],
+        type,
+        pageNumber,
+        chunkIndex,
+        workspace: workspaceContext ? {
+          projectId: workspaceContext.projectId,
+          userId: workspaceContext.userId,
+          tags: workspaceContext.tags,
+        } : undefined,
+      },
+      workspace: workspaceContext?.projectId || 'default',
     };
   }
 

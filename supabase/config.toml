@@ -16,9 +16,6 @@ verify_jwt = false
 [functions.material-agent-orchestrator]
 verify_jwt = false
 
-[functions.enhanced-rag-search]
-verify_jwt = false
-
 [functions.huggingface-model-trainer]
 verify_jwt = false
 
@@ -32,9 +29,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.parse-sitemap]
-verify_jwt = false
-
-[functions.rag-knowledge-search]
 verify_jwt = false
 
 [functions.scrape-session-manager]

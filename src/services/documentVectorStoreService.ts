@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import { AppError } from '../utils/errorHandler';
 
-import { MivaaEmbeddingIntegration } from './mivaaEmbeddingIntegration';
+import { EmbeddingGenerationService } from './embeddingGenerationService';
 import { DEFAULT_EMBEDDING_CONFIG } from '../config/embeddingConfig';
 import { unifiedTextPreprocessor } from './textPreprocessor';
 
@@ -154,7 +154,7 @@ export interface DocumentVectorStoreConfig {
  */
 export class DocumentVectorStoreService {
   private readonly config: DocumentVectorStoreConfig;
-  private readonly embeddingService: MivaaEmbeddingIntegration;
+  private readonly embeddingService: EmbeddingGenerationService;
   private readonly metrics = {
     totalStored: 0,
     totalSearches: 0,
@@ -166,7 +166,7 @@ export class DocumentVectorStoreService {
 
   constructor(
     config: DocumentVectorStoreConfig,
-    embeddingService: MivaaEmbeddingIntegration,
+    embeddingService: EmbeddingGenerationService,
   ) {
     this.config = config;
     this.embeddingService = embeddingService;
@@ -245,12 +245,11 @@ export class DocumentVectorStoreService {
           // Generate embeddings for batch
           const embeddingStart = performance.now();
           // Generate embeddings for each text in the batch using unified config
-          const embeddingPromises = batch.map(chunk => {
-            const preprocessedText = unifiedTextPreprocessor.preprocess(chunk.content);
+          const embeddingPromises = batch.map(async chunk => {
+            const preprocessedText = await unifiedTextPreprocessor.preprocessForEmbedding(chunk.content);
             return this.embeddingService.generateEmbedding({
+              id: chunk.id,
               text: preprocessedText,
-              model: DEFAULT_EMBEDDING_CONFIG.primary.name,
-              dimensions: DEFAULT_EMBEDDING_CONFIG.primary.dimensions,
             });
           });
 
@@ -410,12 +409,10 @@ export class DocumentVectorStoreService {
 
       // Generate query embedding using unified config
       const embeddingStart = performance.now();
-      const preprocessedQuery = unifiedTextPreprocessor.preprocess(request.query);
+      const preprocessedQuery = await unifiedTextPreprocessor.preprocessForRAG(request.query);
       const queryEmbeddingResponse = await this.embeddingService.generateEmbedding({
-        model: DEFAULT_EMBEDDING_CONFIG.primary.name,
-        dimensions: DEFAULT_EMBEDDING_CONFIG.primary.dimensions,
+        id: `query_${Date.now()}`,
         text: preprocessedQuery,
-        // cache_ttl: 300 // Not part of EmbeddingRequest interface
       });
 
       const queryEmbedding = queryEmbeddingResponse.embedding;
@@ -564,7 +561,7 @@ export class DocumentVectorStoreService {
         return new Set();
       }
 
-      return new Set(data?.map(item => (item as Record<string, unknown>).chunk_id as string) || []);
+      return new Set(data?.map((item: any) => (item as Record<string, unknown>).chunk_id as string) || []);
 
     } catch (error) {
       console.warn('Error fetching existing chunk IDs', {
@@ -625,7 +622,7 @@ export const defaultDocumentVectorStoreConfig: DocumentVectorStoreConfig = {
 
 // Export singleton instance factory
 export const createDocumentVectorStoreService = (
-  embeddingService: MivaaEmbeddingIntegration,
+  embeddingService: EmbeddingGenerationService,
   config: Partial<DocumentVectorStoreConfig> = {},
 ): DocumentVectorStoreService => {
   const finalConfig = { ...defaultDocumentVectorStoreConfig, ...config };

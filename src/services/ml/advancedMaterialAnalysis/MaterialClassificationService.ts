@@ -75,12 +75,12 @@ export interface ClassificationModel {
 
 export class MaterialClassificationService {
   private config: MaterialClassificationConfig;
-  private attentionModule: TextureAttentionModule;
-  private gaborFilters: TextureGaborFilters;
-  private multiScaleModule: MultiScaleTextureModule;
+  private attentionModule!: TextureAttentionModule;
+  private gaborFilters!: TextureGaborFilters;
+  private multiScaleModule!: MultiScaleTextureModule;
   private ensemble: ModelEnsemble | null = null;
   private modelWeights: Map<string, Float32Array> = new Map();
-  private trainingHistory: unknown[] = [];
+
 
   constructor(config: MaterialClassificationConfig) {
     this.config = config;
@@ -159,7 +159,7 @@ export class MaterialClassificationService {
       console.log('Pretrained weights loaded successfully');
     } catch (error) {
       console.error('Error loading pretrained weights:', error);
-      throw new Error(`Failed to load model weights: ${error.message}`);
+      throw new Error(`Failed to load model weights: ${(error as Error).message}`);
     }
   }
 
@@ -262,7 +262,7 @@ export class MaterialClassificationService {
 
     } catch (error) {
       console.error('Error in material classification:', error);
-      throw new Error(`Classification failed: ${error.message}`);
+      throw new Error(`Classification failed: ${(error as Error).message}`);
     }
   }
 
@@ -410,17 +410,20 @@ export class MaterialClassificationService {
     const scores = new Float32Array(numClasses);
 
     // Model-specific feature processing
-    const _processedFeatures = features;
+    features;
 
     switch (model.type) {
       case 'TextureNetSVD':
-        const _processedFeaturesTNS = this.applyTextureNetSVDProcessing(features);
+        // Process features for TextureNetSVD
+        this.applyTextureNetSVDProcessing(features);
         break;
       case 'MaterialTextureNet':
-        const _processedFeaturesMTN = this.applyMaterialTextureNetProcessing(features);
+        // Process features for MaterialTextureNet
+        this.applyMaterialTextureNetProcessing(features);
         break;
       case 'HybridNet':
-        const _processedFeatures = this.applyHybridNetProcessing(features);
+        // Process features for HybridNet
+        this.applyHybridNetProcessing(features);
         break;
     }
 
@@ -759,14 +762,14 @@ export class MaterialClassificationService {
    * Import trained model
    */
   public importModel(modelData: Record<string, unknown>): void {
-    this.config = { ...this.config, ...modelData.config };
+    this.config = { ...this.config, ...(modelData.config as any) };
 
-    for (const [key, weights] of Object.entries(modelData.weights)) {
+    for (const [key, weights] of Object.entries((modelData.weights as any) || {})) {
       this.modelWeights.set(key, new Float32Array(weights as number[]));
     }
 
     if (modelData.ensemble) {
-      this.ensemble = modelData.ensemble;
+      this.ensemble = modelData.ensemble as any;
     }
 
     console.log('Model imported successfully');
