@@ -235,27 +235,8 @@ export const supabaseConfig: SupabaseApiConfig = {
       timeout: 120000, // 2 minutes for SVBRDF extraction
     },
 
-    'nerf-processor': {
-      inputSchema: z.object({
-        images: z.array(z.string().url()).min(1, 'At least 1 image required'),
-        output_format: z.string().optional(),
-        quality: z.string().optional(),
-      }),
-      outputSchema: z.union([
-        z.object({
-          success: z.literal(true),
-          model_url: z.string().url(),
-          preview_images: z.array(z.string().url()),
-          metadata: z.object({
-            vertex_count: z.number(),
-            face_count: z.number(),
-            processing_time: z.number(),
-          }),
-        }),
-        commonErrorSchema,
-      ]),
-      timeout: 600000, // 10 minutes for NeRF processing
-    },
+    // 'nerf-processor': Removed - Edge Function not implemented
+    // TODO: Implement NeRF processing Edge Function if needed
 
     'spaceformer-analysis': {
       inputSchema: z.object({

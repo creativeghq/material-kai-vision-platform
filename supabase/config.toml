@@ -22,8 +22,7 @@ verify_jwt = false
 [functions.material-scraper]
 verify_jwt = false
 
-[functions.nerf-processor]
-verify_jwt = false
+
 
 [functions.ocr-processing]
 verify_jwt = false

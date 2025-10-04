@@ -10,7 +10,8 @@ This document provides a comprehensive inventory of ALL services, components, an
 - ✅ **Legacy ML Service References** - Updated all remaining references to use `unifiedMLService`
 - ✅ **Duplicate API Client Factory** - Removed unused `ApiClientFactory` from `standardizedApiClient.ts`
 - ✅ **Duplicate Edge Functions** - Removed `enhanced-rag-search` and `rag-knowledge-search` from config
-- ✅ **TypeScript Compilation** - 0 errors, successful production build (10.72s)
+- ✅ **Missing NeRF Processor Edge Function** - Removed configuration for non-existent `nerf-processor` function
+- ✅ **TypeScript Compilation** - 0 errors, successful production build (11.65s)
 - ✅ **Comprehensive Platform Review** - All services, components, and utilities verified
 
 ## 🎯 CONSOLIDATION SUMMARY
@@ -230,12 +231,19 @@ The following service categories were analyzed and found to have **proper separa
 ## 📊 Supabase Edge Functions
 
 ### Processing Functions
-- **nerf-processor** - Serverless NeRF processing
 - **svbrdf-extractor** - Serverless SVBRDF extraction
 - **crewai-3d-generation** - AI-powered 3D model generation
 - **material-recognition** - Serverless material recognition processing
-- **enhanced-rag-search** - Advanced search with RAG capabilities
 - **material-scraper** - Web scraping for material data
+- **visual-search-analyze** - Visual search and image analysis
+- **analyze-knowledge-content** - Knowledge content analysis and text embedding
+- **extract-material-knowledge** - Material knowledge extraction
+- **pdf-extract** - PDF content extraction and processing
+- **mivaa-gateway** - MIVAA microservice integration gateway
+- **api-gateway** - Central API gateway for service coordination
+- **scrape-single-page** - Single page web scraping
+- **scrape-session-manager** - Web scraping session management
+- **hybrid-material-analysis** - Hybrid material analysis processing
 
 ## 🗄️ Database Schema (Supabase)
 
