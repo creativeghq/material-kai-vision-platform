@@ -39,9 +39,11 @@ FOR ALL USING (
 
 **Key Sections**:
 - **PDF Knowledge Base**: Primary document processing system
+- **Deployment Package Validation**: Real-time verification of all required packages
 - **Search Hub**: Multi-modal search interface management
 - **3D Material Suggestions**: AI-powered 3D generation management
 - **System Analytics**: Performance and usage metrics
+- **Package Management**: Monitor and manage system dependencies
 - **Quick Actions**: Common administrative tasks
 
 **Dashboard Features**:
@@ -372,6 +374,139 @@ interface PDFAdminFeatures {
 - Replicate service monitoring
 - Supabase administration
 - Third-party APIs
+
+## 🔍 Deployment Package Validation
+
+### Overview
+
+**Location**: Admin Dashboard Overview Tab
+**Component**: Integrated into `AdminDashboard.tsx`
+
+The Deployment Package Validation section provides real-time verification that all packages from `requirements.txt` are properly installed on the server.
+
+### Features
+
+#### **Real-time Validation**
+- **Automatic Checking**: Validates packages on dashboard load
+- **Requirements.txt Parsing**: Reads actual requirements file to check all dependencies
+- **Import Testing**: Tests if each package can be imported successfully
+- **Version Detection**: Shows installed version for each package
+
+#### **Visual Status Indicators**
+
+| Metric | Description | Color |
+|--------|-------------|-------|
+| **Installed** | Successfully imported packages | Green |
+| **Missing** | Packages that failed to import | Red |
+| **Critical Missing** | Essential packages not available | Orange |
+| **Total** | All packages from requirements.txt | Blue |
+
+#### **Deployment Readiness**
+- **Green Status**: All critical packages installed ✅
+- **Red Status**: Missing critical packages ⚠️
+- **Quick Actions**: Refresh status and view detailed packages
+
+#### **Critical Package Detection**
+Essential packages for system operation:
+- `fastapi`, `uvicorn` (Web framework)
+- `opencv-python-headless` (Image processing)
+- `pymupdf4llm` (PDF processing)
+- `supabase` (Database)
+- `numpy`, `pandas` (Data processing)
+
+## 📦 Package Management Panel
+
+### Overview
+
+**Location**: `/admin/packages`
+**Component**: `src/components/admin/PackagesPanel.tsx`
+
+The Package Management panel provides comprehensive monitoring and management of system dependencies across both NodeJS and MIVAA Python services.
+
+### Features
+
+#### **Real-time Package Status**
+- Live monitoring of package availability
+- Version information display
+- Critical vs optional package indicators
+- Error reporting for missing dependencies
+
+#### **Multi-Platform Support**
+- **NodeJS Packages**: Frontend dependencies (React, Next.js, TypeScript, etc.)
+- **MIVAA Packages**: Python backend dependencies (FastAPI, OpenCV, ML libraries, etc.)
+
+#### **Advanced Filtering**
+- Search by package name or description
+- Filter by category (Frontend, AI/ML, Database, etc.)
+- Filter by status (Active, Inactive, Error)
+- Critical package highlighting
+
+#### **Package Categories**
+
+**NodeJS Categories**:
+- Frontend (React, Next.js)
+- Styling (Tailwind CSS)
+- Development (TypeScript, ESLint)
+- Database (Supabase client)
+- UI Components (Lucide icons, Framer Motion)
+
+**MIVAA Categories**:
+- Web Framework (FastAPI, Uvicorn)
+- AI/ML (LlamaIndex, Transformers, Scikit-learn)
+- Image Processing (OpenCV headless, Pillow)
+- PDF Processing (PyMuPDF4LLM)
+- Database (Supabase Python client)
+- Scientific Computing (NumPy, Pandas)
+
+#### **Package Status Indicators**
+
+| Status | Icon | Description |
+|--------|------|-------------|
+| Active | ✅ | Package installed and functional |
+| Inactive | ❌ | Package missing or not installed |
+| Error | ⚠️ | Package installed but has issues |
+| Checking | 🔄 | Status verification in progress |
+
+#### **Critical Package Monitoring**
+
+Critical packages are marked with special indicators:
+- **Red badge**: Critical package
+- **Bold text**: Essential for system operation
+- **Priority alerts**: Immediate attention required if missing
+
+#### **API Integration**
+
+The panel integrates with the MIVAA service API:
+```http
+GET /api/packages/status
+```
+
+This endpoint provides:
+- Real-time package availability
+- Version information
+- Deployment readiness status
+- Error details for troubleshooting
+
+#### **Usage Instructions**
+
+1. **Access Panel**: Navigate to `/admin/packages`
+2. **Refresh Status**: Click "Refresh Status" to update package information
+3. **Filter Packages**: Use search and filter options to find specific packages
+4. **Monitor Critical**: Pay attention to critical package status
+5. **Troubleshoot**: Use error messages to resolve package issues
+
+#### **Troubleshooting**
+
+**Common Issues**:
+- **Package Not Found**: Check installation and virtual environment
+- **Version Mismatch**: Update to required version
+- **Import Errors**: Verify package dependencies
+- **Permission Issues**: Check file system permissions
+
+**OpenCV Specific**:
+- Ensure `opencv-python-headless` is installed (not regular `opencv-python`)
+- Package is automatically installed from requirements.txt during deployment
+- Headless version prevents GUI dependency issues on servers
 
 ## 📋 Admin Best Practices
 

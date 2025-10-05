@@ -30,6 +30,7 @@ import {
   Download,
   Filter,
   MoreHorizontal,
+  Package,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -95,6 +96,23 @@ const AdminDashboard: React.FC = () => {
   const [configFilter, setConfigFilter] = useState('');
   const [, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
+  const [packageStatus, setPackageStatus] = useState<any>(null);
+  const [packageLoading, setPackageLoading] = useState(false);
+
+  const loadPackageStatus = useCallback(async () => {
+    try {
+      setPackageLoading(true);
+      const response = await fetch('/api/packages/status');
+      if (response.ok) {
+        const data = await response.json();
+        setPackageStatus(data);
+      }
+    } catch (error) {
+      console.error('Error loading package status:', error);
+    } finally {
+      setPackageLoading(false);
+    }
+  }, []);
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -110,13 +128,16 @@ const AdminDashboard: React.FC = () => {
       // Load configurations from workspace settings
       await loadConfigurations();
 
+      // Load package status
+      await loadPackageStatus();
+
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadPackageStatus]);
 
   // Load real data from Supabase
   useEffect(() => {
@@ -392,6 +413,15 @@ const AdminDashboard: React.FC = () => {
       count: '99.8% uptime',
       priority: 9,
     },
+    {
+      title: 'Package Management',
+      description: 'Monitor and manage system dependencies across NodeJS and MIVAA services',
+      icon: Package,
+      path: '/admin/packages',
+      status: 'active',
+      count: 'Dependencies',
+      priority: 10,
+    },
   ];
 
   const getStatusColor = (status: string) => {
@@ -480,6 +510,104 @@ const AdminDashboard: React.FC = () => {
                     </Link>
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Package Validation Section */}
+            <Card className="border-2 border-blue-200 bg-blue-50/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-blue-600" />
+                  Deployment Package Validation
+                  {packageLoading && <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />}
+                </CardTitle>
+                <CardDescription>
+                  Verify all required packages from requirements.txt are properly installed
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {packageStatus ? (
+                  <div className="space-y-4">
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-3 bg-white rounded-lg border">
+                        <div className="text-2xl font-bold text-green-600">
+                          {packageStatus.data?.summary?.available_packages || 0}
+                        </div>
+                        <div className="text-sm text-gray-600">Installed</div>
+                      </div>
+                      <div className="text-center p-3 bg-white rounded-lg border">
+                        <div className="text-2xl font-bold text-red-600">
+                          {packageStatus.data?.summary?.missing_packages || 0}
+                        </div>
+                        <div className="text-sm text-gray-600">Missing</div>
+                      </div>
+                      <div className="text-center p-3 bg-white rounded-lg border">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {packageStatus.data?.summary?.critical_missing || 0}
+                        </div>
+                        <div className="text-sm text-gray-600">Critical Missing</div>
+                      </div>
+                      <div className="text-center p-3 bg-white rounded-lg border">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {packageStatus.data?.summary?.total_packages || 0}
+                        </div>
+                        <div className="text-sm text-gray-600">Total</div>
+                      </div>
+                    </div>
+
+                    {/* Deployment Status */}
+                    <div className="flex items-center gap-2 p-3 rounded-lg border bg-white">
+                      {packageStatus.data?.summary?.deployment_ready ? (
+                        <>
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <span className="font-medium text-green-700">Deployment Ready</span>
+                          <Badge className="bg-green-100 text-green-800">All Critical Packages Installed</Badge>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="h-5 w-5 text-red-600" />
+                          <span className="font-medium text-red-700">Deployment Issues</span>
+                          <Badge className="bg-red-100 text-red-800">Missing Critical Packages</Badge>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={loadPackageStatus}
+                        disabled={packageLoading}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${packageLoading ? 'animate-spin' : ''}`} />
+                        Refresh Status
+                      </Button>
+                      <Button asChild variant="outline" size="sm">
+                        <Link to="/admin/packages">
+                          <Package className="h-4 w-4 mr-2" />
+                          View All Packages
+                        </Link>
+                      </Button>
+                    </div>
+
+                    {/* Critical Missing Packages Alert */}
+                    {packageStatus.data?.summary?.critical_missing > 0 && (
+                      <Alert className="border-red-200 bg-red-50">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-700">
+                          <strong>Critical packages missing:</strong> Some essential packages are not installed.
+                          Check the packages panel for details and run <code className="bg-red-100 px-1 rounded">pip install -r requirements.txt</code> on the server.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <div className="text-gray-500">Loading package status...</div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

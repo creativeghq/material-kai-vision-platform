@@ -965,8 +965,102 @@ GET /performance/summary
 - **Impact**: Developer experience issues
 - **Fix**: Generate OpenAPI specifications
 
+## 🔧 Admin & Monitoring Endpoints
+
+### Package Status Monitoring
+```http
+GET /api/packages/status
+Host: mivaa-pdf-extractor:8000
+```
+
+**Description**: Get the status of all system packages and dependencies
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "packages": {
+      "critical": {
+        "fastapi": {
+          "available": true,
+          "version": "0.104.1",
+          "description": "FastAPI web framework",
+          "critical": true
+        },
+        "opencv-python-headless": {
+          "available": true,
+          "version": "4.8.0",
+          "description": "Computer vision library (headless)",
+          "critical": true
+        }
+      },
+      "optional": {
+        "llama-index": {
+          "available": true,
+          "version": "0.10.36",
+          "description": "RAG framework for LLM applications",
+          "critical": false
+        }
+      }
+    },
+    "summary": {
+      "critical_missing": 0,
+      "total_critical": 8,
+      "total_optional": 10
+    },
+    "deployment_ready": true
+  },
+  "timestamp": "2025-10-05T13:30:00Z"
+}
+```
+
+**Use Cases**:
+- Monitor system health in admin panel
+- Verify deployment readiness
+- Track package versions
+- Identify missing dependencies
+
+### System Health Monitoring
+```http
+GET /api/health/detailed
+Host: mivaa-pdf-extractor:8000
+```
+
+**Description**: Comprehensive system health check including dependencies
+
+**Response**:
+```json
+{
+  "service": "MIVAA PDF Extractor",
+  "status": "healthy",
+  "timestamp": "2025-10-05T13:30:00Z",
+  "dependencies": {
+    "opencv": {
+      "available": true,
+      "version": "4.8.0",
+      "type": "headless"
+    },
+    "supabase": {
+      "connected": true,
+      "response_time": "45ms"
+    },
+    "database": {
+      "status": "connected",
+      "tables": 12
+    }
+  },
+  "performance": {
+    "cpu_usage": 15.2,
+    "memory_usage": 45.8,
+    "disk_usage": 23.1
+  }
+}
+```
+
 ## 🔗 Related Documentation
 
 - [Security & Authentication](./security-authentication.md) - API security
 - [Setup & Configuration](./setup-configuration.md) - API configuration
 - [AI & ML Services](./ai-ml-services.md) - AI API integrations
+- [Admin Panel Guide](./admin-panel-guide.md) - Admin interface documentation

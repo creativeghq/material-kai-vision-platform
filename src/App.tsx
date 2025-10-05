@@ -34,6 +34,7 @@ import PDFProcessing from './pages/PDFProcessing';
 import SearchHub from './pages/SearchHub';
 import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
 import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
+import PackagesPanel from './components/Admin/PackagesPanel';
 import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import HealthPage from './pages/Health';
@@ -153,6 +154,11 @@ const App = () => (
             <Route path="/admin/api-gateway" element={
               <AuthGuard>
                 <ApiGatewayAdmin />
+              </AuthGuard>
+            } />
+            <Route path="/admin/packages" element={
+              <AuthGuard>
+                <PackagesPanel />
               </AuthGuard>
             } />
             <Route path="/admin/svbrdf" element={
