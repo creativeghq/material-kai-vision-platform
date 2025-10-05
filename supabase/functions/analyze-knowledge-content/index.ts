@@ -120,7 +120,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
       },
       body: JSON.stringify({
         input: text.substring(0, 8000), // Limit input length
-        model: 'text-embedding-3-large', // Specify preferred model
+        model: 'text-embedding-ada-002', // PLATFORM STANDARD
       }),
     });
 

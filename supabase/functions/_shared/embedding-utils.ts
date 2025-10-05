@@ -8,7 +8,7 @@
  * Environment Variables Required:
  * - MIVAA_GATEWAY_URL: Main app URL for MIVAA gateway access
  * - MIVAA_API_KEY: API key for MIVAA authentication
- * - EMBEDDING_MODEL: The embedding model to use (default: text-embedding-3-small)
+ * - EMBEDDING_MODEL: The embedding model to use (default: text-embedding-ada-002)
  * - EMBEDDING_DIMENSIONS: The vector dimensions (default: 1536)
  */
 

@@ -67,7 +67,23 @@ export const openaiConfig: OpenAIApiConfig = {
   environment: 'production',
 
   models: {
-    // Text Embedding 3 Small - 512 dimensions (legacy support)
+    // Text Embedding Ada 002 - 1536 dimensions (PLATFORM STANDARD)
+    'text-embedding-ada-002': {
+      maxTokens: 8191,
+      inputSchema: embeddingInputSchema,
+      outputSchema: embeddingOutputSchema,
+      costPerToken: 0.0001,
+      defaultParams: {
+        model: 'text-embedding-ada-002',
+        encoding_format: 'float',
+        dimensions: 1536,
+      },
+      description: 'OpenAI text-embedding-ada-002 model with 1536 dimensions - PLATFORM STANDARD',
+      category: 'text-embedding',
+      status: 'working',
+      dimensions: 1536,
+    },
+    // Text Embedding 3 Small - 1536 dimensions (alternative)
     'text-embedding-3-small': {
       maxTokens: 8191,
       inputSchema: embeddingInputSchema,
@@ -76,12 +92,12 @@ export const openaiConfig: OpenAIApiConfig = {
       defaultParams: {
         model: 'text-embedding-3-small',
         encoding_format: 'float',
-        dimensions: 512,
+        dimensions: 1536,
       },
-      description: 'OpenAI text-embedding-3-small model with 512 dimensions',
+      description: 'OpenAI text-embedding-3-small model with 1536 dimensions',
       category: 'text-embedding',
       status: 'working',
-      dimensions: 512,
+      dimensions: 1536,
     },
 
     // Text Embedding 3 Large - 768 dimensions (new default)

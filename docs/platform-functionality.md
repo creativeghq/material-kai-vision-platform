@@ -342,19 +342,22 @@ The admin panel provides comprehensive system management through multiple tabs:
 
 ## 🔗 Service Integration
 
-### MIVAA Service APIs
-- **PDF Processing**: `/api/v1/extract/markdown`
-- **RAG Operations**: `/api/v1/rag/query`
-- **Document Upload**: `/api/v1/rag/documents/upload`
-- **Search**: `/api/v1/search/semantic`
-- **Health Check**: `/health`
+### MIVAA Service APIs (Updated January 2025)
+- **PDF Processing**: `/api/v1/extract/markdown`, `/api/v1/extract/tables`, `/api/v1/extract/images`
+- **RAG Operations**: `/api/v1/rag/query`, `/api/v1/rag/chat`, `/api/v1/rag/search`
+- **Document Management**: `/api/v1/rag/documents/upload`, `/api/v1/rag/documents`, `/api/v1/rag/documents/{id}`
+- **Search APIs**: `/api/search/semantic`, `/api/search/vector`, `/api/search/hybrid`
+- **Embedding APIs**: `/api/embeddings/generate`, `/api/embeddings/batch`, `/api/embeddings/clip-generate`
+- **AI Analysis**: `/api/semantic-analysis` (LLaMA Vision), `/api/chat/completions`
+- **Health & Monitoring**: `/health`, `/metrics`, `/performance/summary`, `/api/v1/health`
 
-### Supabase Edge Functions
+### Supabase Edge Functions (Enhanced)
+- **Enhanced RAG Search**: `enhanced-rag-search` (✅ Optimized with unified vector search)
+- **RAG Knowledge Search**: `rag-knowledge-search` (✅ Optimized with unified vector search)
 - **Material Recognition**: `material-recognition`
-- **Enhanced RAG Search**: `enhanced-rag-search`
 - **3D Generation**: `crewai-3d-generation`
 - **Material Scraper**: `material-scraper`
-
+- **OCR Processing**: `ocr-processing`
 - **SVBRDF Extractor**: `svbrdf-extractor`
 
 ### External API Integrations

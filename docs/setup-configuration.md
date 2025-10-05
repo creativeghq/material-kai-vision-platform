@@ -106,10 +106,13 @@
 | Secret/Key | Where to Add | Environment Variable | Purpose | How to Generate/Obtain |
 |------------|--------------|---------------------|---------|------------------------|
 | **GitHub Token** | Auto-provided, GitHub Secrets | `GITHUB_TOKEN` | Repository access for CI/CD | Auto-provided by GitHub Actions |
+| **GitHub Container Registry Token** | GitHub Secrets, Deployment Scripts | `GH_TOKEN` | Docker image authentication | Use `${{ secrets.GITHUB_TOKEN }}` (⚠️ **NEVER** use `GITHUB_TOKEN` as env var name) |
 | **GitHub Repository** | MIVAA Deployment | `GITHUB_REPOSITORY` | Container registry path | Format: `owner/repo` |
 | **Deploy Host** | GitHub Secrets | `DEPLOY_HOST` | Server IP/hostname for deployment | Your server address |
 | **Deploy User** | GitHub Secrets | `DEPLOY_USER` | SSH username | Server username (e.g., `root`) |
 | **Deploy SSH Key** | GitHub Secrets | `DEPLOY_SSH_KEY` | SSH private key for deployment | Generate: `ssh-keygen -t ed25519` |
+
+> **⚠️ CRITICAL**: GitHub doesn't allow environment variables starting with `GITHUB_` prefix. Always use `GH_TOKEN` instead of `GITHUB_TOKEN` when passing the token as an environment variable in workflows and deployments.
 
 #### Monitoring & Error Tracking
 
@@ -150,10 +153,11 @@
 ### ⚠️ Critical Security Notes
 
 1. **NEVER use .env files** - All secrets managed through GitHub, Vercel, and Supabase
-2. **Rotate exposed keys immediately** - If any key is accidentally committed
-3. **Use different keys for different environments** - Development vs Production
-4. **Limit key permissions** - Only grant necessary permissions
-5. **Monitor key usage** - Set up alerts for unusual activity
+2. **GitHub Token Naming** - Never use environment variables starting with `GITHUB_` prefix (use `GH_TOKEN` instead of `GITHUB_TOKEN`)
+3. **Rotate exposed keys immediately** - If any key is accidentally committed
+4. **Use different keys for different environments** - Development vs Production
+5. **Limit key permissions** - Only grant necessary permissions
+6. **Monitor key usage** - Set up alerts for unusual activity
 
 ### Required Environment Variables
 
@@ -176,28 +180,28 @@
 - [ ] `DEPLOY_HOST` - Server IP/hostname
 - [ ] `DEPLOY_USER` - SSH username
 - [ ] `DEPLOY_SSH_KEY` - SSH private key
-- [ ] `SUPABASE_URL` - Supabase project URL
-- [ ] `SUPABASE_ANON_KEY` - Supabase anon key
+- [ ] `SUPABASE_URL` - Supabase project URL (⚠️ **Must be available on server**)
+- [ ] `SUPABASE_ANON_KEY` - Supabase anon key (⚠️ **Must be available on server**)
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
 - [ ] `JWT_SECRET_KEY` - JWT signing secret
 - [ ] `ENCRYPTION_KEY` - Data encryption key
 
 ### AI/ML API Keys
-- [ ] `OPENAI_API_KEY` - OpenAI API access
+- [ ] `OPENAI_API_KEY` - OpenAI API access (⚠️ **Must be available on server**)
 - [ ] `ANTHROPIC_API_KEY` - Anthropic Claude access
 - [ ] `HUGGINGFACE_API_KEY` - HuggingFace models
 - [ ] `REPLICATE_API_TOKEN` - Replicate 3D models
 - [ ] `TOGETHER_API_KEY` - TogetherAI LLaMA Vision
 
 ### Material Kai Platform
-- [ ] `MATERIAL_KAI_API_KEY` - Platform API key
-- [ ] `MATERIAL_KAI_API_URL` - Platform API endpoint
+- [ ] `MATERIAL_KAI_API_KEY` - Platform API key (⚠️ **Must be available on server**)
+- [ ] `MATERIAL_KAI_API_URL` - Platform API endpoint (⚠️ **Must be available on server**)
 - [ ] `MATERIAL_KAI_CLIENT_ID` - OAuth client ID
 - [ ] `MATERIAL_KAI_CLIENT_SECRET` - OAuth client secret
 - [ ] `MATERIAL_KAI_WEBHOOK_SECRET` - Webhook verification
 
 ### Monitoring (Optional)
-- [ ] `SENTRY_DSN` - Sentry error tracking
+- [ ] `SENTRY_DSN` - Sentry error tracking (⚠️ **Must be available on server**)
 - [ ] `SENTRY_AUTH_TOKEN` - Sentry API token
 - [ ] `SENTRY_ORG` - Sentry organization
 - [ ] `SENTRY_PROJECT` - Sentry project
@@ -303,9 +307,9 @@ supabase secrets set OPENAI_API_KEY "your-openai-key"
 - [ ] `FIRECRAWL_API_KEY` - Firecrawl API key (optional)
 
 ### Material Kai Platform
-- [ ] `MATERIAL_KAI_PLATFORM_URL` - Platform API URL
-- [ ] `MATERIAL_KAI_API_KEY` - Platform API key
-- [ ] `MATERIAL_KAI_WORKSPACE_ID` - Workspace ID
+- [ ] `MATERIAL_KAI_API_URL` - Platform API URL (⚠️ **Required for Docker deployment**)
+- [ ] `MATERIAL_KAI_API_KEY` - Platform API key (⚠️ **Required for Docker deployment**)
+- [ ] `MATERIAL_KAI_WORKSPACE_ID` - Workspace ID (optional)
 
 ### Security
 - [ ] `ENCRYPTION_KEY` - Data encryption key
@@ -313,13 +317,44 @@ supabase secrets set OPENAI_API_KEY "your-openai-key"
 - [ ] `RATE_LIMIT_PER_MINUTE` - Rate limit (default: 60)
 
 ### Monitoring
-- [ ] `SENTRY_DSN` - Sentry error tracking
+- [ ] `SENTRY_DSN` - Sentry error tracking (⚠️ **Required for Docker deployment**)
 - [ ] `SENTRY_ENVIRONMENT` - Sentry environment name
 
 ### Performance (Optional)
 - [ ] `MAX_WORKERS` - Worker processes (default: 4)
 - [ ] `CACHE_TTL` - Cache TTL in seconds (default: 3600)
 - [ ] `DATABASE_POOL_SIZE` - DB pool size (default: 10)
+
+### 🐳 Docker Deployment - Required Environment Variables
+
+**⚠️ CRITICAL**: These environment variables are **REQUIRED** for Docker deployment and must be available on the deployment server. The docker-compose.yml file expects these exact variable names:
+
+#### Core Required Variables (Must be set on server)
+- [ ] `SUPABASE_URL` - Supabase project URL
+- [ ] `SUPABASE_ANON_KEY` - Supabase anon key
+- [ ] `OPENAI_API_KEY` - OpenAI API key
+- [ ] `MATERIAL_KAI_API_URL` - Material Kai platform API URL
+- [ ] `MATERIAL_KAI_API_KEY` - Material Kai platform API key
+- [ ] `SENTRY_DSN` - Sentry error tracking DSN
+
+#### How to Set on Deployment Server
+```bash
+# Option 1: Export in deployment script
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_ANON_KEY="your-anon-key"
+export OPENAI_API_KEY="your-openai-key"
+export MATERIAL_KAI_API_URL="https://your-platform-url.com"
+export MATERIAL_KAI_API_KEY="your-api-key"
+export SENTRY_DSN="your-sentry-dsn"
+
+# Option 2: Add to server environment file
+echo 'export SUPABASE_URL="https://your-project.supabase.co"' >> ~/.bashrc
+echo 'export SUPABASE_ANON_KEY="your-anon-key"' >> ~/.bashrc
+# ... etc for all variables
+source ~/.bashrc
+```
+
+> **Note**: These variables must be available in the shell environment where `docker-compose up` is executed. If any are missing, Docker will show warnings and the application may not function correctly.
 
 ---
 

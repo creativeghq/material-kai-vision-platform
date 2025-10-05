@@ -1,6 +1,7 @@
 import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { performUnifiedVectorSearch, UnifiedSearchRequest } from '../_shared/unified-vector-search.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,79 +47,9 @@ interface RAGSearchResult {
   processing_time_ms: number;
 }
 
-async function generateQueryEmbeddingViaMivaa(text: string): Promise<number[]> {
-  if (!MIVAA_API_KEY) {
-    throw new Error('MIVAA API key not configured');
-  }
+// Legacy MIVAA embedding function - replaced by unified vector search service
 
-  try {
-    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MIVAA_API_KEY}`,
-      },
-      body: JSON.stringify({
-        action: 'generate_embedding',
-        payload: {
-          text: text,
-          model: 'text-embedding-ada-002',
-          dimensions: 1536
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`MIVAA embedding error: ${response.status} - ${error}`);
-    }
-
-    const gatewayResponse = await response.json();
-    
-    if (!gatewayResponse.success) {
-      throw new Error(`MIVAA embedding failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
-    }
-
-    return gatewayResponse.data.embedding;
-  } catch (error) {
-    console.error('Error generating embedding via MIVAA:', error);
-    throw error;
-  }
-}
-
-// Generate embeddings with MIVAA only - OpenAI fallback removed
-async function generateQueryEmbedding(text: string): Promise<number[]> {
-  if (!USE_MIVAA_EMBEDDINGS) {
-    throw new Error('MIVAA embeddings disabled - direct AI integration removed as part of centralized AI architecture. Please enable MIVAA service.');
-  }
-
-  console.log('Using MIVAA proxy for query embedding generation');
-  return await generateQueryEmbeddingViaMivaa(text);
-}
-
-// Perform enhanced vector search
-async function performRAGSearch(
-  queryEmbedding: number[],
-  searchParams: RAGSearchRequest,
-): Promise<any[]> {
-  console.log('Performing RAG search with params:', searchParams);
-
-  const { data, error } = await supabase
-    .rpc('enhanced_vector_search', {
-      query_embedding: queryEmbedding,
-      search_type: searchParams.search_type || 'hybrid',
-      embedding_types: searchParams.embedding_types || ['clip'],
-      match_threshold: searchParams.match_threshold || 0.7,
-      match_count: searchParams.match_count || 10,
-    });
-
-  if (error) {
-    console.error('Vector search error:', error);
-    throw new Error(`Vector search failed: ${error.message}`);
-  }
-
-  return data || [];
-}
+// Legacy embedding and search functions - replaced by unified vector search service
 
 // Generate contextual response using RAG results
 async function generateRAGContext(query: string, searchResults: any[]): Promise<string> {
@@ -214,28 +145,33 @@ serve(async (req) => {
       );
     }
 
-    // Generate embedding for the query
-    const queryEmbedding = await generateQueryEmbedding(requestBody.query);
-    console.log('Generated embedding with dimensions:', queryEmbedding.length);
+    // Use unified vector search with caching
+    const searchRequest: UnifiedSearchRequest = {
+      query: requestBody.query,
+      searchType: requestBody.search_type || 'hybrid',
+      embeddingTypes: requestBody.embedding_types || ['openai'],
+      matchThreshold: requestBody.match_threshold || 0.7,
+      matchCount: requestBody.match_count || 10,
+      includeContext: requestBody.include_context,
+      workspaceId: undefined, // TODO: Extract from auth context
+      userId: undefined, // TODO: Extract from auth context
+    };
 
-    // Perform vector search
-    const searchResults = await performRAGSearch(queryEmbedding, requestBody);
-    console.log('Found search results:', searchResults.length);
+    const unifiedResponse = await performUnifiedVectorSearch(searchRequest, supabase);
+    console.log('Unified search completed:', unifiedResponse.totalResults, 'results');
 
     // Generate contextual response if requested
     let context: string | undefined;
     if (requestBody.include_context) {
-      context = await generateRAGContext(requestBody.query, searchResults);
+      context = await generateRAGContext(requestBody.query, unifiedResponse.results);
     }
 
-    const processingTime = Date.now() - startTime;
-
     const result: RAGSearchResult = {
-      results: searchResults,
+      results: unifiedResponse.results,
       context,
-      query_embedding: requestBody.include_context ? undefined : queryEmbedding, // Only include if no context needed
+      query_embedding: requestBody.include_context ? undefined : undefined, // Embedding not exposed for security
       search_params: requestBody,
-      processing_time_ms: processingTime,
+      processing_time_ms: unifiedResponse.performance.totalTime,
     };
 
     console.log(`RAG search completed in ${processingTime}ms`);

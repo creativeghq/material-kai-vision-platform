@@ -187,6 +187,54 @@ export default defineConfig({
 
 ## 🐳 MIVAA Service Deployment (Docker)
 
+### 🚀 Deployment Options
+
+#### 🔄 Default Deployment (Recommended)
+- **Automatic**: Triggers on push to `main` or `production` branches
+- **Fast & Reliable**: Optimized for regular deployments (2-3 minutes)
+- **Manual Option**: Available via GitHub Actions workflow_dispatch
+- **Health Monitoring**: Real-time endpoint testing with auto-recovery
+
+#### 🚀 Orchestrated Deployment (Advanced)
+- **On-Demand Only**: Manual trigger via GitHub Actions
+- **Multi-Phase Pipeline**: Intelligence, validation, and comprehensive reporting
+- **Configurable**: Multiple deployment modes (fast-track, intelligent, comprehensive)
+- **Advanced Diagnostics**: Comprehensive system analysis and auto-recovery
+
+### 🏥 Health Check & Monitoring Features
+
+#### **Real-Time Health Monitoring**
+- **HTTP Status Code Verification**: Tests actual endpoint responses (200, 502, 404, etc.)
+- **Multiple Endpoint Testing**: Health, docs, redoc, and OpenAPI schema endpoints
+- **Response Time Monitoring**: Tracks endpoint response times and availability
+- **Retry Logic**: Multiple attempts with intelligent backoff
+
+#### **Automatic Diagnostics**
+When health checks fail, the system automatically:
+- **System Resource Analysis**: CPU, memory, disk usage, and load averages
+- **Service Status Investigation**: systemd service status and configuration
+- **Network Diagnostics**: Port availability, process binding, and network interfaces
+- **Application Log Analysis**: Recent logs, error logs, and service history
+- **Environment Verification**: Python environment, dependencies, and application structure
+
+#### **Auto-Recovery Features**
+- **Automatic Service Restart**: Attempts to restart failed services
+- **Post-Restart Verification**: Re-tests endpoints after recovery attempts
+- **Recovery Status Reporting**: Clear indication of recovery success or failure
+- **Escalation Path**: Provides manual intervention steps when auto-recovery fails
+
+### 🌐 Service Endpoints
+
+All MIVAA service endpoints are available at:
+- **Base URL**: `https://v1api.materialshub.gr`
+- **Health Check**: `https://v1api.materialshub.gr/health`
+- **API Documentation**: `https://v1api.materialshub.gr/docs`
+- **ReDoc**: `https://v1api.materialshub.gr/redoc`
+- **OpenAPI Schema**: `https://v1api.materialshub.gr/openapi.json`
+- **PDF Processing**: `https://v1api.materialshub.gr/api/v1/pdf/*`
+- **AI Analysis**: `https://v1api.materialshub.gr/api/v1/ai/*`
+- **Vector Search**: `https://v1api.materialshub.gr/api/v1/search/*`
+
 ### Docker Configuration
 
 **Dockerfile**:
@@ -299,8 +347,14 @@ sudo chmod +x /usr/local/bin/docker-compose
 git clone https://github.com/your-org/material-kai-vision-platform.git
 cd material-kai-vision-platform/mivaa-pdf-extractor
 
-# Set up environment variables in Vercel/GitHub/Supabase
-# All secrets are managed through platform secret managers
+# Set up environment variables for Docker deployment
+# These MUST be available in the shell environment where docker-compose runs
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_ANON_KEY="your-anon-key"
+export OPENAI_API_KEY="your-openai-key"
+export MATERIAL_KAI_API_URL="https://your-platform-url.com"
+export MATERIAL_KAI_API_KEY="your-api-key"
+export SENTRY_DSN="your-sentry-dsn"
 
 # Deploy
 docker-compose -f docker-compose.prod.yml up -d
@@ -309,6 +363,170 @@ docker-compose -f docker-compose.prod.yml up -d
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
+
+## 🤖 GitHub Actions Deployment Workflows
+
+### 🚀 Default Deployment Workflow
+
+**File**: `.github/workflows/deploy.yml`
+
+**Features**:
+- **Automatic Triggers**: Push to `main` or `production` branches
+- **Manual Triggers**: workflow_dispatch with optional deployment reason
+- **Comprehensive Overview**: Pre-deployment system architecture and process breakdown
+- **Real-Time Health Checks**: Tests actual service endpoints with HTTP status verification
+- **Automatic Diagnostics**: System analysis when health checks fail
+- **Auto-Recovery**: Service restart attempts with verification
+- **GitHub Summary**: Detailed deployment results on action summary page
+
+**Usage**:
+```bash
+# Automatic deployment
+git push origin main
+
+# Manual deployment
+# Go to GitHub Actions → "MIVAA Deployment (Default)" → Run workflow
+```
+
+### 🚀 Orchestrated Deployment Workflow
+
+**File**: `.github/workflows/orchestrated-deployment.yml`
+
+**Features**:
+- **On-Demand Only**: Manual trigger via workflow_dispatch
+- **Multi-Phase Pipeline**: 5-phase deployment with validation gates
+- **Configurable Options**:
+  - **Deployment Mode**: fast-track, intelligent, comprehensive
+  - **Skip Diagnostics**: For faster deployments
+  - **Target Branch**: main, production
+  - **Deployment Reason**: Custom description for audit trail
+- **Advanced Verification**: Comprehensive endpoint testing and system validation
+- **Enhanced Diagnostics**: Detailed system analysis and recovery attempts
+- **Complete Audit Trail**: Full deployment journey with metrics and status
+
+**Usage**:
+```bash
+# Manual orchestrated deployment
+# Go to GitHub Actions → "Orchestrated MIVAA Deployment Pipeline (On-Demand)"
+# Configure options:
+# - Deployment Mode: intelligent
+# - Target Branch: main
+# - Deployment Reason: "Feature release with enhanced monitoring"
+# Run workflow
+```
+
+### 🏥 Health Check Features
+
+Both workflows include comprehensive health monitoring:
+
+#### **Endpoint Testing**
+```bash
+# Tested endpoints:
+curl https://v1api.materialshub.gr/health
+curl https://v1api.materialshub.gr/docs
+curl https://v1api.materialshub.gr/redoc
+curl https://v1api.materialshub.gr/openapi.json
+```
+
+#### **Status Code Verification**
+- **200**: ✅ Service healthy and responding correctly
+- **502**: ❌ Bad Gateway - Service not responding
+- **404**: ❌ Not Found - Endpoint not available
+- **500**: ❌ Internal Server Error - Application error
+- **000**: ❌ Connection failed - Service not reachable
+
+#### **Automatic Diagnostics on Failure**
+```bash
+# System diagnostics collected:
+- Server uptime and load averages
+- Memory and disk usage
+- Service status (systemctl status mivaa-pdf-extractor)
+- Recent service logs (last 50 lines)
+- Network status (port 8000 availability)
+- Process binding verification
+- Service restart attempt
+- Post-restart verification
+```
+
+#### **GitHub Action Summary**
+All deployment results are displayed on the main GitHub Action page with:
+- **Deployment Overview**: Architecture, components, and process steps
+- **Health Check Results**: Real-time endpoint status with HTTP codes
+- **Service Endpoints**: Clickable links to all available endpoints
+- **Troubleshooting**: Commands and steps for manual intervention
+- **Quick Actions**: Direct links to health check, docs, and service endpoints
+
+### 📋 Deployment Overview Features
+
+#### **Pre-Deployment Information**
+- **Deployment Configuration**: Environment, target server, branch, commit details
+- **Application Architecture**: Runtime (Python 3.9, pyenv, uv), dependencies, process management
+- **Key Components**: PDF processing, AI/ML models, database, authentication
+- **Environment Variables**: Verification of all required secrets and configurations (15+ variables)
+- **Deployment Process**: 8-step breakdown of the deployment pipeline
+- **Expected Outcomes**: Clear expectations for deployment results
+- **Summary Table**: All key information displayed on the main action page
+
+#### **Post-Deployment Summary**
+- **Deployment Status**: Success/failure with timestamps and duration
+- **Service Information**: Server details, service status, process management
+- **Health Check Results**: Real-time endpoint testing with HTTP status codes
+- **API Endpoints**: Complete list of available endpoints with clickable URLs
+- **Verification Checklist**: Confirmation of all deployment steps
+- **Automatic Diagnostics**: Comprehensive system analysis when health checks fail
+- **Auto-Recovery**: Automatic service restart and re-testing on failures
+- **Troubleshooting Guide**: Quick access to logs, status commands, and common fixes
+- **Next Steps**: Recommended actions after deployment
+- **Results Table**: Deployment results and service status on the main action page
+
+#### **Deployment Process Steps**
+1. **🔄 Code Checkout**: Latest code from target branch
+2. **🐍 Environment Setup**: Python 3.9, pyenv, uv package manager
+3. **📦 Dependency Installation**: Requirements and system packages
+4. **🔧 Service Configuration**: systemd service setup and configuration
+5. **🚀 Service Deployment**: Service restart and process management
+6. **🏥 Health Verification**: Real-time endpoint testing with diagnostics
+7. **📊 Summary Generation**: Comprehensive results on GitHub Action page
+8. **✅ Completion**: Final status and next steps
+
+#### **System Architecture Overview**
+- **Runtime**: Python 3.9+ with pyenv version management
+- **Package Manager**: uv (ultrafast Python package installer)
+- **Process Management**: systemd service (mivaa-pdf-extractor.service)
+- **Web Framework**: FastAPI with Uvicorn ASGI server
+- **Database**: Supabase PostgreSQL with vector extensions
+- **AI Integration**: OpenAI, HuggingFace, TogetherAI APIs
+- **Monitoring**: Sentry error tracking and structured logging
+- **Security**: JWT authentication and environment-based secrets
+
+### 🔧 Workflow Configuration
+
+#### **Required Secrets**
+Set these in GitHub repository secrets:
+```bash
+# Server Access
+SSH_PRIVATE_KEY=your_ssh_private_key
+DEPLOY_HOST=104.248.68.3
+
+# Application Environment
+SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+JWT_SECRET_KEY=your_jwt_secret
+OPENAI_API_KEY=your_openai_key
+HUGGINGFACE_API_KEY=your_huggingface_key
+MATERIAL_KAI_API_URL=https://v1api.materialshub.gr
+MATERIAL_KAI_API_KEY=your_api_key
+SENTRY_DSN=your_sentry_dsn
+```
+
+#### **Deployment Process**
+1. **Code Checkout**: Latest code from target branch
+2. **Environment Setup**: Python 3.9, pyenv, uv package manager
+3. **Dependency Installation**: Requirements and system packages
+4. **Service Deployment**: systemd service configuration and restart
+5. **Health Verification**: Real-time endpoint testing with diagnostics
+6. **Summary Generation**: Comprehensive results on GitHub Action page
 
 ## 🗄️ Database Deployment (Supabase)
 
@@ -485,6 +703,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Deploy to server
+        env:
+          # ⚠️ IMPORTANT: Use GH_TOKEN, not GITHUB_TOKEN as env var name
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: ${{ secrets.HOST }}
@@ -493,14 +714,39 @@ jobs:
           script: |
             cd /app/material-kai-vision-platform
             git pull origin main
+            # Authenticate with GitHub Container Registry
+            echo "$GH_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker-compose -f docker-compose.prod.yml up -d --build
 ```
+
+### ⚠️ GitHub Actions Security Notes
+
+1. **Token Naming**: GitHub doesn't allow environment variables starting with `GITHUB_` prefix
+   - ✅ **Correct**: `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
+   - ❌ **Wrong**: `GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
+
+2. **Container Registry Authentication**: Always authenticate before pulling private images
+   ```bash
+   echo "$GH_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+   ```
 
 ## 🚨 Deployment Issues & Solutions
 
 ### Common Issues
 
-1. **Environment Variable Mismatch**:
+1. **Missing Docker Environment Variables**:
+   - **Problem**: Docker shows warnings like "variable is not set. Defaulting to a blank string"
+   - **Solution**: Ensure all required environment variables are exported on the deployment server:
+     ```bash
+     export SUPABASE_URL="https://your-project.supabase.co"
+     export SUPABASE_ANON_KEY="your-anon-key"
+     export OPENAI_API_KEY="your-openai-key"
+     export MATERIAL_KAI_API_URL="https://your-platform-url.com"
+     export MATERIAL_KAI_API_KEY="your-api-key"
+     export SENTRY_DSN="your-sentry-dsn"
+     ```
+
+2. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments
    - **Solution**: Configure environment-specific variables in Vercel (Production/Preview/Development)
 
@@ -530,7 +776,8 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Pre-Deployment
 - [ ] All tests passing
-- [ ] Environment variables configured
+- [ ] Environment variables configured in GitHub Secrets
+- [ ] **Docker environment variables exported on server** (SUPABASE_URL, SUPABASE_ANON_KEY, OPENAI_API_KEY, MATERIAL_KAI_API_URL, MATERIAL_KAI_API_KEY, SENTRY_DSN)
 - [ ] SSL certificates ready
 - [ ] Database migrations prepared
 - [ ] Backup strategy in place

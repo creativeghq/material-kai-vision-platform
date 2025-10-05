@@ -602,9 +602,245 @@ Relevant log entries
 Any other relevant information
 ```
 
+## 🤖 MIVAA Service Troubleshooting
+
+### 🏥 Health Check Issues
+
+#### **Health Endpoint Returns 502 Bad Gateway**
+```bash
+# Check service status
+sudo systemctl status mivaa-pdf-extractor
+
+# Check if service is running
+ps aux | grep mivaa
+
+# Check port binding
+ss -tlnp | grep :8000
+
+# Restart service
+sudo systemctl restart mivaa-pdf-extractor
+
+# Monitor logs
+sudo journalctl -u mivaa-pdf-extractor -f
+```
+
+#### **Health Endpoint Returns 404 Not Found**
+```bash
+# Verify endpoint URL
+curl https://v1api.materialshub.gr/health
+
+# Check nginx configuration
+sudo nginx -t
+sudo systemctl status nginx
+
+# Verify proxy configuration
+sudo cat /etc/nginx/sites-available/default | grep proxy_pass
+```
+
+#### **Connection Timeout or 000 Status**
+```bash
+# Check network connectivity
+ping v1api.materialshub.gr
+
+# Check DNS resolution
+nslookup v1api.materialshub.gr
+
+# Check SSL certificate
+curl -I https://v1api.materialshub.gr
+
+# Test local endpoint
+curl http://localhost:8000/health
+```
+
+### 🚀 Deployment Issues
+
+#### **Deployment Fails During Health Check**
+1. **Check Service Status**:
+   ```bash
+   sudo systemctl status mivaa-pdf-extractor
+   sudo journalctl -u mivaa-pdf-extractor --since "5 minutes ago"
+   ```
+
+2. **Verify Environment Variables**:
+   ```bash
+   # Check if all required variables are set
+   sudo systemctl show mivaa-pdf-extractor --property=Environment
+   ```
+
+3. **Test Local Endpoints**:
+   ```bash
+   curl http://localhost:8000/health
+   curl http://localhost:8000/docs
+   ```
+
+4. **Check Dependencies**:
+   ```bash
+   # Verify Python environment
+   which python3
+   python3 --version
+
+   # Check installed packages
+   pip list | grep fastapi
+   ```
+
+#### **Service Fails to Start**
+```bash
+# Check service configuration
+sudo systemctl cat mivaa-pdf-extractor
+
+# Check for port conflicts
+sudo lsof -i :8000
+
+# Verify file permissions
+ls -la /path/to/mivaa-pdf-extractor/
+
+# Check Python path and virtual environment
+which python3
+echo $VIRTUAL_ENV
+```
+
+### 📊 Performance Issues
+
+#### **Slow Response Times**
+```bash
+# Monitor system resources
+htop
+free -h
+df -h
+
+# Check service logs for errors
+sudo journalctl -u mivaa-pdf-extractor --since "1 hour ago" | grep ERROR
+
+# Test endpoint response time
+time curl https://v1api.materialshub.gr/health
+```
+
+#### **High Memory Usage**
+```bash
+# Check memory usage by service
+ps aux | grep mivaa | awk '{print $4, $11}'
+
+# Monitor memory over time
+watch -n 5 'free -h && ps aux | grep mivaa'
+
+# Check for memory leaks in logs
+sudo journalctl -u mivaa-pdf-extractor | grep -i memory
+```
+
+### 🔧 Auto-Recovery Troubleshooting
+
+#### **Auto-Recovery Fails**
+When the automatic recovery system fails to restore service:
+
+1. **Manual Service Restart**:
+   ```bash
+   sudo systemctl stop mivaa-pdf-extractor
+   sleep 5
+   sudo systemctl start mivaa-pdf-extractor
+   ```
+
+2. **Check Service Dependencies**:
+   ```bash
+   # Verify database connectivity
+   curl -X POST https://bgbavxtjlbvgplozizxu.supabase.co/rest/v1/rpc/ping \
+     -H "apikey: your-anon-key"
+
+   # Check external API connectivity
+   curl -H "Authorization: Bearer $OPENAI_API_KEY" \
+     https://api.openai.com/v1/models
+   ```
+
+3. **Rebuild Service**:
+   ```bash
+   cd /path/to/mivaa-pdf-extractor
+   git pull origin main
+   pip install -r requirements.txt
+   sudo systemctl restart mivaa-pdf-extractor
+   ```
+
+### 🔍 Diagnostic Commands
+
+#### **Quick Health Check**
+```bash
+# Test all endpoints
+curl https://v1api.materialshub.gr/health
+curl https://v1api.materialshub.gr/docs
+curl https://v1api.materialshub.gr/redoc
+curl https://v1api.materialshub.gr/openapi.json
+```
+
+#### **Service Status Check**
+```bash
+# Complete service status
+sudo systemctl status mivaa-pdf-extractor --no-pager --lines=20
+
+# Recent logs
+sudo journalctl -u mivaa-pdf-extractor --since "10 minutes ago" --no-pager
+
+# Error logs only
+sudo journalctl -u mivaa-pdf-extractor --priority=err --since "1 hour ago"
+```
+
+#### **System Resource Check**
+```bash
+# System overview
+uptime
+free -h
+df -h /
+
+# Network status
+ss -tlnp | grep :8000
+netstat -tlnp | grep :8000
+
+# Process information
+ps aux | grep mivaa
+pgrep -f mivaa-pdf-extractor
+```
+
+### 🚨 Emergency Procedures
+
+#### **Service Down - Immediate Recovery**
+```bash
+# 1. Quick restart
+sudo systemctl restart mivaa-pdf-extractor
+
+# 2. If restart fails, check logs
+sudo journalctl -u mivaa-pdf-extractor --since "5 minutes ago"
+
+# 3. Kill and restart if necessary
+sudo pkill -f mivaa-pdf-extractor
+sudo systemctl start mivaa-pdf-extractor
+
+# 4. Verify recovery
+curl https://v1api.materialshub.gr/health
+```
+
+#### **Complete System Recovery**
+```bash
+# 1. Stop service
+sudo systemctl stop mivaa-pdf-extractor
+
+# 2. Clear logs
+sudo journalctl --vacuum-time=1d
+
+# 3. Update code
+cd /path/to/mivaa-pdf-extractor
+git pull origin main
+
+# 4. Reinstall dependencies
+pip install -r requirements.txt
+
+# 5. Restart service
+sudo systemctl start mivaa-pdf-extractor
+
+# 6. Monitor startup
+sudo journalctl -u mivaa-pdf-extractor -f
+```
+
 ## 🔗 Related Documentation
 
 - [Setup & Configuration](./setup-configuration.md) - Initial setup issues
 - [Security & Authentication](./security-authentication.md) - Security problems
 - [API Documentation](./api-documentation.md) - API issues
 - [Deployment Guide](./deployment-guide.md) - Deployment problems
+- [MIVAA Service](./mivaa-service.md) - MIVAA-specific documentation

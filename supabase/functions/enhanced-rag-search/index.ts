@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { performUnifiedVectorSearch, UnifiedSearchRequest } from '../_shared/unified-vector-search.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +33,8 @@ interface SearchResult {
   associated_images: any[];
   source_info: any;
 }
+
+// Embedding generation is now handled by the unified vector search service
 
 // Query intent analysis
 function analyzeQueryIntent(query: string): string {
@@ -87,49 +90,21 @@ serve(async (req) => {
 
     console.log(`Processing ${searchType} search for query: "${query}"`);
 
-    // TEMP: Always use test embedding for debugging - FORCE UPDATE
-    console.log('TEMP: Using test embedding from database for debugging - FORCE UPDATE');
-    const { data: testEmbedding, error: testError } = await supabase
-      .from('document_chunks')
-      .select('embedding')
-      .limit(1)
-      .single();
+    // Use unified vector search with caching
+    const searchRequest: UnifiedSearchRequest = {
+      query,
+      searchType,
+      matchThreshold: matchThreshold || 0.7,
+      matchCount: maxResults,
+      includeContext,
+      workspaceId: undefined, // TODO: Extract from auth context
+      userId: undefined, // TODO: Extract from auth context
+    };
 
-    if (testError || !testEmbedding?.embedding) {
-      throw new Error('Failed to get test embedding from database');
-    }
+    const searchResponse = await performUnifiedVectorSearch(searchRequest, supabase);
 
-    // Convert vector to array
-    const embeddingStr = testEmbedding.embedding.toString();
-    const queryEmbedding = embeddingStr.slice(1, -1).split(',').map(Number);
-    console.log(`Using test embedding with ${queryEmbedding.length} dimensions`);
-
-    // TEMP: Test direct database call - UPDATED
-    console.log('TEMP: Testing direct database call - UPDATED VERSION');
-    const { data: directResults, error: directError } = await supabase
-      .rpc('enhanced_vector_search_service', {
-        query_embedding_text: `[${queryEmbedding.join(',')}]`,
-        search_type: 'documents',
-        embedding_types: ['openai'],
-        match_threshold: 0.1,
-        match_count: 2,
-      });
-
-    console.log('Direct DB call results:', directResults);
-    console.log('Direct DB call error:', directError);
-
-    // Return early with raw results for testing
     return new Response(
-      JSON.stringify({
-        success: true,
-        query,
-        debug: {
-          embeddingLength: queryEmbedding.length,
-          directResults: directResults || [],
-          directError: directError,
-        },
-        totalResults: directResults?.length || 0,
-      }),
+      JSON.stringify(searchResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
 

@@ -52,6 +52,13 @@ This documentation is organized into the following sections:
 - External API integrations
 - MIVAA service endpoints
 
+### 🤖 [MIVAA Service](./mivaa-service.md)
+- Complete MIVAA service documentation
+- Deployment options and health monitoring
+- Service endpoints and API reference
+- Troubleshooting and maintenance guides
+- System requirements and configuration
+
 ### 🔧 Core Services Documentation
 
 #### 📄 [PDF Processing Services](./services-pdf-processing.md)
@@ -130,8 +137,17 @@ This documentation is organized into the following sections:
 - Environment setup
 - CI/CD pipelines
 
+### 🚀 [Deployment Guide](./deployment-guide.md)
+- Multi-service deployment strategy
+- Frontend deployment (Vercel)
+- MIVAA service deployment (Docker)
+- GitHub Actions workflows
+- Health monitoring and auto-recovery
+- Database deployment (Supabase)
+
 ### 🐛 [Troubleshooting](./troubleshooting.md)
 - Common issues and solutions
+- MIVAA service troubleshooting
 - Debugging guides
 - Performance optimization
 
