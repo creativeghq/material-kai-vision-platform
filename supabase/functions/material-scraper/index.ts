@@ -1227,9 +1227,8 @@ async function saveToTemporaryStorage(req: Request, materials: MaterialData[]): 
     throw new Error('No authorization header found');
   }
 
-  const { data: userData, error: userError } = await supabase.auth.getUser(
-    authHeader.replace('Bearer ', ''),
-  );
+  const token = authHeader.replace('Bearer ', '');
+  const { data: userData, error: userError } = await supabase.auth.getUser(token);
 
   if (userError || !userData.user) {
     throw new Error('Invalid user token');

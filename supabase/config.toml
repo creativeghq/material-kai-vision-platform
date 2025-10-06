@@ -42,6 +42,9 @@ verify_jwt = false
 [functions.svbrdf-extractor]
 verify_jwt = false
 
+[functions.mivaa-gateway]
+verify_jwt = false
+
 [auth]
 # JWT secret key for token signing and verification
 jwt_secret = "Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s"

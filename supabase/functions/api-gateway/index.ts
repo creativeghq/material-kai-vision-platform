@@ -355,8 +355,15 @@ async function forwardRequest(
   startTime: number,
 ): Promise<Response> {
   try {
-    // For now, we'll just return a success response
-    // In a real implementation, you would forward to the actual API endpoints
+    const url = new URL(req.url);
+    const requestBody = req.method !== 'GET' ? await req.json() : null;
+
+    // Check if this is a MIVAA gateway request
+    if (url.pathname.includes('/mivaa/') || requestBody?.action) {
+      return await handleMivaaRequest(req, requestBody, logData, startTime, supabase);
+    }
+
+    // Default response for other requests
     const endTime = Date.now();
     const responseTime = endTime - startTime;
 
@@ -383,6 +390,90 @@ async function forwardRequest(
   } catch (error) {
     console.error('Error forwarding request:', error);
     return createErrorResponse('Error processing request', 500, startTime, {
+      ...logData,
+      response_status: 500,
+    }, supabase);
+  }
+}
+
+// MIVAA Gateway Handler
+async function handleMivaaRequest(
+  req: Request,
+  requestBody: any,
+  logData: Omit<ApiUsageLog, 'response_status' | 'response_time_ms'>,
+  startTime: number,
+  supabase: any,
+): Promise<Response> {
+  try {
+    const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://104.248.68.3:8000';
+    const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+
+    if (!requestBody?.action) {
+      throw new Error('Missing action parameter');
+    }
+
+    // Map actions to MIVAA endpoints
+    const endpointMap: Record<string, { path: string; method: string }> = {
+      'health_check': { path: '/health', method: 'GET' },
+      'generate_embedding': { path: '/api/embeddings/generate', method: 'POST' },
+      'semantic_search': { path: '/api/search/semantic', method: 'POST' },
+      'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+      'pdf_extract': { path: '/api/pdf/extract', method: 'POST' },
+      'material_recognition': { path: '/api/material-recognition', method: 'POST' },
+      'rag_search': { path: '/api/rag/search', method: 'POST' },
+    };
+
+    const endpoint = endpointMap[requestBody.action];
+    if (!endpoint) {
+      throw new Error(`Unknown action: ${requestBody.action}`);
+    }
+
+    // Forward request to MIVAA service
+    const mivaaUrl = `${MIVAA_SERVICE_URL}${endpoint.path}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (MIVAA_API_KEY) {
+      headers['Authorization'] = `Bearer ${MIVAA_API_KEY}`;
+    }
+
+    const mivaaResponse = await fetch(mivaaUrl, {
+      method: endpoint.method,
+      headers,
+      body: endpoint.method !== 'GET' ? JSON.stringify(requestBody.payload || {}) : undefined,
+    });
+
+    const responseData = await mivaaResponse.json();
+    const endTime = Date.now();
+    const responseTime = endTime - startTime;
+
+    // Log the request
+    await logApiUsage(supabase, {
+      ...logData,
+      response_status: mivaaResponse.status,
+      response_time_ms: responseTime,
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: mivaaResponse.ok,
+        data: responseData,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          processingTime: responseTime,
+          version: '1.0.0',
+          mivaaEndpoint: mivaaUrl,
+        },
+      }),
+      {
+        status: mivaaResponse.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    );
+  } catch (error) {
+    console.error('MIVAA request error:', error);
+    return createErrorResponse(`MIVAA Gateway Error: ${error.message}`, 500, startTime, {
       ...logData,
       response_status: 500,
     }, supabase);

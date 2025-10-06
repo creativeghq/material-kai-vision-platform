@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { RecognitionResult } from '@/types/materials';
-import { integratedWorkflowService } from '@/services/integratedWorkflowService';
+import { mivaaService } from '@/services/mivaaIntegrationService';
 
 import { RecognitionResults } from './RecognitionResults';
 
@@ -53,49 +53,70 @@ export const MaterialRecognition: React.FC = () => {
     }, 200);
 
     try {
-      // Use the integrated workflow service for enhanced processing
-      const { recognitionResults, enhancements } = await integratedWorkflowService.enhancedMaterialRecognition(files);
+      console.log('🚀 Starting MIVAA material recognition...');
 
-      // Merge enhancements into recognition results
-      const enhancedResults = recognitionResults.map(result => {
-        const enhancement = enhancements[(result as any).id];
-        if (enhancement) {
-          const enhancedMetadata = {
-            ...(result as any).metadata,
-            properties: {
-              ...(enhancement.ocrExtraction && {
-                extracted_text: enhancement.ocrExtraction.extractedText,
-                specifications: enhancement.ocrExtraction.specifications,
-                ocr_confidence: enhancement.ocrExtraction.confidence,
-              }),
-              ...(enhancement.svbrdfMaps && {
-                svbrdf_maps: enhancement.svbrdfMaps,
-                has_pbr_materials: true,
-              }),
-              ...(enhancement.ragKnowledge && {
-                related_knowledge: enhancement.ragKnowledge.relatedKnowledge,
-                ai_context: enhancement.ragKnowledge.aiContext,
-              }),
-            },
+      const recognitionResults: RecognitionResult[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setProgress((i / files.length) * 90);
+
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]); // Remove data:image/... prefix
           };
+          reader.readAsDataURL(file);
+        });
 
-          return { ...result, metadata: enhancedMetadata };
+        // Call MIVAA service for material analysis
+        const response = await mivaaService.analyzeMaterial(base64, {
+          includeProperties: true,
+          includeComposition: true,
+          confidenceThreshold: 0.8,
+        });
+
+        if (response.success && response.data) {
+          recognitionResults.push({
+            id: crypto.randomUUID(),
+            fileName: file.name,
+            confidence: response.data.confidence || 0.8,
+            materialType: response.data.material_type || 'Unknown',
+            properties: response.data.properties || {},
+            composition: response.data.composition || {},
+            sustainability: response.data.sustainability || {},
+            imageUrl: URL.createObjectURL(file),
+            processingTime: response.metadata.processingTime,
+          });
+        } else {
+          console.error('MIVAA analysis failed:', response.error);
+          // Add fallback result
+          recognitionResults.push({
+            id: crypto.randomUUID(),
+            fileName: file.name,
+            confidence: 0.5,
+            materialType: 'Analysis Failed',
+            properties: {},
+            composition: {},
+            sustainability: {},
+            imageUrl: URL.createObjectURL(file),
+            processingTime: 0,
+          });
         }
-        return result;
-      });
+      }
 
-      setResults(enhancedResults);
+      console.log('✅ MIVAA recognition completed:', recognitionResults);
+
+      setResults(recognitionResults);
       setProgress(100);
 
-      const enhancementCount = Object.values(enhancements).reduce((count, enhancement) => {
-        return count + Object.keys(enhancement).length;
-      }, 0);
-
-      toast.success(`Analyzed ${recognitionResults.length} materials with ${enhancementCount} enhancements`);
+      toast.success(`Successfully analyzed ${recognitionResults.length} materials with MIVAA!`);
 
     } catch (error) {
-      console.error('Recognition failed:', error);
-      toast.error('Material recognition failed. Please try again.');
+      console.error('❌ MIVAA recognition failed:', error);
+      toast.error(error instanceof Error ? error.message : 'MIVAA recognition failed');
     } finally {
       setIsProcessing(false);
       clearInterval(progressInterval);

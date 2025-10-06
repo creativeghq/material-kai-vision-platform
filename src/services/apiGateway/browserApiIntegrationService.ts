@@ -192,19 +192,22 @@ export class BrowserApiIntegrationService {
   }
 
   /**
-   * Material recognition using Supabase Edge Function
+   * Material recognition using MIVAA service via Supabase Edge Function
    */
   public async recognizeMaterial(imageFile: File): Promise<StandardizedApiResponse> {
     try {
       // Convert file to base64 for transmission
       const base64Image = await this.fileToBase64(imageFile);
-      
-      return this.callSupabaseFunction('material-recognition', {
-        image: base64Image,
-        options: {
-          includeProperties: true,
-          includeComposition: true,
-          includeSustainability: true,
+
+      return this.callSupabaseFunction('mivaa-gateway', {
+        action: 'material_recognition',
+        payload: {
+          image_data: base64Image,
+          analysis_options: {
+            include_properties: true,
+            include_composition: true,
+            confidence_threshold: 0.8,
+          },
         },
       });
     } catch (error) {
@@ -226,19 +229,20 @@ export class BrowserApiIntegrationService {
   }
 
   /**
-   * Enhanced RAG search using Supabase Edge Function
+   * Enhanced RAG search using MIVAA service via Supabase Edge Function
    */
   public async performEnhancedSearch(query: string, options: {
     includeImages?: boolean;
     includeMaterials?: boolean;
     limit?: number;
   } = {}): Promise<StandardizedApiResponse> {
-    return this.callSupabaseFunction('enhanced-rag-search', {
-      query,
-      options: {
-        includeImages: options.includeImages ?? true,
-        includeMaterials: options.includeMaterials ?? true,
+    return this.callSupabaseFunction('mivaa-gateway', {
+      action: 'semantic_search',
+      payload: {
+        query,
         limit: options.limit ?? 10,
+        similarity_threshold: 0.7,
+        include_metadata: true,
       },
     });
   }
