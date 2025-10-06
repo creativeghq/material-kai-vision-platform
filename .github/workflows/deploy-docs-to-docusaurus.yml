@@ -16,6 +16,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: write
 
 jobs:
   check_changes:
@@ -110,6 +112,12 @@ jobs:
 
           echo "Adding files to git..."
           git add .
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit - documentation is already up to date"
+            exit 0
+          fi
 
           echo "Committing changes..."
           git commit -m "Deploy Documentation: ${{ github.event.head_commit.message }}"
