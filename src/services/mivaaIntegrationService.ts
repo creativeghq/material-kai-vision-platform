@@ -60,7 +60,7 @@ export class MivaaIntegrationService {
 
   private constructor() {
     this.config = {
-      baseUrl: 'http://104.248.68.3:8000',
+      baseUrl: 'https://v1api.materialshub.gr',
       timeout: 30000,
       retryAttempts: 3,
     };

@@ -99,7 +99,7 @@ serve(async (req) => {
       'material_visual_search': { path: '/api/search/materials/visual', method: 'POST' },
       'material_embeddings': { path: '/api/embeddings/materials/generate', method: 'POST' },
 
-      // PDF processing (MIVAA specific endpoints)
+      // PDF processing (MIVAA specific endpoints) - Fixed duplicated paths
       'pdf_extract_markdown': { path: '/api/v1/extract/markdown', method: 'POST' },
       'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
       'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
