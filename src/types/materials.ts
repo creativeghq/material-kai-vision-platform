@@ -369,10 +369,18 @@ export interface ProcessingJob {
 }
 
 export interface RecognitionResult {
-  materialId: string;
+  id: string;
+  fileName: string;
+  materialId?: string;
   confidence: number;
-  matchedMaterial: Material;
-  extractedProperties: Record<string, unknown>;
+  materialType: string;
+  properties: Record<string, unknown>;
+  composition: Record<string, unknown>;
+  sustainability: Record<string, unknown>;
+  imageUrl: string;
+  processingTime: number;
+  matchedMaterial?: Material;
+  extractedProperties?: Record<string, unknown>;
 }
 
 export interface ApiResponse<T> {

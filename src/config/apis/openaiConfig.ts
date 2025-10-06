@@ -133,21 +133,5 @@ export const openaiConfig: OpenAIApiConfig = {
       status: 'working',
       dimensions: 3072,
     },
-
-    // Text Embedding Ada 002 (legacy)
-    'text-embedding-ada-002': {
-      maxTokens: 8191,
-      inputSchema: embeddingInputSchema,
-      outputSchema: embeddingOutputSchema,
-      costPerToken: 0.0001,
-      defaultParams: {
-        model: 'text-embedding-ada-002',
-        encoding_format: 'float',
-      },
-      description: 'OpenAI text-embedding-ada-002 model (legacy) - 1536 dimensions',
-      category: 'text-embedding',
-      status: 'working',
-      dimensions: 1536,
-    },
   },
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Settings, ArrowLeft, Home } from 'lucide-react';
+import { Plus, Edit, Trash2, Settings, ArrowLeft, Home, Zap, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
 // Import proper TypeScript types
 import type {
@@ -52,6 +53,46 @@ interface MetafieldFormData {
   sort_order: number;
 }
 
+/**
+ * Auto-population result interface
+ */
+interface AutoPopulationResult {
+  document_id: string;
+  document_name: string;
+  fields_populated: Array<{
+    field_name: string;
+    old_value: any;
+    new_value: any;
+    confidence: number;
+    source: 'entity_extraction' | 'ai_analysis' | 'pattern_matching';
+  }>;
+  entities_extracted: Array<{
+    type: string;
+    text: string;
+    confidence: number;
+  }>;
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Auto-population summary interface
+ */
+interface AutoPopulationSummary {
+  total_documents: number;
+  documents_processed: number;
+  documents_updated: number;
+  total_fields_populated: number;
+  processing_time_ms: number;
+  success_rate: number;
+  field_mapping_stats: Array<{
+    field_name: string;
+    documents_updated: number;
+    avg_confidence: number;
+    common_values: string[];
+  }>;
+}
+
 export const MetadataFieldsManagement: React.FC = () => {
   const navigate = useNavigate();
   const [fields, setFields] = useState<MaterialMetafieldDefinition[]>([]);
@@ -71,7 +112,112 @@ export const MetadataFieldsManagement: React.FC = () => {
     sort_order: 0,
   });
   const [dropdownOptionInput, setDropdownOptionInput] = useState('');
+
+  // Auto-population state
+  const [autoPopulationResults, setAutoPopulationResults] = useState<AutoPopulationResult[]>([]);
+  const [autoPopulationSummary, setAutoPopulationSummary] = useState<AutoPopulationSummary | null>(null);
+  const [isAutoPopulating, setIsAutoPopulating] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [availableDocuments, setAvailableDocuments] = useState<Array<{id: string, name: string, has_metadata: boolean}>>([]);
+
   const { toast } = useToast();
+
+  // Load available documents for auto-population
+  const loadAvailableDocuments = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('materials_catalog')
+        .select('id, name, metadata')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const documents = (data || []).map((doc: Record<string, unknown>) => ({
+        id: doc.id,
+        name: doc.name || `Document ${String(doc.id).slice(0, 8)}`,
+        has_metadata: Boolean(doc.metadata && Object.keys(doc.metadata as Record<string, unknown>).length > 0)
+      }));
+
+      setAvailableDocuments(documents);
+    } catch (error) {
+      console.error('Error loading available documents:', error);
+    }
+  }, []);
+
+  // Auto-populate metadata using entity extraction
+  const autoPopulateMetadata = useCallback(async () => {
+    if (selectedDocuments.length === 0) {
+      toast({
+        title: 'No Documents Selected',
+        description: 'Please select documents to auto-populate metadata for.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsAutoPopulating(true);
+    setAutoPopulationResults([]);
+    setAutoPopulationSummary(null);
+
+    try {
+      const apiService = BrowserApiIntegrationService.getInstance();
+
+      const result = await apiService.callSupabaseFunction('mivaa-gateway', {
+        action: 'auto_populate_metadata',
+        payload: {
+          document_ids: selectedDocuments,
+          metadata_fields: fields.map(field => ({
+            field_name: field.name,
+            field_type: field.dataType,
+            extraction_hints: (field as any).metadata?.extractionHints || '',
+            applies_to_categories: field.applicableCategories || []
+          })),
+          confidence_threshold: 0.6,
+          include_entity_extraction: true,
+          update_existing: true
+        }
+      });
+
+      if (!result.success) {
+        throw new Error(`Auto-population failed: ${result.error?.message || 'Unknown error'}`);
+      }
+
+      const data = result.data;
+
+      // Process results
+      const results: AutoPopulationResult[] = data.results || [];
+      const summary: AutoPopulationSummary = {
+        total_documents: selectedDocuments.length,
+        documents_processed: data.documents_processed || 0,
+        documents_updated: data.documents_updated || 0,
+        total_fields_populated: data.total_fields_populated || 0,
+        processing_time_ms: data.processing_time_ms || 0,
+        success_rate: data.success_rate || 0,
+        field_mapping_stats: data.field_mapping_stats || []
+      };
+
+      setAutoPopulationResults(results);
+      setAutoPopulationSummary(summary);
+
+      toast({
+        title: 'Auto-Population Complete',
+        description: `Successfully processed ${summary.documents_processed} documents and populated ${summary.total_fields_populated} metadata fields.`,
+      });
+
+      // Note: Metadata fields will be refreshed on next page load
+
+    } catch (error) {
+      console.error('Error during auto-population:', error);
+      toast({
+        title: 'Auto-Population Failed',
+        description: error instanceof Error ? error.message : 'Failed to auto-populate metadata',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAutoPopulating(false);
+    }
+  }, [selectedDocuments, fields, toast]);
 
   // Get available material categories dynamically
   const [materialCategories, setMaterialCategories] = useState<MaterialCategory[]>([]);
@@ -141,7 +287,8 @@ export const MetadataFieldsManagement: React.FC = () => {
 
   useEffect(() => {
     loadMetadataFields();
-  }, [loadMetadataFields]);
+    loadAvailableDocuments();
+  }, [loadMetadataFields, loadAvailableDocuments]);
 
   const resetForm = () => {
     setFormData({
@@ -567,6 +714,191 @@ export const MetadataFieldsManagement: React.FC = () => {
                 ))}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Auto-Population Interface */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5" />
+            Auto-Populate Metadata
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Automatically populate metadata fields using AI entity extraction and analysis
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Document Selection */}
+          <div>
+            <Label className="text-base font-medium">Select Documents</Label>
+            <p className="text-sm text-muted-foreground mb-3">
+              Choose documents to auto-populate metadata for ({availableDocuments.length} available)
+            </p>
+            <div className="border rounded-lg p-4 max-h-60 overflow-y-auto">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Checkbox
+                    id="select-all"
+                    checked={selectedDocuments.length === availableDocuments.length}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedDocuments(availableDocuments.map(doc => doc.id));
+                      } else {
+                        setSelectedDocuments([]);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="select-all" className="font-medium">
+                    Select All ({availableDocuments.length})
+                  </Label>
+                </div>
+                {availableDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`doc-${doc.id}`}
+                      checked={selectedDocuments.includes(doc.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedDocuments(prev => [...prev, doc.id]);
+                        } else {
+                          setSelectedDocuments(prev => prev.filter(id => id !== doc.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`doc-${doc.id}`} className="flex-1 text-sm">
+                      {doc.name}
+                    </Label>
+                    {doc.has_metadata && (
+                      <Badge className="text-xs bg-blue-100 text-blue-800">
+                        Has Metadata
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Auto-Population Controls */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Selected: {selectedDocuments.length} documents
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Will use {fields.length} metadata field definitions for extraction
+              </p>
+            </div>
+            <Button
+              onClick={autoPopulateMetadata}
+              disabled={isAutoPopulating || selectedDocuments.length === 0}
+              className="flex items-center gap-2"
+            >
+              {isAutoPopulating ? (
+                <>
+                  <Activity className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4" />
+                  Auto-Populate Metadata
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Auto-Population Results */}
+          {autoPopulationSummary && (
+            <div className="border rounded-lg p-4 bg-muted/50">
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                Auto-Population Results
+              </h4>
+
+              <div className="grid md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{autoPopulationSummary.documents_processed}</div>
+                  <div className="text-sm text-muted-foreground">Documents Processed</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{autoPopulationSummary.documents_updated}</div>
+                  <div className="text-sm text-muted-foreground">Documents Updated</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{autoPopulationSummary.total_fields_populated}</div>
+                  <div className="text-sm text-muted-foreground">Fields Populated</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{autoPopulationSummary.success_rate.toFixed(1)}%</div>
+                  <div className="text-sm text-muted-foreground">Success Rate</div>
+                </div>
+              </div>
+
+              {autoPopulationSummary.field_mapping_stats.length > 0 && (
+                <div>
+                  <h5 className="font-medium mb-2">Field Mapping Statistics</h5>
+                  <div className="space-y-2">
+                    {autoPopulationSummary.field_mapping_stats.slice(0, 5).map((stat, index) => (
+                      <div key={index} className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{stat.field_name}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge className="text-xs">
+                            {stat.documents_updated} docs
+                          </Badge>
+                          <Badge className="text-xs bg-green-100 text-green-800">
+                            {stat.avg_confidence.toFixed(1)}% confidence
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 text-xs text-muted-foreground">
+                Processing completed in {Math.round(autoPopulationSummary.processing_time_ms / 1000)}s
+              </div>
+            </div>
+          )}
+
+          {/* Individual Results */}
+          {autoPopulationResults.length > 0 && (
+            <div>
+              <h4 className="font-medium mb-3">Individual Document Results</h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {autoPopulationResults.slice(0, 10).map((result, index) => (
+                  <div key={index} className="border rounded p-3 text-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">{result.document_name}</span>
+                      {result.success ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+
+                    {result.success ? (
+                      <div>
+                        <p className="text-muted-foreground mb-1">
+                          Populated {result.fields_populated.length} fields,
+                          extracted {result.entities_extracted.length} entities
+                        </p>
+                        {result.fields_populated.slice(0, 3).map((field, i) => (
+                          <div key={i} className="text-xs text-muted-foreground">
+                            • {field.field_name}: {String(field.new_value)} ({field.confidence.toFixed(1)}%)
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-red-600 text-xs">{result.error}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

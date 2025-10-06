@@ -594,11 +594,14 @@ Deno.serve(async (req: Request) => {
 
     const processingTime = Date.now() - startTime;
 
-    // Create standardized success response using the new pattern
-    const responseData: MaterialRecognitionResult = {
-      materials: filteredMaterials.map((material: any) => ({
-        name: material.name,
-        confidence: material.confidence,
+    // Create standardized success response matching frontend expectations
+    const responseData = {
+      materials: filteredMaterials.map((material: any, index: number) => ({
+        // Frontend expects these exact field names (camelCase)
+        id: `mat_${Date.now()}_${index}`,
+        fileName: body.image_url ? 'uploaded_image.jpg' : 'unknown',
+        confidence: material.confidence,                    // ✅ Fixed: matches frontend expectation
+        materialType: material.name,                        // ✅ Fixed: was 'name', now 'materialType'
         properties: {
           category: material.properties.category,
           subcategory: material.properties.subcategory || undefined,
@@ -606,13 +609,20 @@ Deno.serve(async (req: Request) => {
           texture: material.properties.texture || undefined,
           finish: material.properties.finish || undefined,
           durability: material.properties.durability || undefined,
-          sustainability: material.properties.sustainability || undefined,
         },
+        composition: material.properties.composition || {},  // ✅ Added: frontend expects this
+        sustainability: {                                   // ✅ Added: frontend expects this
+          rating: material.properties.sustainability || 'unknown',
+          certifications: [],
+          environmental_impact: 'unknown'
+        },
+        processingTime: processingTime,                     // ✅ Fixed: matches frontend expectation
         boundingBox: material.bounding_box,
       })),
       analysisMetadata: {
         analysisType: analysisType,
         processingMethod: processingMethod as any,
+        totalProcessingTime: processingTime,                // ✅ Added: for metadata
         imageDimensions: {
           width: 800,
           height: 600,

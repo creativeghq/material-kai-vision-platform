@@ -159,6 +159,7 @@ interface EnhancedContext {
   }[];
   ragResults?: RAGResults;
   visualSearchResults?: VisualSearchResults;
+  similaritySearchResults?: SimilaritySearchResults;
 }
 
 interface VisualSearchResults {
@@ -175,6 +176,23 @@ interface VisualSearchResults {
   search_execution_time_ms: number;
   total_results: number;
   query_analysis?: Record<string, unknown>;
+}
+
+interface SimilaritySearchResults {
+  searchId: string;
+  results: Array<{
+    id: string;
+    title: string;
+    content: string;
+    similarity_score: number;
+    metadata?: Record<string, unknown>;
+    document_type?: string;
+    source?: string;
+  }>;
+  processing_time_ms: number;
+  total_results: number;
+  search_type: 'semantic' | 'vector' | 'hybrid';
+  threshold_used: number;
 }
 
 interface MaterialAgentSearchInterfaceProps {
@@ -207,8 +225,10 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
     useVisualSearch: true,
     enableVisualSearch: true,
   });
-  const [_searchMode, _setSearchMode] = useState<'text' | 'visual' | 'hybrid'>('text');
+  const [searchMode, setSearchMode] = useState<'text' | 'visual' | 'hybrid' | 'similarity'>('text');
   const [visualSearchResults, setVisualSearchResults] = useState<VisualSearchResults | null>(null);
+  const [similaritySearchResults, setSimilaritySearchResults] = useState<SimilaritySearchResults | null>(null);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.7);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -422,27 +442,36 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                 session_id: sessionId,
               });
 
-              const apiData = visualResponse.data as { success?: boolean; results?: Array<Record<string, unknown>>; search_id?: string; search_execution_time_ms?: number; query_analysis?: Record<string, unknown> };
-              if (apiData?.success && apiData?.results && apiData.results.length > 0) {
-                visualSearchResults = {
-                  searchId: apiData.search_id || crypto.randomUUID(),
-                  matches: apiData.results.map((result) => ({
-                    id: result.material_id as string,
-                    name: (result.material_name as string) || (result.name as string),
-                    description: result.description as string,
-                    similarity_score: result.similarity_score as number,
-                    llama_analysis: result.llama_analysis as Record<string, unknown>,
-                    visual_features: result.visual_features as Record<string, unknown>,
-                    thumbnail_url: result.thumbnail_url as string,
-                  })),
-                  search_execution_time_ms: apiData.search_execution_time_ms || 0,
-                  total_results: apiData.results.length,
-                  query_analysis: apiData.query_analysis || {},
-                };
-                console.log('✅ Visual search completed:', visualSearchResults);
-                enhancedContext.visualSearchResults = visualSearchResults || null;
-                setVisualSearchResults(visualSearchResults);
-                break; // Use first image for now
+              // ✅ Handle standardized visual search response format
+              if (visualResponse.success && visualResponse.data) {
+                const responseData = visualResponse.data as any;
+
+                // Handle both new standardized format and legacy format
+                const matches = responseData.matches || responseData.results || [];
+                const searchId = responseData.query_id || responseData.search_id || crypto.randomUUID();
+                const executionTime = responseData.search_statistics?.search_time_ms || responseData.search_execution_time_ms || 0;
+
+                if (matches.length > 0) {
+                  visualSearchResults = {
+                    searchId: searchId,
+                    matches: matches.map((result: any) => ({
+                      id: result.material_id || result.id || crypto.randomUUID(),
+                      name: result.material_name || result.name || 'Unknown Material',
+                      description: result.description || result.material_data?.description || 'No description available',
+                      similarity_score: result.similarity_score || 0.8,
+                      llama_analysis: result.llama_analysis || {},
+                      visual_features: result.visual_features || {},
+                      thumbnail_url: result.thumbnail_url || result.image_url || '',
+                    })),
+                    search_execution_time_ms: executionTime,
+                    total_results: matches.length,
+                    query_analysis: responseData.query_analysis || responseData.query_metadata || {},
+                  };
+                  console.log('✅ Visual search completed:', visualSearchResults);
+                  enhancedContext.visualSearchResults = visualSearchResults || null;
+                  setVisualSearchResults(visualSearchResults);
+                  break; // Use first image for now
+                }
               }
             } catch (imageError) {
               console.warn(`⚠️ Visual search failed for ${imageFile.name}:`, imageError);
@@ -450,6 +479,49 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           }
         } catch (visualError) {
           console.warn('⚠️ Visual search failed, continuing without:', visualError);
+        }
+      }
+
+      // If Similarity Search mode is enabled, perform vector similarity search
+      let similaritySearchResults: SimilaritySearchResults | null = null;
+      if (searchMode === 'similarity' && input.trim()) {
+        try {
+          console.log('🔍 Performing vector similarity search...');
+          const apiService = BrowserApiIntegrationService.getInstance();
+          const similarityResponse = await apiService.callSupabaseFunction('mivaa-gateway', {
+            action: 'vector_similarity_search',
+            payload: {
+              query_text: input.trim(),
+              similarity_threshold: similarityThreshold,
+              limit: 20,
+              include_metadata: true,
+              search_type: 'semantic'
+            }
+          });
+
+          if (similarityResponse.success && similarityResponse.data?.results) {
+            similaritySearchResults = {
+              searchId: crypto.randomUUID(),
+              results: similarityResponse.data.results.map((result: any) => ({
+                id: result.id || crypto.randomUUID(),
+                title: result.title || result.name || 'Untitled',
+                content: result.content || result.description || '',
+                similarity_score: result.similarity_score || 0,
+                metadata: result.metadata || {},
+                document_type: result.document_type || 'material',
+                source: result.source || 'vector_search'
+              })),
+              processing_time_ms: similarityResponse.data.processing_time_ms || 0,
+              total_results: similarityResponse.data.results.length,
+              search_type: 'semantic',
+              threshold_used: similarityThreshold
+            };
+            console.log('✅ Vector similarity search completed:', similaritySearchResults);
+            enhancedContext.similaritySearchResults = similaritySearchResults;
+            setSimilaritySearchResults(similaritySearchResults);
+          }
+        } catch (similarityError) {
+          console.warn('⚠️ Vector similarity search failed, continuing without:', similarityError);
         }
       }
 
@@ -822,6 +894,54 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                       </div>
                     )}
 
+                    {/* Similarity Search Results */}
+                    {similaritySearchResults && similaritySearchResults.results.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Search className="h-3 w-3" />
+                          Vector Similarity Results ({similaritySearchResults.total_results} found, {(similaritySearchResults.threshold_used * 100).toFixed(0)}% threshold)
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          {similaritySearchResults.results.slice(0, 5).map((result) => (
+                            <div
+                              key={result.id}
+                              onClick={() => handleMaterialClick({
+                                id: result.id,
+                                name: result.title,
+                                description: result.content,
+                                relevanceScore: result.similarity_score,
+                                source: 'similarity_search'
+                              })}
+                              className="p-3 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="font-medium text-sm">{result.title}</div>
+                              <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                {result.content.substring(0, 150)}...
+                              </div>
+                              <div className="flex items-center justify-between mt-2">
+                                <Badge className="text-xs border border-green-200 bg-green-50 text-green-700">
+                                  <Search className="h-2 w-2 mr-1" />
+                                  {Math.round(result.similarity_score * 100)}% similarity
+                                </Badge>
+                                {result.document_type && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {result.document_type}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {similaritySearchResults.results.length > 5 && (
+                          <div className="text-xs text-muted-foreground">
+                            +{similaritySearchResults.results.length - 5} more similarity matches found
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground">
+                          Similarity search completed in {similaritySearchResults.processing_time_ms}ms using {similaritySearchResults.search_type} search
+                        </div>
+                      </div>
+                    )}
 
                     {/* Suggestions */}
                     {message.suggestions && message.suggestions.length > 0 && (
@@ -986,12 +1106,66 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               </div>
             )}
 
+            {/* Search Mode Controls */}
+            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+              <span className="text-sm font-medium text-muted-foreground">Search Mode:</span>
+              <div className="flex gap-1">
+                <Button
+                  variant={searchMode === 'text' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSearchMode('text')}
+                >
+                  Text
+                </Button>
+                <Button
+                  variant={searchMode === 'visual' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSearchMode('visual')}
+                >
+                  Visual
+                </Button>
+                <Button
+                  variant={searchMode === 'hybrid' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSearchMode('hybrid')}
+                >
+                  Hybrid
+                </Button>
+                <Button
+                  variant={searchMode === 'similarity' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSearchMode('similarity')}
+                >
+                  Similarity
+                </Button>
+              </div>
+
+              {/* Similarity Threshold Control */}
+              {searchMode === 'similarity' && (
+                <div className="flex items-center gap-2 ml-4">
+                  <span className="text-sm text-muted-foreground">Threshold:</span>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="0.95"
+                    step="0.05"
+                    value={similarityThreshold}
+                    onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
+                    className="w-20"
+                  />
+                  <span className="text-sm font-mono w-10">
+                    {(similarityThreshold * 100).toFixed(0)}%
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* Input Row */}
             <div className="flex gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder="Ask me about materials, properties, applications, or design ideas..."
                 disabled={isLoading}
                 className="flex-1"

@@ -57,8 +57,16 @@ function mapToMaterial(dbMaterial: MaterialsRow): Material {
 
 function mapToRecognitionResult(dbResult: RecognitionResultRow): RecognitionResult {
   return {
+    id: dbResult.id || crypto.randomUUID(),
+    fileName: String(dbResult.file_id) || 'unknown',
     materialId: dbResult.material_id || '',
     confidence: dbResult.confidence_score,
+    materialType: 'Unknown Material',
+    properties: (dbResult.properties_detected as Record<string, unknown>) || {},
+    composition: {},
+    sustainability: {},
+    imageUrl: '',
+    processingTime: Number(dbResult.processing_time_ms) || 0,
     matchedMaterial: {
       id: dbResult.material_id || '',
       name: 'Unknown Material',

@@ -6,23 +6,14 @@ import {
   AlertTriangle,
   RefreshCw,
   Server,
-  Globe,
-  Database,
-  Brain,
-  Image,
-  FileText,
-  Search,
-  Shield,
-  Cpu,
-  Download,
-  ExternalLink,
+  Globe
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

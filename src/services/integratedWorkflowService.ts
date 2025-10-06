@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { RecognitionResult } from '@/types/materials';
+import { validateAndLog, validators } from '@/utils/apiResponseValidation';
 
 import { unifiedMLService } from './ml/unifiedMLService';
 
@@ -176,46 +177,87 @@ export class IntegratedWorkflowService {
       throw new Error('Material recognition failed');
     }
 
-    // Convert ML results to RecognitionResult format
+    // Convert ML results to RecognitionResult format with validation
     return files.map((file, i) => {
       const mlResult = mlResults[i]?.result;
-      const analysisData = mlResult?.data || {};
-      const materialData = (analysisData as any)?.combined || analysisData || {};
 
+      // ✅ Validate the API response before processing
+      const validationResult = validateAndLog(
+        mlResult,
+        validators.materialRecognition,
+        `Material Recognition for ${file.name}`
+      );
+
+      if (!validationResult.isValid) {
+        console.error(`❌ Validation failed for ${file.name}:`, validationResult.errors);
+        // Return a fallback result for failed validation
+        return {
+          id: `fallback-${Date.now()}-${i}`,
+          fileName: file.name,
+          materialId: 'unknown',
+          confidence: 0,
+          materialType: 'Unknown Material',
+          properties: {},
+          composition: {},
+          sustainability: {},
+          imageUrl: URL.createObjectURL(file),
+          processingTime: 0,
+          matchedMaterial: undefined,
+          extractedProperties: {},
+        };
+      }
+
+      // Use validated data
+      const validatedMaterials = validationResult.data || [];
+      const materialData = validatedMaterials[0] || {};
+
+      // Handle legacy format fallback if validation passed but no materials found
+      if (validatedMaterials.length === 0) {
+        const responseData = mlResult?.data || {};
+        const typedResponseData = responseData as any;
+        const legacyData = typedResponseData?.combined || typedResponseData || {};
+
+        return {
+          id: `legacy-${Date.now()}-${i}`,
+          fileName: file.name,
+          materialId: legacyData.materialType || 'unknown',
+          confidence: legacyData.confidence || 0,
+          materialType: legacyData.classification || 'Unknown Material',
+          properties: legacyData.properties || {},
+          composition: legacyData.composition || {},
+          sustainability: legacyData.sustainability || {},
+          imageUrl: URL.createObjectURL(file),
+          processingTime: mlResult?.processingTime || 0,
+          matchedMaterial: undefined,
+          extractedProperties: legacyData,
+        };
+      }
+
+      // ✅ Return properly typed RecognitionResult
       return {
-        id: `hybrid-${Date.now()}-${i}`,
-        file_id: `file-${Date.now()}-${i}`,
-        material_id: materialData.materialType || 'unknown',
-        confidence_score: materialData.confidence || 0,
-        detection_method: 'combined' as const,
-        ai_model_version: `${mlResult?.processingMethod || 'unified'}-v1.0`,
-        properties_detected: materialData,
-        processing_time_ms: mlResult?.processingTime || 0,
-        user_verified: false,
-        created_at: new Date().toISOString(),
-
-        // RecognitionResult interface properties
-        materialId: materialData.materialType || 'unknown',
-        confidence: materialData.confidence || 0,
+        id: materialData.id || `hybrid-${Date.now()}-${i}`,
+        fileName: materialData.fileName || file.name,
+        materialId: materialData.id || 'unknown',
+        confidence: Number(materialData.confidence) || 0,
+        materialType: String(materialData.materialType) || 'Unknown Material',
+        properties: materialData.properties || {},
+        composition: materialData.composition || {},
+        sustainability: materialData.sustainability || {},
+        imageUrl: URL.createObjectURL(file),
+        processingTime: Number(materialData.processingTime) || Number(mlResult?.processingTime) || 0,
         matchedMaterial: {
-          id: materialData.materialType || 'unknown',
-          name: materialData.classification || 'Unknown Material',
+          id: String(materialData.id) || 'unknown',
+          name: String(materialData.materialType) || 'Unknown Material',
           description: 'AI-detected material',
-          category: materialData.category || 'unknown',
-          properties: materialData,
+          category: String(materialData.properties?.category) || 'unknown',
+          properties: materialData.properties || {},
           metadata: {},
           standards: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
-        extractedProperties: materialData,
-
-        // Additional properties
-        name: materialData.classification || 'Unknown Material',
-        imageUrl: URL.createObjectURL(file),
-        metadata: { properties: materialData },
-        processingTime: mlResult?.processingTime || 0,
-      };
+        extractedProperties: materialData as unknown as Record<string, unknown>,
+      } as RecognitionResult;
     });
   }
 

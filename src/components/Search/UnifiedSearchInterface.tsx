@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Search,
   Upload,
@@ -10,6 +10,11 @@ import {
   BookOpen,
   Brain,
   X,
+  Filter,
+  Tag,
+  Building,
+  MapPin,
+  User,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,8 +22,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { materialSearchService, MaterialSearchResult } from '@/services/materialSearchService';
+import { supabase } from '@/integrations/supabase/client';
 
 // Using MaterialSearchResult from our service as base, with additional UI fields
 type SearchResult = MaterialSearchResult & {
@@ -28,7 +35,28 @@ type SearchResult = MaterialSearchResult & {
   similarity_score: number;
   source?: string;
   metadata?: Record<string, unknown>;
+  extracted_entities?: EntityData[];
 };
+
+interface EntityData {
+  type: 'MATERIAL' | 'ORG' | 'LOCATION' | 'PERSON' | 'DATE';
+  text: string;
+  confidence: number;
+}
+
+interface EntityFilters {
+  materials: string[];
+  organizations: string[];
+  locations: string[];
+  people: string[];
+}
+
+interface AvailableEntities {
+  materials: string[];
+  organizations: string[];
+  locations: string[];
+  people: string[];
+}
 
 interface UnifiedSearchInterfaceProps {
   onResultsFound?: (results: SearchResult[]) => void;
@@ -45,11 +73,88 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [filteredResults, setFilteredResults] = useState<SearchResult[]>([]);
   // const [_searchType, _setSearchType] = useState<'text' | 'image' | 'hybrid'>('text');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showEntityFilters, setShowEntityFilters] = useState(false);
+  const [entityFilters, setEntityFilters] = useState<EntityFilters>({
+    materials: [],
+    organizations: [],
+    locations: [],
+    people: []
+  });
+  const [availableEntities, setAvailableEntities] = useState<AvailableEntities>({
+    materials: [],
+    organizations: [],
+    locations: [],
+    people: []
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Load available entities from database
+  const loadAvailableEntities = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('materials_catalog')
+        .select('extracted_entities')
+        .not('extracted_entities', 'is', null);
+
+      if (error) throw error;
+
+      const allEntities: AvailableEntities = {
+        materials: [],
+        organizations: [],
+        locations: [],
+        people: []
+      };
+
+      data?.forEach((item: any) => {
+        const entities = item.extracted_entities as EntityData[] || [];
+        entities.forEach(entity => {
+          if (entity.confidence >= 0.7) { // Only include high-confidence entities
+            switch (entity.type) {
+              case 'MATERIAL':
+                if (!allEntities.materials.includes(entity.text)) {
+                  allEntities.materials.push(entity.text);
+                }
+                break;
+              case 'ORG':
+                if (!allEntities.organizations.includes(entity.text)) {
+                  allEntities.organizations.push(entity.text);
+                }
+                break;
+              case 'LOCATION':
+                if (!allEntities.locations.includes(entity.text)) {
+                  allEntities.locations.push(entity.text);
+                }
+                break;
+              case 'PERSON':
+                if (!allEntities.people.includes(entity.text)) {
+                  allEntities.people.push(entity.text);
+                }
+                break;
+            }
+          }
+        });
+      });
+
+      // Sort entities alphabetically
+      Object.keys(allEntities).forEach(key => {
+        (allEntities as any)[key].sort();
+      });
+
+      setAvailableEntities(allEntities);
+    } catch (error) {
+      console.error('Error loading entities:', error);
+    }
+  }, []);
+
+  // Load entities on component mount
+  useEffect(() => {
+    loadAvailableEntities();
+  }, [loadAvailableEntities]);
 
   const handleImageSelect = useCallback((file: File) => {
     setSelectedImage(file);
@@ -73,6 +178,63 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     if (selectedImage) return 'image';
     return 'text';
   }, [selectedImage]);
+
+  // Apply entity filters to search results
+  const applyEntityFilters = useCallback((searchResults: SearchResult[]) => {
+    if (!entityFilters.materials.length &&
+        !entityFilters.organizations.length &&
+        !entityFilters.locations.length &&
+        !entityFilters.people.length) {
+      return searchResults; // No filters applied
+    }
+
+    return searchResults.filter(result => {
+      const entities = result.extracted_entities || [];
+
+      // Check if result matches any selected entity filters
+      let matchesFilter = false;
+
+      // Check material entities
+      if (entityFilters.materials.length > 0) {
+        const materialEntities = entities.filter(e => e.type === 'MATERIAL');
+        if (materialEntities.some(e => entityFilters.materials.includes(e.text))) {
+          matchesFilter = true;
+        }
+      }
+
+      // Check organization entities
+      if (entityFilters.organizations.length > 0) {
+        const orgEntities = entities.filter(e => e.type === 'ORG');
+        if (orgEntities.some(e => entityFilters.organizations.includes(e.text))) {
+          matchesFilter = true;
+        }
+      }
+
+      // Check location entities
+      if (entityFilters.locations.length > 0) {
+        const locationEntities = entities.filter(e => e.type === 'LOCATION');
+        if (locationEntities.some(e => entityFilters.locations.includes(e.text))) {
+          matchesFilter = true;
+        }
+      }
+
+      // Check people entities
+      if (entityFilters.people.length > 0) {
+        const peopleEntities = entities.filter(e => e.type === 'PERSON');
+        if (peopleEntities.some(e => entityFilters.people.includes(e.text))) {
+          matchesFilter = true;
+        }
+      }
+
+      return matchesFilter;
+    });
+  }, [entityFilters]);
+
+  // Update filtered results when filters or results change
+  useEffect(() => {
+    const filtered = applyEntityFilters(results);
+    setFilteredResults(filtered);
+  }, [results, applyEntityFilters]);
 
   const performSearch = useCallback(async () => {
     if (!query.trim() && !selectedImage) {
@@ -128,7 +290,29 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         throw new Error(materialSearchResponse.error || 'Search failed');
       }
 
-      // Transform MaterialSearchResult to SearchResult format
+      // Transform MaterialSearchResult to SearchResult format and fetch entity data
+      const resultIds = materialSearchResponse.data.map(result => result.id);
+
+      // Fetch entity data for the search results
+      let entityDataMap: Record<string, EntityData[]> = {};
+      if (resultIds.length > 0) {
+        try {
+          const { data: entityData } = await supabase
+            .from('materials_catalog')
+            .select('id, extracted_entities')
+            .in('id', resultIds)
+            .not('extracted_entities', 'is', null);
+
+          entityData?.forEach((item: any) => {
+            if (item.extracted_entities) {
+              entityDataMap[item.id] = item.extracted_entities as EntityData[];
+            }
+          });
+        } catch (entityError) {
+          console.warn('Failed to fetch entity data:', entityError);
+        }
+      }
+
       const unifiedResults: SearchResult[] = materialSearchResponse.data.map((result) => ({
         ...result,
         title: result.name,
@@ -136,6 +320,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         type: 'material' as const,
         similarity_score: result.search_score || 0.8,
         source: 'unified_search',
+        extracted_entities: entityDataMap[result.id] || [],
         metadata: {
           category: result.category,
           properties: result.properties,
@@ -253,7 +438,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 placeholder="Search materials: 'Cement tile 60x120', 'Fire resistance', 'Waterproof flooring'..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && performSearch()}
+                onKeyDown={(e) => e.key === 'Enter' && performSearch()}
                 className="pr-10"
               />
               <Type className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -346,17 +531,278 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         </CardContent>
       </Card>
 
+      {/* Entity Filters */}
+      {results.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Entity Filters
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEntityFilters(!showEntityFilters)}
+              >
+                {showEntityFilters ? 'Hide Filters' : 'Show Filters'}
+              </Button>
+            </div>
+          </CardHeader>
+          {showEntityFilters && (
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Material Filters */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-medium">
+                    <Tag className="h-4 w-4" />
+                    Materials ({availableEntities.materials.length})
+                  </Label>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {availableEntities.materials.slice(0, 10).map(material => (
+                      <div key={material} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`material-${material}`}
+                          checked={entityFilters.materials.includes(material)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                materials: [...prev.materials, material]
+                              }));
+                            } else {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                materials: prev.materials.filter(m => m !== material)
+                              }));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`material-${material}`} className="text-sm">
+                          {material}
+                        </Label>
+                      </div>
+                    ))}
+                    {availableEntities.materials.length > 10 && (
+                      <div className="text-xs text-muted-foreground">
+                        +{availableEntities.materials.length - 10} more materials
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Organization Filters */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-medium">
+                    <Building className="h-4 w-4" />
+                    Organizations ({availableEntities.organizations.length})
+                  </Label>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {availableEntities.organizations.slice(0, 10).map(org => (
+                      <div key={org} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`org-${org}`}
+                          checked={entityFilters.organizations.includes(org)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                organizations: [...prev.organizations, org]
+                              }));
+                            } else {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                organizations: prev.organizations.filter(o => o !== org)
+                              }));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`org-${org}`} className="text-sm">
+                          {org}
+                        </Label>
+                      </div>
+                    ))}
+                    {availableEntities.organizations.length > 10 && (
+                      <div className="text-xs text-muted-foreground">
+                        +{availableEntities.organizations.length - 10} more organizations
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Location Filters */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-medium">
+                    <MapPin className="h-4 w-4" />
+                    Locations ({availableEntities.locations.length})
+                  </Label>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {availableEntities.locations.slice(0, 10).map(location => (
+                      <div key={location} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`location-${location}`}
+                          checked={entityFilters.locations.includes(location)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                locations: [...prev.locations, location]
+                              }));
+                            } else {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                locations: prev.locations.filter(l => l !== location)
+                              }));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`location-${location}`} className="text-sm">
+                          {location}
+                        </Label>
+                      </div>
+                    ))}
+                    {availableEntities.locations.length > 10 && (
+                      <div className="text-xs text-muted-foreground">
+                        +{availableEntities.locations.length - 10} more locations
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* People Filters */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-medium">
+                    <User className="h-4 w-4" />
+                    People ({availableEntities.people.length})
+                  </Label>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {availableEntities.people.slice(0, 10).map(person => (
+                      <div key={person} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`person-${person}`}
+                          checked={entityFilters.people.includes(person)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                people: [...prev.people, person]
+                              }));
+                            } else {
+                              setEntityFilters(prev => ({
+                                ...prev,
+                                people: prev.people.filter(p => p !== person)
+                              }));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`person-${person}`} className="text-sm">
+                          {person}
+                        </Label>
+                      </div>
+                    ))}
+                    {availableEntities.people.length > 10 && (
+                      <div className="text-xs text-muted-foreground">
+                        +{availableEntities.people.length - 10} more people
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex flex-wrap gap-1">
+                  {entityFilters.materials.map(material => (
+                    <Badge key={material} variant="secondary" className="text-xs">
+                      <Tag className="h-2 w-2 mr-1" />
+                      {material}
+                      <X
+                        className="h-2 w-2 ml-1 cursor-pointer"
+                        onClick={() => setEntityFilters(prev => ({
+                          ...prev,
+                          materials: prev.materials.filter(m => m !== material)
+                        }))}
+                      />
+                    </Badge>
+                  ))}
+                  {entityFilters.organizations.map(org => (
+                    <Badge key={org} variant="secondary" className="text-xs">
+                      <Building className="h-2 w-2 mr-1" />
+                      {org}
+                      <X
+                        className="h-2 w-2 ml-1 cursor-pointer"
+                        onClick={() => setEntityFilters(prev => ({
+                          ...prev,
+                          organizations: prev.organizations.filter(o => o !== org)
+                        }))}
+                      />
+                    </Badge>
+                  ))}
+                  {entityFilters.locations.map(location => (
+                    <Badge key={location} variant="secondary" className="text-xs">
+                      <MapPin className="h-2 w-2 mr-1" />
+                      {location}
+                      <X
+                        className="h-2 w-2 ml-1 cursor-pointer"
+                        onClick={() => setEntityFilters(prev => ({
+                          ...prev,
+                          locations: prev.locations.filter(l => l !== location)
+                        }))}
+                      />
+                    </Badge>
+                  ))}
+                  {entityFilters.people.map(person => (
+                    <Badge key={person} variant="secondary" className="text-xs">
+                      <User className="h-2 w-2 mr-1" />
+                      {person}
+                      <X
+                        className="h-2 w-2 ml-1 cursor-pointer"
+                        onClick={() => setEntityFilters(prev => ({
+                          ...prev,
+                          people: prev.people.filter(p => p !== person)
+                        }))}
+                      />
+                    </Badge>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEntityFilters({
+                    materials: [],
+                    organizations: [],
+                    locations: [],
+                    people: []
+                  })}
+                  disabled={!entityFilters.materials.length &&
+                           !entityFilters.organizations.length &&
+                           !entityFilters.locations.length &&
+                           !entityFilters.people.length}
+                >
+                  Clear All Filters
+                </Button>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       {/* Search Results */}
       {results.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>
-              Search Results ({results.length} found)
+              Search Results ({filteredResults.length} of {results.length} found)
+              {filteredResults.length !== results.length && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  (filtered by entities)
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {results.map((result, index) => (
+              {filteredResults.map((result, index) => (
                 <Card
                   key={index}
                   className="border-l-4 border-l-primary hover:shadow-md transition-shadow cursor-pointer"
@@ -409,6 +855,36 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                             Properties Available
                           </Badge>
                         )}
+                      </div>
+                    )}
+
+                    {/* Entity Badges */}
+                    {result.extracted_entities && result.extracted_entities.length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-xs text-muted-foreground mb-1">Extracted Entities:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {result.extracted_entities.slice(0, 6).map((entity, i) => (
+                            <Badge
+                              key={i}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {entity.type === 'MATERIAL' && <Tag className="h-2 w-2 mr-1" />}
+                              {entity.type === 'ORG' && <Building className="h-2 w-2 mr-1" />}
+                              {entity.type === 'LOCATION' && <MapPin className="h-2 w-2 mr-1" />}
+                              {entity.type === 'PERSON' && <User className="h-2 w-2 mr-1" />}
+                              {entity.text}
+                              <span className="ml-1 text-muted-foreground">
+                                ({Math.round(entity.confidence * 100)}%)
+                              </span>
+                            </Badge>
+                          ))}
+                          {result.extracted_entities.length > 6 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{result.extracted_entities.length - 6} more
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     )}
                   </CardContent>

@@ -10,6 +10,12 @@ import {
   Home,
   ArrowLeft,
   Gauge,
+  FileText,
+
+  Layers,
+  BarChart3,
+  TrendingUp,
+  Zap,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,6 +34,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
 
 interface SystemMetrics {
@@ -60,6 +67,50 @@ interface MLTask {
   created_at: string;
 }
 
+interface EnhancedJobDetails {
+  job_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress_percentage: number;
+  current_stage: string;
+  stages: Array<{
+    name: string;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    processing_time_ms?: number;
+    error_message?: string;
+  }>;
+  estimated_completion_time?: number;
+  total_processing_time_ms: number;
+  document_info?: {
+    name: string;
+    type: string;
+    size_bytes: number;
+  };
+  error_details?: {
+    stage: string;
+    message: string;
+    timestamp: string;
+  };
+}
+
+interface DocumentAnalysisMetrics {
+  total_documents: number;
+  documents_processed_today: number;
+  avg_processing_time_per_document: number;
+  success_rate_24h: number;
+  error_rate_24h: number;
+  processing_stages: Array<{
+    stage_name: string;
+    avg_time_ms: number;
+    success_rate: number;
+    common_errors: string[];
+  }>;
+  performance_trends: {
+    processing_time_trend: number; // percentage change
+    success_rate_trend: number;
+    volume_trend: number;
+  };
+}
+
 export const SystemPerformance: React.FC = () => {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<SystemMetrics>({
@@ -77,7 +128,112 @@ export const SystemPerformance: React.FC = () => {
   const [processingJobs, setProcessingJobs] = useState<ProcessingJob[]>([]);
   const [mlTasks, setMLTasks] = useState<MLTask[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Enhanced monitoring state
+  const [enhancedJobs, setEnhancedJobs] = useState<EnhancedJobDetails[]>([]);
+  const [documentMetrics, setDocumentMetrics] = useState<DocumentAnalysisMetrics | null>(null);
+
+  const [jobDetailsLoading, setJobDetailsLoading] = useState(false);
+
   const { toast } = useToast();
+
+  // Enhanced job details fetching
+  const fetchEnhancedJobDetails = useCallback(async (jobId: string): Promise<EnhancedJobDetails | null> => {
+    try {
+      setJobDetailsLoading(true);
+      const apiService = BrowserApiIntegrationService.getInstance();
+
+      const result = await apiService.callSupabaseFunction('mivaa-gateway', {
+        action: 'get_job_details',
+        payload: {
+          job_id: jobId,
+          include_stages: true,
+          include_progress: true
+        }
+      });
+
+      if (!result.success) {
+        throw new Error(`Failed to fetch job details: ${result.error?.message || 'Unknown error'}`);
+      }
+
+      const data = result.data;
+
+      return {
+        job_id: jobId,
+        status: data.status || 'pending',
+        progress_percentage: data.progress_percentage || 0,
+        current_stage: data.current_stage || 'Initializing',
+        stages: data.stages || [],
+        estimated_completion_time: data.estimated_completion_time,
+        total_processing_time_ms: data.total_processing_time_ms || 0,
+        document_info: data.document_info,
+        error_details: data.error_details
+      };
+
+    } catch (error) {
+      console.error('Error fetching enhanced job details:', error);
+      return null;
+    } finally {
+      setJobDetailsLoading(false);
+    }
+  }, []);
+
+  // Document analysis metrics fetching
+  const fetchDocumentAnalysisMetrics = useCallback(async (): Promise<DocumentAnalysisMetrics | null> => {
+    try {
+      const apiService = BrowserApiIntegrationService.getInstance();
+
+      const result = await apiService.callSupabaseFunction('mivaa-gateway', {
+        action: 'get_document_analysis_metrics',
+        payload: {
+          time_range: '24h',
+          include_trends: true,
+          include_stage_breakdown: true
+        }
+      });
+
+      if (!result.success) {
+        throw new Error(`Failed to fetch document metrics: ${result.error?.message || 'Unknown error'}`);
+      }
+
+      const data = result.data;
+
+      return {
+        total_documents: data.total_documents || 0,
+        documents_processed_today: data.documents_processed_today || 0,
+        avg_processing_time_per_document: data.avg_processing_time_per_document || 0,
+        success_rate_24h: data.success_rate_24h || 0,
+        error_rate_24h: data.error_rate_24h || 0,
+        processing_stages: data.processing_stages || [],
+        performance_trends: data.performance_trends || {
+          processing_time_trend: 0,
+          success_rate_trend: 0,
+          volume_trend: 0
+        }
+      };
+
+    } catch (error) {
+      console.error('Error fetching document analysis metrics:', error);
+      return null;
+    }
+  }, []);
+
+  // Load enhanced job details for recent jobs
+  const loadEnhancedJobDetails = useCallback(async () => {
+    try {
+      // Get recent job IDs from processing jobs
+      const recentJobIds = processingJobs.slice(0, 10).map(job => job.id);
+
+      const enhancedJobPromises = recentJobIds.map(jobId => fetchEnhancedJobDetails(jobId));
+      const enhancedJobResults = await Promise.all(enhancedJobPromises);
+
+      const validEnhancedJobs = enhancedJobResults.filter((job): job is EnhancedJobDetails => job !== null);
+      setEnhancedJobs(validEnhancedJobs);
+
+    } catch (error) {
+      console.error('Error loading enhanced job details:', error);
+    }
+  }, [processingJobs, fetchEnhancedJobDetails]);
 
   const fetchPerformanceData = useCallback(async () => {
     try {
@@ -153,6 +309,10 @@ export const SystemPerformance: React.FC = () => {
         },
       });
 
+      // Load enhanced document analysis metrics
+      const docMetrics = await fetchDocumentAnalysisMetrics();
+      setDocumentMetrics(docMetrics);
+
     } catch (error) {
       console.error('Error fetching performance data:', error);
       toast({
@@ -163,11 +323,18 @@ export const SystemPerformance: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, fetchDocumentAnalysisMetrics]);
 
   useEffect(() => {
     fetchPerformanceData();
   }, [fetchPerformanceData]);
+
+  // Load enhanced job details when processing jobs change
+  useEffect(() => {
+    if (processingJobs.length > 0) {
+      loadEnhancedJobDetails();
+    }
+  }, [processingJobs, loadEnhancedJobDetails]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -295,13 +462,210 @@ export const SystemPerformance: React.FC = () => {
           />
         </div>
 
-        <Tabs defaultValue="ai-performance" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="enhanced-monitoring" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="enhanced-monitoring">Enhanced Monitoring</TabsTrigger>
             <TabsTrigger value="ai-performance">AI Performance</TabsTrigger>
             <TabsTrigger value="processing-queue">Processing Queue</TabsTrigger>
             <TabsTrigger value="ml-tasks">ML Tasks</TabsTrigger>
             <TabsTrigger value="system-health">System Health</TabsTrigger>
           </TabsList>
+
+          {/* Enhanced Monitoring Tab */}
+          <TabsContent value="enhanced-monitoring" className="space-y-6">
+            {/* Document Analysis Metrics */}
+            {documentMetrics && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <MetricCard
+                  title="Documents Today"
+                  value={documentMetrics.documents_processed_today}
+                  icon={FileText}
+                  description="Processed in last 24h"
+                  trend={documentMetrics.performance_trends.volume_trend}
+                  status="good"
+                />
+                <MetricCard
+                  title="Avg Processing Time"
+                  value={`${Math.round(documentMetrics.avg_processing_time_per_document / 1000)}s`}
+                  icon={Zap}
+                  description="Per document"
+                  trend={documentMetrics.performance_trends.processing_time_trend}
+                  status={documentMetrics.avg_processing_time_per_document < 30000 ? 'good' : 'warning'}
+                />
+                <MetricCard
+                  title="Success Rate (24h)"
+                  value={`${documentMetrics.success_rate_24h.toFixed(1)}%`}
+                  icon={CheckCircle}
+                  description="Last 24 hours"
+                  trend={documentMetrics.performance_trends.success_rate_trend}
+                  status={documentMetrics.success_rate_24h > 95 ? 'good' : documentMetrics.success_rate_24h > 85 ? 'warning' : 'error'}
+                />
+                <MetricCard
+                  title="Total Documents"
+                  value={documentMetrics.total_documents}
+                  icon={BarChart3}
+                  description="All time processed"
+                  status="good"
+                />
+              </div>
+            )}
+
+            {/* Enhanced Job Details */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Job Progress Monitoring */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Active Job Monitoring
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {enhancedJobs.length > 0 ? (
+                      enhancedJobs.slice(0, 5).map((job) => (
+                        <div key={job.job_id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">
+                              {job.document_info?.name || `Job ${job.job_id.slice(0, 8)}`}
+                            </div>
+                            <Badge className={getStatusColor(job.status)}>
+                              {job.status}
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span>Progress</span>
+                              <span>{job.progress_percentage}%</span>
+                            </div>
+                            <Progress value={job.progress_percentage} className="h-2" />
+
+                            <div className="text-sm text-muted-foreground">
+                              Current Stage: {job.current_stage}
+                            </div>
+
+                            {job.estimated_completion_time && (
+                              <div className="text-sm text-muted-foreground">
+                                ETA: {Math.round(job.estimated_completion_time / 1000)}s
+                              </div>
+                            )}
+                          </div>
+
+                          {job.error_details && (
+                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                              Error in {job.error_details.stage}: {job.error_details.message}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        {jobDetailsLoading ? 'Loading job details...' : 'No active jobs found'}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Processing Stages Performance */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Processing Stages
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {documentMetrics?.processing_stages && documentMetrics.processing_stages.length > 0 ? (
+                    <div className="space-y-4">
+                      {documentMetrics.processing_stages.map((stage, index) => (
+                        <div key={index} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">{stage.stage_name}</div>
+                            <Badge className={stage.success_rate > 95 ? 'bg-green-600 text-white' :
+                                           stage.success_rate > 85 ? 'bg-yellow-600 text-white' :
+                                           'bg-red-600 text-white'}>
+                              {stage.success_rate.toFixed(1)}%
+                            </Badge>
+                          </div>
+
+                          <div className="text-sm text-muted-foreground mb-2">
+                            Avg Time: {Math.round(stage.avg_time_ms / 1000)}s
+                          </div>
+
+                          {stage.common_errors.length > 0 && (
+                            <div className="text-xs">
+                              <div className="font-medium text-red-600 mb-1">Common Errors:</div>
+                              <div className="space-y-1">
+                                {stage.common_errors.slice(0, 2).map((error, i) => (
+                                  <div key={i} className="text-red-600 truncate">
+                                    • {error}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      No stage data available
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Performance Trends */}
+            {documentMetrics && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Performance Trends (24h)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="text-center p-4 border rounded">
+                      <div className="text-2xl font-bold flex items-center justify-center gap-2">
+                        {documentMetrics.performance_trends.processing_time_trend > 0 ? '↗️' : '↘️'}
+                        {Math.abs(documentMetrics.performance_trends.processing_time_trend).toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Processing Time</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {documentMetrics.performance_trends.processing_time_trend > 0 ? 'Slower' : 'Faster'} than yesterday
+                      </div>
+                    </div>
+
+                    <div className="text-center p-4 border rounded">
+                      <div className="text-2xl font-bold flex items-center justify-center gap-2">
+                        {documentMetrics.performance_trends.success_rate_trend > 0 ? '↗️' : '↘️'}
+                        {Math.abs(documentMetrics.performance_trends.success_rate_trend).toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Success Rate</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {documentMetrics.performance_trends.success_rate_trend > 0 ? 'Better' : 'Worse'} than yesterday
+                      </div>
+                    </div>
+
+                    <div className="text-center p-4 border rounded">
+                      <div className="text-2xl font-bold flex items-center justify-center gap-2">
+                        {documentMetrics.performance_trends.volume_trend > 0 ? '↗️' : '↘️'}
+                        {Math.abs(documentMetrics.performance_trends.volume_trend).toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Volume</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {documentMetrics.performance_trends.volume_trend > 0 ? 'More' : 'Fewer'} documents than yesterday
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
           <TabsContent value="ai-performance" className="space-y-4">
             <div className="grid md:grid-cols-2 gap-6">
