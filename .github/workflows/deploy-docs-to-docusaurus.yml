@@ -37,8 +37,15 @@ jobs:
             exit 0
           fi
 
+          # For manual triggers or if we can't detect changes, just run
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Manual trigger - will proceed with deployment"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           # Get the list of changed files in the most recent commit
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD || echo "docs/")
           echo "Changed files in the most recent commit:"
           echo "$CHANGED_FILES"
 
