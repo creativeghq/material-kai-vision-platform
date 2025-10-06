@@ -76,6 +76,8 @@
 | **MIVAA Gateway URL** | Vercel, Supabase Edge Functions | `MIVAA_GATEWAY_URL` | MIVAA service endpoint | Production URL or `http://localhost:8000` for dev |
 | **MIVAA API Key** | Vercel, Supabase Edge Functions | `MIVAA_API_KEY` | MIVAA authentication | Same as Material Kai API Key |
 | **MIVAA Service URL** | Vercel | `VITE_MIVAA_SERVICE_URL` | Frontend MIVAA endpoint | Production URL or localhost |
+| **MIVAA Docs Enabled** | MIVAA Deployment | `DOCS_ENABLED` | Enable Swagger UI documentation | Default: `true` |
+| **MIVAA ReDoc Enabled** | MIVAA Deployment | `REDOC_ENABLED` | Enable ReDoc documentation | Default: `true` |
 
 #### AI/ML Service API Keys
 
@@ -324,6 +326,10 @@ supabase secrets set OPENAI_API_KEY "your-openai-key"
 - [ ] `MAX_WORKERS` - Worker processes (default: 4)
 - [ ] `CACHE_TTL` - Cache TTL in seconds (default: 3600)
 - [ ] `DATABASE_POOL_SIZE` - DB pool size (default: 10)
+
+### Documentation
+- [ ] `DOCS_ENABLED` - Enable Swagger UI documentation (default: true)
+- [ ] `REDOC_ENABLED` - Enable ReDoc documentation (default: true)
 
 ### 🐳 Docker Deployment - Required Environment Variables
 

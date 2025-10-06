@@ -108,6 +108,22 @@ serve(async (req) => {
       // RAG operations
       'rag_query': { path: '/api/rag/query', method: 'POST' },
       'rag_upload': { path: '/api/rag/documents/upload', method: 'POST' },
+
+      // NEW: Enhanced Document Analysis APIs
+      'get_related_documents': { path: '/api/documents/{document_id}/related', method: 'GET' },
+      'summarize_document': { path: '/api/documents/{document_id}/summarize', method: 'POST' },
+      'extract_entities': { path: '/api/documents/{document_id}/extract-entities', method: 'POST' },
+      'compare_documents': { path: '/api/documents/compare', method: 'POST' },
+      'vector_similarity_search': { path: '/api/search/similarity', method: 'POST' },
+      'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
+
+      // Enhanced existing APIs
+      'get_document_details': { path: '/api/v1/documents/documents/{document_id}', method: 'GET' },
+      'get_document_content': { path: '/api/v1/documents/documents/{document_id}/content', method: 'GET' },
+      'get_job_status': { path: '/api/v1/documents/job/{job_id}', method: 'GET' },
+      'analyze_document': { path: '/api/v1/documents/analyze', method: 'POST' },
+      'batch_image_analysis': { path: '/api/v1/images/analyze/batch', method: 'POST' },
+      'advanced_image_search': { path: '/api/v1/images/search', method: 'POST' },
     };
 
     const endpoint = endpointMap[action];
@@ -115,8 +131,34 @@ serve(async (req) => {
       throw new Error(`Unknown action: ${action}`);
     }
 
+    // Handle dynamic path parameters
+    let finalPath = endpoint.path;
+    if (payload) {
+      // Replace path parameters with actual values
+      if (payload.document_id && finalPath.includes('{document_id}')) {
+        finalPath = finalPath.replace('{document_id}', payload.document_id);
+      }
+      if (payload.job_id && finalPath.includes('{job_id}')) {
+        finalPath = finalPath.replace('{job_id}', payload.job_id);
+      }
+    }
+
+    // Handle request body and query parameters
+    if (endpoint.method === 'GET' && payload) {
+      // For GET requests, add query parameters
+      const queryParams = new URLSearchParams();
+      Object.entries(payload).forEach(([key, value]) => {
+        if (key !== 'document_id' && key !== 'job_id' && value !== undefined) {
+          queryParams.append(key, String(value));
+        }
+      });
+      if (queryParams.toString()) {
+        finalPath += `?${queryParams.toString()}`;
+      }
+    }
+
     // Prepare request to MIVAA service
-    const mivaaUrl = `${MIVAA_SERVICE_URL}${endpoint.path}`;
+    const mivaaUrl = `${MIVAA_SERVICE_URL}${finalPath}`;
     const requestOptions: RequestInit = {
       method: endpoint.method,
       headers: {
@@ -129,7 +171,11 @@ serve(async (req) => {
 
     // Add payload for POST requests
     if (endpoint.method === 'POST' && payload) {
-      requestOptions.body = JSON.stringify(payload);
+      // For POST requests, send payload in body (excluding path parameters)
+      const bodyPayload = { ...payload };
+      delete bodyPayload.document_id;
+      delete bodyPayload.job_id;
+      requestOptions.body = JSON.stringify(bodyPayload);
     }
 
     console.log(`📡 Calling MIVAA: ${endpoint.method} ${mivaaUrl}`);

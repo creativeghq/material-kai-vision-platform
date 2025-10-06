@@ -13,6 +13,11 @@ import {
   Image as ImageIcon,
   Zap,
   EyeOff,
+  Link,
+  FileText,
+  Tag,
+  GitCompare,
+  Loader2,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { FunctionalPropertySearch, type FunctionalPropertyFilters } from '../Search/FunctionalPropertySearch';
@@ -66,7 +72,172 @@ const KnowledgeBaseManagement: React.FC = () => {
     propertyFilters: {},
   });
   const [showFunctionalSearch, setShowFunctionalSearch] = useState(false);
+
+  // MIVAA API Integration State
+  const [relatedDocs, setRelatedDocs] = useState<any[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
+  const [documentSummary, setDocumentSummary] = useState('');
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [extractedEntities, setExtractedEntities] = useState<any[]>([]);
+  const [extractingEntities, setExtractingEntities] = useState(false);
+  const [selectedDocsForComparison, setSelectedDocsForComparison] = useState<string[]>([]);
+  const [comparisonResult, setComparisonResult] = useState<any>(null);
+  const [comparingDocs, setComparingDocs] = useState(false);
+
   const { toast } = useToast();
+
+  // MIVAA API Integration Functions
+  const fetchRelatedDocuments = async (documentId: string) => {
+    setLoadingRelated(true);
+    try {
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'get_related_documents',
+          payload: {
+            document_id: documentId,
+            limit: 10,
+            similarity_threshold: 0.7
+          }
+        }
+      });
+
+      if (response.data?.related_documents) {
+        setRelatedDocs(response.data.related_documents);
+      }
+    } catch (error) {
+      console.error('Error fetching related documents:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch related documents',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingRelated(false);
+    }
+  };
+
+  const generateDocumentSummary = async (documentId: string) => {
+    setGeneratingSummary(true);
+    try {
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'summarize_document',
+          payload: {
+            document_id: documentId,
+            summary_type: 'comprehensive',
+            max_length: 500,
+            include_key_points: true
+          }
+        }
+      });
+
+      if (response.data?.summary) {
+        setDocumentSummary(response.data.summary);
+
+        // Save summary to database
+        await supabase
+          .from('materials_catalog')
+          .update({ summary: response.data.summary })
+          .eq('id', documentId);
+
+        toast({
+          title: 'Success',
+          description: 'Document summary generated and saved',
+        });
+      }
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate document summary',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
+  const extractDocumentEntities = async (documentId: string) => {
+    setExtractingEntities(true);
+    try {
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'extract_entities',
+          payload: {
+            document_id: documentId,
+            entity_types: ['PERSON', 'ORG', 'MATERIAL', 'LOCATION', 'DATE'],
+            confidence_threshold: 0.8
+          }
+        }
+      });
+
+      if (response.data?.entities) {
+        setExtractedEntities(response.data.entities);
+
+        // Auto-populate metadata fields based on extracted entities
+        const materialEntities = response.data.entities.filter((e: any) => e.type === 'MATERIAL');
+        const tags = materialEntities.map((e: any) => e.text);
+
+        await supabase
+          .from('materials_catalog')
+          .update({
+            semantic_tags: tags,
+            extracted_entities: response.data.entities
+          })
+          .eq('id', documentId);
+
+        toast({
+          title: 'Success',
+          description: 'Entities extracted and metadata updated',
+        });
+      }
+    } catch (error) {
+      console.error('Error extracting entities:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to extract document entities',
+        variant: 'destructive',
+      });
+    } finally {
+      setExtractingEntities(false);
+    }
+  };
+
+  const compareDocuments = async () => {
+    if (selectedDocsForComparison.length < 2) return;
+
+    setComparingDocs(true);
+    try {
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'compare_documents',
+          payload: {
+            document_ids: selectedDocsForComparison,
+            comparison_type: 'comprehensive',
+            include_similarities: true,
+            include_differences: true
+          }
+        }
+      });
+
+      if (response.data) {
+        setComparisonResult(response.data);
+        toast({
+          title: 'Success',
+          description: 'Document comparison completed',
+        });
+      }
+    } catch (error) {
+      console.error('Error comparing documents:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to compare documents',
+        variant: 'destructive',
+      });
+    } finally {
+      setComparingDocs(false);
+    }
+  };
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -287,11 +458,14 @@ const KnowledgeBaseManagement: React.FC = () => {
       {/* Main Content */}
       <div className="p-6 space-y-6">
         <Tabs defaultValue="entries" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="entries">Knowledge Entries</TabsTrigger>
-            <TabsTrigger value="viewer">Enhanced PDF Viewer</TabsTrigger>
-            <TabsTrigger value="images">Images</TabsTrigger>
-            <TabsTrigger value="embeddings">Embedding Generation</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-7">
+            <TabsTrigger value="entries">📚 Documents</TabsTrigger>
+            <TabsTrigger value="analysis">🔍 Analysis</TabsTrigger>
+            <TabsTrigger value="comparison">⚖️ Comparison</TabsTrigger>
+            <TabsTrigger value="entities">🏷️ Entities</TabsTrigger>
+            <TabsTrigger value="viewer">📖 PDF Viewer</TabsTrigger>
+            <TabsTrigger value="images">🖼️ Images</TabsTrigger>
+            <TabsTrigger value="embeddings">🧠 Embeddings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="entries" className="space-y-4">
@@ -492,6 +666,18 @@ const KnowledgeBaseManagement: React.FC = () => {
                             </Button>
                             <Button
                               className="border border-border bg-background text-foreground h-8 px-3 text-sm"
+                              onClick={() => {
+                                setSelectedEntry(entry);
+                                // Fetch related documents and entities when selecting
+                                fetchRelatedDocuments(entry.id);
+                                extractDocumentEntities(entry.id);
+                              }}
+                              title="Analyze with MIVAA"
+                            >
+                              <Zap className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              className="border border-border bg-background text-foreground h-8 px-3 text-sm"
                               onClick={() => handleDeleteEntry(entry.id)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -504,6 +690,311 @@ const KnowledgeBaseManagement: React.FC = () => {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="analysis" className="space-y-4">
+            {selectedEntry ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Related Documents Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Link className="h-4 w-4" />
+                      Related Documents
+                    </CardTitle>
+                    <CardDescription>
+                      Documents similar to "{selectedEntry.title}"
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingRelated ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Finding related documents...
+                      </div>
+                    ) : relatedDocs.length > 0 ? (
+                      <div className="space-y-2">
+                        {relatedDocs.map((doc: any) => (
+                          <div key={doc.document_id} className="flex items-center justify-between p-2 border rounded">
+                            <div>
+                              <p className="font-medium">{doc.document_name || `Document ${doc.document_id}`}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Similarity: {(doc.similarity_score * 100).toFixed(1)}%
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const relatedEntry = entries.find(e => e.id === doc.document_id);
+                                if (relatedEntry) {
+                                  setSelectedEntry(relatedEntry);
+                                  fetchRelatedDocuments(relatedEntry.id);
+                                }
+                              }}
+                            >
+                              View
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">No related documents found.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Document Summary Panel */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Document Summary
+                    </CardTitle>
+                    <CardDescription>
+                      AI-generated summary of document content
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <Button
+                        onClick={() => generateDocumentSummary(selectedEntry.id)}
+                        disabled={generatingSummary}
+                        className="w-full"
+                      >
+                        {generatingSummary ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Generating Summary...
+                          </>
+                        ) : (
+                          'Generate Summary'
+                        )}
+                      </Button>
+                      {documentSummary && (
+                        <div className="p-4 bg-muted rounded-lg">
+                          <p className="text-sm">{documentSummary}</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    Select a document from the Documents tab to analyze it with MIVAA
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const firstEntry = filteredEntries[0];
+                      if (firstEntry) {
+                        setSelectedEntry(firstEntry);
+                        fetchRelatedDocuments(firstEntry.id);
+                      }
+                    }}
+                  >
+                    Analyze First Document
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="comparison" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GitCompare className="h-4 w-4" />
+                  Document Comparison
+                </CardTitle>
+                <CardDescription>
+                  Compare multiple documents to identify similarities and differences
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium">Select documents to compare:</Label>
+                    <div className="mt-2 space-y-2">
+                      {entries.slice(0, 10).map((entry) => (
+                        <div key={entry.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`compare-${entry.id}`}
+                            checked={selectedDocsForComparison.includes(entry.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedDocsForComparison([...selectedDocsForComparison, entry.id]);
+                              } else {
+                                setSelectedDocsForComparison(selectedDocsForComparison.filter(id => id !== entry.id));
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor={`compare-${entry.id}`} className="text-sm">
+                            {entry.title}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={compareDocuments}
+                    disabled={comparingDocs || selectedDocsForComparison.length < 2}
+                    className="w-full"
+                  >
+                    {comparingDocs ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Comparing Documents...
+                      </>
+                    ) : (
+                      `Compare ${selectedDocsForComparison.length} Documents`
+                    )}
+                  </Button>
+
+                  {comparisonResult && (
+                    <div className="space-y-4 mt-6">
+                      <div>
+                        <h5 className="font-medium mb-2">Overall Similarity:</h5>
+                        <Progress value={(comparisonResult.overall_similarity || 0) * 100} className="w-full" />
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {((comparisonResult.overall_similarity || 0) * 100).toFixed(1)}% similar
+                        </p>
+                      </div>
+
+                      {comparisonResult.similarities && (
+                        <div>
+                          <h5 className="font-medium mb-2">Key Similarities:</h5>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {comparisonResult.similarities.slice(0, 5).map((sim: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-green-500 mt-1">•</span>
+                                {sim}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {comparisonResult.differences && (
+                        <div>
+                          <h5 className="font-medium mb-2">Key Differences:</h5>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {comparisonResult.differences.slice(0, 5).map((diff: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-red-500 mt-1">•</span>
+                                {diff}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="entities" className="space-y-4">
+            {selectedEntry ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    Extracted Entities
+                  </CardTitle>
+                  <CardDescription>
+                    Named entities extracted from "{selectedEntry.title}"
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <Button
+                      onClick={() => extractDocumentEntities(selectedEntry.id)}
+                      disabled={extractingEntities}
+                      className="w-full"
+                    >
+                      {extractingEntities ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Extracting Entities...
+                        </>
+                      ) : (
+                        'Extract Entities'
+                      )}
+                    </Button>
+
+                    {extractedEntities.length > 0 && (
+                      <div className="space-y-4">
+                        {['MATERIAL', 'PERSON', 'ORG', 'LOCATION', 'DATE'].map(type => {
+                          const typeEntities = extractedEntities.filter((e: any) => e.type === type);
+                          if (typeEntities.length === 0) return null;
+
+                          return (
+                            <div key={type}>
+                              <h5 className="font-medium text-sm mb-2 flex items-center gap-2">
+                                <Badge variant="outline">{type}S</Badge>
+                                <span className="text-muted-foreground">({typeEntities.length})</span>
+                              </h5>
+                              <div className="flex flex-wrap gap-2">
+                                {typeEntities.map((entity: any) => (
+                                  <Badge
+                                    key={entity.id || `${entity.text}-${entity.start}`}
+                                    variant="secondary"
+                                    className="cursor-pointer hover:bg-secondary/80"
+                                    title={`Confidence: ${(entity.confidence * 100).toFixed(0)}%`}
+                                  >
+                                    {entity.text}
+                                    <span className="ml-1 text-xs opacity-70">
+                                      {(entity.confidence * 100).toFixed(0)}%
+                                    </span>
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        <div className="mt-6 p-4 bg-muted rounded-lg">
+                          <h5 className="font-medium text-sm mb-2">Auto-Generated Tags:</h5>
+                          <p className="text-sm text-muted-foreground">
+                            Material entities have been automatically added to the document's semantic tags.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <Tag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    Select a document from the Documents tab to extract entities
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const firstEntry = filteredEntries[0];
+                      if (firstEntry) {
+                        setSelectedEntry(firstEntry);
+                        extractDocumentEntities(firstEntry.id);
+                      }
+                    }}
+                  >
+                    Extract from First Document
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="viewer" className="space-y-4">
