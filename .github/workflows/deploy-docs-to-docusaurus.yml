@@ -133,15 +133,15 @@ jobs:
           # Create a pull request using GitHub CLI
           gh auth login --with-token <<< "${{ secrets.GH_TOKEN }}"
 
-          # Try to create PR, with fallback to manual link
+          # Try to create PR targeting gh-pages branch (where GitHub Pages serves from)
           if ! gh pr create \
             --title "Deploy Documentation: ${{ github.event.head_commit.message }}" \
             --body "This PR was automatically created by the GitHub Actions workflow to update the documentation site. Changes include updates from the Material Kai Vision Platform repository (commit: ${{ github.sha }})." \
             --repo Basilakis/basilakis.github.io \
             --head $BRANCH_NAME \
-            --base $DEFAULT_BRANCH; then
+            --base gh-pages; then
             echo "❌ Failed to create PR automatically"
-            echo "🔗 Create PR manually at: https://github.com/Basilakis/basilakis.github.io/compare/$DEFAULT_BRANCH...$BRANCH_NAME"
+            echo "🔗 Create PR manually at: https://github.com/Basilakis/basilakis.github.io/compare/gh-pages...$BRANCH_NAME"
           else
             echo "✅ Pull request created successfully"
           fi
