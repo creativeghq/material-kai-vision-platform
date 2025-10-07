@@ -178,8 +178,8 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 
   // MIVAA API calls (primary provider)
   private static async callMIVAA(request: HybridRequest): Promise<HybridResponse> {
-    const mivaaGatewayUrl = process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000';
-    const mivaaApiKey = process.env.NEXT_PUBLIC_MIVAA_API_KEY;
+    const mivaaGatewayUrl = process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
+    const mivaaApiKey = process.env.MIVAA_API_KEY;
     
     if (!mivaaApiKey) {
       throw new Error('MIVAA API key not configured');

@@ -405,7 +405,7 @@ async function handleMivaaRequest(
   supabase: any,
 ): Promise<Response> {
   try {
-    const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://104.248.68.3:8000';
+    const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
     const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
 
     if (!requestBody?.action) {

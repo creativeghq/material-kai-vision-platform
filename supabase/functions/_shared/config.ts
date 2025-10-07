@@ -32,7 +32,7 @@ export interface EdgeFunctionConfig {
 
 export const getConfig = (): EdgeFunctionConfig => {
   return {
-    mivaaBaseUrl: Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000',
+    mivaaBaseUrl: Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr',
     mivaaApiKey: Deno.env.get('MIVAA_API_KEY'),
     pdfProcessingTimeout: parseInt(Deno.env.get('PDF_PROCESSING_TIMEOUT') || '300000'), // 5 minutes
 

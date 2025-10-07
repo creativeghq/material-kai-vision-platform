@@ -50,8 +50,8 @@ SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 SUPABASE_ANON_KEY=your_production_anon_key
 
 # Services
-VITE_MIVAA_SERVICE_URL=https://your-mivaa-service.com
-VITE_MATERIAL_KAI_API_KEY=your_production_api_key
+MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
+MIVAA_API_KEY=your_production_mivaa_jwt_token
 
 # External APIs
 VITE_OPENAI_API_KEY=your_production_openai_key

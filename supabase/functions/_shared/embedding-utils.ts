@@ -57,7 +57,7 @@ function getEnv(key: string, fallback: string = ''): string {
  * Configuration for MIVAA integration and embedding generation
  */
 export const MIVAA_CONFIG = {
-  gatewayUrl: getEnv('MIVAA_GATEWAY_URL', 'http://localhost:3000'),
+  gatewayUrl: getEnv('MIVAA_GATEWAY_URL', 'https://v1api.materialshub.gr'),
   apiKey: getEnv('MIVAA_API_KEY', ''),
   timeout: 30000,
   maxRetries: 3,

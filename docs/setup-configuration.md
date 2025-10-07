@@ -73,9 +73,8 @@
 
 | Secret/Key | Where to Add | Environment Variable | Purpose | How to Generate/Obtain |
 |------------|--------------|---------------------|---------|------------------------|
-| **MIVAA Gateway URL** | Vercel, Supabase Edge Functions | `MIVAA_GATEWAY_URL` | MIVAA service endpoint | Production URL or `http://localhost:8000` for dev |
-| **MIVAA API Key** | Vercel, Supabase Edge Functions | `MIVAA_API_KEY` | MIVAA authentication | Same as Material Kai API Key |
-| **MIVAA Service URL** | Vercel | `VITE_MIVAA_SERVICE_URL` | Frontend MIVAA endpoint | Production URL or localhost |
+| **MIVAA Gateway URL** | Vercel, Supabase Edge Functions | `MIVAA_GATEWAY_URL` | MIVAA service endpoint | `https://v1api.materialshub.gr` |
+| **MIVAA API Key** | Vercel, Supabase Edge Functions | `MIVAA_API_KEY` | MIVAA authentication | JWT token from Supabase function |
 | **MIVAA Docs Enabled** | MIVAA Deployment | `DOCS_ENABLED` | Enable Swagger UI documentation | Default: `true` |
 | **MIVAA ReDoc Enabled** | MIVAA Deployment | `REDOC_ENABLED` | Enable ReDoc documentation | Default: `true` |
 

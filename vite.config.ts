@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
       'process.env.NODE_ENV': JSON.stringify(mode),
       'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
+      'process.env.MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL),
+      'process.env.MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
     }
   }
 })

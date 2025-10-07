@@ -60,7 +60,8 @@ export class MivaaIntegrationService {
 
   private constructor() {
     this.config = {
-      baseUrl: 'https://v1api.materialshub.gr',
+      baseUrl: process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
+      apiKey: process.env.MIVAA_API_KEY,
       timeout: 30000,
       retryAttempts: 3,
     };
@@ -216,12 +217,10 @@ export class MivaaIntegrationService {
   ): Promise<MivaaResponse> {
     return this.callMivaaViaSupabase('material_recognition', {
       image_data: imageData,
-      analysis_options: {
-        include_properties: options.includeProperties ?? true,
-        include_composition: options.includeComposition ?? true,
-        confidence_threshold: options.confidenceThreshold ?? 0.8,
-        analysis_types: options.analysisTypes ?? ['visual', 'spectral', 'chemical'],
-      },
+      analysis_types: options.analysisTypes ?? ['visual', 'spectral', 'chemical'],
+      include_properties: options.includeProperties ?? true,
+      include_composition: options.includeComposition ?? true,
+      confidence_threshold: options.confidenceThreshold ?? 0.8,
     });
   }
 
@@ -258,12 +257,25 @@ export class MivaaIntegrationService {
   }
 
   /**
-   * Generate Embeddings
+   * Generate Text Embeddings
    */
   async generateEmbedding(text: string): Promise<MivaaResponse> {
     return this.callMivaaViaSupabase('generate_embedding', {
       text,
       model: 'text-embedding-ada-002',
+    });
+  }
+
+  /**
+   * Generate Material Embeddings
+   */
+  async generateMaterialEmbeddings(
+    imageData: string,
+    embeddingTypes: string[] = ['clip']
+  ): Promise<MivaaResponse> {
+    return this.callMivaaViaSupabase('material_embeddings', {
+      image_data: imageData,
+      embedding_types: embeddingTypes,
     });
   }
 
@@ -275,10 +287,12 @@ export class MivaaIntegrationService {
     options: SearchOptions = {}
   ): Promise<MivaaResponse> {
     return this.callMivaaEndpoint('/api/search/materials/visual', 'POST', {
-      image_data: imageData,
+      query_image: imageData,
+      search_type: 'hybrid',
+      search_strategy: 'comprehensive',
+      confidence_threshold: 0.75,
+      similarity_threshold: options.similarityThreshold ?? 0.7,
       limit: options.limit ?? 10,
-      similarity_threshold: options.similarityThreshold ?? 0.75,
-      include_metadata: options.includeMetadata ?? true,
     });
   }
 
@@ -287,15 +301,20 @@ export class MivaaIntegrationService {
    */
   async analyzeImage(
     imageData: string,
-    options: { includeOCR?: boolean; includeObjects?: boolean } = {}
+    options: { includeOCR?: boolean; includeObjects?: boolean; imageId?: string } = {}
   ): Promise<MivaaResponse> {
+    const analysisTypes = [];
+    if (options.includeOCR !== false) analysisTypes.push('ocr');
+    if (options.includeObjects !== false) analysisTypes.push('objects');
+    analysisTypes.push('description'); // Always include description
+
     return this.callMivaaEndpoint('/api/v1/images/analyze', 'POST', {
-      image_data: imageData,
-      analysis_options: {
-        include_ocr: options.includeOCR ?? true,
-        include_objects: options.includeObjects ?? true,
-        confidence_threshold: 0.7,
-      },
+      image_id: options.imageId || `temp_${Date.now()}`,
+      image_url: imageData.startsWith('http') ? imageData : undefined,
+      analysis_types: analysisTypes,
+      quality: 'standard',
+      language: 'auto',
+      confidence_threshold: 0.7,
     });
   }
 
@@ -329,11 +348,12 @@ export class MivaaIntegrationService {
     options: MaterialAnalysisOptions = {}
   ): Promise<MivaaResponse> {
     return this.callMivaaEndpoint('/api/v1/images/analyze/batch', 'POST', {
-      images,
-      analysis_options: {
-        include_properties: options.includeProperties ?? true,
-        confidence_threshold: options.confidenceThreshold ?? 0.8,
-      },
+      image_ids: images.map(img => img.id),
+      analysis_types: options.analysisTypes ?? ['description', 'ocr', 'objects'],
+      quality: 'standard',
+      confidence_threshold: options.confidenceThreshold ?? 0.8,
+      parallel_processing: true,
+      priority: 'normal',
     });
   }
 }

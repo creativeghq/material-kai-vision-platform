@@ -53,7 +53,7 @@ export class MivaaGatewayController {
   private readonly timeout: number;
 
   constructor() {
-    this.mivaaServiceUrl = process.env.MIVAA_GATEWAY_URL || 'http://localhost:8000';
+    this.mivaaServiceUrl = process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
     this.apiKey = process.env.MIVAA_API_KEY || '';
     this.timeout = parseInt(process.env.MIVAA_TIMEOUT || '30000', 10);
   }

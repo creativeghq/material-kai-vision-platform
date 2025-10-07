@@ -746,8 +746,8 @@ export class EmbeddingGenerationService extends EventEmitter {
 export const defaultEmbeddingConfig: EmbeddingGenerationConfig = {
   embedding: DEFAULT_EMBEDDING_CONFIG,
   mivaa: {
-    gatewayUrl: process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000',
-    apiKey: process.env.NEXT_PUBLIC_MIVAA_API_KEY || '',
+    gatewayUrl: process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
+    apiKey: process.env.MIVAA_API_KEY || '',
     timeout: 30000,
     model: 'clip', // Default to CLIP for embeddings
   },

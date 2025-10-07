@@ -58,18 +58,70 @@ jobs:
           mkdir -p docs-temp/docs
           mkdir -p docs-temp/build
 
-      - name: 📚 Process documentation files
+      - name: 📚 Create Docusaurus project
         run: |
-          echo "📚 Processing documentation files..."
+          echo "📚 Creating Docusaurus project..."
 
-          # Copy all documentation
-          cp -r docs/* docs-temp/docs/
+          # Create a basic Docusaurus project structure
+          npx create-docusaurus@latest docs-temp/docusaurus classic --typescript
 
-          # Copy the docs directory directly to the build directory
-          cp -r docs-temp/docs/* docs-temp/build/
+          # Remove default docs and copy our documentation
+          rm -rf docs-temp/docusaurus/docs/*
+          cp -r docs/* docs-temp/docusaurus/docs/
 
-          echo "✅ Documentation processed. Files copied:"
-          find docs-temp/build -name "*.md" | wc -l
+          # Create a basic docusaurus.config.js
+          cat > docs-temp/docusaurus/docusaurus.config.js << 'EOF'
+          const config = {
+            title: 'Material Kai Vision Platform',
+            tagline: 'AI-powered material intelligence system',
+            favicon: 'img/favicon.ico',
+            url: 'https://basilakis.github.io',
+            baseUrl: '/',
+            organizationName: 'Basilakis',
+            projectName: 'basilakis.github.io',
+            onBrokenLinks: 'throw',
+            onBrokenMarkdownLinks: 'warn',
+            i18n: {
+              defaultLocale: 'en',
+              locales: ['en'],
+            },
+            presets: [
+              [
+                'classic',
+                {
+                  docs: {
+                    sidebarPath: require.resolve('./sidebars.js'),
+                    routeBasePath: '/',
+                  },
+                  blog: false,
+                  theme: {
+                    customCss: require.resolve('./src/css/custom.css'),
+                  },
+                },
+              ],
+            ],
+            themeConfig: {
+              navbar: {
+                title: 'Material Kai Vision Platform',
+                items: [
+                  {
+                    type: 'docSidebar',
+                    sidebarId: 'tutorialSidebar',
+                    position: 'left',
+                    label: 'Documentation',
+                  },
+                ],
+              },
+              footer: {
+                style: 'dark',
+                copyright: `Copyright © ${new Date().getFullYear()} Material Kai Vision Platform.`,
+              },
+            },
+          };
+          module.exports = config;
+          EOF
+
+          echo "✅ Docusaurus project created"
 
       - name: 🔍 Checkout target repository
         uses: actions/checkout@v4
@@ -86,6 +138,14 @@ jobs:
           sudo apt update
           sudo apt install gh
 
+      - name: 🏗️ Build Docusaurus site
+        run: |
+          echo "🏗️ Building Docusaurus site..."
+          cd docs-temp/docusaurus
+          npm install
+          npm run build
+          echo "✅ Docusaurus build completed"
+
       - name: 🚀 Create Pull Request
         run: |
           # Generate a unique branch name
@@ -100,8 +160,8 @@ jobs:
           echo "Removing existing files..."
           rm -rf * || true
 
-          echo "Copying documentation files..."
-          cp -r ../docs-temp/build/* .
+          echo "Copying built Docusaurus site..."
+          cp -r ../docs-temp/docusaurus/build/* .
 
           echo "Contents after copying:"
           ls -la
@@ -126,9 +186,6 @@ jobs:
           git push origin $BRANCH_NAME
 
           echo "Creating pull request..."
-          # Check what the default branch is
-          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-          echo "Default branch: $DEFAULT_BRANCH"
 
           # Create a pull request using GitHub CLI
           gh auth login --with-token <<< "${{ secrets.GH_TOKEN }}"
