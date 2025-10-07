@@ -43,8 +43,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get MIVAA configuration
-    const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-    const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY');
+    const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://104.248.68.3:8000';
+    const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || 'test-key';
 
     // MIVAA API key is optional for some endpoints
     console.log('MIVAA Gateway initialized:', {
@@ -103,7 +103,7 @@ serve(async (req) => {
       'pdf_extract_markdown': { path: '/api/v1/extract/markdown', method: 'POST' },
       'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
       'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
-      'pdf_process_document': { path: '/api/v1/documents/process', method: 'POST' },
+      'pdf_process_document': { path: '/api/v1/documents/process-url', method: 'POST' },
       
       // RAG operations
       'rag_query': { path: '/api/rag/query', method: 'POST' },
@@ -172,9 +172,27 @@ serve(async (req) => {
     // Add payload for POST requests
     if (endpoint.method === 'POST' && payload) {
       // For POST requests, send payload in body (excluding path parameters)
-      const bodyPayload = { ...payload };
+      let bodyPayload = { ...payload };
       delete bodyPayload.document_id;
       delete bodyPayload.job_id;
+
+      // Special handling for PDF processing - transform frontend payload to MIVAA format
+      if (action === 'pdf_process_document') {
+        bodyPayload = {
+          url: payload.documentId, // Frontend sends documentId which is actually the URL
+          async_processing: false,
+          options: {
+            extract_images: true,
+            extract_text: true,
+            extract_tables: true,
+            quality: 'standard'
+          },
+          document_name: payload.document_name || 'Uploaded Document',
+          tags: payload.tags || [],
+          metadata: payload.metadata || {}
+        };
+      }
+
       requestOptions.body = JSON.stringify(bodyPayload);
     }
 
