@@ -4,8 +4,8 @@ import { Upload, Activity } from 'lucide-react';
 
 import { PDFWorkflowViewer, WorkflowJob } from '@/components/PDF/PDFWorkflowViewer';
 import { PDFUploadProgressModal } from '@/components/PDF/PDFUploadProgressModal';
-import { PDFUploadTest } from '@/components/PDF/PDFUploadTest';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { consolidatedPDFWorkflowService } from '@/services/consolidatedPDFWorkflowService';
@@ -98,24 +98,19 @@ const PDFProcessing = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="workflow" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="workflow" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Live Workflow
+      <div className="space-y-6">
+        {/* Header with status */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            <h2 className="text-xl font-semibold">PDF Processing Workflow</h2>
             {runningJobs > 0 && (
-              <Badge variant="default" className="ml-1">
-                {runningJobs}
+              <Badge variant="default" className="ml-2">
+                {runningJobs} running
               </Badge>
             )}
-          </TabsTrigger>
-          <TabsTrigger value="test" className="flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            Progress Modal Test
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="workflow" className="space-y-6">
+          </div>
+        </div>
           {/* Status Overview */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
@@ -190,12 +185,7 @@ const PDFProcessing = () => {
             jobs={workflowJobs}
             onRetryJob={handleRetryJob}
           />
-        </TabsContent>
-
-        <TabsContent value="test" className="space-y-6">
-          <PDFUploadTest />
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* PDF Upload Progress Modal */}
       <PDFUploadProgressModal
