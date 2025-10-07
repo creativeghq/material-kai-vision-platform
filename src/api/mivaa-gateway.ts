@@ -174,6 +174,7 @@ export class MivaaGatewayController {
       // Document processing actions
       'extract_text': { path: '/api/documents/extract', method: 'POST' },
       'process_document': { path: '/api/documents/process', method: 'POST' },
+      'process_pdf': { path: '/api/documents/process', method: 'POST' },
       'analyze_material': { path: '/api/materials/analyze', method: 'POST' },
       
       // Legacy support

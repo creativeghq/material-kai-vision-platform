@@ -269,17 +269,24 @@ export function EnhancedPDFProcessor() {
       setUploadProgress(40);
       updateJobStatus(jobId, 'processing', 30, 'Processing PDF with MIVAA...');
 
-      // Process PDF using MIVAA integration service
-      // Note: Using a simplified approach for now
-      const extractionResult = await fetch('/api/mivaa-extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentId: publicUrl,
-          extractionType: 'all',
-          outputFormat: 'json',
-        }),
-      }).then(res => res.json());
+      // Process PDF using MIVAA integration service via Supabase
+      const { supabase } = await import('@/integrations/supabase/client');
+      const extractionResponse = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'pdf_process_document',
+          payload: {
+            documentId: publicUrl,
+            extractionType: 'all',
+            outputFormat: 'json',
+          },
+        },
+      });
+
+      if (extractionResponse.error) {
+        throw new Error(`PDF extraction failed: ${extractionResponse.error.message}`);
+      }
+
+      const extractionResult = extractionResponse.data;
 
       console.log('MIVAA extraction result:', extractionResult);
 

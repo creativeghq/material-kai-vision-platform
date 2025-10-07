@@ -98,24 +98,29 @@ const PackagesPanel: React.FC = () => {
     setIsChecking(true);
 
     try {
-      // Check MIVAA packages via API
-      const mivaaResponse = await fetch('/api/packages/status');
-      if (mivaaResponse.ok) {
-        const mivaaData = await mivaaResponse.json();
-        if (mivaaData.success) {
-          // Convert API data to our package format
-          const apiPackages = mivaaData.data.packages || {};
-          const updatedMivaaPackages = Object.entries(apiPackages).map(([packageName, packageInfo]: [string, any]) => ({
-            name: packageName,
-            description: packageInfo.import_name ? `Import as: ${packageInfo.import_name}` : 'Python package',
-            category: packageInfo.critical ? 'Critical' : 'Optional',
-            critical: packageInfo.critical,
-            status: packageInfo.available ? 'active' : 'inactive' as PackageStatus,
-            version: packageInfo.version || 'unknown',
-            error: packageInfo.error
-          }));
-          setMivaaPackages(updatedMivaaPackages);
-        }
+      // Check MIVAA packages via Supabase Edge Function
+      const { supabase } = await import('@/integrations/supabase/client');
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'health_check',
+          payload: {},
+        },
+      });
+
+      if (!response.error && response.data) {
+        // For now, show basic package status based on health check
+        const updatedMivaaPackages = [
+          {
+            name: 'MIVAA Service',
+            description: 'Material Intelligence Vision AI Architecture',
+            category: 'Critical',
+            critical: true,
+            status: 'active' as PackageStatus,
+            version: '1.0.0',
+            error: undefined
+          }
+        ];
+        setMivaaPackages(updatedMivaaPackages);
       }
 
       // For NodeJS packages, simulate checking (would integrate with package.json in production)

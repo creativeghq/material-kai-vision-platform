@@ -102,10 +102,23 @@ const AdminDashboard: React.FC = () => {
   const loadPackageStatus = useCallback(async () => {
     try {
       setPackageLoading(true);
-      const response = await fetch('/api/packages/status');
-      if (response.ok) {
-        const data = await response.json();
-        setPackageStatus(data);
+      // Use Supabase MIVAA gateway for health check
+      const { supabase } = await import('@/integrations/supabase/client');
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'health_check',
+          payload: {},
+        },
+      });
+
+      if (!response.error) {
+        setPackageStatus({
+          success: true,
+          data: {
+            status: 'healthy',
+            services: { mivaa: 'operational' }
+          }
+        });
       }
     } catch (error) {
       console.error('Error loading package status:', error);

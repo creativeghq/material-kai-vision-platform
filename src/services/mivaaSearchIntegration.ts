@@ -96,24 +96,20 @@ export class MivaaSearchIntegration {
    */
   async vectorSearch(request: VectorSearchRequest): Promise<SearchResponse> {
     try {
-      const response = await fetch(`${this.gatewayUrl}/api/mivaa/gateway`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
+      // Use existing Supabase MIVAA gateway
+      const { supabase } = await import('@/integrations/supabase/client');
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
           action: 'vector_search',
           payload: request,
-        }),
+        },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`MIVAA vector search request failed: ${response.status} ${errorText}`);
+      if (response.error) {
+        throw new Error(`MIVAA vector search request failed: ${response.error.message || 'Unknown error'}`);
       }
 
-      const result = await response.json();
+      const result = response.data;
       return result.data as SearchResponse;
     } catch (error) {
       console.error('Error performing vector search via MIVAA gateway:', error);

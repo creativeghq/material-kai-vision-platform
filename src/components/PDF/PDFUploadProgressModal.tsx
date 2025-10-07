@@ -84,24 +84,24 @@ const getStepIcon = (stepId: string) => {
 const getStatusIcon = (status: string) => {
   switch (status) {
     case 'completed':
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
+      return <CheckCircle className="h-4 w-4 text-green-600" />;
     case 'failed':
-      return <XCircle className="h-4 w-4 text-red-500" />;
+      return <XCircle className="h-4 w-4 text-red-600" />;
     case 'running':
-      return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
+      return <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />;
     default:
-      return <Clock className="h-4 w-4 text-gray-400" />;
+      return <Clock className="h-4 w-4 text-gray-500" />;
   }
 };
 
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'completed':
-      return <Badge variant="default" className="bg-green-500">Completed</Badge>;
+      return <Badge variant="default" className="bg-green-600 hover:bg-green-700">Completed</Badge>;
     case 'failed':
       return <Badge variant="destructive">Failed</Badge>;
     case 'running':
-      return <Badge variant="default" className="bg-blue-500">Running</Badge>;
+      return <Badge variant="default" className="bg-blue-600 hover:bg-blue-700">Running</Badge>;
     case 'pending':
       return <Badge variant="secondary">Pending</Badge>;
     default:
@@ -237,19 +237,19 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               return (
                 <Card key={step.id} className={cn(
                   "transition-all duration-200",
-                  step.status === 'failed' && "border-red-200 bg-red-50/50",
-                  step.status === 'running' && "border-blue-200 bg-blue-50/50",
-                  step.status === 'completed' && "border-green-200 bg-green-50/50"
+                  step.status === 'failed' && "border-red-300 bg-red-50",
+                  step.status === 'running' && "border-blue-300 bg-blue-50",
+                  step.status === 'completed' && "border-green-300 bg-green-50"
                 )}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 flex-1">
                         <StepIcon className={cn(
                           "h-5 w-5",
-                          step.status === 'completed' && "text-green-500",
-                          step.status === 'failed' && "text-red-500",
-                          step.status === 'running' && "text-blue-500",
-                          step.status === 'pending' && "text-gray-400"
+                          step.status === 'completed' && "text-green-600",
+                          step.status === 'failed' && "text-red-600",
+                          step.status === 'running' && "text-blue-600",
+                          step.status === 'pending' && "text-gray-500"
                         )} />
                         
                         <div className="flex-1">

@@ -312,20 +312,20 @@ export class DocumentIntegrationService implements IDocumentIntegrationService {
         },
       };
 
-      // Make request to the gateway endpoint
-      const response = await fetch('/api/mivaa/gateway', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Use existing Supabase MIVAA gateway
+      const { supabase } = await import('@/integrations/supabase/client');
+      const response = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'extract_text',
+          payload: gatewayPayload.body,
         },
-        body: JSON.stringify(gatewayPayload),
       });
 
-      if (!response.ok) {
-        throw new Error(`Gateway request failed: ${response.status} ${response.statusText}`);
+      if (response.error) {
+        throw new Error(`Gateway request failed: ${response.error.message || 'Unknown error'}`);
       }
 
-      const result = await response.json();
+      const result = response.data;
 
       // Return the MIVAA response data
       return result.data || result;

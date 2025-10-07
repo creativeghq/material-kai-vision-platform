@@ -295,8 +295,8 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
    * Make HTTP request to MIVAA service through gateway with retry logic
    */
   private async makeRequest(endpoint: string, options: RequestInit, retries = 3): Promise<Response> {
-    // Route through the gateway instead of making direct calls
-    const gatewayUrl = '/api/mivaa/gateway';
+    // Use existing Supabase MIVAA gateway
+    const { supabase } = await import('@/integrations/supabase/client');
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -315,17 +315,33 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
           body: options.body,
         };
 
-        const response = await fetch(gatewayUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        // Determine the action based on endpoint
+        let action = 'extract_text';
+        if (endpoint.includes('markdown')) action = 'pdf_extract_markdown';
+        else if (endpoint.includes('tables')) action = 'pdf_extract_tables';
+        else if (endpoint.includes('images')) action = 'pdf_extract_images';
+        else if (endpoint.includes('process')) action = 'pdf_process_document';
+
+        const response = await supabase.functions.invoke('mivaa-gateway', {
+          body: {
+            action,
+            payload: options.body ? JSON.parse(options.body as string) : {},
           },
-          body: JSON.stringify(gatewayPayload),
-          signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
-        return response;
+
+        if (!response.error) {
+          // Convert Supabase response to Response-like object for compatibility
+          return {
+            ok: true,
+            status: 200,
+            json: async () => response.data,
+            text: async () => JSON.stringify(response.data),
+          } as Response;
+        } else {
+          throw new Error(`MIVAA request failed: ${response.error.message || 'Unknown error'}`);
+        }
       } catch (error) {
         if (attempt === retries) {
           throw error;

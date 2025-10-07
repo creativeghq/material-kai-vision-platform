@@ -360,20 +360,16 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        // Use MIVAA gateway for RAG processing
-        const response = await fetch('/api/mivaa/gateway', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'process_pdf',
+        // Use existing Supabase MIVAA gateway for RAG processing
+        const response = await supabase.functions.invoke('mivaa-gateway', {
+          body: {
+            action: 'pdf_process_document',
             payload: {
               fileUrl: processingRequest.fileUrl,
               filename: processingRequest.filename,
               options: processingRequest.options,
             },
-          }),
+          },
         });
 
         // Update progress: Processing response
@@ -387,11 +383,11 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        if (!response.ok) {
-          throw new Error(`MIVAA gateway request failed: ${response.statusText}`);
+        if (response.error) {
+          throw new Error(`MIVAA gateway request failed: ${response.error.message || 'Unknown error'}`);
         }
 
-        const result = await response.json();
+        const result = response.data;
 
         // Update progress: Processing complete
         this.updateJobStep(jobId, 'mivaa-processing', {

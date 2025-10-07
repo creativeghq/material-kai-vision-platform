@@ -178,12 +178,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 
   // MIVAA API calls (primary provider)
   private static async callMIVAA(request: HybridRequest): Promise<HybridResponse> {
-    const mivaaGatewayUrl = process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
-    const mivaaApiKey = process.env.MIVAA_API_KEY;
-    
-    if (!mivaaApiKey) {
-      throw new Error('MIVAA API key not configured');
-    }
+    // Note: Using Supabase MIVAA gateway instead of direct calls
 
     // Map request type to MIVAA action
     let mivaaAction: string;
@@ -220,25 +215,20 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
       payload.analysis_type = 'material_analysis';
     }
 
-    const response = await fetch(`${mivaaGatewayUrl}/api/mivaa/gateway`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${mivaaApiKey}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Material-Kai-Vision-Platform-Client/1.0',
-      },
-      body: JSON.stringify({
+    // Use existing Supabase MIVAA gateway
+    const { supabase } = await import('@/integrations/supabase/client');
+    const response = await supabase.functions.invoke('mivaa-gateway', {
+      body: {
         action: mivaaAction,
         payload,
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+    if (response.error) {
+      throw new Error(`MIVAA gateway error: ${response.error.message || 'Unknown error'}`);
     }
 
-    const result = await response.json();
+    const result = response.data;
     if (!result.success) {
       throw new Error(`MIVAA ${mivaaAction} error: ${result.error?.message || 'Unknown error'}`);
     }
