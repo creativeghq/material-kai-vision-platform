@@ -92,18 +92,10 @@ export const MaterialRecognition: React.FC = () => {
           });
         } else {
           console.error('MIVAA analysis failed:', response.error);
-          // Add fallback result
-          recognitionResults.push({
-            id: crypto.randomUUID(),
-            fileName: file.name,
-            confidence: 0.5,
-            materialType: 'Analysis Failed',
-            properties: {},
-            composition: {},
-            sustainability: {},
-            imageUrl: URL.createObjectURL(file),
-            processingTime: 0,
-          });
+          // Don't create fake results - let user know the analysis failed
+          toast.error(`Analysis failed for ${file.name}: ${response.error?.message || 'Unknown error'}`);
+          // Skip this file and continue with next one
+          continue;
         }
       }
 

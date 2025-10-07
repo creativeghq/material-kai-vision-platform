@@ -140,38 +140,66 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
 
       setResult(mappedResult);
 
-      // Generate sample tiles based on the processing result
-      // The tiles data would typically come from the results JSON field or a separate table
-      const totalTiles = mappedResult.total_tiles_extracted || Math.min(mappedResult.total_pages * 4, 20);
-      const materialTypes = ['concrete', 'steel', 'aluminum', 'composite'];
+      // Extract real tiles data from processing results
+      let realTiles: PDFTile[] = [];
 
-      const sampleTiles: PDFTile[] = Array.from({ length: totalTiles }, (_, i) => ({
-        id: `tile-${processingId}-${i}`,
-        page_number: Math.floor(i / 4) + 1,
-        tile_index: i % 4,
-        extracted_text: `Sample extracted text for tile ${i + 1} from ${mappedResult.original_filename}`,
-        ocr_confidence: 0.85 + Math.random() * 0.15,
-        material_detected: i % 3 === 0,
-        material_type: i % 3 === 0 ? (materialTypes[i % materialTypes.length] || 'unknown') : 'unknown',
-        material_confidence: i % 3 === 0 ? 0.75 + Math.random() * 0.25 : 0,
-        structured_data: {
-          tile_index: i,
-          extraction_type: processingResult.extraction_type,
-          page_number: Math.floor(i / 4) + 1,
-        },
-        metadata_extracted: {
-          processing_id: processingId,
-          file_size: processingResult.file_size_bytes,
-          processing_time: processingResult.processing_time_ms,
-        },
-        x_coordinate: (i % 2) * 200,
-        y_coordinate: Math.floor((i % 4) / 2) * 150,
-        width: 200,
-        height: 150,
-        image_url: `/api/processing-images/tile-${processingId}-${i}.jpg`,
-      }));
+      try {
+        // Try to get tiles from the results JSON field or structured data
+        const resultsData = results || {};
 
-      setTiles(sampleTiles);
+        if (resultsData.tiles && Array.isArray(resultsData.tiles)) {
+          // Use real tiles data if available
+          realTiles = resultsData.tiles.map((tile: any, index: number) => ({
+            id: tile.id || `tile-${processingId}-${index}`,
+            page_number: tile.page_number || Math.floor(index / 4) + 1,
+            tile_index: tile.tile_index || index % 4,
+            extracted_text: tile.extracted_text || tile.text || '',
+            ocr_confidence: tile.ocr_confidence || tile.confidence || 0,
+            material_detected: tile.material_detected || false,
+            material_type: tile.material_type || 'unknown',
+            material_confidence: tile.material_confidence || 0,
+            structured_data: tile.structured_data || {},
+            metadata_extracted: tile.metadata_extracted || {},
+            x_coordinate: tile.x_coordinate || 0,
+            y_coordinate: tile.y_coordinate || 0,
+            width: tile.width || 200,
+            height: tile.height || 150,
+            image_url: tile.image_url || `/api/processing-images/tile-${processingId}-${index}.jpg`,
+          }));
+        } else if (resultsData.content && resultsData.content.chunks) {
+          // Convert chunks to tiles format if available
+          realTiles = resultsData.content.chunks.map((chunk: any, index: number) => ({
+            id: `chunk-tile-${processingId}-${index}`,
+            page_number: chunk.page_number || 1,
+            tile_index: index,
+            extracted_text: chunk.text || chunk.content || '',
+            ocr_confidence: chunk.confidence || 0.8,
+            material_detected: false,
+            material_type: 'unknown',
+            material_confidence: 0,
+            structured_data: chunk.metadata || {},
+            metadata_extracted: {
+              processing_id: processingId,
+              chunk_index: index,
+            },
+            x_coordinate: 0,
+            y_coordinate: 0,
+            width: 200,
+            height: 150,
+            image_url: `/api/processing-images/chunk-${processingId}-${index}.jpg`,
+          }));
+        }
+
+        // If no real tiles data available, show empty state instead of fake data
+        if (realTiles.length === 0) {
+          console.log('No tiles data available for processing result:', processingId);
+        }
+      } catch (error) {
+        console.error('Error parsing tiles data:', error);
+        realTiles = [];
+      }
+
+      setTiles(realTiles);
     } catch (error) {
       console.error('Error loading processing results:', error);
       toast({
