@@ -3,6 +3,8 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, Activity } from 'lucide-react';
 
 import { PDFWorkflowViewer, WorkflowJob } from '@/components/PDF/PDFWorkflowViewer';
+import { PDFUploadProgressModal } from '@/components/PDF/PDFUploadProgressModal';
+import { PDFUploadTest } from '@/components/PDF/PDFUploadTest';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 
 const PDFProcessing = () => {
   const [workflowJobs, setWorkflowJobs] = useState<WorkflowJob[]>([]);
+  const [currentJob, setCurrentJob] = useState<WorkflowJob | null>(null);
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -19,6 +23,14 @@ const PDFProcessing = () => {
       setWorkflowJobs((prev: WorkflowJob[]) => {
         const filtered = prev.filter(j => j.id !== job.id);
         return [job, ...filtered];
+      });
+
+      // Update current job if it's the one being tracked
+      setCurrentJob(prevCurrentJob => {
+        if (prevCurrentJob && prevCurrentJob.id === job.id) {
+          return job;
+        }
+        return prevCurrentJob;
       });
     });
 
@@ -33,10 +45,18 @@ const PDFProcessing = () => {
   const onDrop = async (acceptedFiles: File[]) => {
     for (const file of acceptedFiles) {
       try {
-        void await consolidatedPDFWorkflowService.startPDFProcessing(file);
+        const jobId = await consolidatedPDFWorkflowService.startPDFProcessing(file);
+
+        // Get the job and show progress modal
+        const job = consolidatedPDFWorkflowService.getJob(jobId);
+        if (job) {
+          setCurrentJob(job);
+          setIsProgressModalOpen(true);
+        }
+
         toast({
           title: 'Processing Started',
-          description: `Started processing ${file.name}. You can monitor the progress in the workflow below.`,
+          description: `Started processing ${file.name}. You can monitor the progress in the modal.`,
         });
       } catch (error) {
         toast({
@@ -79,7 +99,7 @@ const PDFProcessing = () => {
       </div>
 
       <Tabs defaultValue="workflow" className="w-full">
-        <TabsList className="grid w-full grid-cols-1">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="workflow" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Live Workflow
@@ -88,6 +108,10 @@ const PDFProcessing = () => {
                 {runningJobs}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="test" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Progress Modal Test
           </TabsTrigger>
         </TabsList>
 
@@ -167,7 +191,27 @@ const PDFProcessing = () => {
             onRetryJob={handleRetryJob}
           />
         </TabsContent>
+
+        <TabsContent value="test" className="space-y-6">
+          <PDFUploadTest />
+        </TabsContent>
       </Tabs>
+
+      {/* PDF Upload Progress Modal */}
+      <PDFUploadProgressModal
+        isOpen={isProgressModalOpen}
+        onClose={() => setIsProgressModalOpen(false)}
+        job={currentJob}
+        onRetry={() => {
+          if (currentJob) {
+            handleRetryJob(currentJob.id);
+          }
+        }}
+        onViewResults={() => {
+          setIsProgressModalOpen(false);
+          // Could navigate to results view or show results in another modal
+        }}
+      />
     </div>
   );
 };

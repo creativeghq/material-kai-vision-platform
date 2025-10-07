@@ -113,12 +113,24 @@ export class ConsolidatedPDFWorkflowService {
       throw new Error(`Step at index ${stepIndex} not found`);
     }
 
+    // Track timing
+    let updatedStartTime = updates.startTime ?? currentStep.startTime;
+    let updatedEndTime = updates.endTime ?? currentStep.endTime;
+    let updatedDuration = updates.duration ?? currentStep.duration;
+
+    if (updates.status === 'running' && !currentStep.startTime) {
+      updatedStartTime = new Date();
+    } else if ((updates.status === 'completed' || updates.status === 'failed') && currentStep.startTime && !currentStep.endTime) {
+      updatedEndTime = new Date();
+      updatedDuration = updatedEndTime.getTime() - currentStep.startTime.getTime();
+    }
+
     job.steps[stepIndex] = {
       ...currentStep,
       status: updates.status ?? currentStep.status,
-      startTime: updates.startTime ?? currentStep.startTime,
-      endTime: updates.endTime ?? currentStep.endTime,
-      duration: updates.duration ?? currentStep.duration,
+      startTime: updatedStartTime,
+      endTime: updatedEndTime,
+      duration: updatedDuration,
       details: updates.details ?? currentStep.details,
       error: updates.error ?? currentStep.error,
       logs: updates.logs ?? currentStep.logs,
@@ -126,7 +138,10 @@ export class ConsolidatedPDFWorkflowService {
     } as WorkflowStep;
 
     // Update job status based on step statuses
-    if (updates.status === 'failed') {
+    if (updates.status === 'running') {
+      job.currentStepIndex = stepIndex;
+      job.status = 'running';
+    } else if (updates.status === 'failed') {
       job.status = 'failed';
       job.endTime = new Date();
     } else if (job.steps.every(s => s.status === 'completed')) {
@@ -135,6 +150,9 @@ export class ConsolidatedPDFWorkflowService {
     } else if (job.steps.some(s => s.status === 'running')) {
       job.status = 'running';
     }
+
+    // Update job metadata
+    job.metadata.lastUpdated = new Date().toISOString();
 
     this.jobs.set(jobId, job);
     this.notifyUpdate(job);
@@ -312,6 +330,12 @@ export class ConsolidatedPDFWorkflowService {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        // Update progress: Starting MIVAA processing
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: 10,
+          details: ['Initializing MIVAA processing...', 'Preparing document for analysis'],
+        });
+
         const processingRequest = {
           fileUrl: (uploadResult as any).result?.publicUrl,
           filename: file.name,
@@ -325,6 +349,16 @@ export class ConsolidatedPDFWorkflowService {
             workspaceAware: options.workspaceAware || false,
           },
         };
+
+        // Update progress: Sending to MIVAA
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: 30,
+          details: [
+            'Initializing MIVAA processing...',
+            'Preparing document for analysis',
+            'Sending document to MIVAA service...',
+          ],
+        });
 
         // Use MIVAA gateway for RAG processing
         const response = await fetch('/api/mivaa/gateway', {
@@ -342,24 +376,52 @@ export class ConsolidatedPDFWorkflowService {
           }),
         });
 
+        // Update progress: Processing response
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: 60,
+          details: [
+            'Initializing MIVAA processing...',
+            'Preparing document for analysis',
+            'Sending document to MIVAA service...',
+            'Processing document with MIVAA...',
+          ],
+        });
+
         if (!response.ok) {
           throw new Error(`MIVAA gateway request failed: ${response.statusText}`);
         }
 
         const result = await response.json();
 
+        // Update progress: Processing complete
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: 90,
+          details: [
+            'Initializing MIVAA processing...',
+            'Preparing document for analysis',
+            'Sending document to MIVAA service...',
+            'Processing document with MIVAA...',
+            'Extracting content and generating embeddings...',
+          ],
+        });
+
         return {
           details: [
-            'MIVAA microservice processing initiated',
+            'MIVAA microservice processing completed successfully',
             'Advanced PDF extraction using LlamaIndex RAG',
             `Processing completed with ${result.sources?.length || 0} sources`,
+            `Generated ${result.chunks?.length || 0} text chunks`,
+            `Extracted ${result.images?.length || 0} images`,
             'Generated 1536-dimension embeddings',
             `Quality score: ${Math.round((result.confidence || 0) * 100)}%`,
           ],
           metadata: {
             service: 'MIVAA',
             sourcesGenerated: result.sources?.length || 0,
+            chunksCreated: result.chunks?.length || 0,
+            imagesExtracted: result.images?.length || 0,
             confidence: result.confidence || 0,
+            processingTime: result.processingTime || 0,
           },
           result,
         };
@@ -367,17 +429,22 @@ export class ConsolidatedPDFWorkflowService {
 
       // Step 5: Layout Analysis (show MIVAA analysis results)
       await this.executeStep(jobId, 'layout-analysis', async () => {
+        const mivaaData = (mivaaResult as any).result;
         return {
           details: [
             'Layout analysis completed using MIVAA',
             'Document structure preserved with advanced algorithms',
             'Reading order optimized for RAG processing',
             'Element hierarchy established',
+            `Analyzed ${mivaaData?.pages || 'unknown'} pages`,
+            `Detected ${mivaaData?.elements || 'various'} layout elements`,
           ],
           metadata: {
             layoutAnalysisCompleted: true,
             mivaaProcessed: true,
             structurePreserved: true,
+            pagesAnalyzed: mivaaData?.pages || 0,
+            elementsDetected: mivaaData?.elements || 0,
           },
         };
       });
@@ -491,6 +558,13 @@ export class ConsolidatedPDFWorkflowService {
    */
   getProcessingStatus(processingId: string): WorkflowJob | null {
     return this.jobs.get(processingId) || null;
+  }
+
+  /**
+   * Get a specific job by ID
+   */
+  getJob(jobId: string): WorkflowJob | undefined {
+    return this.jobs.get(jobId);
   }
 
   /**
