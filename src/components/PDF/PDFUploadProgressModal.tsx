@@ -237,9 +237,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               return (
                 <Card key={step.id} className={cn(
                   "transition-all duration-200",
-                  step.status === 'failed' && "border-red-300 bg-red-50",
-                  step.status === 'running' && "border-blue-300 bg-blue-50",
-                  step.status === 'completed' && "border-green-300 bg-green-50"
+                  step.status === 'failed' && "border-red-500 bg-red-100",
+                  step.status === 'running' && "border-blue-500 bg-blue-100",
+                  step.status === 'completed' && "border-green-500 bg-green-100",
+                  step.status === 'pending' && "border-gray-300 bg-gray-50"
                 )}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">

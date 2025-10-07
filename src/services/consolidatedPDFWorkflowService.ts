@@ -384,7 +384,11 @@ export class ConsolidatedPDFWorkflowService {
         });
 
         if (response.error) {
-          throw new Error(`MIVAA gateway request failed: ${response.error.message || 'Unknown error'}`);
+          const errorMessage = response.error.message || 'Unknown error';
+          if (errorMessage.includes('Invalid authentication token') || errorMessage.includes('401')) {
+            throw new Error('MIVAA service authentication failed. Please check API key configuration.');
+          }
+          throw new Error(`MIVAA gateway request failed: ${errorMessage}`);
         }
 
         const result = response.data;
