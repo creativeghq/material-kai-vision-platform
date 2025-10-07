@@ -1,4 +1,4 @@
-name: 📚 Deploy Documentation to Docusaurus
+name: 📚 Deploy Documentation
 
 on:
   push:
@@ -91,8 +91,20 @@ jobs:
           </head>
           <body>
               <div class="container">
-                  <h1>🚀 Material Kai Vision Platform Documentation</h1>
-                  <p>AI-powered material intelligence system with comprehensive documentation and services.</p>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                      <div>
+                          <h1 style="margin: 0;">🚀 Material Kai Vision Platform Documentation</h1>
+                          <p style="margin: 10px 0 0 0;">AI-powered material intelligence system with comprehensive documentation and services.</p>
+                      </div>
+                      <div style="display: flex; gap: 15px;">
+                          <a href="https://v1api.materialshub.gr/docs" target="_blank" style="background: #27ae60; color: white; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;">
+                              📡 API Docs
+                          </a>
+                          <a href="https://v1api.materialshub.gr/redoc" target="_blank" style="background: #e74c3c; color: white; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;">
+                              📋 ReDoc
+                          </a>
+                      </div>
+                  </div>
 
                   <div class="docs-grid">
                       <div class="doc-card">
@@ -201,6 +213,68 @@ jobs:
               echo '</div></body></html>' >> "$html_file"
           done
 
+          # Create a proper README.md for GitHub
+          cat > docs-temp/build/README.md << 'EOF'
+          # 🚀 Material Kai Vision Platform Documentation
+
+          Welcome to the Material Kai Vision Platform documentation site!
+
+          ## 📖 View Documentation
+
+          **[📚 Browse Full Documentation](https://basilakis.github.io/)**
+
+          ## 🔗 Quick Links
+
+          - **[📡 API Documentation](https://v1api.materialshub.gr/docs)** - Interactive API documentation
+          - **[📋 ReDoc API](https://v1api.materialshub.gr/redoc)** - Alternative API documentation format
+
+          ## 📋 Documentation Sections
+
+          ### Core Platform
+          - [Platform Overview](https://basilakis.github.io/README.html)
+          - [Platform Flows](https://basilakis.github.io/platform-flows.html)
+          - [Platform Functionality](https://basilakis.github.io/platform-functionality.html)
+
+          ### Setup & Configuration
+          - [Setup Configuration](https://basilakis.github.io/setup-configuration.html)
+          - [Deployment Guide](https://basilakis.github.io/deployment-guide.html)
+          - [Troubleshooting](https://basilakis.github.io/troubleshooting.html)
+
+          ### API & Architecture
+          - [API Documentation](https://basilakis.github.io/api-documentation.html)
+          - [Architecture Services](https://basilakis.github.io/architecture-services.html)
+          - [Database Schema](https://basilakis.github.io/database-schema.html)
+
+          ### AI & ML Services
+          - [AI/ML Services](https://basilakis.github.io/ai-ml-services.html)
+          - [MIVAA Service](https://basilakis.github.io/mivaa-service.html)
+          - [AI Agents](https://basilakis.github.io/services-ai-agents.html)
+
+          ### Processing & Search
+          - [PDF Processing](https://basilakis.github.io/services-pdf-processing.html)
+          - [Search Services](https://basilakis.github.io/services-search.html)
+          - [RAG Knowledge](https://basilakis.github.io/services-rag-knowledge.html)
+
+          ## 🔧 Services
+
+          - [Services Overview](https://basilakis.github.io/services/README.html)
+          - [Material Recognition](https://basilakis.github.io/services-material-recognition.html)
+          - [Utility Infrastructure](https://basilakis.github.io/services-utility-infrastructure.html)
+          - [Complete Service Inventory](https://basilakis.github.io/complete-service-inventory.html)
+
+          ## 🛡️ Security & Testing
+
+          - [Security Authentication](https://basilakis.github.io/security-authentication.html)
+          - [Admin Panel Guide](https://basilakis.github.io/admin-panel-guide.html)
+          - [Testing Strategy](https://basilakis.github.io/testing-strategy.html)
+
+          ---
+
+          **Material Kai Vision Platform** - AI-powered material intelligence system
+
+          *This documentation is automatically generated and deployed from the main repository.*
+          EOF
+
           echo "✅ Simple documentation site created"
 
       - name: 🔍 Checkout target repository
@@ -252,7 +326,7 @@ jobs:
           fi
 
           echo "Committing changes..."
-          git commit -m "Deploy Documentation: ${{ github.event.head_commit.message }}"
+          git commit -m "Deploy Documentation: $(date)"
 
           echo "Pushing branch..."
           git push origin $BRANCH_NAME
