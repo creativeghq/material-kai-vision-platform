@@ -58,105 +58,150 @@ jobs:
           mkdir -p docs-temp/docs
           mkdir -p docs-temp/build
 
-      - name: 📚 Create Docusaurus project
+      - name: 📚 Create simple documentation site
         run: |
-          echo "📚 Creating Docusaurus project..."
+          echo "📚 Creating simple documentation site..."
 
-          # Create a basic Docusaurus project structure
-          npx create-docusaurus@latest docs-temp/docusaurus classic --typescript
+          # Create build directory
+          mkdir -p docs-temp/build
 
-          # Remove default docs and copy our documentation
-          rm -rf docs-temp/docusaurus/docs/*
-          cp -r docs/* docs-temp/docusaurus/docs/
+          # Create index.html
+          cat > docs-temp/build/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Material Kai Vision Platform Documentation</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+                  .container { max-width: 1200px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                  h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+                  h2 { color: #34495e; margin-top: 30px; }
+                  .docs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px; }
+                  .doc-card { background: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 4px solid #3498db; }
+                  .doc-card h3 { margin-top: 0; color: #2c3e50; }
+                  .doc-card a { color: #3498db; text-decoration: none; font-weight: 500; }
+                  .doc-card a:hover { text-decoration: underline; }
+                  .services-section { margin-top: 40px; }
+                  .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }
+                  .service-item { background: #e8f4fd; padding: 15px; border-radius: 4px; }
+                  .service-item a { color: #2980b9; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🚀 Material Kai Vision Platform Documentation</h1>
+                  <p>AI-powered material intelligence system with comprehensive documentation and services.</p>
 
-          # Create a basic docusaurus.config.js
-          cat > docs-temp/docusaurus/docusaurus.config.js << 'EOF'
-          const config = {
-            title: 'Material Kai Vision Platform',
-            tagline: 'AI-powered material intelligence system',
-            favicon: 'img/favicon.ico',
-            url: 'https://basilakis.github.io',
-            baseUrl: '/',
-            organizationName: 'Basilakis',
-            projectName: 'basilakis.github.io',
-            onBrokenLinks: 'ignore',
-            onBrokenMarkdownLinks: 'ignore',
-            i18n: {
-              defaultLocale: 'en',
-              locales: ['en'],
-            },
-            presets: [
-              [
-                'classic',
-                {
-                  docs: {
-                    sidebarPath: require.resolve('./sidebars.js'),
-                    routeBasePath: '/',
-                  },
-                  blog: false,
-                  theme: {
-                    customCss: require.resolve('./src/css/custom.css'),
-                  },
-                },
-              ],
-            ],
-            themeConfig: {
-              navbar: {
-                title: 'Material Kai Vision Platform',
-                items: [],
-              },
-              footer: {
-                style: 'dark',
-                copyright: `Copyright © ${new Date().getFullYear()} Material Kai Vision Platform.`,
-              },
-            },
-          };
-          module.exports = config;
+                  <div class="docs-grid">
+                      <div class="doc-card">
+                          <h3>📋 Platform Overview</h3>
+                          <a href="README.html">Platform README</a><br>
+                          <a href="platform-flows.html">Platform Flows</a><br>
+                          <a href="platform-functionality.html">Platform Functionality</a>
+                      </div>
+
+                      <div class="doc-card">
+                          <h3>⚙️ Setup & Configuration</h3>
+                          <a href="setup-configuration.html">Setup Configuration</a><br>
+                          <a href="deployment-guide.html">Deployment Guide</a><br>
+                          <a href="troubleshooting.html">Troubleshooting</a>
+                      </div>
+
+                      <div class="doc-card">
+                          <h3>📡 API & Architecture</h3>
+                          <a href="api-documentation.html">API Documentation</a><br>
+                          <a href="architecture-services.html">Architecture Services</a><br>
+                          <a href="database-schema.html">Database Schema</a>
+                      </div>
+
+                      <div class="doc-card">
+                          <h3>🔒 Security & Auth</h3>
+                          <a href="security-authentication.html">Security Authentication</a><br>
+                          <a href="admin-panel-guide.html">Admin Panel Guide</a>
+                      </div>
+
+                      <div class="doc-card">
+                          <h3>🤖 AI & ML Services</h3>
+                          <a href="ai-ml-services.html">AI/ML Services</a><br>
+                          <a href="mivaa-service.html">MIVAA Service</a><br>
+                          <a href="services-ai-agents.html">AI Agents</a>
+                      </div>
+
+                      <div class="doc-card">
+                          <h3>📄 Processing & Search</h3>
+                          <a href="services-pdf-processing.html">PDF Processing</a><br>
+                          <a href="services-search.html">Search Services</a><br>
+                          <a href="services-rag-knowledge.html">RAG Knowledge</a>
+                      </div>
+                  </div>
+
+                  <div class="services-section">
+                      <h2>🔧 Detailed Services</h2>
+                      <div class="services-grid">
+                          <div class="service-item"><a href="services/README.html">Services Overview</a></div>
+                          <div class="service-item"><a href="services-material-recognition.html">Material Recognition</a></div>
+                          <div class="service-item"><a href="services-utility-infrastructure.html">Utility Infrastructure</a></div>
+                          <div class="service-item"><a href="complete-service-inventory.html">Complete Service Inventory</a></div>
+                          <div class="service-item"><a href="testing-strategy.html">Testing Strategy</a></div>
+                          <div class="service-item"><a href="changes-log.html">Changes Log</a></div>
+                      </div>
+                  </div>
+              </div>
+          </body>
+          </html>
           EOF
 
-          # Create intro.md to fix the main broken link
-          cat > docs-temp/docusaurus/docs/intro.md << 'EOF'
-          ---
-          sidebar_position: 1
-          ---
+          # Convert all markdown files to HTML
+          npm install -g marked
 
-          # Material Kai Vision Platform
+          # Process each markdown file
+          find docs -name "*.md" | while read file; do
+              # Get relative path and convert to HTML filename
+              rel_path=${file#docs/}
+              html_file="docs-temp/build/${rel_path%.md}.html"
 
-          Welcome to the Material Kai Vision Platform documentation.
+              # Create directory if needed
+              mkdir -p "$(dirname "$html_file")"
 
-          ## Quick Navigation
+              # Convert markdown to HTML with basic styling
+              cat > "$html_file" << 'HTMLSTART'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Material Kai Vision Platform</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; line-height: 1.6; }
+                  .container { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                  h1, h2, h3 { color: #2c3e50; }
+                  h1 { border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+                  code { background: #f1f2f6; padding: 2px 6px; border-radius: 3px; font-family: 'Monaco', 'Consolas', monospace; }
+                  pre { background: #f1f2f6; padding: 15px; border-radius: 6px; overflow-x: auto; }
+                  a { color: #3498db; text-decoration: none; }
+                  a:hover { text-decoration: underline; }
+                  .back-link { margin-bottom: 20px; }
+                  .back-link a { background: #3498db; color: white; padding: 8px 16px; border-radius: 4px; }
+                  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                  th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                  th { background: #f8f9fa; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="back-link"><a href="../index.html">← Back to Documentation Home</a></div>
+          HTMLSTART
 
-          - [Platform Overview](README)
-          - [Setup & Configuration](setup-configuration)
-          - [API Documentation](api-documentation)
-          - [Services](services/)
+              # Convert markdown content and append
+              marked "$file" >> "$html_file"
 
-          EOF
+              # Close HTML
+              echo '</div></body></html>' >> "$html_file"
+          done
 
-          echo "✅ Docusaurus project created"
-
-      - name: 🔧 Fix markdown files for Docusaurus
-        run: |
-          echo "🔧 Fixing markdown files..."
-          cd docs-temp/docusaurus/docs
-
-          # Remove problematic links that don't exist
-          find . -name "*.md" -exec sed -i '/\[.*\](\.\/.*\.md)/d' {} \;
-          find . -name "*.md" -exec sed -i '/\[.*\](\.\.\/.*\.md)/d' {} \;
-          find . -name "*.md" -exec sed -i '/\[.*\](.*IMPLEMENTATION.*)/d' {} \;
-          find . -name "*.md" -exec sed -i '/\[.*\](.*PLATFORM_FLOWS.*)/d' {} \;
-          find . -name "*.md" -exec sed -i '/\[.*\](.*services-3d-processing.*)/d' {} \;
-
-          # Fix remaining relative links
-          find . -name "*.md" -exec sed -i 's/\.\///g' {} \;
-          find . -name "*.md" -exec sed -i 's/\.md//g' {} \;
-
-          # Fix MDX syntax issues
-          find . -name "*.md" -exec sed -i 's/<\([0-9]\)/\&lt;\1/g' {} \;
-          find . -name "*.md" -exec sed -i 's/>\([0-9]\)/\&gt;\1/g' {} \;
-          find . -name "*.md" -exec sed -i 's/<\([0-9][^>]*\)>/`\1`/g' {} \;
-
-          echo "✅ Markdown files fixed"
+          echo "✅ Simple documentation site created"
 
       - name: 🔍 Checkout target repository
         uses: actions/checkout@v4
@@ -173,14 +218,6 @@ jobs:
           sudo apt update
           sudo apt install gh
 
-      - name: 🏗️ Build Docusaurus site
-        run: |
-          echo "🏗️ Building Docusaurus site..."
-          cd docs-temp/docusaurus
-          npm install
-          npm run build
-          echo "✅ Docusaurus build completed"
-
       - name: 🚀 Create Pull Request
         run: |
           # Generate a unique branch name
@@ -195,8 +232,8 @@ jobs:
           echo "Removing existing files..."
           rm -rf * || true
 
-          echo "Copying built Docusaurus site..."
-          cp -r ../docs-temp/docusaurus/build/* .
+          echo "Copying built documentation site..."
+          cp -r ../docs-temp/build/* .
 
           echo "Contents after copying:"
           ls -la
