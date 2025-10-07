@@ -229,12 +229,15 @@ const testResults = {
  * Create test file for file upload endpoints
  */
 function createTestFile(filename) {
-  const testContent = filename.endsWith('.pdf') ?
-    Buffer.from(TEST_PDF_BASE64.split(',')[1], 'base64') :
-    Buffer.from(TEST_IMAGE_BASE64.split(',')[1], 'base64');
+  // Create a completely fresh buffer each time
+  const base64Data = filename.endsWith('.pdf') ?
+    TEST_PDF_BASE64.split(',')[1] :
+    TEST_IMAGE_BASE64.split(',')[1];
 
-  // Create a new Blob each time to avoid "Body is unusable" errors
-  return new Blob([testContent], {
+  const testContent = Buffer.from(base64Data, 'base64');
+
+  // Create a new Blob with fresh content each time to avoid "Body is unusable" errors
+  return new Blob([new Uint8Array(testContent)], {
     type: filename.endsWith('.pdf') ? 'application/pdf' : 'image/png'
   });
 }
@@ -245,16 +248,16 @@ function createTestFile(filename) {
 async function testEndpoint(category, endpoint) {
   const fullPath = endpoint.path;
   const url = `${BASE_URL}${fullPath}`;
-  
+
   console.log(`\n  🧪 Testing: ${endpoint.name}`);
   console.log(`     ${endpoint.method} ${fullPath}`);
-  
+
   try {
-    let requestOptions = {
+    // Create completely fresh request options for each test
+    const requestOptions = {
       method: endpoint.method,
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${API_KEY}`
       }
     };
 
@@ -276,8 +279,9 @@ async function testEndpoint(category, endpoint) {
       });
 
       requestOptions.body = formData;
-      delete requestOptions.headers['Content-Type']; // Let browser set multipart boundary
+      // Don't set Content-Type for FormData - let browser handle it
     } else if (endpoint.method !== 'GET') {
+      requestOptions.headers['Content-Type'] = 'application/json';
       requestOptions.body = JSON.stringify(endpoint.testData);
     }
 
@@ -396,9 +400,11 @@ async function runComprehensiveAudit() {
   // Test each category of endpoints
   for (const [category, endpoints] of Object.entries(API_ENDPOINTS)) {
     console.log(`\n📂 Testing ${category.toUpperCase()} Endpoints:`);
-    
+
     for (const endpoint of endpoints) {
       await testEndpoint(category, endpoint);
+      // Add small delay between tests to prevent FormData reuse issues
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
