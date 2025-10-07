@@ -18,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -75,9 +76,74 @@ export interface SemanticSearchProps {
   enableViewToggle?: boolean;
 }
 
-// Database search function
+// MIVAA Semantic Search function - uses real AI-powered semantic search
 const searchDatabase = async (query: string): Promise<SearchResult[]> => {
   try {
+    // Use MIVAA semantic search API instead of basic database queries
+    const apiService = BrowserApiIntegrationService.getInstance();
+
+    console.log('🔍 Performing MIVAA semantic search for:', query);
+
+    const mivaaResponse = await apiService.callSupabaseFunction('mivaa-gateway', {
+      action: 'semantic_search',
+      payload: {
+        query: query.trim(),
+        limit: 20,
+        similarity_threshold: 0.6,
+        include_metadata: true,
+        search_type: 'semantic'
+      }
+    });
+
+    if (!mivaaResponse.success) {
+      console.error('MIVAA semantic search failed:', mivaaResponse.error);
+      // Fallback to basic database search if MIVAA fails
+      return await fallbackDatabaseSearch(query);
+    }
+
+    // Transform MIVAA response to SearchResult format
+    const mivaaResults = mivaaResponse.data?.results || [];
+    const results: SearchResult[] = [];
+
+    mivaaResults.forEach((item: any, index: number) => {
+      results.push({
+        id: `mivaa_${item.document_id || index}`,
+        title: item.metadata?.title || item.title || `Document ${item.document_id}`,
+        content: item.content || item.text || item.content_snippet || '',
+        type: item.type || 'document',
+        category: item.category || item.metadata?.category || 'semantic',
+        relevanceScore: item.score || item.similarity_score || 0.8,
+        semanticScore: item.semantic_score || item.score || 0.8,
+        timestamp: new Date(item.metadata?.created_at || item.timestamp || Date.now()),
+        metadata: {
+          source: `mivaa/${item.document_id || item.id}`,
+          fileType: item.metadata?.fileType || 'Document',
+          size: item.metadata?.size || 0,
+          tags: item.metadata?.tags || item.tags || [],
+          processingStatus: 'completed' as const,
+          confidence: item.confidence || item.score || 0.8,
+          searchType: 'semantic'
+        },
+        highlights: item.highlights || [query, 'semantic search', 'AI-powered'],
+        url: item.url || `/documents/${item.document_id || item.id}`,
+      });
+    });
+
+    console.log(`✅ MIVAA semantic search returned ${results.length} results`);
+    return results;
+
+  } catch (error) {
+    console.error('MIVAA semantic search error:', error);
+    // Fallback to basic database search if MIVAA fails
+    return await fallbackDatabaseSearch(query);
+  }
+};
+
+// Fallback database search function (basic text matching)
+const fallbackDatabaseSearch = async (query: string): Promise<SearchResult[]> => {
+  try {
+    console.log('⚠️ Using fallback database search for:', query);
+
     // Search across multiple tables for comprehensive results
     const searchPromises = [];
 
@@ -145,6 +211,7 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
             tags: metadata.tags || [],
             processingStatus: item.status as 'completed' | 'processing' | 'failed',
             confidence: 0.8 + Math.random() * 0.2,
+            searchType: 'fallback'
           },
           highlights: [item.extraction_type, 'document processing', 'analysis'],
           url: `/processing/${item.id}`,
@@ -171,6 +238,7 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
             tags: metadata.tags || [item.category],
             processingStatus: 'completed' as const,
             confidence: 0.85 + Math.random() * 0.15,
+            searchType: 'fallback'
           },
           highlights: [item.category, 'material properties', 'catalog'],
           url: `/materials/${item.id}`,
@@ -178,9 +246,10 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
       });
     }
 
+    console.log(`⚠️ Fallback search returned ${results.length} results`);
     return results;
   } catch (error) {
-    console.error('Database search error:', error);
+    console.error('Fallback database search error:', error);
     return [];
   }
 };
