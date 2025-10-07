@@ -11,8 +11,7 @@
  * 5. Authentication and authorization
  */
 
-import fs from 'fs';
-import path from 'path';
+// Use native FormData (available in Node.js 18+)
 
 // Configuration
 const BASE_URL = 'https://v1api.materialshub.gr';
@@ -226,20 +225,46 @@ const testResults = {
 };
 
 /**
- * Create test file for file upload endpoints
+ * Create fresh test file blob for file upload endpoints
  */
-function createTestFile(filename) {
+function createFreshFileBlob(filename) {
   // Create a completely fresh buffer each time
   const base64Data = filename.endsWith('.pdf') ?
     TEST_PDF_BASE64.split(',')[1] :
     TEST_IMAGE_BASE64.split(',')[1];
 
+  // Create fresh buffer and blob for each call
   const testContent = Buffer.from(base64Data, 'base64');
 
   // Create a new Blob with fresh content each time to avoid "Body is unusable" errors
   return new Blob([new Uint8Array(testContent)], {
     type: filename.endsWith('.pdf') ? 'application/pdf' : 'image/png'
   });
+}
+
+/**
+ * Create completely isolated FormData for file uploads
+ */
+function createIsolatedFormData(testData) {
+  // Create a completely new FormData instance
+  const formData = new FormData();
+  const filename = testData.file;
+
+  // Create fresh file blob
+  const fileBlob = createFreshFileBlob(filename);
+
+  // Append file
+  formData.append('file', fileBlob, filename);
+
+  // Add other form data
+  Object.keys(testData).forEach(key => {
+    if (key !== 'file') {
+      const value = testData[key];
+      formData.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+    }
+  });
+
+  return formData;
 }
 
 /**
@@ -261,28 +286,17 @@ async function testEndpoint(category, endpoint) {
       }
     };
 
-    // Handle file uploads - create fresh FormData for each request
+    // Create fresh test data for each request to avoid any state leakage
+    const freshTestData = JSON.parse(JSON.stringify(endpoint.testData));
+
+    // Handle file uploads - create completely isolated FormData
     if (endpoint.requiresFile) {
-      // Create a completely new FormData instance for each request
-      const formData = new FormData();
-      const filename = endpoint.testData.file;
-
-      // Create a fresh file blob for each request to avoid "Body is unusable" errors
-      const file = createTestFile(filename);
-      formData.append('file', file, filename);
-
-      // Add other form data
-      Object.keys(endpoint.testData).forEach(key => {
-        if (key !== 'file') {
-          formData.append(key, JSON.stringify(endpoint.testData[key]));
-        }
-      });
-
-      requestOptions.body = formData;
-      // Don't set Content-Type for FormData - let browser handle it
+      // Create completely isolated FormData to prevent state leakage
+      requestOptions.body = createIsolatedFormData(freshTestData);
+      // Don't set Content-Type for FormData - let fetch handle the boundary
     } else if (endpoint.method !== 'GET') {
       requestOptions.headers['Content-Type'] = 'application/json';
-      requestOptions.body = JSON.stringify(endpoint.testData);
+      requestOptions.body = JSON.stringify(freshTestData);
     }
 
     const startTime = Date.now();
@@ -403,8 +417,8 @@ async function runComprehensiveAudit() {
 
     for (const endpoint of endpoints) {
       await testEndpoint(category, endpoint);
-      // Add small delay between tests to prevent FormData reuse issues
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Add delay between tests to prevent FormData reuse issues
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
   }
 
