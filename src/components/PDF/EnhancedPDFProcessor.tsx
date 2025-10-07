@@ -290,8 +290,8 @@ export function EnhancedPDFProcessor() {
 
       console.log('MIVAA extraction result:', extractionResult);
 
-      // Create a document ID for tracking (using filename + timestamp as fallback)
-      const documentId = `${file.name.replace(/\.[^/.]+$/, '')}_${Date.now()}`;
+      // Use the document ID from MIVAA response, fallback to generated ID
+      const documentId = extractionResult?.document_id || `${file.name.replace(/\.[^/.]+$/, '')}_${Date.now()}`;
 
       if (!documentId) {
         console.error('No document ID found in response:', extractionResult);
@@ -315,26 +315,39 @@ export function EnhancedPDFProcessor() {
       updateJobStatus(jobId, 'processing', 90, 'Generating quality metrics...');
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Create mock results structure for now
-      const mockResults = {
+      // Create results structure from MIVAA response
+      const mivaaResults = {
         documentId,
-        chunks: [
+        chunks: extractionResult?.content?.chunks?.map((chunk: any, index: number) => ({
+          id: `chunk-${index}`,
+          documentId: documentId,
+          chunkIndex: index,
+          text: chunk.content || chunk.text || '',
+          htmlContent: `<p>${chunk.content || chunk.text || ''}</p>`,
+          chunkType: 'paragraph' as const,
+          hierarchyLevel: 1,
+          pageNumber: chunk.page_number || 1,
+          metadata: chunk.metadata || {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })) || [
+          // Fallback chunk from markdown content if no chunks provided
           {
-            id: 'chunk-1',
+            id: 'chunk-0',
             documentId: documentId,
             chunkIndex: 0,
-            text: 'Sample enhanced chunk with layout awareness',
-            htmlContent: '<p>Sample enhanced chunk with layout awareness</p>',
+            text: extractionResult?.content?.markdown_content || 'No content extracted',
+            htmlContent: `<p>${extractionResult?.content?.markdown_content || 'No content extracted'}</p>`,
             chunkType: 'paragraph' as const,
             hierarchyLevel: 1,
             pageNumber: 1,
-            metadata: { enhanced: true },
+            metadata: { source: 'mivaa_markdown' },
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-          },
+          }
         ],
-        images: [],
-        layout: [],
+        images: extractionResult?.content?.images || [],
+        layout: [], // MIVAA doesn't provide layout data yet
         quality: {
           id: 'quality-1',
           documentId: documentId,
@@ -342,22 +355,31 @@ export function EnhancedPDFProcessor() {
           chunkingQuality: 0.90,
           imageMappingAccuracy: 0.80,
           overallQuality: 0.85,
-          statistics: { totalChunks: 1, totalImages: 0 },
-          processingTimeMs: 3000,
+          statistics: {
+            totalChunks: extractionResult?.content?.chunks?.length || 1,
+            totalImages: extractionResult?.content?.images?.length || 0,
+            wordCount: extractionResult?.metrics?.word_count || 0,
+            pageCount: extractionResult?.metrics?.page_count || 0
+          },
+          processingTimeMs: (extractionResult?.metrics?.processing_time_seconds || 0) * 1000,
           createdAt: new Date().toISOString(),
         },
         summary: {
-          totalChunks: 1,
-          totalImages: 0,
-          totalPages: 1,
+          totalChunks: extractionResult?.content?.chunks?.length || 1,
+          totalImages: extractionResult?.content?.images?.length || 0,
+          totalPages: extractionResult?.metrics?.page_count || 1,
           overallQuality: 0.85,
+          wordCount: extractionResult?.metrics?.word_count || 0,
+          processingTime: extractionResult?.metrics?.processing_time_seconds || 0,
+          author: extractionResult?.metadata?.author || null,
+          title: extractionResult?.metadata?.title || file.name,
         },
       };
 
       updateJobStatus(jobId, 'completed', 100, 'Enhanced processing completed successfully');
       setProcessingJobs(prev => prev.map(job =>
         job.id === jobId
-          ? { ...job, results: mockResults, endTime: new Date() }
+          ? { ...job, results: mivaaResults, endTime: new Date() }
           : job,
       ));
 
