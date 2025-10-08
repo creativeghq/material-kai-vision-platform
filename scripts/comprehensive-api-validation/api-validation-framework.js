@@ -81,11 +81,11 @@ const API_ENDPOINTS = [
   { path: '/api/search/semantic', method: 'POST', category: 'search', critical: true, auth: true,
     payload: { query: 'sustainable materials', limit: 10, similarity_threshold: 0.7 } },
   { path: '/api/search/similarity', method: 'POST', category: 'search', critical: true, auth: true,
-    payload: { vector: [0.1, 0.2, 0.3], limit: 5 } },
+    payload: { reference_text: 'carbon fiber composite materials', limit: 5, similarity_threshold: 0.7 } },
   { path: '/api/search/multimodal', method: 'POST', category: 'search', critical: true, auth: true,
-    payload: { query: 'metal alloys', include_images: true, limit: 10 } },
+    payload: { query: 'metal alloys', include_image_context: true, limit: 10, similarity_threshold: 0.7 } },
   { path: '/api/search/images', method: 'POST', category: 'search', critical: true, auth: true,
-    payload: { query: 'composite materials', limit: 10 } },
+    payload: { query: 'composite materials', search_type: 'description', limit: 10 } },
   { path: '/api/search/health', method: 'GET', category: 'search', critical: false, auth: true },
 
   // RAG System Endpoints
@@ -103,11 +103,11 @@ const API_ENDPOINTS = [
 
   // AI Analysis Endpoints
   { path: '/api/semantic-analysis', method: 'POST', category: 'ai', critical: true, auth: true,
-    payload: { text: 'Analyze this material: carbon fiber composite', analysis_type: 'material_analysis' } },
+    payload: { image_data: 'https://example.com/material.jpg', analysis_type: 'material_identification' } },
   { path: '/api/analyze/multimodal', method: 'POST', category: 'ai', critical: true, auth: true,
-    payload: { text: 'material analysis', image_url: 'https://example.com/material.jpg' } },
+    payload: { test_type: 'combined_analysis', text_content: 'material analysis', image_url: 'https://example.com/material.jpg', include_entities: true } },
   { path: '/api/query/multimodal', method: 'POST', category: 'ai', critical: true, auth: true,
-    payload: { query: 'What type of material is this?', context: 'material_identification' } },
+    payload: { query: 'What type of material is this?', include_image_context: true, limit: 5 } },
 
   // Jobs & Processing Endpoints
   { path: '/api/jobs', method: 'GET', category: 'jobs', critical: false, auth: true },
@@ -116,9 +116,9 @@ const API_ENDPOINTS = [
     payload: { documents: [{ url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }] } },
 
   // Data Management Endpoints
-  { path: '/api/data/export', method: 'POST', category: 'data', critical: false, auth: true },
+  { path: '/api/data/export', method: 'GET', category: 'data', critical: false, auth: true },
   { path: '/api/data/backup', method: 'POST', category: 'data', critical: false, auth: true },
-  { path: '/api/data/cleanup', method: 'POST', category: 'data', critical: false, auth: true },
+  { path: '/api/data/cleanup', method: 'DELETE', category: 'data', critical: false, auth: true },
 
   // Models & Packages
   { path: '/api/models', method: 'GET', category: 'system', critical: false, auth: true },
