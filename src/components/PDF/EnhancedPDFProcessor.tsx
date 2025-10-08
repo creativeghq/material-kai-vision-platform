@@ -186,33 +186,41 @@ export function EnhancedPDFProcessor() {
     if (!searchQuery.trim()) return;
 
     try {
-      // Show enhanced search capabilities
-      const mockResults = [
-        {
-          id: 'result-1',
-          text: `Sample search result for "${searchQuery}". This demonstrates the enhanced search functionality with semantic similarity matching.`,
-          chunk_type: 'paragraph',
-          page_number: 1,
-          chunk_index: 0,
-          similarity_score: 0.85,
-          metadata: { enhanced: true },
+      // Perform real semantic search using MIVAA gateway
+      const { data, error } = await supabase.functions.invoke('mivaa-gateway', {
+        body: {
+          action: 'semantic_search',
+          payload: {
+            query: searchQuery,
+            limit: 10,
+            similarity_threshold: 0.7,
+            include_metadata: true
+          },
         },
-        {
-          id: 'result-2',
-          text: `Another relevant result for "${searchQuery}". The enhanced processor provides intelligent search with layout-aware chunking.`,
-          chunk_type: 'heading',
-          page_number: 1,
-          chunk_index: 1,
-          similarity_score: 0.78,
-          metadata: { enhanced: true },
-        },
-      ];
+      });
 
-      setSearchResults(mockResults);
+      if (error) {
+        throw new Error(`Search failed: ${error.message}`);
+      }
+
+      const searchResults = data?.results || [];
+
+      // Transform results to match expected format
+      const transformedResults = searchResults.map((result: any, index: number) => ({
+        id: result.id || `result-${index + 1}`,
+        text: result.content || result.text || 'No content available',
+        chunk_type: result.chunk_type || 'paragraph',
+        page_number: result.page_number || 1,
+        chunk_index: result.chunk_index || index,
+        similarity_score: result.similarity_score || result.score || 0.5,
+        metadata: result.metadata || { source: 'semantic_search' },
+      }));
+
+      setSearchResults(transformedResults);
 
       toast({
         title: 'Search Complete!',
-        description: `Found ${mockResults.length} sample results. This demonstrates the enhanced search capabilities that will work with your processed documents.`,
+        description: `Found ${transformedResults.length} results for "${searchQuery}".`,
       });
     } catch (error) {
       console.error('Search error:', error);

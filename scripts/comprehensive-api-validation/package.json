@@ -1,0 +1,17 @@
+{
+  "name": "comprehensive-api-validation",
+  "version": "1.0.0",
+  "description": "Comprehensive API validation framework for Material Kai Vision Platform",
+  "type": "commonjs",
+  "main": "run-complete-validation.js",
+  "scripts": {
+    "test": "node run-complete-validation.js",
+    "validate-endpoints": "node validate-all-endpoints.js",
+    "validate-frontend": "node validate-frontend-integration.js"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "author": "Material Kai Vision Platform",
+  "license": "MIT"
+}
