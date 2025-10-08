@@ -85,7 +85,7 @@ const API_ENDPOINTS = [
   { path: '/api/search/multimodal', method: 'POST', category: 'search', critical: true, auth: true,
     payload: { query: 'metal alloys', include_image_context: true, limit: 10, similarity_threshold: 0.7 } },
   { path: '/api/search/images', method: 'POST', category: 'search', critical: true, auth: true,
-    payload: { query: 'composite materials', search_type: 'description', limit: 10 } },
+    payload: { query: 'composite materials', limit: 10, similarity_threshold: 0.7, include_ocr_text: true } },
   { path: '/api/search/health', method: 'GET', category: 'search', critical: false, auth: true },
 
   // RAG System Endpoints
@@ -105,9 +105,9 @@ const API_ENDPOINTS = [
   { path: '/api/semantic-analysis', method: 'POST', category: 'ai', critical: true, auth: true,
     payload: { image_data: 'https://example.com/material.jpg', analysis_type: 'material_identification' } },
   { path: '/api/analyze/multimodal', method: 'POST', category: 'ai', critical: true, auth: true,
-    payload: { test_type: 'combined_analysis', text_content: 'material analysis', image_url: 'https://example.com/material.jpg', include_entities: true } },
+    payload: { document_id: 'test_doc_123', analysis_types: ['text_analysis', 'image_analysis'], include_text_analysis: true, include_image_analysis: true } },
   { path: '/api/query/multimodal', method: 'POST', category: 'ai', critical: true, auth: true,
-    payload: { query: 'What type of material is this?', include_image_context: true, limit: 5 } },
+    payload: { question: 'What type of material is this?', max_context_chunks: 5, temperature: 0.7, max_tokens: 500 } },
 
   // Jobs & Processing Endpoints
   { path: '/api/jobs', method: 'GET', category: 'jobs', critical: false, auth: true },
