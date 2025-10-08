@@ -1,0 +1,203 @@
+{
+  "timestamp": "2025-10-08T10:27:53.124Z",
+  "summary": {
+    "total_components": 7,
+    "passed": 2,
+    "failed": 5,
+    "critical_passed": 2,
+    "critical_failed": 4
+  },
+  "components": [
+    {
+      "component": "EnhancedPDFProcessor",
+      "endpoint": "mivaa-gateway",
+      "action": "pdf_process_document",
+      "critical": true,
+      "status": "passed",
+      "response_time": 1287,
+      "data_flow_valid": true,
+      "mock_data_detected": [],
+      "missing_fields": [],
+      "transformation_issues": [],
+      "error_handling_valid": true,
+      "response_preview": "{\"success\":true,\"data\":{\"success\":true,\"message\":\"Document processed successfully\",\"timestamp\":\"2025-10-08T10:28:27.870922\",\"document_id\":\"dccfbb28-80c4-4e79-8599-ea91e5126dfd\",\"status\":\"completed\",\"source_info\":{\"url\":\"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\",\"conten"
+    },
+    {
+      "component": "MaterialRecognition",
+      "endpoint": "mivaa-gateway",
+      "action": "material_recognition",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 805,
+      "data_flow_valid": true,
+      "mock_data_detected": [],
+      "missing_fields": [
+        "analysis_results",
+        "confidence_score",
+        "detected_materials"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ],
+      "error_handling_valid": true,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (400): {\\\"error\\\":\\\"image_data is required\\\",\\\"detail\\\":\\\"HTTP 400\\\",\\\"timestamp\\\":\\\"2025-10-08T10:28:28.965384\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T10:28:29.049Z\",\"processingTime\":632}},\"metadata\":{\"timestamp\":\"2025-1"
+    },
+    {
+      "component": "SemanticSearch",
+      "endpoint": "mivaa-gateway",
+      "action": "semantic_search",
+      "critical": true,
+      "status": "passed",
+      "response_time": 1105,
+      "data_flow_valid": true,
+      "mock_data_detected": [],
+      "missing_fields": [],
+      "transformation_issues": [],
+      "error_handling_valid": true,
+      "response_preview": "{\"success\":true,\"data\":{\"success\":true,\"message\":null,\"timestamp\":\"2025-10-08T10:28:30.225133\",\"query\":\"carbon fiber composite materials\",\"results\":[],\"total_results\":0,\"metadata\":{\"searched_documents\":0,\"similarity_threshold\":0.7}},\"metadata\":{\"timestamp\":\"2025-10-08T10:28:30.384Z\",\"processingTime\""
+    },
+    {
+      "component": "MaterialAgentSearchInterface",
+      "endpoint": "visual-search-query",
+      "action": null,
+      "critical": true,
+      "status": "http_error",
+      "response_time": 1064,
+      "data_flow_valid": true,
+      "mock_data_detected": [],
+      "missing_fields": [
+        "matches",
+        "search_metadata",
+        "performance_stats"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ],
+      "error_handling_valid": true,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"VISUAL_SEARCH_QUERY_ERROR\",\"message\":\"Database search failed: Could not find a relationship between 'visual_search_embeddings' and 'visual_search_analysis' in the schema cache\",\"details\":{\"timestamp\":\"2025-10-08T10:28:31.617Z\",\"error_type\":\"Error\"}},\"metadata\":{\"pro"
+    },
+    {
+      "component": "UnifiedSearchInterface",
+      "endpoint": "unified-material-search",
+      "action": null,
+      "critical": true,
+      "status": "incomplete_data",
+      "response_time": 1053,
+      "data_flow_valid": true,
+      "mock_data_detected": [],
+      "missing_fields": [
+        "success",
+        "data",
+        "metadata"
+      ],
+      "transformation_issues": [],
+      "error_handling_valid": true,
+      "response_preview": "{\"success\":true,\"data\":[],\"metadata\":{\"total_count\":0,\"processing_time_ms\":803,\"error\":\"Search embedding generation failed: MIVAA embedding error: 404 - {\\\"detail\\\":\\\"Not Found\\\"}. Please check MIVAA service availability.\",\"query\":\"sustainable materials\",\"filters_applied\":{\"limit\":20}}}"
+    },
+    {
+      "component": "HybridAIService",
+      "endpoint": "mivaa-gateway",
+      "action": "llama_vision_analysis",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 757,
+      "data_flow_valid": true,
+      "mock_data_detected": [],
+      "missing_fields": [
+        "analysis_result",
+        "confidence",
+        "material_properties"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ],
+      "error_handling_valid": true,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T10:28:33.887Z\",\"processingTime\":610}},\"metadata\":{\"timestamp\":\"2025-10-08T10:28:33.887Z\",\"processingTime\":610,\"version\":\"1.0.0\"}}"
+    },
+    {
+      "component": "AITestingPanel",
+      "endpoint": "mivaa-gateway",
+      "action": "multimodal_analysis",
+      "critical": false,
+      "status": "http_error",
+      "response_time": 826,
+      "data_flow_valid": true,
+      "mock_data_detected": [],
+      "missing_fields": [
+        "multimodal_results",
+        "text_analysis",
+        "image_analysis"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ],
+      "error_handling_valid": true,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (422): {\\\"detail\\\":[{\\\"type\\\":\\\"missing\\\",\\\"loc\\\":[\\\"body\\\",\\\"document_id\\\"],\\\"msg\\\":\\\"Field required\\\",\\\"input\\\":{\\\"text\\\":\\\"Analyze this material sample\\\",\\\"image_url\\\":\\\"https://example.com/sample.jpg\\\",\\\"analysis_dep"
+    }
+  ],
+  "data_flow_issues": [
+    {
+      "component": "MaterialRecognition",
+      "data_flow_valid": true,
+      "missing_fields": [
+        "analysis_results",
+        "confidence_score",
+        "detected_materials"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ]
+    },
+    {
+      "component": "MaterialAgentSearchInterface",
+      "data_flow_valid": true,
+      "missing_fields": [
+        "matches",
+        "search_metadata",
+        "performance_stats"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ]
+    },
+    {
+      "component": "UnifiedSearchInterface",
+      "data_flow_valid": true,
+      "missing_fields": [
+        "success",
+        "data",
+        "metadata"
+      ],
+      "transformation_issues": []
+    },
+    {
+      "component": "HybridAIService",
+      "data_flow_valid": true,
+      "missing_fields": [
+        "analysis_result",
+        "confidence",
+        "material_properties"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ]
+    },
+    {
+      "component": "AITestingPanel",
+      "data_flow_valid": true,
+      "missing_fields": [
+        "multimodal_results",
+        "text_analysis",
+        "image_analysis"
+      ],
+      "transformation_issues": [
+        "HTTP 500: Internal Server Error"
+      ]
+    }
+  ],
+  "mock_data_issues": [],
+  "recommendations": [
+    "Fix data flow issues in 5 components",
+    "Debug 5 failing component integrations"
+  ]
+}

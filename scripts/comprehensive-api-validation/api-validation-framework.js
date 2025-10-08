@@ -63,7 +63,7 @@ const API_ENDPOINTS = [
   { path: '/api/v1/images/analyze/batch', method: 'POST', category: 'images', critical: false, auth: true,
     payload: { image_ids: ['img_123', 'img_456'], analysis_types: ['description', 'ocr'] } },
   { path: '/api/v1/images/search', method: 'POST', category: 'images', critical: true, auth: true,
-    payload: { query_text: 'carbon fiber material', search_type: 'semantic', limit: 5 } },
+    payload: { query_description: 'carbon fiber material', limit: 5, similarity_threshold: 0.7 } },
   { path: '/api/v1/images/health', method: 'GET', category: 'images', critical: false, auth: true },
   { path: '/api/v1/images/upload/analyze', method: 'POST', category: 'images', critical: false, auth: true,
     skip: true, reason: 'Requires multipart/form-data file upload' },
@@ -113,7 +113,7 @@ const API_ENDPOINTS = [
   { path: '/api/jobs', method: 'GET', category: 'jobs', critical: false, auth: true },
   { path: '/api/jobs/statistics', method: 'GET', category: 'jobs', critical: false, auth: true },
   { path: '/api/bulk/process', method: 'POST', category: 'jobs', critical: false, auth: true,
-    payload: { documents: [{ url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }] } },
+    payload: { urls: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'], batch_size: 5 } },
 
   // Data Management Endpoints
   { path: '/api/data/export', method: 'GET', category: 'data', critical: false, auth: true },
