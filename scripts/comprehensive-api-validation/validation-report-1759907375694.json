@@ -1,0 +1,827 @@
+{
+  "timestamp": "2025-10-08T07:08:14.666Z",
+  "summary": {
+    "total_endpoints": 49,
+    "total_gateway_actions": 10,
+    "passed": 8,
+    "failed": 34,
+    "critical_passed": 4,
+    "critical_failed": 17,
+    "categories": {
+      "health": {
+        "passed": 2,
+        "failed": 2
+      },
+      "monitoring": {
+        "passed": 1,
+        "failed": 2
+      },
+      "pdf": {
+        "passed": 1,
+        "failed": 0
+      },
+      "documents": {
+        "passed": 2,
+        "failed": 1
+      },
+      "images": {
+        "passed": 2,
+        "failed": 2
+      },
+      "materials": {
+        "passed": 0,
+        "failed": 4
+      },
+      "search": {
+        "passed": 0,
+        "failed": 5
+      },
+      "rag": {
+        "passed": 0,
+        "failed": 6
+      },
+      "ai": {
+        "passed": 0,
+        "failed": 3
+      },
+      "jobs": {
+        "passed": 0,
+        "failed": 3
+      },
+      "data": {
+        "passed": 0,
+        "failed": 3
+      },
+      "system": {
+        "passed": 0,
+        "failed": 2
+      },
+      "root": {
+        "passed": 0,
+        "failed": 1
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "passed",
+      "response_time": 372,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 114,
+      "response_preview": "{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:08:13.681778\",\"version\":\"1.0.0\",\"service\":\"PDF Processing Service\"}"
+    },
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "warning",
+      "response_time": 958,
+      "status_code": 200,
+      "issues": [
+        "Health endpoint missing status field"
+      ],
+      "mock_data_detected": [],
+      "response_size": 109,
+      "response_preview": "{\"success\":true,\"message\":\"TogetherAI service is healthy and ready\",\"timestamp\":\"2025-10-08T07:08:14.746901\"}"
+    },
+    {
+      "endpoint": "/api/v1/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "passed",
+      "response_time": 184,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 272,
+      "response_preview": "{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:08:15.032563\",\"service\":\"PDF Processing API\",\"capabilities\":{\"markdown_extraction\":true,\"table_extraction\":true,\"image_extraction\":true,\"pymupdf4llm_avai"
+    },
+    {
+      "endpoint": "/api/system/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "warning",
+      "response_time": 6903,
+      "status_code": 200,
+      "issues": [
+        "Health endpoint missing status field",
+        "Mock data detected in response"
+      ],
+      "mock_data_detected": [
+        "Potential mock data detected: null.*response"
+      ],
+      "response_size": 914,
+      "response_preview": "{\"success\":true,\"message\":\"System health retrieved successfully\",\"data\":{\"overall_status\":\"healthy\",\"system_metrics\":{\"cpu_usage_percent\":56.8,\"memory_usage_percent\":32.9,\"memory_available_gb\":5.20766"
+    },
+    {
+      "endpoint": "/metrics",
+      "method": "GET",
+      "category": "monitoring",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 184,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Missing authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:08:22.332080+00:00\"}"
+    },
+    {
+      "endpoint": "/performance/summary",
+      "method": "GET",
+      "category": "monitoring",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 184,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Missing authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:08:22.618189+00:00\"}"
+    },
+    {
+      "endpoint": "/api/system/metrics",
+      "method": "GET",
+      "category": "monitoring",
+      "critical": false,
+      "status": "passed",
+      "response_time": 1192,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 799,
+      "response_preview": "{\"success\":true,\"message\":\"System metrics retrieved successfully\",\"data\":{\"cpu\":{\"count\":2,\"usage_percent\":72.3,\"usage_per_core\":[3.0,80.0],\"frequency_mhz\":1995.312},\"memory\":{\"total_gb\":7.75586700439"
+    },
+    {
+      "endpoint": "/api/v1/documents/process-url",
+      "method": "POST",
+      "category": "pdf",
+      "critical": true,
+      "status": "passed",
+      "response_time": 506,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 961,
+      "response_preview": "{\"success\":true,\"message\":\"Document processed successfully\",\"timestamp\":\"2025-10-08T07:08:24.521586\",\"document_id\":\"370e6c5a-f3c7-4458-8976-651abc5e149b\",\"status\":\"completed\",\"source_info\":{\"url\":\"htt"
+    },
+    {
+      "endpoint": "/api/v1/documents/batch-process",
+      "method": "POST",
+      "category": "documents",
+      "critical": false,
+      "status": "client_error",
+      "response_time": 952,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 189,
+      "response_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"urls\"],\"msg\":\"Field required\",\"input\":{\"documents\":[{\"source_url\":\"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\"}]}}]}"
+    },
+    {
+      "endpoint": "/api/v1/documents/documents",
+      "method": "GET",
+      "category": "documents",
+      "critical": false,
+      "status": "passed",
+      "response_time": 1007,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 146,
+      "response_preview": "{\"success\":true,\"message\":\"Retrieved 0 documents\",\"timestamp\":\"2025-10-08T07:08:26.694328\",\"documents\":[],\"total_count\":0,\"page\":1,\"page_size\":20}"
+    },
+    {
+      "endpoint": "/api/v1/documents/health",
+      "method": "GET",
+      "category": "documents",
+      "critical": false,
+      "status": "passed",
+      "response_time": 187,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 208,
+      "response_preview": "{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:08:26.989929Z\",\"service\":\"Document Processing API\",\"version\":\"1.0.0\",\"dependencies\":{\"pdf_processor\":true,\"temp_directory\":true,\"job_storage\":true},\"erro"
+    },
+    {
+      "endpoint": "/api/v1/images/analyze",
+      "method": "POST",
+      "category": "images",
+      "critical": true,
+      "status": "passed",
+      "response_time": 190,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 172,
+      "response_preview": "{\"success\":true,\"message\":\"Image analysis test response\",\"timestamp\":\"1759907307\",\"image_id\":\"test-image\",\"status\":\"completed\",\"description\":\"Test image analysis response\"}"
+    },
+    {
+      "endpoint": "/api/v1/images/analyze/batch",
+      "method": "POST",
+      "category": "images",
+      "critical": false,
+      "status": "server_error",
+      "response_time": 200,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 118,
+      "response_preview": "{\"error\":\"Material Kai Vision Platform is not available\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:08:27.581868\"}"
+    },
+    {
+      "endpoint": "/api/v1/images/search",
+      "method": "POST",
+      "category": "images",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 189,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 232,
+      "response_preview": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"body\"],\"msg\":\"Value error, Either query_image_id or query_description must be provided\",\"input\":{\"query_text\":\"carbon fiber material\",\"search_type\":\"semantic\","
+    },
+    {
+      "endpoint": "/api/v1/images/health",
+      "method": "GET",
+      "category": "images",
+      "critical": false,
+      "status": "passed",
+      "response_time": 183,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 105,
+      "response_preview": "{\"success\":true,\"message\":\"Image analysis service health check\",\"timestamp\":\"2025-10-08T07:08:28.166368\"}"
+    },
+    {
+      "endpoint": "/api/analyze/materials/image",
+      "method": "POST",
+      "category": "materials",
+      "critical": true,
+      "status": "server_error",
+      "response_time": 1072,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:08:29.346228\"}"
+    },
+    {
+      "endpoint": "/api/search/materials/visual",
+      "method": "POST",
+      "category": "materials",
+      "critical": true,
+      "status": "server_error",
+      "response_time": 952,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:08:30.400721\"}"
+    },
+    {
+      "endpoint": "/api/embeddings/materials/generate",
+      "method": "POST",
+      "category": "materials",
+      "critical": true,
+      "status": "server_error",
+      "response_time": 1026,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:08:31.529672\"}"
+    },
+    {
+      "endpoint": "/api/search/materials/health",
+      "method": "GET",
+      "category": "materials",
+      "critical": false,
+      "status": "server_error",
+      "response_time": 1088,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:08:32.721021\"}"
+    },
+    {
+      "endpoint": "/api/search/semantic",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "error",
+      "response_time": 98,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/search/semantic failed, reason: socket hang up"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/search/similarity",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "error",
+      "response_time": 2908,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/search/similarity failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/search/multimodal",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "error",
+      "response_time": 2911,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/search/multimodal failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/search/images",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "error",
+      "response_time": 2901,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/search/images failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/search/health",
+      "method": "GET",
+      "category": "search",
+      "critical": false,
+      "status": "error",
+      "response_time": 2916,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/search/health failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/v1/rag/query",
+      "method": "POST",
+      "category": "rag",
+      "critical": true,
+      "status": "error",
+      "response_time": 2907,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/v1/rag/query failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/v1/rag/search",
+      "method": "POST",
+      "category": "rag",
+      "critical": true,
+      "status": "error",
+      "response_time": 2896,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/v1/rag/search failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/v1/rag/chat",
+      "method": "POST",
+      "category": "rag",
+      "critical": true,
+      "status": "error",
+      "response_time": 2914,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/v1/rag/chat failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/v1/rag/documents",
+      "method": "GET",
+      "category": "rag",
+      "critical": false,
+      "status": "error",
+      "response_time": 2881,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/v1/rag/documents failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/v1/rag/health",
+      "method": "GET",
+      "category": "rag",
+      "critical": false,
+      "status": "error",
+      "response_time": 2911,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/v1/rag/health failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/v1/rag/stats",
+      "method": "GET",
+      "category": "rag",
+      "critical": false,
+      "status": "error",
+      "response_time": 2912,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/v1/rag/stats failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/semantic-analysis",
+      "method": "POST",
+      "category": "ai",
+      "critical": true,
+      "status": "error",
+      "response_time": 2927,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/semantic-analysis failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/analyze/multimodal",
+      "method": "POST",
+      "category": "ai",
+      "critical": true,
+      "status": "error",
+      "response_time": 2910,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/analyze/multimodal failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/query/multimodal",
+      "method": "POST",
+      "category": "ai",
+      "critical": true,
+      "status": "error",
+      "response_time": 2912,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/query/multimodal failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/jobs",
+      "method": "GET",
+      "category": "jobs",
+      "critical": false,
+      "status": "error",
+      "response_time": 2883,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/jobs failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/jobs/statistics",
+      "method": "GET",
+      "category": "jobs",
+      "critical": false,
+      "status": "error",
+      "response_time": 2925,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/jobs/statistics failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/bulk/process",
+      "method": "POST",
+      "category": "jobs",
+      "critical": false,
+      "status": "error",
+      "response_time": 2905,
+      "status_code": 0,
+      "issues": [
+        "Request failed: request to http://104.248.68.3:8000/api/bulk/process failed, reason: connect ECONNREFUSED 104.248.68.3:8000"
+      ],
+      "mock_data_detected": [],
+      "response_size": 0,
+      "response_preview": ""
+    },
+    {
+      "endpoint": "/api/data/export",
+      "method": "POST",
+      "category": "data",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 366,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Invalid authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:09:21.568965+00:00\"}"
+    },
+    {
+      "endpoint": "/api/data/backup",
+      "method": "POST",
+      "category": "data",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 181,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Invalid authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:09:21.851015+00:00\"}"
+    },
+    {
+      "endpoint": "/api/data/cleanup",
+      "method": "POST",
+      "category": "data",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 182,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Invalid authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:09:22.134281+00:00\"}"
+    },
+    {
+      "endpoint": "/api/models",
+      "method": "GET",
+      "category": "system",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 182,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Invalid authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:09:22.419452+00:00\"}"
+    },
+    {
+      "endpoint": "/api/packages/status",
+      "method": "GET",
+      "category": "system",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 181,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Invalid authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:09:22.704399+00:00\"}"
+    },
+    {
+      "endpoint": "/",
+      "method": "GET",
+      "category": "root",
+      "critical": true,
+      "status": "auth_failed",
+      "response_time": 181,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Missing authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:09:22.986502+00:00\"}"
+    }
+  ],
+  "gateway_actions": [
+    {
+      "action": "health_check",
+      "critical": true,
+      "status": "passed",
+      "response_time": 1110,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 284,
+      "response_preview": "{\"success\":true,\"data\":{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:09:24.020174\",\"version\":\"1.0.0\",\"service\":\"PDF Processing Service\"},\"metadata\":{\"timestamp\":\"2025-10-08T07:09:24.211Z\",\"processing"
+    },
+    {
+      "action": "pdf_process_document",
+      "critical": true,
+      "status": "passed",
+      "response_time": 1365,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 1155,
+      "response_preview": "{\"success\":true,\"data\":{\"success\":true,\"message\":\"Document processed successfully\",\"timestamp\":\"2025-10-08T07:09:25.473528\",\"document_id\":\"bcf6130f-bd38-4f93-a9ab-cfc1fa370413\",\"status\":\"completed\",\"s"
+    },
+    {
+      "action": "material_recognition",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 1569,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 416,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (503): {\\\"error\\\":\\\"Material Visual Search service is not available. Please check configuration.\\\",\\\"detail\\\":\\\"HTTP 503"
+    },
+    {
+      "action": "semantic_search",
+      "critical": true,
+      "status": "passed",
+      "response_time": 1121,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 382,
+      "response_preview": "{\"success\":true,\"data\":{\"success\":true,\"message\":null,\"timestamp\":\"2025-10-08T07:09:28.470256\",\"query\":\"carbon fiber materials\",\"results\":[],\"total_results\":0,\"metadata\":{\"searched_documents\":0,\"simil"
+    },
+    {
+      "action": "generate_embedding",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 856,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:09:29.535Z\",\"processingTime\":643}},\"metadata\":{"
+    },
+    {
+      "action": "llama_vision_analysis",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 887,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:09:30.491Z\",\"processingTime\":638}},\"metadata\":{"
+    },
+    {
+      "action": "chat_completion",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 828,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:09:31.463Z\",\"processingTime\":633}},\"metadata\":{"
+    },
+    {
+      "action": "vector_search",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 873,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:09:32.458Z\",\"processingTime\":646}},\"metadata\":{"
+    },
+    {
+      "action": "multimodal_analysis",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 836,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [
+        "Potential mock data detected: example\\.com"
+      ],
+      "response_size": 620,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (422): {\\\"detail\\\":[{\\\"type\\\":\\\"missing\\\",\\\"loc\\\":[\\\"body\\\",\\\"document_id\\\"],\\\"msg\\\":\\\"Field required\\\",\\\"input\\\":{\\\"tex"
+    },
+    {
+      "action": "clip_embedding_generation",
+      "critical": false,
+      "status": "http_error",
+      "response_time": 768,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:09:34.295Z\",\"processingTime\":631}},\"metadata\":{"
+    }
+  ],
+  "issues": [],
+  "recommendations": []
+}

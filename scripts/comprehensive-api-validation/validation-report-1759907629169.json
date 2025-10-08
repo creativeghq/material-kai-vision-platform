@@ -1,0 +1,809 @@
+{
+  "timestamp": "2025-10-08T07:13:09.125Z",
+  "summary": {
+    "total_endpoints": 49,
+    "total_gateway_actions": 10,
+    "passed": 18,
+    "failed": 24,
+    "critical_passed": 8,
+    "critical_failed": 13,
+    "categories": {
+      "health": {
+        "passed": 2,
+        "failed": 2
+      },
+      "monitoring": {
+        "passed": 1,
+        "failed": 2
+      },
+      "pdf": {
+        "passed": 1,
+        "failed": 0
+      },
+      "documents": {
+        "passed": 2,
+        "failed": 1
+      },
+      "images": {
+        "passed": 2,
+        "failed": 2
+      },
+      "materials": {
+        "passed": 0,
+        "failed": 4
+      },
+      "search": {
+        "passed": 1,
+        "failed": 4
+      },
+      "rag": {
+        "passed": 6,
+        "failed": 0
+      },
+      "ai": {
+        "passed": 0,
+        "failed": 3
+      },
+      "jobs": {
+        "passed": 1,
+        "failed": 2
+      },
+      "data": {
+        "passed": 1,
+        "failed": 2
+      },
+      "system": {
+        "passed": 1,
+        "failed": 1
+      },
+      "root": {
+        "passed": 0,
+        "failed": 1
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "passed",
+      "response_time": 368,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 114,
+      "response_preview": "{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:13:08.134552\",\"version\":\"1.0.0\",\"service\":\"PDF Processing Service\"}"
+    },
+    {
+      "endpoint": "/api/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "warning",
+      "response_time": 448,
+      "status_code": 200,
+      "issues": [
+        "Health endpoint missing status field"
+      ],
+      "mock_data_detected": [],
+      "response_size": 109,
+      "response_preview": "{\"success\":true,\"message\":\"TogetherAI service is healthy and ready\",\"timestamp\":\"2025-10-08T07:13:08.688727\"}"
+    },
+    {
+      "endpoint": "/api/v1/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "passed",
+      "response_time": 184,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 272,
+      "response_preview": "{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:13:08.974909\",\"service\":\"PDF Processing API\",\"capabilities\":{\"markdown_extraction\":true,\"table_extraction\":true,\"image_extraction\":true,\"pymupdf4llm_avai"
+    },
+    {
+      "endpoint": "/api/system/health",
+      "method": "GET",
+      "category": "health",
+      "critical": true,
+      "status": "warning",
+      "response_time": 6958,
+      "status_code": 200,
+      "issues": [
+        "Health endpoint missing status field",
+        "Mock data detected in response"
+      ],
+      "mock_data_detected": [
+        "Potential mock data detected: null.*response"
+      ],
+      "response_size": 915,
+      "response_preview": "{\"success\":true,\"message\":\"System health retrieved successfully\",\"data\":{\"overall_status\":\"healthy\",\"system_metrics\":{\"cpu_usage_percent\":0.0,\"memory_usage_percent\":32.1,\"memory_available_gb\":5.268993"
+    },
+    {
+      "endpoint": "/metrics",
+      "method": "GET",
+      "category": "monitoring",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 181,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Missing authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:13:16.321048+00:00\"}"
+    },
+    {
+      "endpoint": "/performance/summary",
+      "method": "GET",
+      "category": "monitoring",
+      "critical": false,
+      "status": "auth_failed",
+      "response_time": 182,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Missing authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:13:16.606069+00:00\"}"
+    },
+    {
+      "endpoint": "/api/system/metrics",
+      "method": "GET",
+      "category": "monitoring",
+      "critical": false,
+      "status": "passed",
+      "response_time": 1186,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 802,
+      "response_preview": "{\"success\":true,\"message\":\"System metrics retrieved successfully\",\"data\":{\"cpu\":{\"count\":2,\"usage_percent\":33.8,\"usage_per_core\":[0.0,0.0],\"frequency_mhz\":1995.312},\"memory\":{\"total_gb\":7.755867004394"
+    },
+    {
+      "endpoint": "/api/v1/documents/process-url",
+      "method": "POST",
+      "category": "pdf",
+      "critical": true,
+      "status": "passed",
+      "response_time": 533,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 962,
+      "response_preview": "{\"success\":true,\"message\":\"Document processed successfully\",\"timestamp\":\"2025-10-08T07:13:18.529050\",\"document_id\":\"0dec8f63-3610-4eb9-9b35-d59281b9d95d\",\"status\":\"completed\",\"source_info\":{\"url\":\"htt"
+    },
+    {
+      "endpoint": "/api/v1/documents/batch-process",
+      "method": "POST",
+      "category": "documents",
+      "critical": false,
+      "status": "client_error",
+      "response_time": 193,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 189,
+      "response_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"urls\"],\"msg\":\"Field required\",\"input\":{\"documents\":[{\"source_url\":\"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\"}]}}]}"
+    },
+    {
+      "endpoint": "/api/v1/documents/documents",
+      "method": "GET",
+      "category": "documents",
+      "critical": false,
+      "status": "passed",
+      "response_time": 720,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 146,
+      "response_preview": "{\"success\":true,\"message\":\"Retrieved 0 documents\",\"timestamp\":\"2025-10-08T07:13:19.649375\",\"documents\":[],\"total_count\":0,\"page\":1,\"page_size\":20}"
+    },
+    {
+      "endpoint": "/api/v1/documents/health",
+      "method": "GET",
+      "category": "documents",
+      "critical": false,
+      "status": "passed",
+      "response_time": 187,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 208,
+      "response_preview": "{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:13:19.938761Z\",\"service\":\"Document Processing API\",\"version\":\"1.0.0\",\"dependencies\":{\"pdf_processor\":true,\"temp_directory\":true,\"job_storage\":true},\"erro"
+    },
+    {
+      "endpoint": "/api/v1/images/analyze",
+      "method": "POST",
+      "category": "images",
+      "critical": true,
+      "status": "passed",
+      "response_time": 191,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 172,
+      "response_preview": "{\"success\":true,\"message\":\"Image analysis test response\",\"timestamp\":\"1759907600\",\"image_id\":\"test-image\",\"status\":\"completed\",\"description\":\"Test image analysis response\"}"
+    },
+    {
+      "endpoint": "/api/v1/images/analyze/batch",
+      "method": "POST",
+      "category": "images",
+      "critical": false,
+      "status": "server_error",
+      "response_time": 207,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 118,
+      "response_preview": "{\"error\":\"Material Kai Vision Platform is not available\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:13:20.538014\"}"
+    },
+    {
+      "endpoint": "/api/v1/images/search",
+      "method": "POST",
+      "category": "images",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 191,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 232,
+      "response_preview": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"body\"],\"msg\":\"Value error, Either query_image_id or query_description must be provided\",\"input\":{\"query_text\":\"carbon fiber material\",\"search_type\":\"semantic\","
+    },
+    {
+      "endpoint": "/api/v1/images/health",
+      "method": "GET",
+      "category": "images",
+      "critical": false,
+      "status": "passed",
+      "response_time": 198,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 105,
+      "response_preview": "{\"success\":true,\"message\":\"Image analysis service health check\",\"timestamp\":\"2025-10-08T07:13:21.136629\"}"
+    },
+    {
+      "endpoint": "/api/analyze/materials/image",
+      "method": "POST",
+      "category": "materials",
+      "critical": true,
+      "status": "server_error",
+      "response_time": 1258,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:13:22.498477\"}"
+    },
+    {
+      "endpoint": "/api/search/materials/visual",
+      "method": "POST",
+      "category": "materials",
+      "critical": true,
+      "status": "server_error",
+      "response_time": 908,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:13:23.506313\"}"
+    },
+    {
+      "endpoint": "/api/embeddings/materials/generate",
+      "method": "POST",
+      "category": "materials",
+      "critical": true,
+      "status": "server_error",
+      "response_time": 895,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:13:24.517635\"}"
+    },
+    {
+      "endpoint": "/api/search/materials/health",
+      "method": "GET",
+      "category": "materials",
+      "critical": false,
+      "status": "server_error",
+      "response_time": 1004,
+      "status_code": 503,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 503"
+      ],
+      "mock_data_detected": [],
+      "response_size": 149,
+      "response_preview": "{\"error\":\"Material Visual Search service is not available. Please check configuration.\",\"detail\":\"HTTP 503\",\"timestamp\":\"2025-10-08T07:13:25.622718\"}"
+    },
+    {
+      "endpoint": "/api/search/semantic",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "passed",
+      "response_time": 428,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 198,
+      "response_preview": "{\"success\":true,\"message\":null,\"timestamp\":\"2025-10-08T07:13:26.151847\",\"query\":\"sustainable materials\",\"results\":[],\"total_results\":0,\"metadata\":{\"searched_documents\":0,\"similarity_threshold\":0.7}}"
+    },
+    {
+      "endpoint": "/api/search/similarity",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 189,
+      "status_code": 422,
+      "issues": [
+        "Search endpoint missing results or error field",
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 197,
+      "response_preview": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"body\"],\"msg\":\"Value error, Either reference_document_id or reference_text must be provided\",\"input\":{\"vector\":[0.1,0.2,0.3],\"limit\":5},\"ctx\":{\"error\":{}}}]}"
+    },
+    {
+      "endpoint": "/api/search/multimodal",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 198,
+      "status_code": 400,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Client error: 400"
+      ],
+      "mock_data_detected": [],
+      "response_size": 135,
+      "response_preview": "{\"error\":\"Multi-modal search is not enabled. Please check configuration.\",\"detail\":\"HTTP 400\",\"timestamp\":\"2025-10-08T07:13:26.743682\"}"
+    },
+    {
+      "endpoint": "/api/search/images",
+      "method": "POST",
+      "category": "search",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 199,
+      "status_code": 400,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Client error: 400"
+      ],
+      "mock_data_detected": [],
+      "response_size": 133,
+      "response_preview": "{\"error\":\"Image processing is not enabled. Please check configuration.\",\"detail\":\"HTTP 400\",\"timestamp\":\"2025-10-08T07:13:27.048706\"}"
+    },
+    {
+      "endpoint": "/api/search/health",
+      "method": "GET",
+      "category": "search",
+      "critical": false,
+      "status": "warning",
+      "response_time": 183,
+      "status_code": 200,
+      "issues": [
+        "Search endpoint missing results or error field"
+      ],
+      "mock_data_detected": [],
+      "response_size": 398,
+      "response_preview": "{\"success\":true,\"message\":\"Search and RAG services are operational\",\"timestamp\":\"2025-10-08T07:13:27.337717\",\"data\":{\"status\":\"healthy\",\"message\":\"LlamaIndex service operational\",\"components\":{\"embedd"
+    },
+    {
+      "endpoint": "/api/v1/rag/query",
+      "method": "POST",
+      "category": "rag",
+      "critical": true,
+      "status": "passed",
+      "response_time": 183,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 147,
+      "response_preview": "{\"query\":\"What are the properties of carbon fiber?\",\"answer\":\"\",\"sources\":[],\"confidence_score\":0.0,\"processing_time\":1.5e-05,\"retrieved_chunks\":0}"
+    },
+    {
+      "endpoint": "/api/v1/rag/search",
+      "method": "POST",
+      "category": "rag",
+      "critical": true,
+      "status": "passed",
+      "response_time": 189,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 113,
+      "response_preview": "{\"query\":\"material properties\",\"results\":[],\"total_results\":0,\"search_type\":\"semantic\",\"processing_time\":1.2e-05}"
+    },
+    {
+      "endpoint": "/api/v1/rag/chat",
+      "method": "POST",
+      "category": "rag",
+      "critical": true,
+      "status": "passed",
+      "response_time": 188,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 131,
+      "response_preview": "{\"message\":\"Tell me about sustainable materials\",\"response\":\"\",\"conversation_id\":\"test-123\",\"sources\":[],\"processing_time\":1.7e-05}"
+    },
+    {
+      "endpoint": "/api/v1/rag/documents",
+      "method": "GET",
+      "category": "rag",
+      "critical": false,
+      "status": "passed",
+      "response_time": 183,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 56,
+      "response_preview": "{\"documents\":[],\"total_count\":0,\"page\":1,\"page_size\":20}"
+    },
+    {
+      "endpoint": "/api/v1/rag/health",
+      "method": "GET",
+      "category": "rag",
+      "critical": false,
+      "status": "passed",
+      "response_time": 184,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 443,
+      "response_preview": "{\"status\":\"healthy\",\"services\":{\"llamaindex\":{\"status\":\"healthy\",\"message\":\"LlamaIndex service operational\",\"components\":{\"embeddings\":true,\"llm\":true,\"storage\":true},\"config\":{\"embedding_model\":\"text"
+    },
+    {
+      "endpoint": "/api/v1/rag/stats",
+      "method": "GET",
+      "category": "rag",
+      "critical": false,
+      "status": "passed",
+      "response_time": 184,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 576,
+      "response_preview": "{\"status\":\"success\",\"statistics\":{\"memory\":{\"total_sessions\":0,\"max_turns_per_session\":10,\"summary_threshold\":8,\"sessions\":{}},\"health\":{\"status\":\"healthy\",\"message\":\"LlamaIndex service operational\",\""
+    },
+    {
+      "endpoint": "/api/semantic-analysis",
+      "method": "POST",
+      "category": "ai",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 187,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 407,
+      "response_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"image_data\"],\"msg\":\"Field required\",\"input\":{\"text\":\"Analyze this material: carbon fiber composite\",\"analysis_type\":\"material_analysis\"}},{\"type\":\"value_err"
+    },
+    {
+      "endpoint": "/api/analyze/multimodal",
+      "method": "POST",
+      "category": "ai",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 194,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [
+        "Potential mock data detected: example\\.com"
+      ],
+      "response_size": 325,
+      "response_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"document_id\"],\"msg\":\"Field required\",\"input\":{\"text\":\"material analysis\",\"image_url\":\"https://example.com/material.jpg\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"a"
+    },
+    {
+      "endpoint": "/api/query/multimodal",
+      "method": "POST",
+      "category": "ai",
+      "critical": true,
+      "status": "client_error",
+      "response_time": 198,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 167,
+      "response_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"question\"],\"msg\":\"Field required\",\"input\":{\"query\":\"What type of material is this?\",\"context\":\"material_identification\"}}]}"
+    },
+    {
+      "endpoint": "/api/jobs",
+      "method": "GET",
+      "category": "jobs",
+      "critical": false,
+      "status": "passed",
+      "response_time": 183,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 218,
+      "response_preview": "{\"success\":true,\"message\":\"Jobs retrieved successfully\",\"timestamp\":\"2025-10-08T07:13:30.232108\",\"jobs\":[],\"total_count\":0,\"page\":1,\"page_size\":20,\"status_counts\":{\"active\":0,\"completed\":0,\"failed\":0}"
+    },
+    {
+      "endpoint": "/api/jobs/statistics",
+      "method": "GET",
+      "category": "jobs",
+      "critical": false,
+      "status": "client_error",
+      "response_time": 184,
+      "status_code": 404,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Client error: 404"
+      ],
+      "mock_data_detected": [],
+      "response_size": 97,
+      "response_preview": "{\"error\":\"Job statistics not found\",\"detail\":\"HTTP 404\",\"timestamp\":\"2025-10-08T07:13:30.516108\"}"
+    },
+    {
+      "endpoint": "/api/bulk/process",
+      "method": "POST",
+      "category": "jobs",
+      "critical": false,
+      "status": "client_error",
+      "response_time": 188,
+      "status_code": 422,
+      "issues": [
+        "Client error: 422"
+      ],
+      "mock_data_detected": [],
+      "response_size": 182,
+      "response_preview": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"urls\"],\"msg\":\"Field required\",\"input\":{\"documents\":[{\"url\":\"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\"}]}}]}"
+    },
+    {
+      "endpoint": "/api/data/export",
+      "method": "POST",
+      "category": "data",
+      "critical": false,
+      "status": "client_error",
+      "response_time": 182,
+      "status_code": 405,
+      "issues": [
+        "Client error: 405"
+      ],
+      "mock_data_detected": [],
+      "response_size": 31,
+      "response_preview": "{\"detail\":\"Method Not Allowed\"}"
+    },
+    {
+      "endpoint": "/api/data/backup",
+      "method": "POST",
+      "category": "data",
+      "critical": false,
+      "status": "passed",
+      "response_time": 183,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 183,
+      "response_preview": "{\"success\":true,\"message\":\"Data backup created successfully\",\"data\":{\"backup_id\":\"backup_20251008_071331\",\"backup_size_bytes\":156,\"items_backed_up\":{\"active_jobs\":0,\"job_history\":0}}}"
+    },
+    {
+      "endpoint": "/api/data/cleanup",
+      "method": "POST",
+      "category": "data",
+      "critical": false,
+      "status": "client_error",
+      "response_time": 183,
+      "status_code": 405,
+      "issues": [
+        "Client error: 405"
+      ],
+      "mock_data_detected": [],
+      "response_size": 31,
+      "response_preview": "{\"detail\":\"Method Not Allowed\"}"
+    },
+    {
+      "endpoint": "/api/models",
+      "method": "GET",
+      "category": "system",
+      "critical": false,
+      "status": "server_error",
+      "response_time": 191,
+      "status_code": 500,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Server error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 110,
+      "response_preview": "{\"error\":\"Failed to retrieve models information\",\"detail\":\"HTTP 500\",\"timestamp\":\"2025-10-08T07:13:31.961422\"}"
+    },
+    {
+      "endpoint": "/api/packages/status",
+      "method": "GET",
+      "category": "system",
+      "critical": false,
+      "status": "passed",
+      "response_time": 338,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 8663,
+      "response_preview": "{\"success\":true,\"data\":{\"packages\":{\"fastapi\":{\"available\":true,\"version\":\"0.115.0\",\"version_spec\":\">=0.104.1\",\"critical\":true,\"import_name\":\"fastapi\"},\"uvicorn\":{\"available\":true,\"version\":\"0.24.0\",\""
+    },
+    {
+      "endpoint": "/",
+      "method": "GET",
+      "category": "root",
+      "critical": true,
+      "status": "auth_failed",
+      "response_time": 183,
+      "status_code": 401,
+      "issues": [
+        "Error field should be an object with message and code",
+        "Authentication failed"
+      ],
+      "mock_data_detected": [],
+      "response_size": 117,
+      "response_preview": "{\"error\":\"Missing authentication token\",\"type\":\"authentication_error\",\"timestamp\":\"2025-10-08T07:13:32.685481+00:00\"}"
+    }
+  ],
+  "gateway_actions": [
+    {
+      "action": "health_check",
+      "critical": true,
+      "status": "passed",
+      "response_time": 980,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 284,
+      "response_preview": "{\"success\":true,\"data\":{\"status\":\"healthy\",\"timestamp\":\"2025-10-08T07:13:33.680431\",\"version\":\"1.0.0\",\"service\":\"PDF Processing Service\"},\"metadata\":{\"timestamp\":\"2025-10-08T07:13:33.830Z\",\"processing"
+    },
+    {
+      "action": "pdf_process_document",
+      "critical": true,
+      "status": "passed",
+      "response_time": 1279,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 1155,
+      "response_preview": "{\"success\":true,\"data\":{\"success\":true,\"message\":\"Document processed successfully\",\"timestamp\":\"2025-10-08T07:13:35.055709\",\"document_id\":\"f46103cb-4fd6-4f83-b444-67e58a44d557\",\"status\":\"completed\",\"s"
+    },
+    {
+      "action": "material_recognition",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 2674,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 416,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (503): {\\\"error\\\":\\\"Material Visual Search service is not available. Please check configuration.\\\",\\\"detail\\\":\\\"HTTP 503"
+    },
+    {
+      "action": "semantic_search",
+      "critical": true,
+      "status": "passed",
+      "response_time": 1187,
+      "status_code": 200,
+      "issues": [],
+      "mock_data_detected": [],
+      "response_size": 382,
+      "response_preview": "{\"success\":true,\"data\":{\"success\":true,\"message\":null,\"timestamp\":\"2025-10-08T07:13:39.086268\",\"query\":\"carbon fiber materials\",\"results\":[],\"total_results\":0,\"metadata\":{\"searched_documents\":0,\"simil"
+    },
+    {
+      "action": "generate_embedding",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 981,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:13:40.288Z\",\"processingTime\":701}},\"metadata\":{"
+    },
+    {
+      "action": "llama_vision_analysis",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 3609,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:13:44.074Z\",\"processingTime\":854}},\"metadata\":{"
+    },
+    {
+      "action": "chat_completion",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 795,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:13:44.972Z\",\"processingTime\":635}},\"metadata\":{"
+    },
+    {
+      "action": "vector_search",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 775,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:13:45.849Z\",\"processingTime\":629}},\"metadata\":{"
+    },
+    {
+      "action": "multimodal_analysis",
+      "critical": true,
+      "status": "http_error",
+      "response_time": 811,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [
+        "Potential mock data detected: example\\.com"
+      ],
+      "response_size": 620,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (422): {\\\"detail\\\":[{\\\"type\\\":\\\"missing\\\",\\\"loc\\\":[\\\"body\\\",\\\"document_id\\\"],\\\"msg\\\":\\\"Field required\\\",\\\"input\\\":{\\\"tex"
+    },
+    {
+      "action": "clip_embedding_generation",
+      "critical": false,
+      "status": "http_error",
+      "response_time": 894,
+      "status_code": 500,
+      "issues": [
+        "HTTP error: 500"
+      ],
+      "mock_data_detected": [],
+      "response_size": 279,
+      "response_preview": "{\"success\":false,\"error\":{\"code\":\"GATEWAY_ERROR\",\"message\":\"MIVAA service error (404): {\\\"detail\\\":\\\"Not Found\\\"}\",\"details\":{\"timestamp\":\"2025-10-08T07:13:47.666Z\",\"processingTime\":628}},\"metadata\":{"
+    }
+  ],
+  "issues": [],
+  "recommendations": []
+}

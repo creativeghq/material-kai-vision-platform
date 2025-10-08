@@ -1,0 +1,129 @@
+{
+  "validation_id": "validation_1759907294673",
+  "timestamp": "2025-10-08T07:08:14.673Z",
+  "platform": "Material Kai Vision Platform",
+  "version": "1.0.0",
+  "summary": {
+    "total_tests": 49,
+    "passed": 10,
+    "failed": 39,
+    "success_rate": 20.408163265306122,
+    "critical_success_rate": 0,
+    "mock_data_issues": 0,
+    "data_flow_issues": 5,
+    "authentication_issues": 0
+  },
+  "test_categories": {
+    "direct_endpoints": {
+      "total": 42,
+      "passed": 8,
+      "failed": 34
+    },
+    "gateway_actions": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    "frontend_integration": {
+      "total": 7,
+      "passed": 2,
+      "failed": 5
+    }
+  },
+  "critical_issues": [
+    "Data flow issues in 5 components"
+  ],
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "category": "Data Flow",
+      "action": "Fix data transformation issues in 5 components",
+      "impact": "Frontend not properly processing backend responses"
+    },
+    {
+      "priority": "MEDIUM",
+      "category": "Reliability",
+      "action": "Improve API reliability - currently 20.4%",
+      "impact": "Platform stability and user experience"
+    }
+  ],
+  "detailed_reports": [
+    {
+      "type": "endpoint_validation",
+      "file": "validation-report-1759907375694.json",
+      "summary": {
+        "total_endpoints": 49,
+        "total_gateway_actions": 10,
+        "passed": 8,
+        "failed": 34,
+        "critical_passed": 4,
+        "critical_failed": 17,
+        "categories": {
+          "health": {
+            "passed": 2,
+            "failed": 2
+          },
+          "monitoring": {
+            "passed": 1,
+            "failed": 2
+          },
+          "pdf": {
+            "passed": 1,
+            "failed": 0
+          },
+          "documents": {
+            "passed": 2,
+            "failed": 1
+          },
+          "images": {
+            "passed": 2,
+            "failed": 2
+          },
+          "materials": {
+            "passed": 0,
+            "failed": 4
+          },
+          "search": {
+            "passed": 0,
+            "failed": 5
+          },
+          "rag": {
+            "passed": 0,
+            "failed": 6
+          },
+          "ai": {
+            "passed": 0,
+            "failed": 3
+          },
+          "jobs": {
+            "passed": 0,
+            "failed": 3
+          },
+          "data": {
+            "passed": 0,
+            "failed": 3
+          },
+          "system": {
+            "passed": 0,
+            "failed": 2
+          },
+          "root": {
+            "passed": 0,
+            "failed": 1
+          }
+        }
+      }
+    },
+    {
+      "type": "frontend_integration",
+      "file": "frontend-integration-report-1759907389585.json",
+      "summary": {
+        "total_components": 7,
+        "passed": 2,
+        "failed": 5,
+        "critical_passed": 2,
+        "critical_failed": 4
+      }
+    }
+  ]
+}
