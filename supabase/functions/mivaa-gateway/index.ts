@@ -64,26 +64,26 @@ serve(async (req) => {
       'health_check': { path: '/health', method: 'GET' },
       
       // Embedding actions
-      'generate_embedding': { path: '/api/embeddings/generate', method: 'POST' },
-      'generate_batch_embeddings': { path: '/api/embeddings/batch', method: 'POST' },
-      
+      'generate_embedding': { path: '/api/embeddings/materials/generate', method: 'POST' },
+      'generate_batch_embeddings': { path: '/api/embeddings/materials/generate', method: 'POST' },
+
       // Search actions
       'semantic_search': { path: '/api/search/semantic', method: 'POST' },
-      'vector_search': { path: '/api/search/vector', method: 'POST' },
+      'vector_search': { path: '/api/search/similarity', method: 'POST' },
       'hybrid_search': { path: '/api/search/hybrid', method: 'POST' },
       'get_recommendations': { path: '/api/search/recommendations', method: 'POST' },
       'get_analytics': { path: '/api/analytics', method: 'GET' },
       
       // AI Analysis actions
       'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
-      'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
-      'advanced_visual_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
-      
+      'llama_vision_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
+      'advanced_visual_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
+
       // CLIP Embedding actions
-      'clip_embedding_generation': { path: '/api/embeddings/clip-generate', method: 'POST' },
-      
+      'clip_embedding_generation': { path: '/api/embeddings/materials/generate', method: 'POST' },
+
       // Chat completion and conversational AI
-      'chat_completion': { path: '/api/chat/completions', method: 'POST' },
+      'chat_completion': { path: '/api/rag/chat', method: 'POST' },
       'contextual_response': { path: '/api/chat/contextual', method: 'POST' },
       
       // Audio processing
@@ -100,10 +100,10 @@ serve(async (req) => {
       'material_embeddings': { path: '/api/embeddings/materials/generate', method: 'POST' },
 
       // PDF processing (MIVAA specific endpoints) - Fixed duplicated paths
-      'pdf_extract_markdown': { path: '/api/v1/extract/markdown', method: 'POST' },
-      'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
-      'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
-      'pdf_process_document': { path: '/api/v1/documents/process-url', method: 'POST' },
+      'pdf_extract_markdown': { path: '/api/pdf/extract/markdown', method: 'POST' },
+      'pdf_extract_tables': { path: '/api/pdf/extract/tables', method: 'POST' },
+      'pdf_extract_images': { path: '/api/pdf/extract/images', method: 'POST' },
+      'pdf_process_document': { path: '/api/documents/process-url', method: 'POST' },
       
       // RAG operations
       'rag_query': { path: '/api/rag/query', method: 'POST' },
@@ -118,12 +118,12 @@ serve(async (req) => {
       'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
 
       // Enhanced existing APIs
-      'get_document_details': { path: '/api/v1/documents/documents/{document_id}', method: 'GET' },
-      'get_document_content': { path: '/api/v1/documents/documents/{document_id}/content', method: 'GET' },
-      'get_job_status': { path: '/api/v1/documents/job/{job_id}', method: 'GET' },
-      'analyze_document': { path: '/api/v1/documents/analyze', method: 'POST' },
-      'batch_image_analysis': { path: '/api/v1/images/analyze/batch', method: 'POST' },
-      'advanced_image_search': { path: '/api/v1/images/search', method: 'POST' },
+      'get_document_details': { path: '/api/documents/documents/{document_id}', method: 'GET' },
+      'get_document_content': { path: '/api/documents/documents/{document_id}/content', method: 'GET' },
+      'get_job_status': { path: '/api/documents/job/{job_id}', method: 'GET' },
+      'analyze_document': { path: '/api/documents/analyze', method: 'POST' },
+      'batch_image_analysis': { path: '/api/images/analyze/batch', method: 'POST' },
+      'advanced_image_search': { path: '/api/images/search', method: 'POST' },
     };
 
     const endpoint = endpointMap[action];
