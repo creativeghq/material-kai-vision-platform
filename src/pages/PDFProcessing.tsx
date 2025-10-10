@@ -192,6 +192,7 @@ const PDFProcessing = () => {
         isOpen={isProgressModalOpen}
         onClose={() => setIsProgressModalOpen(false)}
         job={currentJob}
+        enablePolling={true} // Enable real-time polling
         onRetry={() => {
           if (currentJob) {
             handleRetryJob(currentJob.id);

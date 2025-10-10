@@ -18,6 +18,7 @@ import {
   Eye,
 
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
@@ -65,6 +66,7 @@ interface PDFUploadProgressModalProps {
   job: WorkflowJob | null;
   onRetry?: () => void;
   onViewResults?: () => void;
+  enablePolling?: boolean; // New prop to enable real-time polling
 }
 
 const stepIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -143,8 +145,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   job,
   onRetry,
   onViewResults,
+  enablePolling = false,
 }) => {
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   // const [autoScroll, setAutoScroll] = useState(true);
 
   const toggleStepExpansion = (stepId: string) => {
@@ -179,6 +183,55 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
       // }
     }
   }, [job]);
+
+  // Real-time polling for job status updates
+  useEffect(() => {
+    if (enablePolling && job && isOpen && (job.status === 'running' || job.status === 'pending')) {
+      const startPolling = () => {
+        const interval = setInterval(async () => {
+          try {
+            // Poll MIVAA gateway for job status
+            const response = await supabase.functions.invoke('mivaa-gateway', {
+              body: {
+                action: 'get_job_status',
+                payload: { job_id: job.id }
+              }
+            });
+
+            if (response.data?.success && response.data.data) {
+              const statusData = response.data.data;
+
+              // Update job status based on polling response
+              // This would typically trigger a callback to update the parent component
+              console.log('📊 Job status update:', statusData);
+
+              // Stop polling if job is completed or failed
+              if (statusData.status === 'completed' || statusData.status === 'failed') {
+                if (pollingInterval) {
+                  clearInterval(pollingInterval);
+                  setPollingInterval(null);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Polling error:', error);
+          }
+        }, 2000); // Poll every 2 seconds
+
+        setPollingInterval(interval);
+      };
+
+      startPolling();
+    }
+
+    // Cleanup polling on unmount or when conditions change
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+    };
+  }, [enablePolling, job, isOpen, pollingInterval]);
 
   if (!job) return null;
 
@@ -235,13 +288,18 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               const isExpanded = expandedSteps.has(step.id);
               const hasDetails = (step.details && step.details.length > 0) || step.error || (step.logs && step.logs.length > 0);
 
+              const isCurrentStep = job.currentStepIndex === _index;
+
               return (
                 <Card key={step.id} className={cn(
-                  "transition-all duration-200",
-                  step.status === 'failed' && "border-red-500 bg-red-100",
-                  step.status === 'running' && "border-blue-500 bg-blue-100",
-                  step.status === 'completed' && "border-green-500 bg-green-100",
-                  step.status === 'pending' && "border-gray-300 bg-gray-50"
+                  "transition-all duration-300 border-2",
+                  "bg-[#1f2937]", // Background color as requested
+                  step.status === 'failed' && "border-red-500",
+                  step.status === 'running' && "border-blue-500",
+                  step.status === 'completed' && "border-green-500",
+                  step.status === 'pending' && "border-gray-600",
+                  isCurrentStep && "border-white", // Active step has white border
+                  step.status === 'running' && isCurrentStep && "animate-pulse"
                 )}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -256,19 +314,19 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-medium">{step.name}</h4>
+                            <h4 className="font-medium text-white">{step.name}</h4>
                             <div className="flex items-center gap-2">
                               {step.status === 'running' && step.progress !== undefined && (
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-gray-400">
                                   {Math.round(step.progress)}%
                                 </span>
                               )}
                               {getStatusIcon(step.status)}
                             </div>
                           </div>
-                          
+
                           {step.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
+                            <p className="text-sm text-gray-400 mt-1">
                               {step.description}
                             </p>
                           )}

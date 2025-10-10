@@ -76,13 +76,20 @@ export const MivaaPDFProcessor: React.FC = () => {
         // In production, you'd upload to Supabase storage first
         const fileUrl = `https://example.com/temp/${file.name}`;
         
-        // Call MIVAA service for PDF processing
+        // Call MIVAA service for PDF processing with polling
         const response = await mivaaService.processPDF(fileUrl, {
           extractImages: true,
           extractText: true,
           extractTables: true,
           ocrEnabled: true,
         });
+
+        // If we get a job ID, start polling for status updates
+        if (response.success && response.data?.job_id) {
+          console.log('🔄 Starting polling for job:', response.data.job_id);
+          // Note: In a real implementation, you'd want to show a progress modal here
+          // and use the consolidatedPDFWorkflowService.startJobPolling method
+        }
         
         if (response.success && response.data) {
           processingResults.push({

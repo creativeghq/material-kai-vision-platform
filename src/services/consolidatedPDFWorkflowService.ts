@@ -1,7 +1,6 @@
 import React from 'react';
 import { supabase } from '../integrations/supabase/client';
 import WorkflowErrorHandler, { type WorkflowResponse } from '../utils/WorkflowErrorHandler';
-import { pollingService } from './pollingService';
 
 // Define interfaces locally to avoid importing from React components
 interface WorkflowStep {
@@ -89,6 +88,7 @@ export interface ConsolidatedProcessingResult {
 export class ConsolidatedPDFWorkflowService {
   private jobs: Map<string, WorkflowJob> = new Map();
   private callbacks: Set<WorkflowEventCallback> = new Set();
+  private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
     // MIVAA integration now handled via API gateway pattern
@@ -626,144 +626,86 @@ export class ConsolidatedPDFWorkflowService {
   }
 
   /**
-   * Start PDF processing with real-time polling and status updates
+   * Start polling for job status updates
    */
-  async startProcessingWithPolling(
-    fileUrl: string,
-    filename: string,
-    options: ProcessingOptions = {},
-    onStatusUpdate?: (status: any) => void
-  ): Promise<string> {
-    try {
-      // Start the processing job using the polling service
-      const jobId = await pollingService.startProcessingJob(
-        'pdf_process_document',
-        {
-          fileUrl,
-          filename,
-          options: {
-            extract_images: options.extractImages ?? true,
-            extract_tables: options.extractTables ?? true,
-            generate_embeddings: options.generateEmbeddings ?? true,
-            analyze_materials: options.analyzeMaterials ?? true,
-            ...options
+  startJobPolling(jobId: string, intervalMs: number = 2000): void {
+    // Stop any existing polling for this job
+    this.stopJobPolling(jobId);
+
+    const interval = setInterval(async () => {
+      try {
+        // Poll MIVAA gateway for job status
+        const response = await supabase.functions.invoke('mivaa-gateway', {
+          body: {
+            action: 'get_job_status',
+            payload: { job_id: jobId }
           }
-        },
-        (status) => {
-          // Update our internal job tracking
-          this.updateJobFromPollingStatus(jobId, status);
+        });
 
-          // Notify external callback
-          if (onStatusUpdate) {
-            onStatusUpdate(status);
-          }
-        }
-      );
+        if (response.data?.success && response.data.data) {
+          const statusData = response.data.data;
+          const job = this.jobs.get(jobId);
 
-      // Create initial job entry
-      const job: WorkflowJob = {
-        id: jobId,
-        status: 'running',
-        progress: 0,
-        currentStep: 'upload',
-        steps: this.createInitialSteps(),
-        startTime: new Date(),
-        metadata: {
-          fileUrl,
-          filename,
-          options
-        }
-      };
+          if (job) {
+            // Update job status based on polling response
+            job.status = statusData.status === 'completed' ? 'completed' :
+                        statusData.status === 'error' ? 'failed' : 'running';
 
-      this.jobs.set(jobId, job);
-      this.notifyUpdate(job);
+            // Update steps if available
+            if (statusData.steps) {
+              statusData.steps.forEach((stepData: any, index: number) => {
+                if (job.steps[index]) {
+                  job.steps[index].status = stepData.status === 'completed' ? 'completed' :
+                                           stepData.status === 'error' ? 'failed' :
+                                           stepData.status === 'in-progress' ? 'running' : 'pending';
+                  job.steps[index].progress = stepData.progress || 0;
+                }
+              });
+            }
 
-      return jobId;
-    } catch (error) {
-      console.error('Failed to start processing with polling:', error);
-      throw error;
-    }
-  }
+            // Update completion time
+            if (statusData.status === 'completed' || statusData.status === 'error') {
+              job.endTime = new Date();
+              this.stopJobPolling(jobId); // Stop polling when done
+            }
 
-  /**
-   * Update internal job status from polling service status
-   */
-  private updateJobFromPollingStatus(jobId: string, pollingStatus: any): void {
-    const job = this.jobs.get(jobId);
-    if (!job) return;
-
-    // Update job status
-    job.status = pollingStatus.status === 'completed' ? 'completed' :
-                 pollingStatus.status === 'error' ? 'failed' : 'running';
-    job.progress = pollingStatus.progress || 0;
-    job.currentStep = pollingStatus.currentStep;
-
-    // Update steps from polling status
-    if (pollingStatus.steps) {
-      pollingStatus.steps.forEach((pollingStep: any, index: number) => {
-        if (job.steps[index]) {
-          job.steps[index].status = pollingStep.status === 'completed' ? 'completed' :
-                                   pollingStep.status === 'error' ? 'failed' :
-                                   pollingStep.status === 'in-progress' ? 'running' : 'pending';
-          job.steps[index].progress = pollingStep.progress || 0;
-          if (pollingStep.details) {
-            job.steps[index].details = [pollingStep.details];
+            this.jobs.set(jobId, job);
+            this.notifyUpdate(job);
           }
         }
-      });
-    }
-
-    // Update completion time
-    if (pollingStatus.status === 'completed' || pollingStatus.status === 'error') {
-      job.endTime = new Date();
-      job.duration = job.endTime.getTime() - job.startTime.getTime();
-    }
-
-    this.jobs.set(jobId, job);
-    this.notifyUpdate(job);
-  }
-
-  /**
-   * Create initial processing steps
-   */
-  private createInitialSteps(): WorkflowStep[] {
-    return [
-      {
-        id: 'upload',
-        name: 'File Upload',
-        description: 'Uploading and validating PDF file',
-        status: 'pending',
-        progress: 0
-      },
-      {
-        id: 'extraction',
-        name: 'Content Extraction',
-        description: 'Extracting text, images, and tables from PDF',
-        status: 'pending',
-        progress: 0
-      },
-      {
-        id: 'processing',
-        name: 'AI Processing',
-        description: 'Analyzing content with LLaMA and generating insights',
-        status: 'pending',
-        progress: 0
-      },
-      {
-        id: 'embedding',
-        name: 'Vector Embedding',
-        description: 'Creating embeddings for semantic search',
-        status: 'pending',
-        progress: 0
-      },
-      {
-        id: 'storage',
-        name: 'Data Storage',
-        description: 'Saving results to database and knowledge base',
-        status: 'pending',
-        progress: 0
+      } catch (error) {
+        console.error('Job polling error:', error);
       }
-    ];
+    }, intervalMs);
+
+    // Store interval for cleanup
+    if (!this.pollingIntervals) {
+      this.pollingIntervals = new Map();
+    }
+    this.pollingIntervals.set(jobId, interval);
+  }
+
+  /**
+   * Stop polling for a specific job
+   */
+  stopJobPolling(jobId: string): void {
+    if (this.pollingIntervals?.has(jobId)) {
+      const interval = this.pollingIntervals.get(jobId);
+      if (interval) {
+        clearInterval(interval);
+        this.pollingIntervals.delete(jobId);
+      }
+    }
+  }
+
+  /**
+   * Stop all polling
+   */
+  stopAllPolling(): void {
+    if (this.pollingIntervals) {
+      this.pollingIntervals.forEach((interval) => clearInterval(interval));
+      this.pollingIntervals.clear();
+    }
   }
 }
 
