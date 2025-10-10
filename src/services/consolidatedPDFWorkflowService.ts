@@ -1,6 +1,7 @@
 import React from 'react';
 import { supabase } from '../integrations/supabase/client';
 import WorkflowErrorHandler, { type WorkflowResponse } from '../utils/WorkflowErrorHandler';
+import { pollingService } from './pollingService';
 
 // Define interfaces locally to avoid importing from React components
 interface WorkflowStep {
@@ -622,6 +623,147 @@ export class ConsolidatedPDFWorkflowService {
     completedJobs.forEach(([jobId]) => {
       this.jobs.delete(jobId);
     });
+  }
+
+  /**
+   * Start PDF processing with real-time polling and status updates
+   */
+  async startProcessingWithPolling(
+    fileUrl: string,
+    filename: string,
+    options: ProcessingOptions = {},
+    onStatusUpdate?: (status: any) => void
+  ): Promise<string> {
+    try {
+      // Start the processing job using the polling service
+      const jobId = await pollingService.startProcessingJob(
+        'pdf_process_document',
+        {
+          fileUrl,
+          filename,
+          options: {
+            extract_images: options.extractImages ?? true,
+            extract_tables: options.extractTables ?? true,
+            generate_embeddings: options.generateEmbeddings ?? true,
+            analyze_materials: options.analyzeMaterials ?? true,
+            ...options
+          }
+        },
+        (status) => {
+          // Update our internal job tracking
+          this.updateJobFromPollingStatus(jobId, status);
+
+          // Notify external callback
+          if (onStatusUpdate) {
+            onStatusUpdate(status);
+          }
+        }
+      );
+
+      // Create initial job entry
+      const job: WorkflowJob = {
+        id: jobId,
+        status: 'running',
+        progress: 0,
+        currentStep: 'upload',
+        steps: this.createInitialSteps(),
+        startTime: new Date(),
+        metadata: {
+          fileUrl,
+          filename,
+          options
+        }
+      };
+
+      this.jobs.set(jobId, job);
+      this.notifyUpdate(job);
+
+      return jobId;
+    } catch (error) {
+      console.error('Failed to start processing with polling:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update internal job status from polling service status
+   */
+  private updateJobFromPollingStatus(jobId: string, pollingStatus: any): void {
+    const job = this.jobs.get(jobId);
+    if (!job) return;
+
+    // Update job status
+    job.status = pollingStatus.status === 'completed' ? 'completed' :
+                 pollingStatus.status === 'error' ? 'failed' : 'running';
+    job.progress = pollingStatus.progress || 0;
+    job.currentStep = pollingStatus.currentStep;
+
+    // Update steps from polling status
+    if (pollingStatus.steps) {
+      pollingStatus.steps.forEach((pollingStep: any, index: number) => {
+        if (job.steps[index]) {
+          job.steps[index].status = pollingStep.status === 'completed' ? 'completed' :
+                                   pollingStep.status === 'error' ? 'failed' :
+                                   pollingStep.status === 'in-progress' ? 'running' : 'pending';
+          job.steps[index].progress = pollingStep.progress || 0;
+          if (pollingStep.details) {
+            job.steps[index].details = [pollingStep.details];
+          }
+        }
+      });
+    }
+
+    // Update completion time
+    if (pollingStatus.status === 'completed' || pollingStatus.status === 'error') {
+      job.endTime = new Date();
+      job.duration = job.endTime.getTime() - job.startTime.getTime();
+    }
+
+    this.jobs.set(jobId, job);
+    this.notifyUpdate(job);
+  }
+
+  /**
+   * Create initial processing steps
+   */
+  private createInitialSteps(): WorkflowStep[] {
+    return [
+      {
+        id: 'upload',
+        name: 'File Upload',
+        description: 'Uploading and validating PDF file',
+        status: 'pending',
+        progress: 0
+      },
+      {
+        id: 'extraction',
+        name: 'Content Extraction',
+        description: 'Extracting text, images, and tables from PDF',
+        status: 'pending',
+        progress: 0
+      },
+      {
+        id: 'processing',
+        name: 'AI Processing',
+        description: 'Analyzing content with LLaMA and generating insights',
+        status: 'pending',
+        progress: 0
+      },
+      {
+        id: 'embedding',
+        name: 'Vector Embedding',
+        description: 'Creating embeddings for semantic search',
+        status: 'pending',
+        progress: 0
+      },
+      {
+        id: 'storage',
+        name: 'Data Storage',
+        description: 'Saving results to database and knowledge base',
+        status: 'pending',
+        progress: 0
+      }
+    ];
   }
 }
 

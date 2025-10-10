@@ -211,6 +211,11 @@ const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> = {
   'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
   'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
 
+  // Job Status and Polling
+  'get_job_status': { path: '/api/jobs/{job_id}/status', method: 'GET' },
+  'list_jobs': { path: '/api/jobs', method: 'GET' },
+  'cancel_job': { path: '/api/jobs/{job_id}/cancel', method: 'POST' },
+
   // Material Recognition
   'material_recognition': { path: '/api/vision/analyze', method: 'POST' },
   'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
