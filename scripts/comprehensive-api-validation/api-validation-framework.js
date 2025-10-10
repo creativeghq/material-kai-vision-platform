@@ -134,10 +134,10 @@ const GATEWAY_ACTIONS = [
   { action: 'material_recognition', critical: true, payload: { image_data: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64', analysis_type: 'comprehensive' } },
   { action: 'semantic_search', critical: true, payload: { query: 'carbon fiber materials', limit: 10 } },
   { action: 'generate_embedding', critical: true, payload: { image_data: 'https://images.unsplash.com/photo-1567789884554-0b844b597180', embedding_types: ['clip'] } },
-  { action: 'llama_vision_analysis', critical: true, payload: { document_id: 'test-doc-456', analysis_types: ['image', 'material'], enable_llama_vision: true, enable_material_analysis: true } },
-  { action: 'chat_completion', critical: true, payload: { message: 'What are carbon fiber properties?', conversation_id: 'test-123' } },
+  { action: 'llama_vision_analysis', critical: true, payload: { document_id: '550e8400-e29b-41d4-a716-446655440001', analysis_types: ['image', 'material'], enable_llama_vision: true, enable_material_analysis: true } },
+  { action: 'chat_completion', critical: true, payload: { message: 'What are carbon fiber properties?', conversation_id: '550e8400-e29b-41d4-a716-446655440002' } },
   { action: 'vector_search', critical: true, payload: { reference_text: 'carbon fiber composite materials', limit: 5, similarity_threshold: 0.5 } },
-  { action: 'multimodal_analysis', critical: true, payload: { document_id: 'test-doc-123', analysis_types: ['text', 'image'], include_text_analysis: true, include_image_analysis: true } },
+  { action: 'multimodal_analysis', critical: true, payload: { document_id: '550e8400-e29b-41d4-a716-446655440003', analysis_types: ['text', 'image'], include_text_analysis: true, include_image_analysis: true } },
   { action: 'clip_embedding_generation', critical: false, payload: { image_data: 'https://images.unsplash.com/photo-1567789884554-0b844b597180', embedding_types: ['clip'] } }
 ];
 
