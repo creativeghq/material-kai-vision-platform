@@ -231,7 +231,7 @@ serve(async (req) => {
     const body: GatewayRequest = await req.json();
     const { action, payload } = body;
 
-    console.log(`🚀 MIVAA Gateway: Processing action "${action}"`);
+    console.log(`🚀 MIVAA Gateway v2: Processing action "${action}"`);
     console.log(`📊 Request payload:`, JSON.stringify(payload, null, 2));
 
     // Use standardized MIVAA action mapping
