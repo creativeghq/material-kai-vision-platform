@@ -173,8 +173,15 @@ serve(async (req) => {
     if (endpoint.method === 'POST' && payload) {
       // For POST requests, send payload in body (excluding path parameters)
       let bodyPayload = { ...payload };
-      delete bodyPayload.document_id;
-      delete bodyPayload.job_id;
+
+      // Special handling for multimodal analysis - keep document_id in payload
+      if (action === 'llama_vision_analysis' || action === 'multimodal_analysis') {
+        // Keep document_id for multimodal analysis endpoints
+      } else {
+        // For other endpoints, remove path parameters
+        delete bodyPayload.document_id;
+        delete bodyPayload.job_id;
+      }
 
       // Special handling for PDF processing - transform frontend payload to MIVAA format
       if (action === 'pdf_process_document') {
