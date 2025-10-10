@@ -46,11 +46,14 @@ class MivaaErrorHandler {
         details: { originalError: error.message },
         retryable: true
       };
-    } else if (error?.message?.includes('timeout')) {
+    } else if (error?.message?.includes('timeout') || error?.name === 'TimeoutError' || error?.message?.includes('signal')) {
       workflowError = {
         code: 'MIVAA_TIMEOUT',
-        message: 'MIVAA service request timed out',
-        details: { originalError: error.message },
+        message: 'MIVAA service request timed out. PDF processing may take longer for complex documents.',
+        details: {
+          originalError: error.message,
+          suggestion: 'Try again with a smaller file or contact support if the issue persists.'
+        },
         retryable: true
       };
     } else {
@@ -274,6 +277,15 @@ serve(async (req) => {
 
     console.log(`📍 Resolved action "${action}" to endpoint: ${endpoint.method} ${endpoint.path}`);
 
+    // Log timeout configuration for debugging
+    let timeoutMs = 30000; // Default 30 seconds
+    if (action.includes('pdf') || action.includes('document') || action.includes('process')) {
+      timeoutMs = 300000; // 5 minutes for PDF/document processing
+    } else if (action.includes('batch') || action.includes('analyze')) {
+      timeoutMs = 120000; // 2 minutes for batch operations
+    }
+    console.log(`⏱️ Timeout configured: ${timeoutMs}ms (${timeoutMs/1000}s) for action "${action}"`);
+
     // Handle dynamic path parameters
     let finalPath = endpoint.path;
     if (payload) {
@@ -302,6 +314,7 @@ serve(async (req) => {
 
     // Prepare request to MIVAA service
     const mivaaUrl = `${MIVAA_SERVICE_URL}${finalPath}`;
+
     const requestOptions: RequestInit = {
       method: endpoint.method,
       headers: {
@@ -309,7 +322,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${MIVAA_API_KEY}`,
         'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
       },
-      signal: AbortSignal.timeout(30000), // 30 second timeout
+      signal: AbortSignal.timeout(timeoutMs),
     };
 
     // Add payload for POST requests
