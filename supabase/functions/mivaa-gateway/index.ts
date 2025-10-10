@@ -28,6 +28,39 @@ interface GatewayResponse {
   };
 }
 
+// Standardized MIVAA action mapping
+const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> = {
+  // PDF Processing
+  'pdf_process_document': { path: '/api/documents/process-url', method: 'POST' },
+  'pdf_extract_markdown': { path: '/api/v1/extract/markdown', method: 'POST' },
+  'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
+  'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
+
+  // Material Recognition
+  'material_recognition': { path: '/api/vision/analyze', method: 'POST' },
+  'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
+
+  // Embeddings
+  'generate_embedding': { path: '/api/embeddings/generate', method: 'POST' },
+  'generate_batch_embeddings': { path: '/api/embeddings/batch', method: 'POST' },
+  'clip_embedding_generation': { path: '/api/embeddings/clip-generate', method: 'POST' },
+
+  // Search
+  'semantic_search': { path: '/api/search/semantic', method: 'POST' },
+  'vector_search': { path: '/api/search/vector', method: 'POST' },
+  'hybrid_search': { path: '/api/search/hybrid', method: 'POST' },
+
+  // Chat & AI
+  'chat_completion': { path: '/api/chat/completions', method: 'POST' },
+  'contextual_response': { path: '/api/chat/contextual', method: 'POST' },
+  'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+  'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
+
+  // Health & Status
+  'health_check': { path: '/health', method: 'GET' },
+  'service_status': { path: '/api/status', method: 'GET' },
+};
+
 serve(async (req) => {
   const startTime = Date.now();
 
@@ -59,66 +92,29 @@ serve(async (req) => {
     console.log(`🚀 MIVAA Gateway: Processing action "${action}"`);
     console.log(`📊 Request payload:`, JSON.stringify(payload, null, 2));
 
-    // Map gateway actions to MIVAA service endpoints
-    const endpointMap: Record<string, { path: string; method: string }> = {
-      // Health check
-      'health_check': { path: '/health', method: 'GET' },
-      
-      // Embedding actions
-      'generate_embedding': { path: '/api/embeddings/materials/generate', method: 'POST' },
-      'generate_batch_embeddings': { path: '/api/embeddings/materials/generate', method: 'POST' },
+    // Use standardized MIVAA action mapping
+    const endpointMap = MIVAA_ACTION_MAP;
 
-      // Search actions
-      'semantic_search': { path: '/api/search/semantic', method: 'POST' },
-      'vector_search': { path: '/api/search/similarity', method: 'POST' },
-      'hybrid_search': { path: '/api/search/hybrid', method: 'POST' },
+    // Legacy endpoint mappings for backward compatibility
+    const legacyEndpointMap: Record<string, { path: string; method: string }> = {
+      // Legacy mappings that don't match standard format
       'get_recommendations': { path: '/api/search/recommendations', method: 'POST' },
       'get_analytics': { path: '/api/analytics', method: 'GET' },
-      
-      // AI Analysis actions
-      'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
-      'llama_vision_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
       'advanced_visual_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
-
-      // CLIP Embedding actions
-      'clip_embedding_generation': { path: '/api/embeddings/materials/generate', method: 'POST' },
-
-      // Chat completion and conversational AI
-      'chat_completion': { path: '/api/rag/chat', method: 'POST' },
-      'contextual_response': { path: '/api/chat/contextual', method: 'POST' },
-      
-      // Audio processing
       'audio_transcription': { path: '/api/audio/transcribe', method: 'POST' },
-      
-      // Document processing actions
       'extract_text': { path: '/api/documents/extract', method: 'POST' },
       'process_document': { path: '/api/documents/process', method: 'POST' },
       'analyze_material': { path: '/api/materials/analyze', method: 'POST' },
-
-      // Material recognition (MIVAA specific endpoints)
-      'material_recognition': { path: '/api/analyze/materials/image', method: 'POST' },
       'material_visual_search': { path: '/api/search/materials/visual', method: 'POST' },
       'material_embeddings': { path: '/api/embeddings/materials/generate', method: 'POST' },
-
-      // PDF processing (MIVAA specific endpoints) - Fixed duplicated paths
-      'pdf_extract_markdown': { path: '/api/pdf/extract/markdown', method: 'POST' },
-      'pdf_extract_tables': { path: '/api/pdf/extract/tables', method: 'POST' },
-      'pdf_extract_images': { path: '/api/pdf/extract/images', method: 'POST' },
-      'pdf_process_document': { path: '/api/documents/process-url', method: 'POST' },
-      
-      // RAG operations
       'rag_query': { path: '/api/rag/query', method: 'POST' },
       'rag_upload': { path: '/api/rag/documents/upload', method: 'POST' },
-
-      // NEW: Enhanced Document Analysis APIs
       'get_related_documents': { path: '/api/documents/{document_id}/related', method: 'GET' },
       'summarize_document': { path: '/api/documents/{document_id}/summarize', method: 'POST' },
       'extract_entities': { path: '/api/documents/{document_id}/extract-entities', method: 'POST' },
       'compare_documents': { path: '/api/documents/compare', method: 'POST' },
       'vector_similarity_search': { path: '/api/search/similarity', method: 'POST' },
       'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
-
-      // Enhanced existing APIs
       'get_document_details': { path: '/api/documents/documents/{document_id}', method: 'GET' },
       'get_document_content': { path: '/api/documents/documents/{document_id}/content', method: 'GET' },
       'get_job_status': { path: '/api/documents/job/{job_id}', method: 'GET' },
@@ -127,10 +123,14 @@ serve(async (req) => {
       'advanced_image_search': { path: '/api/images/search', method: 'POST' },
     };
 
-    const endpoint = endpointMap[action];
+    // Try standard mapping first, then legacy mapping
+    let endpoint = endpointMap[action] || legacyEndpointMap[action];
     if (!endpoint) {
-      throw new Error(`Unknown action: ${action}`);
+      console.error(`❌ Unknown action: ${action}. Available actions:`, Object.keys({...endpointMap, ...legacyEndpointMap}));
+      throw new Error(`Unknown action: ${action}. Check MIVAA_ACTION_MAP for supported actions.`);
     }
+
+    console.log(`📍 Resolved action "${action}" to endpoint: ${endpoint.method} ${endpoint.path}`);
 
     // Handle dynamic path parameters
     let finalPath = endpoint.path;
@@ -184,7 +184,7 @@ serve(async (req) => {
         delete bodyPayload.job_id;
       }
 
-      // Special handling for PDF processing - transform frontend payload to MIVAA format
+      // Standardized payload transformation based on action type
       if (action === 'pdf_process_document') {
         // Handle different field names from different frontend components
         const documentUrl = payload.documentId || payload.fileUrl || payload.url;
@@ -208,6 +208,25 @@ serve(async (req) => {
           document_name: documentName,
           tags: payload.tags || [],
           metadata: payload.metadata || {}
+        };
+      } else if (action === 'material_recognition' || action === 'llama_vision_analysis') {
+        // Handle material recognition and vision analysis
+        const imageData = payload.image_data || payload.resourceUrl || payload.imageUrl;
+
+        if (!imageData) {
+          throw new Error('Missing image data. Expected image_data, resourceUrl, or imageUrl in payload.');
+        }
+
+        bodyPayload = {
+          image_data: imageData,
+          analysis_type: payload.analysis_type || payload.analysisType || 'material_analysis',
+          analysis_options: {
+            include_properties: payload.analysis_options?.include_properties ?? payload.includeProperties ?? true,
+            include_composition: payload.analysis_options?.include_composition ?? payload.includeComposition ?? true,
+            confidence_threshold: payload.analysis_options?.confidence_threshold ?? payload.confidenceThreshold ?? 0.8,
+            ...payload.analysis_options,
+            ...payload.options
+          }
         };
       }
 
