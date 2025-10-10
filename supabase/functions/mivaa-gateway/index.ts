@@ -228,12 +228,10 @@ serve(async (req) => {
       await supabase
         .from('mivaa_api_usage_logs')
         .insert({
-          action: action,
-          endpoint: endpoint.path,
-          method: endpoint.method,
+          endpoint_path: endpoint.path,
+          request_method: endpoint.method,
           response_status: response.status,
-          processing_time_ms: Date.now() - startTime,
-          success: true,
+          response_time_ms: Date.now() - startTime,
           created_at: new Date().toISOString(),
         });
     } catch (logError) {
