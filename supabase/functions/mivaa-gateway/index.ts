@@ -120,13 +120,43 @@ class MivaaErrorHandler {
           retryable: true
         };
       case 500:
+        return {
+          code: 'MIVAA_INTERNAL_ERROR',
+          message: 'MIVAA service internal error',
+          details: { status, originalError: error.message },
+          retryable: true
+        };
       case 502:
+        return {
+          code: 'MIVAA_BAD_GATEWAY',
+          message: 'MIVAA service is experiencing connectivity issues',
+          details: {
+            status,
+            originalError: error.message,
+            suggestion: 'The MIVAA service may be temporarily unavailable. Please try again in a few minutes.'
+          },
+          retryable: true
+        };
       case 503:
-      case 504:
         return {
           code: 'MIVAA_SERVICE_UNAVAILABLE',
           message: 'MIVAA service temporarily unavailable',
-          details: { status, originalError: error.message },
+          details: {
+            status,
+            originalError: error.message,
+            suggestion: 'The service is under maintenance or overloaded. Please try again later.'
+          },
+          retryable: true
+        };
+      case 504:
+        return {
+          code: 'MIVAA_GATEWAY_TIMEOUT',
+          message: 'MIVAA service is taking longer than expected to respond',
+          details: {
+            status,
+            originalError: error.message,
+            suggestion: 'The document may be complex or the service is under heavy load. Please try again with a smaller file or wait a few minutes.'
+          },
           retryable: true
         };
       default:
@@ -395,13 +425,58 @@ serve(async (req) => {
       hasBody: !!requestOptions.body
     }, null, 2));
 
-    // Make request to MIVAA service
-    const response = await fetch(mivaaUrl, requestOptions);
-    
+    // Make request to MIVAA service with retry logic for 504 errors
+    let response: Response;
+    const maxRetries = 2; // Retry up to 2 times for 504 errors
+
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        if (attempt > 1) {
+          console.log(`🔄 Retry attempt ${attempt - 1}/${maxRetries} for MIVAA request`);
+          // Wait before retry (exponential backoff: 1s, 2s)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 2) * 1000));
+        }
+
+        response = await fetch(mivaaUrl, requestOptions);
+
+        // If we get a 504, retry (unless it's the last attempt)
+        if (response.status === 504 && attempt <= maxRetries) {
+          console.log(`⚠️ Got 504 Gateway Timeout, will retry (attempt ${attempt}/${maxRetries + 1})`);
+          continue;
+        }
+
+        // Success or non-retryable error, break out of retry loop
+        break;
+
+      } catch (error) {
+        if (attempt <= maxRetries && (error as any).name === 'TimeoutError') {
+          console.log(`⚠️ Request timeout, will retry (attempt ${attempt}/${maxRetries + 1})`);
+          continue;
+        }
+        throw error;
+      }
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ MIVAA service error (${response.status}): ${errorText}`);
-      throw new Error(`MIVAA service error (${response.status}): ${errorText}`);
+
+      // Clean up HTML error responses (like nginx 504 errors)
+      let cleanErrorMessage = errorText;
+      if (errorText.includes('<html>') && errorText.includes('<title>')) {
+        // Extract title from HTML error page
+        const titleMatch = errorText.match(/<title>(.*?)<\/title>/);
+        if (titleMatch) {
+          cleanErrorMessage = titleMatch[1];
+        } else {
+          cleanErrorMessage = `HTTP ${response.status} ${response.statusText}`;
+        }
+      }
+
+      console.error(`❌ MIVAA service error (${response.status}): ${cleanErrorMessage}`);
+      const error = new Error(`MIVAA service error (${response.status}): ${cleanErrorMessage}`);
+      (error as any).status = response.status;
+      (error as any).statusText = response.statusText;
+      throw error;
     }
 
     const result = await response.json();
