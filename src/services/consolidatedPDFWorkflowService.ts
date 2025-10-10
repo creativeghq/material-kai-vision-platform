@@ -363,16 +363,11 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        // Use existing Supabase MIVAA gateway for RAG processing
-        const response = await supabase.functions.invoke('mivaa-gateway', {
-          body: {
-            action: 'pdf_process_document',
-            payload: {
-              fileUrl: processingRequest.fileUrl,
-              filename: processingRequest.filename,
-              options: processingRequest.options,
-            },
-          },
+        // Use direct fetch to MIVAA gateway to avoid CORS issues
+        const response = await this.callMivaaGatewayDirect('pdf_process_document', {
+          fileUrl: processingRequest.fileUrl,
+          filename: processingRequest.filename,
+          options: processingRequest.options,
         });
 
         // Update progress: Processing response
@@ -386,22 +381,16 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        // Check for Supabase client errors first
-        if (response.error) {
+        // Check for MIVAA gateway errors in the response data (direct call format)
+        if (!response.success && response.error) {
           const errorMessage = response.error.message || 'Unknown error';
-          throw new Error(`MIVAA gateway request failed: ${errorMessage}`);
-        }
-
-        const result = response.data;
-
-        // Check for MIVAA gateway errors in the response data
-        if (result && !result.success && result.error) {
-          const errorMessage = result.error.message || 'Unknown error';
-          if (result.error.code === 'API_UNAUTHORIZED' || errorMessage.includes('401')) {
+          if (response.error.code === 'API_UNAUTHORIZED' || errorMessage.includes('401')) {
             throw new Error('MIVAA service authentication failed. Please check API key configuration.');
           }
           throw new Error(`MIVAA processing failed: ${errorMessage}`);
         }
+
+        const result = response.data;
 
         // Update progress: Processing complete
         this.updateJobStep(jobId, 'mivaa-processing', {
@@ -634,16 +623,11 @@ export class ConsolidatedPDFWorkflowService {
 
     const interval = setInterval(async () => {
       try {
-        // Poll MIVAA gateway for job status
-        const response = await supabase.functions.invoke('mivaa-gateway', {
-          body: {
-            action: 'get_job_status',
-            payload: { job_id: jobId }
-          }
-        });
+        // Poll MIVAA gateway for job status using direct call
+        const response = await this.callMivaaGatewayDirect('get_job_status', { job_id: jobId });
 
-        if (response.data?.success && response.data.data) {
-          const statusData = response.data.data;
+        if (response.success && response.data) {
+          const statusData = response.data;
           const job = this.jobs.get(jobId);
 
           if (job) {
@@ -705,6 +689,50 @@ export class ConsolidatedPDFWorkflowService {
     if (this.pollingIntervals) {
       this.pollingIntervals.forEach((interval) => clearInterval(interval));
       this.pollingIntervals.clear();
+    }
+  }
+
+  /**
+   * Call MIVAA Gateway directly using fetch to avoid CORS issues
+   */
+  private async callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
+    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+    const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration not found');
+    }
+
+    const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action,
+          payload
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Check for application-level errors
+      if (!data.success && data.error) {
+        throw new Error(`MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Direct MIVAA gateway call failed:', error);
+      throw error;
     }
   }
 }
