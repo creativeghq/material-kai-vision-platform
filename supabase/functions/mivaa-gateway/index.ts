@@ -186,17 +186,26 @@ serve(async (req) => {
 
       // Special handling for PDF processing - transform frontend payload to MIVAA format
       if (action === 'pdf_process_document') {
+        // Handle different field names from different frontend components
+        const documentUrl = payload.documentId || payload.fileUrl || payload.url;
+        const documentName = payload.document_name || payload.filename || payload.documentName || 'Uploaded Document';
+
+        if (!documentUrl) {
+          throw new Error('Missing document URL. Expected documentId, fileUrl, or url in payload.');
+        }
+
         bodyPayload = {
-          url: payload.documentId, // Frontend sends documentId which is actually the URL
+          url: documentUrl,
           async_processing: false,
           options: {
             extract_images: true,
             extract_tables: true,
             timeout_seconds: 300,
             quality: 'standard',
-            language: 'auto'
+            language: 'auto',
+            ...payload.options // Allow frontend to override options
           },
-          document_name: payload.document_name || 'Uploaded Document',
+          document_name: documentName,
           tags: payload.tags || [],
           metadata: payload.metadata || {}
         };
