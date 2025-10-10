@@ -191,9 +191,10 @@ serve(async (req) => {
           async_processing: false,
           options: {
             extract_images: true,
-            extract_text: true,
             extract_tables: true,
-            quality: 'standard'
+            timeout_seconds: 300,
+            quality: 'standard',
+            language: 'auto'
           },
           document_name: payload.document_name || 'Uploaded Document',
           tags: payload.tags || [],
