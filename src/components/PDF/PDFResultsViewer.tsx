@@ -166,9 +166,9 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
             height: tile.height || 150,
             image_url: tile.image_url || `/api/processing-images/tile-${processingId}-${index}.jpg`,
           }));
-        } else if (resultsData.content && resultsData.content.chunks) {
+        } else if (resultsData.content && typeof resultsData.content === 'object' && 'chunks' in resultsData.content && Array.isArray((resultsData.content as any).chunks)) {
           // Convert chunks to tiles format if available
-          realTiles = resultsData.content.chunks.map((chunk: any, index: number) => ({
+          realTiles = ((resultsData.content as any).chunks as any[]).map((chunk: any, index: number) => ({
             id: `chunk-tile-${processingId}-${index}`,
             page_number: chunk.page_number || 1,
             tile_index: index,

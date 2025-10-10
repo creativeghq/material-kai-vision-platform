@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import type { ImageElement, TextBlock } from './htmlDOMAnalyzer';
 import type { DocumentChunk } from './layoutAwareChunker';
-import { HybridMLService } from './ml/hybridMLService';
+import { UnifiedMLService } from './ml/unifiedMLService';
 
 
 export interface ImageTextAssociation {
@@ -81,11 +81,11 @@ export interface MappingResult {
  * semantic understanding, and ML-based context matching
  */
 export class ImageTextMapper {
-  private mlService: HybridMLService;
+  private mlService: UnifiedMLService;
 
   constructor() {
     // Initialize services with minimal configs to avoid further errors
-    this.mlService = {} as unknown as HybridMLService; // Temporarily disable to fix build
+    this.mlService = {} as unknown as UnifiedMLService; // Temporarily disable to fix build
   }
 
   /**
@@ -478,7 +478,7 @@ export class ImageTextMapper {
       const blob = await response.blob();
       const file = new File([blob], 'image.jpg', { type: blob.type });
 
-      const analysisResult = await this.mlService.analyzeMaterials([file]);
+      const analysisResult = await this.mlService.analyzeMaterial(file);
 
       return {
         materialTypes: (analysisResult as unknown as Record<string, unknown>).results ? ((analysisResult as unknown as Record<string, unknown>).results as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => r.label as string) : [],

@@ -152,13 +152,9 @@ interface MivaaImagesResponse {
  */
 export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig> {
   private documentProcessor: DocumentProcessingPipeline;
-  private baseUrl: string;
-  private apiKey: string;
 
   constructor(config: MivaaIntegrationConfig) {
     super(config);
-    this.baseUrl = config.mivaaBaseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.apiKey = config.mivaaApiKey || process.env.MIVAA_API_KEY || '';
     this.documentProcessor = new DocumentProcessingPipeline(config);
   }
 
@@ -303,17 +299,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-        const gatewayPayload = {
-          baseUrl: this.baseUrl,
-          endpoint: endpoint,
-          method: options.method || 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`,
-            ...options.headers,
-          },
-          body: options.body,
-        };
+
 
         // Determine the action based on endpoint
         let action = 'extract_text';

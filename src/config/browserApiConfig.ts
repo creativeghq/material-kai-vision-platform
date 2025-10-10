@@ -146,10 +146,7 @@ export const browserSupabaseConfig: SupabaseConfig = {
       description: 'Material recognition and analysis',
       category: 'material-analysis',
     },
-    'enhanced-rag-search': {
-      description: 'Enhanced RAG search functionality',
-      category: 'search',
-    },
+
   },
 };
 

@@ -56,38 +56,7 @@ const crewai3DGenerationOutputSchema = z.union([
   }),
 ]);
 
-// Enhanced RAG Search function schema - UX validation only
-const enhancedRAGSearchInputSchema = z.object({
-  query: z.string().min(1, 'Query is required'),
-  collection_name: z.string().optional(),
-  limit: z.number().optional(),
-  threshold: z.number().optional(),
-  include_metadata: z.boolean().optional(),
-  filters: z.record(z.string(), z.any()).optional(),
-});
 
-const enhancedRAGSearchOutputSchema = z.union([
-  z.object({
-    success: z.literal(true),
-    results: z.array(z.object({
-      content: z.string(),
-      metadata: z.record(z.string(), z.any()),
-      score: z.number(),
-      id: z.string(),
-    })),
-    total_results: z.number(),
-    query_metadata: z.object({
-      query: z.string(),
-      collection: z.string(),
-      processing_time: z.number(),
-    }),
-  }),
-  z.object({
-    success: z.literal(false),
-    error: z.string(),
-    details: z.string().optional(),
-  }),
-]);
 
 // Material Scraper function schema - UX validation only
 const materialScraperInputSchema = z.object({
@@ -211,11 +180,7 @@ export const supabaseConfig: SupabaseApiConfig = {
       timeout: 300000, // 5 minutes for AI generation
     },
 
-    'enhanced-rag-search': {
-      inputSchema: enhancedRAGSearchInputSchema,
-      outputSchema: enhancedRAGSearchOutputSchema,
-      timeout: 30000, // 30 seconds for search
-    },
+
 
     'material-scraper': {
       inputSchema: materialScraperInputSchema,

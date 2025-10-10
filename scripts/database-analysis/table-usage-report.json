@@ -1,0 +1,2587 @@
+{
+  "summary": {
+    "totalDatabaseTables": 80,
+    "tablesFoundInCode": 162,
+    "unusedTables": 27,
+    "filesScanned": 477
+  },
+  "usedTables": [
+    {
+      "name": "agent_ml_tasks",
+      "references": [
+        "src\\components\\Admin\\AgentMLCoordination.tsx",
+        "src\\components\\Admin\\AgentMLCoordination.tsx",
+        "src\\components\\Admin\\SystemPerformance.tsx",
+        "src\\services\\agentLearningSystem.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentPerformanceOptimizer.ts"
+      ],
+      "referenceCount": 11
+    },
+    {
+      "name": "agent_tasks",
+      "references": [
+        "src\\components\\Admin\\AgentMLCoordination.tsx",
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentCollaborationWorkflows.ts",
+        "src\\services\\agentLearningSystem.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentMLCoordinator.ts",
+        "src\\services\\agentPerformanceOptimizer.ts",
+        "src\\services\\agentPerformanceOptimizer.ts",
+        "src\\services\\agentPerformanceOptimizer.ts",
+        "src\\services\\agentPerformanceOptimizer.ts",
+        "src\\services\\agentPerformanceOptimizer.ts",
+        "src\\services\\agentPerformanceOptimizer.ts",
+        "src\\services\\agentSpecializationManager.ts",
+        "src\\services\\agentSpecializationManager.ts",
+        "src\\services\\integratedAIService.ts",
+        "src\\services\\integratedAIService.ts",
+        "src\\services\\integratedAIService.ts",
+        "src\\services\\realtimeAgentMonitor.ts",
+        "supabase\\functions\\material-agent-orchestrator\\index.ts",
+        "supabase\\functions\\material-agent-orchestrator\\index.ts"
+      ],
+      "referenceCount": 44
+    },
+    {
+      "name": "agentperformanceoptimizer",
+      "references": [
+        "src\\services\\realtimeAgentMonitor.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "aioresponses",
+      "references": [
+        "mivaa-pdf-extractor\\tests\\integration\\test_external_services.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "analysis_templates",
+      "references": [
+        "mivaa-pdf-extractor\\app\\api\\together_ai_routes.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "analytics",
+      "references": [
+        "src\\components\\Admin\\SystemPerformance.tsx"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "analytics_events",
+      "references": [
+        "src\\components\\Admin\\AdminPanel.tsx",
+        "src\\components\\Admin\\AnalyticsDashboard.tsx",
+        "src\\components\\Admin\\SystemPerformance.tsx",
+        "src\\services\\aiMaterialAPI.ts",
+        "src\\services\\aiMaterialAPI.ts",
+        "src\\services\\materialAgent3DGenerationAPI.ts",
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\ml\\costOptimizer.ts",
+        "src\\services\\ml\\costOptimizer.ts",
+        "src\\services\\ml\\costOptimizer.ts",
+        "src\\services\\ml\\costOptimizer.ts",
+        "supabase\\functions\\analyze-knowledge-content\\index.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\document-vector-search\\index.ts",
+        "supabase\\functions\\extract-material-knowledge\\index.ts",
+        "supabase\\functions\\hybrid-material-analysis\\index.ts",
+        "supabase\\functions\\material-properties-analysis\\index.ts",
+        "supabase\\functions\\pdf-processor\\index.ts",
+        "supabase\\functions\\style-analysis\\index.ts",
+        "supabase\\functions\\voice-to-material\\index.ts"
+      ],
+      "referenceCount": 20
+    },
+    {
+      "name": "analyzing",
+      "references": [
+        "src\\hooks\\useImageAnalysis.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "api_endpoints",
+      "references": [
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "supabase\\functions\\api-gateway\\index.ts"
+      ],
+      "referenceCount": 6
+    },
+    {
+      "name": "api_keys",
+      "references": [
+        "src\\middleware\\jwtAuthMiddleware.ts",
+        "src\\middleware\\jwtAuthMiddleware.ts",
+        "src\\middleware\\jwtAuthMiddleware.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "supabase\\functions\\_shared\\config.ts",
+        "supabase\\functions\\_shared\\config.ts"
+      ],
+      "referenceCount": 10
+    },
+    {
+      "name": "api_usage_logs",
+      "references": [
+        "src\\api\\controllers\\consolidatedPDFController.ts",
+        "src\\api\\controllers\\consolidatedPDFController.ts",
+        "src\\components\\Admin\\AnalyticsDashboard.tsx",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\networkAccessControl.ts",
+        "supabase\\functions\\api-gateway\\index.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-extract\\index.ts",
+        "supabase\\functions\\pdf-integration-health\\index.ts",
+        "supabase\\functions\\pdf-integration-health\\index.ts",
+        "supabase\\functions\\_shared\\config.ts",
+        "supabase\\functions\\_shared\\config.ts"
+      ],
+      "referenceCount": 12
+    },
+    {
+      "name": "attachments",
+      "references": [
+        "src\\components\\AI\\MaterialAgentSearchInterface.tsx"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "attention",
+      "references": [
+        "src\\services\\ml\\textureComponents\\MaterialTextureNet.ts",
+        "src\\services\\ml\\textureComponents\\TextureAttentionModule.ts",
+        "src\\services\\ml\\textureComponents\\TextureAttentionModule.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "authenticated",
+      "references": [
+        "mivaa-pdf-extractor\\app\\dependencies.py",
+        "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+        "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "authentication",
+      "references": [
+        "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+        "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "available",
+      "references": [
+        "supabase\\functions\\pdf-extract\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "basemodel",
+      "references": [
+        "mivaa-pdf-extractor\\app\\core\\validation\\registry.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "cancelled",
+      "references": [
+        "src\\services\\ml\\hybridOCRService.ts",
+        "src\\services\\ml\\hybridOCRService.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "capabilities",
+      "references": [
+        "src\\services\\agentSpecializationManager.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "category_validation_rules",
+      "references": [
+        "supabase\\functions\\get-material-categories\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "centralized",
+      "references": [
+        "src\\services\\documentIntegrationService.ts",
+        "src\\services\\ml\\huggingFaceService.ts",
+        "src\\services\\ml\\huggingFaceService.ts",
+        "src\\services\\ml\\replicateService.ts",
+        "src\\services\\ml\\replicateService.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "centroids",
+      "references": [
+        "src\\services\\ml\\colorAnalysisEngine.ts",
+        "src\\services\\ml\\multiModal\\MaterialEmbeddingSpace.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "changelog",
+      "references": [
+        ".github\\scripts\\ai-pr-analyzer.js"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "chemical_analysis_results",
+      "references": [
+        "supabase\\functions\\hybrid-material-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "collections",
+      "references": [
+        "mivaa-pdf-extractor\\app\\core\\validation\\registry.py",
+        "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+        "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "completed",
+      "references": [
+        ".github\\scripts\\ai-pr-analyzer.js"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "concurrent",
+      "references": [
+        "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py",
+        "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+        "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\pdf_processor.py",
+        "mivaa-pdf-extractor\\tests\\unit\\test_pdf_processor.py"
+      ],
+      "referenceCount": 6
+    },
+    {
+      "name": "confidence",
+      "references": [
+        "src\\services\\aiMaterialAPI.ts",
+        "src\\services\\layoutAwareChunker.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "configfactory",
+      "references": [
+        "src\\di\\containerFactory.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "configuration",
+      "references": [
+        "src\\services\\apiGateway\\huggingFaceApiClient.ts",
+        "src\\services\\apiGateway\\huggingFaceApiClient.ts",
+        "src\\services\\apiGateway\\huggingFaceApiClient.ts",
+        "src\\services\\apiGateway\\replicateApiClient.ts",
+        "src\\services\\apiGateway\\replicateApiClient.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "connection",
+      "references": [
+        "src\\hooks\\useMaterialRealtime.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "content_library",
+      "references": [
+        "supabase\\functions\\style-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "contextlib",
+      "references": [
+        "mivaa-pdf-extractor\\app\\main.py",
+        "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "crewai_agents",
+      "references": [
+        "src\\services\\agentLearningSystem.ts",
+        "src\\services\\agentLearningSystem.ts",
+        "src\\services\\agentLearningSystem.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "dataclasses",
+      "references": [
+        "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py",
+        "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+        "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+        "mivaa-pdf-extractor\\app\\services\\enhanced_material_property_extractor.py",
+        "mivaa-pdf-extractor\\app\\services\\ocr_service.py",
+        "mivaa-pdf-extractor\\app\\services\\pdf_processor.py",
+        "mivaa-pdf-extractor\\app\\services\\together_ai_service.py",
+        "mivaa-pdf-extractor\\app\\utils\\json_encoder.py",
+        "mivaa-pdf-extractor\\scripts\\validate-deployment.py",
+        "tests\\integration\\image_analysis\\test_runner.py"
+      ],
+      "referenceCount": 10
+    },
+    {
+      "name": "dependencies",
+      "references": [
+        "scripts\\fix-dependencies.js"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "deployment",
+      "references": [
+        "scripts\\deploy-supabase-enhanced.js"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "different",
+      "references": [
+        "src\\services\\ml\\advancedMaterialAnalysis\\MaterialClassificationService.ts",
+        "src\\services\\ml\\advancedMaterialAnalysis\\MaterialClassificationService.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "document_images",
+      "references": [
+        "mivaa-pdf-extractor\\app\\services\\supabase_client.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "document_layout_analysis",
+      "references": [
+        "src\\services\\htmlDOMAnalyzer.ts",
+        "src\\services\\htmlDOMAnalyzer.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "document_processing_status",
+      "references": [
+        "src\\services\\pdfContentService.ts",
+        "src\\services\\pdfContentService.ts",
+        "src\\services\\pdfContentService.ts",
+        "src\\services\\pdfContentService.ts"
+      ],
+      "referenceCount": 4
+    },
+    {
+      "name": "documents",
+      "references": [
+        "mivaa-pdf-extractor\\app\\api\\documents.py",
+        "mivaa-pdf-extractor\\app\\api\\documents.py",
+        "mivaa-pdf-extractor\\app\\api\\documents.py",
+        "mivaa-pdf-extractor\\app\\api\\documents.py",
+        "mivaa-pdf-extractor\\app\\api\\documents.py",
+        "mivaa-pdf-extractor\\app\\api\\documents.py",
+        "mivaa-pdf-extractor\\app\\api\\search.py",
+        "mivaa-pdf-extractor\\app\\schemas\\search.py",
+        "mivaa-pdf-extractor\\app\\schemas\\search.py",
+        "scripts\\integration-tests\\test-with-proper-auth.js",
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+        "supabase\\functions\\extract-material-knowledge\\index.ts"
+      ],
+      "referenceCount": 12
+    },
+    {
+      "name": "embedding",
+      "references": [
+        "src\\services\\ml\\multiModal\\MaterialEmbeddingSpace.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "enhanced_knowledge_base",
+      "references": [
+        "src\\services\\enhancedRAGService.ts",
+        "src\\services\\imageTextMapper.ts",
+        "src\\services\\imageTextMapper.ts",
+        "src\\services\\layoutAwareChunker.ts",
+        "src\\services\\layoutAwareChunker.ts",
+        "src\\services\\layoutAwareChunker.ts",
+        "src\\services\\pdfContentService.ts",
+        "src\\services\\pdfContentService.ts",
+        "src\\services\\pdfContentService.ts"
+      ],
+      "referenceCount": 9
+    },
+    {
+      "name": "environment",
+      "references": [
+        "mivaa-pdf-extractor\\app\\config.py",
+        "mivaa-pdf-extractor\\app\\core\\validation\\config.py",
+        "mivaa-pdf-extractor\\app\\core\\validation\\config.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "scripts\\auth-tests\\generate-jwt-local.js",
+        "scripts\\integration-tests\\test-frontend-backend-integration.js",
+        "supabase\\functions\\mivaa-jwt-generator\\index.ts"
+      ],
+      "referenceCount": 7
+    },
+    {
+      "name": "error_message",
+      "references": [
+        "mivaa-pdf-extractor\\app\\middleware\\validation.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "expertise",
+      "references": [
+        "src\\services\\agentLearningSystem.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "extracted",
+      "references": [
+        "src\\utils\\materialValidation.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "extractor",
+      "references": [
+        "mivaa-pdf-extractor\\app\\api\\pdf_routes.py",
+        "mivaa-pdf-extractor\\app\\services\\pdf_processor.py",
+        "mivaa-pdf-extractor\\scripts\\tests\\test_enhanced_extraction.py"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "favorites",
+      "references": [
+        "src\\components\\Search\\SearchResultCard.tsx",
+        "src\\components\\Search\\SearchResultCard.tsx"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "following",
+      "references": [
+        "supabase\\functions\\material-scraper\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "frequencies",
+      "references": [
+        "src\\services\\ml\\textureComponents\\TextureGaborFilters.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "frequency",
+      "references": [
+        "tests\\integration\\image_analysis\\test_runner.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "functioning",
+      "references": [
+        "src\\components\\ErrorBoundary\\ErrorBoundary.tsx"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "functions",
+      "references": [
+        "scripts\\integration-tests\\test-scraper-functions-debug.js"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "functools",
+      "references": [
+        "mivaa-pdf-extractor\\app\\core\\validation\\config.py",
+        "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+        "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py",
+        "mivaa-pdf-extractor\\app\\services\\material_kai_service.py",
+        "mivaa-pdf-extractor\\app\\utils\\logging.py"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "generation_3d",
+      "references": [
+        "src\\components\\3D\\Designer3DPage.tsx",
+        "src\\components\\3D\\GenerationWorkflowModal.tsx",
+        "src\\services\\3d\\spatialMaterialMapper.ts",
+        "src\\services\\3d\\spatialMaterialMapper.ts",
+        "src\\services\\3d\\spatialMaterialMapper.ts",
+        "src\\services\\3d\\spatialMaterialMapper.ts",
+        "src\\services\\materialAgent3DGenerationAPI.ts",
+        "src\\services\\materialAgent3DGenerationAPI.ts",
+        "src\\services\\materialAgent3DGenerationAPI.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts"
+      ],
+      "referenceCount": 16
+    },
+    {
+      "name": "health_check",
+      "references": [
+        "mivaa-pdf-extractor\\app\\api\\admin.py",
+        "mivaa-pdf-extractor\\app\\api\\images.py",
+        "src\\services\\ml\\unifiedMLService.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "hybrid_analysis_results",
+      "references": [
+        "supabase\\functions\\hybrid-material-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "ibaseservice",
+      "references": [
+        "src\\services\\documentIntegrationService.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "internal_networks",
+      "references": [
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\networkAccessControl.ts",
+        "src\\services\\networkAccessControl.ts",
+        "src\\services\\networkAccessControl.ts",
+        "src\\services\\networkAccessControl.ts"
+      ],
+      "referenceCount": 8
+    },
+    {
+      "name": "jwt_tokens_log",
+      "references": [
+        "supabase\\functions\\mivaa-jwt-generator\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "knowledge",
+      "references": [
+        "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+        "src\\services\\layoutAwareChunker.ts",
+        "src\\services\\ml\\materialAnalyzer.ts",
+        "src\\services\\pdfContentService.ts",
+        "src\\services\\pdfContentService.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "knowledge_analysis",
+      "references": [
+        "supabase\\functions\\analyze-knowledge-content\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "knowledge_base_entries",
+      "references": [
+        "src\\services\\ragKnowledgeService.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "knowledge_relationships",
+      "references": [
+        "src\\services\\enhancedRAGService.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "last_used_at",
+      "references": [
+        "src\\middleware\\jwtAuthMiddleware.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "llama_index",
+      "references": [
+        "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+        "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+        "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+        "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+        "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+        "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+        "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py"
+      ],
+      "referenceCount": 26
+    },
+    {
+      "name": "llamaindex",
+      "references": [
+        "mivaa-pdf-extractor\\app\\api\\rag_routes.py",
+        "mivaa-pdf-extractor\\app\\api\\rag_routes.py",
+        "mivaa-pdf-extractor\\app\\api\\rag_routes.py"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "log_operation_start",
+      "references": [
+        "mivaa-pdf-extractor\\app\\utils\\logging.py",
+        "mivaa-pdf-extractor\\app\\utils\\logging.py"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "material_agents",
+      "references": [
+        "src\\services\\agentSpecializationManager.ts",
+        "src\\services\\integratedAIService.ts",
+        "supabase\\functions\\material-agent-orchestrator\\index.ts",
+        "supabase\\functions\\material-agent-orchestrator\\index.ts"
+      ],
+      "referenceCount": 4
+    },
+    {
+      "name": "material_categories",
+      "references": [
+        "supabase\\functions\\get-material-categories\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "material_images",
+      "references": [
+        "supabase\\functions\\material-images-api\\index.ts",
+        "supabase\\functions\\material-images-api\\index.ts",
+        "supabase\\functions\\material-images-api\\index.ts",
+        "supabase\\functions\\material-images-api\\index.ts",
+        "supabase\\functions\\material-images-api\\index.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "material_kai_keys",
+      "references": [
+        "tests\\material-kai-integration-test.js"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "material_knowledge_extraction",
+      "references": [
+        "src\\services\\enhancedRAGService.ts",
+        "src\\services\\enhancedRAGService.ts",
+        "src\\services\\enhancedRAGService.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "material_knowledge_extractions",
+      "references": [
+        "supabase\\functions\\extract-material-knowledge\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "material_metadata_fields",
+      "references": [
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "material_properties",
+      "references": [
+        "supabase\\functions\\get-material-categories\\index.ts",
+        "supabase\\functions\\get-material-categories\\index.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "material_recognition_requests",
+      "references": [
+        "supabase\\functions\\material-recognition\\index.ts",
+        "supabase\\functions\\material-recognition\\index.ts",
+        "supabase\\functions\\material-recognition\\index.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "material_recognition_results",
+      "references": [
+        "supabase\\functions\\material-recognition\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "material_style_analysis",
+      "references": [
+        "src\\services\\ml\\hybridStyleAnalysisService.ts",
+        "src\\services\\ml\\materialPropertiesService.ts",
+        "src\\services\\ml\\materialPropertiesService.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "material_visual_analysis",
+      "references": [
+        "src\\services\\visualFeatureExtractionService.ts",
+        "src\\services\\visualFeatureExtractionService.ts",
+        "supabase\\functions\\material-recognition\\index.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "materialmetafielddefinition",
+      "references": [
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "materials",
+      "references": [
+        "mivaa-pdf-extractor\\app\\services\\material_visual_search_service.py",
+        "src\\components\\Admin\\MaterialSuggestionsPanel.tsx",
+        "src\\components\\Search\\SemanticSearchInput.tsx",
+        "src\\services\\jinaAIService.ts",
+        "src\\services\\visualFeatureExtractionService.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "materials_catalog",
+      "references": [
+        "scripts\\integration-tests\\test-with-proper-auth.js",
+        "src\\api\\health.ts",
+        "src\\api\\health.ts",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+        "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+        "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+        "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+        "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+        "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+        "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+        "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+        "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+        "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+        "src\\components\\Admin\\SystemPerformance.tsx",
+        "src\\components\\PDF\\HTMLDocumentViewer.tsx",
+        "src\\components\\Search\\SemanticSearch.tsx",
+        "src\\components\\Search\\SemanticSearchInput.tsx",
+        "src\\components\\Search\\UnifiedSearchInterface.tsx",
+        "src\\components\\Search\\UnifiedSearchInterface.tsx",
+        "src\\services\\3d\\spatialMaterialMapper.ts",
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\svbrdfExtractionAPI.ts",
+        "src\\services\\visualFeatureExtractionService.ts",
+        "supabase\\functions\\crewai-3d-generation\\index.ts",
+        "supabase\\functions\\hybrid-material-analysis\\index.ts",
+        "supabase\\functions\\hybrid-material-analysis\\index.ts",
+        "supabase\\functions\\hybrid-material-analysis\\index.ts",
+        "supabase\\functions\\hybrid-material-analysis\\index.ts",
+        "supabase\\functions\\hybrid-material-analysis\\index.ts",
+        "supabase\\functions\\material-images-api\\index.ts",
+        "supabase\\functions\\material-properties-analysis\\index.ts",
+        "supabase\\functions\\material-recognition\\index.ts",
+        "supabase\\functions\\unified-material-search\\index.ts",
+        "supabase\\functions\\unified-material-search\\index.ts",
+        "supabase\\functions\\unified-material-search\\index.ts",
+        "supabase\\functions\\visual-search-query\\index.ts"
+      ],
+      "referenceCount": 38
+    },
+    {
+      "name": "mechanical_analysis_results",
+      "references": [
+        "supabase\\functions\\hybrid-material-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "metafield",
+      "references": [
+        "src\\services\\materialSearchService.ts",
+        "src\\services\\materialSearchService.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "metafields",
+      "references": [
+        "supabase\\functions\\pdf-extract\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "middleware",
+      "references": [
+        "mivaa-pdf-extractor\\app\\middleware\\validation.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "mivaa_api_key",
+      "references": [
+        "scripts\\auth-tests\\generate-jwt-local.js",
+        "scripts\\auth-tests\\generate-jwt-local.js",
+        "scripts\\auth-tests\\test-deployed-jwt-generator.js",
+        "scripts\\auth-tests\\test-deployed-jwt-generator.js",
+        "scripts\\auth-tests\\test-jwt-generator.js",
+        "scripts\\integration-tests\\test-new-mivaa-key-real.js",
+        "scripts\\integration-tests\\test-supabase-mivaa-auth.js",
+        "scripts\\integration-tests\\test-supabase-mivaa-auth.js"
+      ],
+      "referenceCount": 8
+    },
+    {
+      "name": "mivaa_api_usage_logs",
+      "references": [
+        "supabase\\functions\\mivaa-gateway\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "mivaaembeddingintegration",
+      "references": [
+        "src\\di\\containerFactory.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "ml_models",
+      "references": [
+        "supabase\\functions\\huggingface-model-trainer\\index.ts",
+        "supabase\\functions\\huggingface-model-trainer\\index.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "ml_training_jobs",
+      "references": [
+        "supabase\\functions\\huggingface-model-trainer\\index.ts",
+        "supabase\\functions\\huggingface-model-trainer\\index.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "mock_response",
+      "references": [
+        "mivaa-pdf-extractor\\tests\\unit\\test_material_kai_service.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "mock_update",
+      "references": [
+        "mivaa-pdf-extractor\\tests\\unit\\test_supabase_service.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "moodboard",
+      "references": [
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "moodboard_items",
+      "references": [
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "moodboards",
+      "references": [
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts",
+        "src\\services\\moodboardAPI.ts"
+      ],
+      "referenceCount": 6
+    },
+    {
+      "name": "nerf_reconstructions",
+      "references": [
+        "supabase\\functions\\spaceformer-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "node_env",
+      "references": [
+        "src\\config\\configFactory.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "operations",
+      "references": [
+        "mivaa-pdf-extractor\\tests\\unit\\test_supabase_service.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "orientations",
+      "references": [
+        "src\\services\\ml\\textureComponents\\TextureGaborFilters.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "overloaded",
+      "references": [
+        "src\\services\\agentPerformanceOptimizer.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "pdf_batch_jobs",
+      "references": [
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts"
+      ],
+      "referenceCount": 7
+    },
+    {
+      "name": "pdf_processing_results",
+      "references": [
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-integration-health\\index.ts",
+        "supabase\\functions\\pdf-processor\\index.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "performance",
+      "references": [
+        "src\\services\\agentLearningSystem.ts",
+        "src\\services\\agentLearningSystem.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "predefined",
+      "references": [
+        "src\\services\\agentSpecializationManager.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "processed_documents",
+      "references": [
+        "mivaa-pdf-extractor\\app\\services\\supabase_client.py",
+        "mivaa-pdf-extractor\\app\\services\\supabase_client.py",
+        "mivaa-pdf-extractor\\app\\services\\supabase_client.py",
+        "src\\api\\controllers\\documentWorkflowController.ts"
+      ],
+      "referenceCount": 4
+    },
+    {
+      "name": "processing",
+      "references": [
+        "src\\api\\controllers\\consolidatedPDFController.ts",
+        "src\\api\\controllers\\consolidatedPDFController.ts",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\SystemPerformance.tsx",
+        "src\\components\\PDF\\PDFResultsViewer.tsx",
+        "src\\components\\Search\\SemanticSearchInput.tsx",
+        "src\\services\\agentSpecializationManager.ts",
+        "supabase\\functions\\pdf-extract\\index.ts",
+        "supabase\\functions\\pdf-extract\\index.ts",
+        "supabase\\functions\\svbrdf-extractor\\index.ts",
+        "supabase\\functions\\svbrdf-extractor\\index.ts",
+        "supabase\\functions\\svbrdf-extractor\\index.ts"
+      ],
+      "referenceCount": 13
+    },
+    {
+      "name": "processing_jobs",
+      "references": [
+        "src\\api\\controllers\\consolidatedPDFController.ts",
+        "src\\api\\controllers\\consolidatedPDFController.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "processing_queue",
+      "references": [
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\ragKnowledgeService.ts",
+        "src\\services\\ragKnowledgeService.ts"
+      ],
+      "referenceCount": 6
+    },
+    {
+      "name": "processing_results",
+      "references": [
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\PDF\\PDFResultsViewer.tsx",
+        "src\\components\\PDF\\PDFResultsViewer.tsx",
+        "src\\components\\Search\\SemanticSearch.tsx",
+        "src\\components\\Search\\SemanticSearchInput.tsx",
+        "src\\services\\aiMaterialAPI.ts",
+        "supabase\\functions\\pdf-batch-process\\index.ts",
+        "supabase\\functions\\pdf-extract\\index.ts",
+        "supabase\\functions\\pdf-extract\\index.ts",
+        "supabase\\functions\\pdf-extract\\index.ts",
+        "supabase\\functions\\pdf-extract\\index.ts",
+        "supabase\\functions\\svbrdf-extractor\\index.ts",
+        "supabase\\functions\\svbrdf-extractor\\index.ts"
+      ],
+      "referenceCount": 15
+    },
+    {
+      "name": "properties",
+      "references": [
+        "src\\components\\PDF\\HTMLDocumentViewer.tsx"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "property_analysis_results",
+      "references": [
+        "supabase\\functions\\material-properties-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "pydantic_settings",
+      "references": [
+        "mivaa-pdf-extractor\\app\\config.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "query_intelligence",
+      "references": [
+        "src\\services\\enhancedRAGService.ts",
+        "src\\services\\enhancedRAGService.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "rag_documents",
+      "references": [
+        "supabase\\functions\\pdf-extract\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "ragservice",
+      "references": [
+        "src\\services\\ragKnowledgeService.ts",
+        "src\\services\\ragKnowledgeService.ts",
+        "src\\services\\ragKnowledgeService.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "rate_limit_rules",
+      "references": [
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts",
+        "src\\services\\apiGateway\\apiGatewayService.ts"
+      ],
+      "referenceCount": 4
+    },
+    {
+      "name": "rawrequest",
+      "references": [
+        "supabase\\functions\\crewai-3d-generation\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "recognition_results",
+      "references": [
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\materialRecognitionAPI.ts",
+        "src\\services\\materialRecognitionAPI.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "replicate",
+      "references": [
+        "src\\services\\ml\\replicateModelConfigs.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "reportlab",
+      "references": [
+        "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+        "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py"
+      ],
+      "referenceCount": 12
+    },
+    {
+      "name": "requirements",
+      "references": [
+        "src\\components\\Admin\\AdminDashboard.tsx"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "result_data",
+      "references": [
+        "src\\components\\3D\\GenerationWorkflowModal.tsx"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "scraped_materials_temp",
+      "references": [
+        "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\scrape-single-page\\index.ts"
+      ],
+      "referenceCount": 6
+    },
+    {
+      "name": "scraping_chunks",
+      "references": [
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "scraping_pages",
+      "references": [
+        "src\\components\\Scraper\\LiveProcessingMonitor.tsx",
+        "src\\components\\Scraper\\NewScraperPage.tsx",
+        "src\\components\\Scraper\\PageQueueViewer.tsx",
+        "src\\components\\Scraper\\PageQueueViewer.tsx",
+        "src\\components\\Scraper\\PageQueueViewer.tsx",
+        "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-single-page\\index.ts",
+        "supabase\\functions\\scrape-single-page\\index.ts"
+      ],
+      "referenceCount": 10
+    },
+    {
+      "name": "scraping_sessions",
+      "references": [
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Scraper\\LiveProcessingMonitor.tsx",
+        "src\\components\\Scraper\\NewScraperPage.tsx",
+        "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+        "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+        "src\\components\\Scraper\\SessionDetailView.tsx",
+        "src\\components\\Scraper\\SessionDetailView.tsx",
+        "src\\components\\Scraper\\SessionDetailView.tsx",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\material-scraper\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts",
+        "supabase\\functions\\scrape-session-manager\\index.ts"
+      ],
+      "referenceCount": 20
+    },
+    {
+      "name": "search_analytics",
+      "references": [
+        "src\\services\\enhancedRAGService.ts",
+        "src\\services\\enhancedRAGService.ts",
+        "src\\services\\ragKnowledgeService.ts",
+        "src\\services\\ragKnowledgeService.ts",
+        "src\\services\\ragKnowledgeService.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "sentry_sdk",
+      "references": [
+        "mivaa-pdf-extractor\\app\\main.py",
+        "mivaa-pdf-extractor\\app\\main.py"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "spatial_analysis",
+      "references": [
+        "src\\services\\integratedAIService.ts",
+        "src\\services\\integratedAIService.ts",
+        "src\\services\\integratedAIService.ts",
+        "supabase\\functions\\spaceformer-analysis\\index.ts",
+        "supabase\\functions\\spaceformer-analysis\\index.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "spectral_analysis_results",
+      "references": [
+        "supabase\\functions\\hybrid-material-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "starlette",
+      "references": [
+        "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+        "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+        "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+        "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+        "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+        "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+        "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+        "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+        "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py"
+      ],
+      "referenceCount": 9
+    },
+    {
+      "name": "statistics",
+      "references": [
+        "mivaa-pdf-extractor\\app\\core\\validation\\registry.py",
+        "mivaa-pdf-extractor\\app\\core\\validation\\registry.py"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "structured",
+      "references": [
+        "src\\components\\PDF\\MaterialsListViewer.tsx",
+        "supabase\\functions\\material-scraper\\index.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "style_analysis_results",
+      "references": [
+        "supabase\\functions\\style-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "supabase_client",
+      "references": [
+        "mivaa-pdf-extractor\\tests\\unit\\test_supabase_service.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "svbrdf_extractions",
+      "references": [
+        "src\\services\\integratedAIService.ts",
+        "src\\services\\svbrdfExtractionAPI.ts",
+        "src\\services\\svbrdfExtractionAPI.ts",
+        "src\\services\\svbrdfExtractionAPI.ts",
+        "src\\services\\svbrdfExtractionAPI.ts"
+      ],
+      "referenceCount": 5
+    },
+    {
+      "name": "table_name",
+      "references": [
+        "scripts\\database-analysis\\analyze-table-usage.js",
+        "scripts\\database-analysis\\analyze-table-usage.js",
+        "scripts\\database-analysis\\analyze-table-usage.js"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "technical",
+      "references": [
+        "supabase\\functions\\extract-material-knowledge\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "tesseract",
+      "references": [
+        "mivaa-pdf-extractor\\app\\services\\ocr_service.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "texturenetsvd",
+      "references": [
+        "src\\services\\ml\\advancedMaterialAnalysis\\MaterialClassificationService.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "thermal_analysis_results",
+      "references": [
+        "supabase\\functions\\hybrid-material-analysis\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "togetherai",
+      "references": [
+        "mivaa-pdf-extractor\\app\\services\\enhanced_material_property_extractor.py",
+        "mivaa-pdf-extractor\\app\\services\\enhanced_material_property_extractor.py",
+        "mivaa-pdf-extractor\\app\\services\\together_ai_service.py"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "underloaded",
+      "references": [
+        "src\\services\\agentPerformanceOptimizer.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "uploaded_files",
+      "references": [
+        "src\\components\\Admin\\AITestingPanel.tsx",
+        "src\\components\\Admin\\AITestingPanel.tsx",
+        "src\\services\\materialRecognitionAPI.ts",
+        "supabase\\functions\\hybrid-material-analysis\\index.ts",
+        "supabase\\functions\\material-properties-analysis\\index.ts",
+        "supabase\\functions\\pdf-processor\\index.ts"
+      ],
+      "referenceCount": 6
+    },
+    {
+      "name": "validated",
+      "references": [
+        "supabase\\functions\\crewai-3d-generation\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "validation",
+      "references": [
+        "mivaa-pdf-extractor\\app\\core\\validation\\errors.py"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "visual_analysis_queue",
+      "references": [
+        "src\\services\\visualFeatureExtractionService.ts",
+        "src\\services\\visualFeatureExtractionService.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "visual_search_analysis",
+      "references": [
+        "supabase\\functions\\visual-search-analyze\\index.ts",
+        "supabase\\functions\\visual-search-batch\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts"
+      ],
+      "referenceCount": 7
+    },
+    {
+      "name": "visual_search_batch_items",
+      "references": [
+        "supabase\\functions\\visual-search-batch\\index.ts",
+        "supabase\\functions\\visual-search-batch\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "visual_search_batch_jobs",
+      "references": [
+        "supabase\\functions\\visual-search-batch\\index.ts",
+        "supabase\\functions\\visual-search-batch\\index.ts",
+        "supabase\\functions\\visual-search-batch\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts"
+      ],
+      "referenceCount": 8
+    },
+    {
+      "name": "visual_search_embeddings",
+      "references": [
+        "supabase\\functions\\visual-search-analyze\\index.ts",
+        "supabase\\functions\\visual-search-query\\index.ts",
+        "supabase\\functions\\visual-search-query\\index.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "visual_search_queries",
+      "references": [
+        "supabase\\functions\\visual-search-query\\index.ts",
+        "supabase\\functions\\visual-search-status\\index.ts"
+      ],
+      "referenceCount": 2
+    },
+    {
+      "name": "voice_analysis_results",
+      "references": [
+        "supabase\\functions\\voice-to-material\\index.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "websocket",
+      "references": [
+        "src\\services\\websocket\\WebSocketManager.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "workspace",
+      "references": [
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "workspace_members",
+      "references": [
+        "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+        "supabase\\functions\\_shared\\config.ts",
+        "supabase\\functions\\_shared\\config.ts"
+      ],
+      "referenceCount": 3
+    },
+    {
+      "name": "workspace_permissions",
+      "references": [
+        "src\\api\\controllers\\consolidatedPDFController.ts"
+      ],
+      "referenceCount": 1
+    },
+    {
+      "name": "workspaces",
+      "references": [
+        "src\\api\\controllers\\documentWorkflowController.ts",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx",
+        "src\\components\\Admin\\AdminDashboard.tsx"
+      ],
+      "referenceCount": 6
+    }
+  ],
+  "unusedTables": [
+    "api_access_control",
+    "document_chunks",
+    "document_quality_metrics",
+    "embeddings",
+    "image_text_associations",
+    "images",
+    "knowledge_entries",
+    "material_knowledge",
+    "material_metafield_values",
+    "material_relationships",
+    "mivaa_api_keys",
+    "mivaa_api_usage_summary",
+    "mivaa_batch_jobs",
+    "mivaa_batch_jobs_summary",
+    "mivaa_processing_results",
+    "mivaa_processing_results_summary",
+    "mivaa_rag_documents",
+    "mivaa_service_health_metrics",
+    "pdf_document_structure",
+    "pdf_documents",
+    "pdf_extracted_images",
+    "pdf_material_correlations",
+    "pdf_processing_tiles",
+    "profiles",
+    "semantic_similarity_cache",
+    "user_roles",
+    "visual_search_history"
+  ],
+  "detailedReferences": {
+    "changelog": [
+      ".github\\scripts\\ai-pr-analyzer.js"
+    ],
+    "completed": [
+      ".github\\scripts\\ai-pr-analyzer.js"
+    ],
+    "health_check": [
+      "mivaa-pdf-extractor\\app\\api\\admin.py",
+      "mivaa-pdf-extractor\\app\\api\\images.py",
+      "src\\services\\ml\\unifiedMLService.ts"
+    ],
+    "documents": [
+      "mivaa-pdf-extractor\\app\\api\\documents.py",
+      "mivaa-pdf-extractor\\app\\api\\documents.py",
+      "mivaa-pdf-extractor\\app\\api\\documents.py",
+      "mivaa-pdf-extractor\\app\\api\\documents.py",
+      "mivaa-pdf-extractor\\app\\api\\documents.py",
+      "mivaa-pdf-extractor\\app\\api\\documents.py",
+      "mivaa-pdf-extractor\\app\\api\\search.py",
+      "mivaa-pdf-extractor\\app\\schemas\\search.py",
+      "mivaa-pdf-extractor\\app\\schemas\\search.py",
+      "scripts\\integration-tests\\test-with-proper-auth.js",
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+      "supabase\\functions\\extract-material-knowledge\\index.ts"
+    ],
+    "extractor": [
+      "mivaa-pdf-extractor\\app\\api\\pdf_routes.py",
+      "mivaa-pdf-extractor\\app\\services\\pdf_processor.py",
+      "mivaa-pdf-extractor\\scripts\\tests\\test_enhanced_extraction.py"
+    ],
+    "llamaindex": [
+      "mivaa-pdf-extractor\\app\\api\\rag_routes.py",
+      "mivaa-pdf-extractor\\app\\api\\rag_routes.py",
+      "mivaa-pdf-extractor\\app\\api\\rag_routes.py"
+    ],
+    "analysis_templates": [
+      "mivaa-pdf-extractor\\app\\api\\together_ai_routes.py"
+    ],
+    "pydantic_settings": [
+      "mivaa-pdf-extractor\\app\\config.py"
+    ],
+    "environment": [
+      "mivaa-pdf-extractor\\app\\config.py",
+      "mivaa-pdf-extractor\\app\\core\\validation\\config.py",
+      "mivaa-pdf-extractor\\app\\core\\validation\\config.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "scripts\\auth-tests\\generate-jwt-local.js",
+      "scripts\\integration-tests\\test-frontend-backend-integration.js",
+      "supabase\\functions\\mivaa-jwt-generator\\index.ts"
+    ],
+    "functools": [
+      "mivaa-pdf-extractor\\app\\core\\validation\\config.py",
+      "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+      "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py",
+      "mivaa-pdf-extractor\\app\\services\\material_kai_service.py",
+      "mivaa-pdf-extractor\\app\\utils\\logging.py"
+    ],
+    "validation": [
+      "mivaa-pdf-extractor\\app\\core\\validation\\errors.py"
+    ],
+    "collections": [
+      "mivaa-pdf-extractor\\app\\core\\validation\\registry.py",
+      "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+      "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py"
+    ],
+    "basemodel": [
+      "mivaa-pdf-extractor\\app\\core\\validation\\registry.py"
+    ],
+    "statistics": [
+      "mivaa-pdf-extractor\\app\\core\\validation\\registry.py",
+      "mivaa-pdf-extractor\\app\\core\\validation\\registry.py"
+    ],
+    "authenticated": [
+      "mivaa-pdf-extractor\\app\\dependencies.py",
+      "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+      "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py"
+    ],
+    "contextlib": [
+      "mivaa-pdf-extractor\\app\\main.py",
+      "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py"
+    ],
+    "sentry_sdk": [
+      "mivaa-pdf-extractor\\app\\main.py",
+      "mivaa-pdf-extractor\\app\\main.py"
+    ],
+    "starlette": [
+      "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+      "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+      "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+      "mivaa-pdf-extractor\\app\\middleware\\json_serialization.py",
+      "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+      "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+      "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+      "mivaa-pdf-extractor\\app\\middleware\\validation.py",
+      "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py"
+    ],
+    "workspace_members": [
+      "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+      "supabase\\functions\\_shared\\config.ts",
+      "supabase\\functions\\_shared\\config.ts"
+    ],
+    "authentication": [
+      "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py",
+      "mivaa-pdf-extractor\\app\\middleware\\jwt_auth.py"
+    ],
+    "error_message": [
+      "mivaa-pdf-extractor\\app\\middleware\\validation.py"
+    ],
+    "middleware": [
+      "mivaa-pdf-extractor\\app\\middleware\\validation.py"
+    ],
+    "dataclasses": [
+      "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py",
+      "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+      "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+      "mivaa-pdf-extractor\\app\\services\\enhanced_material_property_extractor.py",
+      "mivaa-pdf-extractor\\app\\services\\ocr_service.py",
+      "mivaa-pdf-extractor\\app\\services\\pdf_processor.py",
+      "mivaa-pdf-extractor\\app\\services\\together_ai_service.py",
+      "mivaa-pdf-extractor\\app\\utils\\json_encoder.py",
+      "mivaa-pdf-extractor\\scripts\\validate-deployment.py",
+      "tests\\integration\\image_analysis\\test_runner.py"
+    ],
+    "concurrent": [
+      "mivaa-pdf-extractor\\app\\monitoring\\performance_monitor.py",
+      "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+      "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\pdf_processor.py",
+      "mivaa-pdf-extractor\\tests\\unit\\test_pdf_processor.py"
+    ],
+    "llama_index": [
+      "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+      "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+      "mivaa-pdf-extractor\\app\\services\\advanced_search_service.py",
+      "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+      "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+      "mivaa-pdf-extractor\\app\\services\\embedding_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py",
+      "mivaa-pdf-extractor\\app\\services\\llamaindex_service.py"
+    ],
+    "togetherai": [
+      "mivaa-pdf-extractor\\app\\services\\enhanced_material_property_extractor.py",
+      "mivaa-pdf-extractor\\app\\services\\enhanced_material_property_extractor.py",
+      "mivaa-pdf-extractor\\app\\services\\together_ai_service.py"
+    ],
+    "materials": [
+      "mivaa-pdf-extractor\\app\\services\\material_visual_search_service.py",
+      "src\\components\\Admin\\MaterialSuggestionsPanel.tsx",
+      "src\\components\\Search\\SemanticSearchInput.tsx",
+      "src\\services\\jinaAIService.ts",
+      "src\\services\\visualFeatureExtractionService.ts"
+    ],
+    "tesseract": [
+      "mivaa-pdf-extractor\\app\\services\\ocr_service.py"
+    ],
+    "processed_documents": [
+      "mivaa-pdf-extractor\\app\\services\\supabase_client.py",
+      "mivaa-pdf-extractor\\app\\services\\supabase_client.py",
+      "mivaa-pdf-extractor\\app\\services\\supabase_client.py",
+      "src\\api\\controllers\\documentWorkflowController.ts"
+    ],
+    "document_images": [
+      "mivaa-pdf-extractor\\app\\services\\supabase_client.py"
+    ],
+    "log_operation_start": [
+      "mivaa-pdf-extractor\\app\\utils\\logging.py",
+      "mivaa-pdf-extractor\\app\\utils\\logging.py"
+    ],
+    "reportlab": [
+      "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_material_spec_pdf.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py",
+      "mivaa-pdf-extractor\\tests\\data\\create_test_pdfs.py"
+    ],
+    "aioresponses": [
+      "mivaa-pdf-extractor\\tests\\integration\\test_external_services.py"
+    ],
+    "mock_response": [
+      "mivaa-pdf-extractor\\tests\\unit\\test_material_kai_service.py"
+    ],
+    "operations": [
+      "mivaa-pdf-extractor\\tests\\unit\\test_supabase_service.py"
+    ],
+    "mock_update": [
+      "mivaa-pdf-extractor\\tests\\unit\\test_supabase_service.py"
+    ],
+    "supabase_client": [
+      "mivaa-pdf-extractor\\tests\\unit\\test_supabase_service.py"
+    ],
+    "mivaa_api_key": [
+      "scripts\\auth-tests\\generate-jwt-local.js",
+      "scripts\\auth-tests\\generate-jwt-local.js",
+      "scripts\\auth-tests\\test-deployed-jwt-generator.js",
+      "scripts\\auth-tests\\test-deployed-jwt-generator.js",
+      "scripts\\auth-tests\\test-jwt-generator.js",
+      "scripts\\integration-tests\\test-new-mivaa-key-real.js",
+      "scripts\\integration-tests\\test-supabase-mivaa-auth.js",
+      "scripts\\integration-tests\\test-supabase-mivaa-auth.js"
+    ],
+    "table_name": [
+      "scripts\\database-analysis\\analyze-table-usage.js",
+      "scripts\\database-analysis\\analyze-table-usage.js",
+      "scripts\\database-analysis\\analyze-table-usage.js"
+    ],
+    "deployment": [
+      "scripts\\deploy-supabase-enhanced.js"
+    ],
+    "dependencies": [
+      "scripts\\fix-dependencies.js"
+    ],
+    "functions": [
+      "scripts\\integration-tests\\test-scraper-functions-debug.js"
+    ],
+    "materials_catalog": [
+      "scripts\\integration-tests\\test-with-proper-auth.js",
+      "src\\api\\health.ts",
+      "src\\api\\health.ts",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+      "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+      "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+      "src\\components\\Admin\\EmbeddingGenerationPanel.tsx",
+      "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+      "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+      "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+      "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+      "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+      "src\\components\\Admin\\SystemPerformance.tsx",
+      "src\\components\\PDF\\HTMLDocumentViewer.tsx",
+      "src\\components\\Search\\SemanticSearch.tsx",
+      "src\\components\\Search\\SemanticSearchInput.tsx",
+      "src\\components\\Search\\UnifiedSearchInterface.tsx",
+      "src\\components\\Search\\UnifiedSearchInterface.tsx",
+      "src\\services\\3d\\spatialMaterialMapper.ts",
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\svbrdfExtractionAPI.ts",
+      "src\\services\\visualFeatureExtractionService.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\hybrid-material-analysis\\index.ts",
+      "supabase\\functions\\hybrid-material-analysis\\index.ts",
+      "supabase\\functions\\hybrid-material-analysis\\index.ts",
+      "supabase\\functions\\hybrid-material-analysis\\index.ts",
+      "supabase\\functions\\hybrid-material-analysis\\index.ts",
+      "supabase\\functions\\material-images-api\\index.ts",
+      "supabase\\functions\\material-properties-analysis\\index.ts",
+      "supabase\\functions\\material-recognition\\index.ts",
+      "supabase\\functions\\unified-material-search\\index.ts",
+      "supabase\\functions\\unified-material-search\\index.ts",
+      "supabase\\functions\\unified-material-search\\index.ts",
+      "supabase\\functions\\visual-search-query\\index.ts"
+    ],
+    "api_usage_logs": [
+      "src\\api\\controllers\\consolidatedPDFController.ts",
+      "src\\api\\controllers\\consolidatedPDFController.ts",
+      "src\\components\\Admin\\AnalyticsDashboard.tsx",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\networkAccessControl.ts",
+      "supabase\\functions\\api-gateway\\index.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-extract\\index.ts",
+      "supabase\\functions\\pdf-integration-health\\index.ts",
+      "supabase\\functions\\pdf-integration-health\\index.ts",
+      "supabase\\functions\\_shared\\config.ts",
+      "supabase\\functions\\_shared\\config.ts"
+    ],
+    "workspace_permissions": [
+      "src\\api\\controllers\\consolidatedPDFController.ts"
+    ],
+    "processing_jobs": [
+      "src\\api\\controllers\\consolidatedPDFController.ts",
+      "src\\api\\controllers\\consolidatedPDFController.ts"
+    ],
+    "processing": [
+      "src\\api\\controllers\\consolidatedPDFController.ts",
+      "src\\api\\controllers\\consolidatedPDFController.ts",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\SystemPerformance.tsx",
+      "src\\components\\PDF\\PDFResultsViewer.tsx",
+      "src\\components\\Search\\SemanticSearchInput.tsx",
+      "src\\services\\agentSpecializationManager.ts",
+      "supabase\\functions\\pdf-extract\\index.ts",
+      "supabase\\functions\\pdf-extract\\index.ts",
+      "supabase\\functions\\svbrdf-extractor\\index.ts",
+      "supabase\\functions\\svbrdf-extractor\\index.ts",
+      "supabase\\functions\\svbrdf-extractor\\index.ts"
+    ],
+    "workspaces": [
+      "src\\api\\controllers\\documentWorkflowController.ts",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx"
+    ],
+    "generation_3d": [
+      "src\\components\\3D\\Designer3DPage.tsx",
+      "src\\components\\3D\\GenerationWorkflowModal.tsx",
+      "src\\services\\3d\\spatialMaterialMapper.ts",
+      "src\\services\\3d\\spatialMaterialMapper.ts",
+      "src\\services\\3d\\spatialMaterialMapper.ts",
+      "src\\services\\3d\\spatialMaterialMapper.ts",
+      "src\\services\\materialAgent3DGenerationAPI.ts",
+      "src\\services\\materialAgent3DGenerationAPI.ts",
+      "src\\services\\materialAgent3DGenerationAPI.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts"
+    ],
+    "result_data": [
+      "src\\components\\3D\\GenerationWorkflowModal.tsx"
+    ],
+    "processing_results": [
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\PDF\\PDFResultsViewer.tsx",
+      "src\\components\\PDF\\PDFResultsViewer.tsx",
+      "src\\components\\Search\\SemanticSearch.tsx",
+      "src\\components\\Search\\SemanticSearchInput.tsx",
+      "src\\services\\aiMaterialAPI.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-extract\\index.ts",
+      "supabase\\functions\\pdf-extract\\index.ts",
+      "supabase\\functions\\pdf-extract\\index.ts",
+      "supabase\\functions\\pdf-extract\\index.ts",
+      "supabase\\functions\\svbrdf-extractor\\index.ts",
+      "supabase\\functions\\svbrdf-extractor\\index.ts"
+    ],
+    "scraping_sessions": [
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Scraper\\LiveProcessingMonitor.tsx",
+      "src\\components\\Scraper\\NewScraperPage.tsx",
+      "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+      "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+      "src\\components\\Scraper\\SessionDetailView.tsx",
+      "src\\components\\Scraper\\SessionDetailView.tsx",
+      "src\\components\\Scraper\\SessionDetailView.tsx",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts"
+    ],
+    "workspace": [
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx",
+      "src\\components\\Admin\\AdminDashboard.tsx"
+    ],
+    "requirements": [
+      "src\\components\\Admin\\AdminDashboard.tsx"
+    ],
+    "analytics_events": [
+      "src\\components\\Admin\\AdminPanel.tsx",
+      "src\\components\\Admin\\AnalyticsDashboard.tsx",
+      "src\\components\\Admin\\SystemPerformance.tsx",
+      "src\\services\\aiMaterialAPI.ts",
+      "src\\services\\aiMaterialAPI.ts",
+      "src\\services\\materialAgent3DGenerationAPI.ts",
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\ml\\costOptimizer.ts",
+      "src\\services\\ml\\costOptimizer.ts",
+      "src\\services\\ml\\costOptimizer.ts",
+      "src\\services\\ml\\costOptimizer.ts",
+      "supabase\\functions\\analyze-knowledge-content\\index.ts",
+      "supabase\\functions\\crewai-3d-generation\\index.ts",
+      "supabase\\functions\\document-vector-search\\index.ts",
+      "supabase\\functions\\extract-material-knowledge\\index.ts",
+      "supabase\\functions\\hybrid-material-analysis\\index.ts",
+      "supabase\\functions\\material-properties-analysis\\index.ts",
+      "supabase\\functions\\pdf-processor\\index.ts",
+      "supabase\\functions\\style-analysis\\index.ts",
+      "supabase\\functions\\voice-to-material\\index.ts"
+    ],
+    "agent_tasks": [
+      "src\\components\\Admin\\AgentMLCoordination.tsx",
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentCollaborationWorkflows.ts",
+      "src\\services\\agentLearningSystem.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentPerformanceOptimizer.ts",
+      "src\\services\\agentPerformanceOptimizer.ts",
+      "src\\services\\agentPerformanceOptimizer.ts",
+      "src\\services\\agentPerformanceOptimizer.ts",
+      "src\\services\\agentPerformanceOptimizer.ts",
+      "src\\services\\agentPerformanceOptimizer.ts",
+      "src\\services\\agentSpecializationManager.ts",
+      "src\\services\\agentSpecializationManager.ts",
+      "src\\services\\integratedAIService.ts",
+      "src\\services\\integratedAIService.ts",
+      "src\\services\\integratedAIService.ts",
+      "src\\services\\realtimeAgentMonitor.ts",
+      "supabase\\functions\\material-agent-orchestrator\\index.ts",
+      "supabase\\functions\\material-agent-orchestrator\\index.ts"
+    ],
+    "agent_ml_tasks": [
+      "src\\components\\Admin\\AgentMLCoordination.tsx",
+      "src\\components\\Admin\\AgentMLCoordination.tsx",
+      "src\\components\\Admin\\SystemPerformance.tsx",
+      "src\\services\\agentLearningSystem.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentMLCoordinator.ts",
+      "src\\services\\agentPerformanceOptimizer.ts"
+    ],
+    "uploaded_files": [
+      "src\\components\\Admin\\AITestingPanel.tsx",
+      "src\\components\\Admin\\AITestingPanel.tsx",
+      "src\\services\\materialRecognitionAPI.ts",
+      "supabase\\functions\\hybrid-material-analysis\\index.ts",
+      "supabase\\functions\\material-properties-analysis\\index.ts",
+      "supabase\\functions\\pdf-processor\\index.ts"
+    ],
+    "knowledge": [
+      "src\\components\\Admin\\KnowledgeBaseManagement.tsx",
+      "src\\services\\layoutAwareChunker.ts",
+      "src\\services\\ml\\materialAnalyzer.ts",
+      "src\\services\\pdfContentService.ts",
+      "src\\services\\pdfContentService.ts"
+    ],
+    "material_metadata_fields": [
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx",
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx"
+    ],
+    "materialmetafielddefinition": [
+      "src\\components\\Admin\\MetadataFieldsManagement.tsx"
+    ],
+    "analytics": [
+      "src\\components\\Admin\\SystemPerformance.tsx"
+    ],
+    "attachments": [
+      "src\\components\\AI\\MaterialAgentSearchInterface.tsx"
+    ],
+    "functioning": [
+      "src\\components\\ErrorBoundary\\ErrorBoundary.tsx"
+    ],
+    "properties": [
+      "src\\components\\PDF\\HTMLDocumentViewer.tsx"
+    ],
+    "structured": [
+      "src\\components\\PDF\\MaterialsListViewer.tsx",
+      "supabase\\functions\\material-scraper\\index.ts"
+    ],
+    "scraping_pages": [
+      "src\\components\\Scraper\\LiveProcessingMonitor.tsx",
+      "src\\components\\Scraper\\NewScraperPage.tsx",
+      "src\\components\\Scraper\\PageQueueViewer.tsx",
+      "src\\components\\Scraper\\PageQueueViewer.tsx",
+      "src\\components\\Scraper\\PageQueueViewer.tsx",
+      "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-session-manager\\index.ts",
+      "supabase\\functions\\scrape-single-page\\index.ts",
+      "supabase\\functions\\scrape-single-page\\index.ts"
+    ],
+    "scraped_materials_temp": [
+      "src\\components\\Scraper\\ScrapingSessionsList.tsx",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\scrape-single-page\\index.ts"
+    ],
+    "favorites": [
+      "src\\components\\Search\\SearchResultCard.tsx",
+      "src\\components\\Search\\SearchResultCard.tsx"
+    ],
+    "node_env": [
+      "src\\config\\configFactory.ts"
+    ],
+    "mivaaembeddingintegration": [
+      "src\\di\\containerFactory.ts"
+    ],
+    "configfactory": [
+      "src\\di\\containerFactory.ts"
+    ],
+    "analyzing": [
+      "src\\hooks\\useImageAnalysis.ts"
+    ],
+    "connection": [
+      "src\\hooks\\useMaterialRealtime.ts"
+    ],
+    "api_keys": [
+      "src\\middleware\\jwtAuthMiddleware.ts",
+      "src\\middleware\\jwtAuthMiddleware.ts",
+      "src\\middleware\\jwtAuthMiddleware.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "supabase\\functions\\_shared\\config.ts",
+      "supabase\\functions\\_shared\\config.ts"
+    ],
+    "last_used_at": [
+      "src\\middleware\\jwtAuthMiddleware.ts"
+    ],
+    "crewai_agents": [
+      "src\\services\\agentLearningSystem.ts",
+      "src\\services\\agentLearningSystem.ts",
+      "src\\services\\agentLearningSystem.ts"
+    ],
+    "performance": [
+      "src\\services\\agentLearningSystem.ts",
+      "src\\services\\agentLearningSystem.ts"
+    ],
+    "expertise": [
+      "src\\services\\agentLearningSystem.ts"
+    ],
+    "overloaded": [
+      "src\\services\\agentPerformanceOptimizer.ts"
+    ],
+    "underloaded": [
+      "src\\services\\agentPerformanceOptimizer.ts"
+    ],
+    "material_agents": [
+      "src\\services\\agentSpecializationManager.ts",
+      "src\\services\\integratedAIService.ts",
+      "supabase\\functions\\material-agent-orchestrator\\index.ts",
+      "supabase\\functions\\material-agent-orchestrator\\index.ts"
+    ],
+    "predefined": [
+      "src\\services\\agentSpecializationManager.ts"
+    ],
+    "capabilities": [
+      "src\\services\\agentSpecializationManager.ts"
+    ],
+    "confidence": [
+      "src\\services\\aiMaterialAPI.ts",
+      "src\\services\\layoutAwareChunker.ts"
+    ],
+    "api_endpoints": [
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "supabase\\functions\\api-gateway\\index.ts"
+    ],
+    "internal_networks": [
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\networkAccessControl.ts",
+      "src\\services\\networkAccessControl.ts",
+      "src\\services\\networkAccessControl.ts",
+      "src\\services\\networkAccessControl.ts"
+    ],
+    "rate_limit_rules": [
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts",
+      "src\\services\\apiGateway\\apiGatewayService.ts"
+    ],
+    "configuration": [
+      "src\\services\\apiGateway\\huggingFaceApiClient.ts",
+      "src\\services\\apiGateway\\huggingFaceApiClient.ts",
+      "src\\services\\apiGateway\\huggingFaceApiClient.ts",
+      "src\\services\\apiGateway\\replicateApiClient.ts",
+      "src\\services\\apiGateway\\replicateApiClient.ts"
+    ],
+    "centralized": [
+      "src\\services\\documentIntegrationService.ts",
+      "src\\services\\ml\\huggingFaceService.ts",
+      "src\\services\\ml\\huggingFaceService.ts",
+      "src\\services\\ml\\replicateService.ts",
+      "src\\services\\ml\\replicateService.ts"
+    ],
+    "ibaseservice": [
+      "src\\services\\documentIntegrationService.ts"
+    ],
+    "material_knowledge_extraction": [
+      "src\\services\\enhancedRAGService.ts",
+      "src\\services\\enhancedRAGService.ts",
+      "src\\services\\enhancedRAGService.ts"
+    ],
+    "enhanced_knowledge_base": [
+      "src\\services\\enhancedRAGService.ts",
+      "src\\services\\imageTextMapper.ts",
+      "src\\services\\imageTextMapper.ts",
+      "src\\services\\layoutAwareChunker.ts",
+      "src\\services\\layoutAwareChunker.ts",
+      "src\\services\\layoutAwareChunker.ts",
+      "src\\services\\pdfContentService.ts",
+      "src\\services\\pdfContentService.ts",
+      "src\\services\\pdfContentService.ts"
+    ],
+    "knowledge_relationships": [
+      "src\\services\\enhancedRAGService.ts"
+    ],
+    "query_intelligence": [
+      "src\\services\\enhancedRAGService.ts",
+      "src\\services\\enhancedRAGService.ts"
+    ],
+    "search_analytics": [
+      "src\\services\\enhancedRAGService.ts",
+      "src\\services\\enhancedRAGService.ts",
+      "src\\services\\ragKnowledgeService.ts",
+      "src\\services\\ragKnowledgeService.ts",
+      "src\\services\\ragKnowledgeService.ts"
+    ],
+    "document_layout_analysis": [
+      "src\\services\\htmlDOMAnalyzer.ts",
+      "src\\services\\htmlDOMAnalyzer.ts"
+    ],
+    "spatial_analysis": [
+      "src\\services\\integratedAIService.ts",
+      "src\\services\\integratedAIService.ts",
+      "src\\services\\integratedAIService.ts",
+      "supabase\\functions\\spaceformer-analysis\\index.ts",
+      "supabase\\functions\\spaceformer-analysis\\index.ts"
+    ],
+    "svbrdf_extractions": [
+      "src\\services\\integratedAIService.ts",
+      "src\\services\\svbrdfExtractionAPI.ts",
+      "src\\services\\svbrdfExtractionAPI.ts",
+      "src\\services\\svbrdfExtractionAPI.ts",
+      "src\\services\\svbrdfExtractionAPI.ts"
+    ],
+    "processing_queue": [
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\ragKnowledgeService.ts",
+      "src\\services\\ragKnowledgeService.ts"
+    ],
+    "recognition_results": [
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\materialRecognitionAPI.ts",
+      "src\\services\\materialRecognitionAPI.ts"
+    ],
+    "metafield": [
+      "src\\services\\materialSearchService.ts",
+      "src\\services\\materialSearchService.ts"
+    ],
+    "different": [
+      "src\\services\\ml\\advancedMaterialAnalysis\\MaterialClassificationService.ts",
+      "src\\services\\ml\\advancedMaterialAnalysis\\MaterialClassificationService.ts"
+    ],
+    "texturenetsvd": [
+      "src\\services\\ml\\advancedMaterialAnalysis\\MaterialClassificationService.ts"
+    ],
+    "centroids": [
+      "src\\services\\ml\\colorAnalysisEngine.ts",
+      "src\\services\\ml\\multiModal\\MaterialEmbeddingSpace.ts"
+    ],
+    "cancelled": [
+      "src\\services\\ml\\hybridOCRService.ts",
+      "src\\services\\ml\\hybridOCRService.ts"
+    ],
+    "material_style_analysis": [
+      "src\\services\\ml\\hybridStyleAnalysisService.ts",
+      "src\\services\\ml\\materialPropertiesService.ts",
+      "src\\services\\ml\\materialPropertiesService.ts"
+    ],
+    "embedding": [
+      "src\\services\\ml\\multiModal\\MaterialEmbeddingSpace.ts"
+    ],
+    "replicate": [
+      "src\\services\\ml\\replicateModelConfigs.ts"
+    ],
+    "attention": [
+      "src\\services\\ml\\textureComponents\\MaterialTextureNet.ts",
+      "src\\services\\ml\\textureComponents\\TextureAttentionModule.ts",
+      "src\\services\\ml\\textureComponents\\TextureAttentionModule.ts"
+    ],
+    "orientations": [
+      "src\\services\\ml\\textureComponents\\TextureGaborFilters.ts"
+    ],
+    "frequencies": [
+      "src\\services\\ml\\textureComponents\\TextureGaborFilters.ts"
+    ],
+    "moodboards": [
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts"
+    ],
+    "moodboard_items": [
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts"
+    ],
+    "moodboard": [
+      "src\\services\\moodboardAPI.ts",
+      "src\\services\\moodboardAPI.ts"
+    ],
+    "document_processing_status": [
+      "src\\services\\pdfContentService.ts",
+      "src\\services\\pdfContentService.ts",
+      "src\\services\\pdfContentService.ts",
+      "src\\services\\pdfContentService.ts"
+    ],
+    "knowledge_base_entries": [
+      "src\\services\\ragKnowledgeService.ts"
+    ],
+    "ragservice": [
+      "src\\services\\ragKnowledgeService.ts",
+      "src\\services\\ragKnowledgeService.ts",
+      "src\\services\\ragKnowledgeService.ts"
+    ],
+    "agentperformanceoptimizer": [
+      "src\\services\\realtimeAgentMonitor.ts"
+    ],
+    "visual_analysis_queue": [
+      "src\\services\\visualFeatureExtractionService.ts",
+      "src\\services\\visualFeatureExtractionService.ts"
+    ],
+    "material_visual_analysis": [
+      "src\\services\\visualFeatureExtractionService.ts",
+      "src\\services\\visualFeatureExtractionService.ts",
+      "supabase\\functions\\material-recognition\\index.ts"
+    ],
+    "websocket": [
+      "src\\services\\websocket\\WebSocketManager.ts"
+    ],
+    "extracted": [
+      "src\\utils\\materialValidation.ts"
+    ],
+    "knowledge_analysis": [
+      "supabase\\functions\\analyze-knowledge-content\\index.ts"
+    ],
+    "validated": [
+      "supabase\\functions\\crewai-3d-generation\\index.ts"
+    ],
+    "rawrequest": [
+      "supabase\\functions\\crewai-3d-generation\\index.ts"
+    ],
+    "material_knowledge_extractions": [
+      "supabase\\functions\\extract-material-knowledge\\index.ts"
+    ],
+    "technical": [
+      "supabase\\functions\\extract-material-knowledge\\index.ts"
+    ],
+    "material_categories": [
+      "supabase\\functions\\get-material-categories\\index.ts"
+    ],
+    "material_properties": [
+      "supabase\\functions\\get-material-categories\\index.ts",
+      "supabase\\functions\\get-material-categories\\index.ts"
+    ],
+    "category_validation_rules": [
+      "supabase\\functions\\get-material-categories\\index.ts"
+    ],
+    "ml_models": [
+      "supabase\\functions\\huggingface-model-trainer\\index.ts",
+      "supabase\\functions\\huggingface-model-trainer\\index.ts"
+    ],
+    "ml_training_jobs": [
+      "supabase\\functions\\huggingface-model-trainer\\index.ts",
+      "supabase\\functions\\huggingface-model-trainer\\index.ts"
+    ],
+    "spectral_analysis_results": [
+      "supabase\\functions\\hybrid-material-analysis\\index.ts"
+    ],
+    "chemical_analysis_results": [
+      "supabase\\functions\\hybrid-material-analysis\\index.ts"
+    ],
+    "mechanical_analysis_results": [
+      "supabase\\functions\\hybrid-material-analysis\\index.ts"
+    ],
+    "thermal_analysis_results": [
+      "supabase\\functions\\hybrid-material-analysis\\index.ts"
+    ],
+    "hybrid_analysis_results": [
+      "supabase\\functions\\hybrid-material-analysis\\index.ts"
+    ],
+    "material_images": [
+      "supabase\\functions\\material-images-api\\index.ts",
+      "supabase\\functions\\material-images-api\\index.ts",
+      "supabase\\functions\\material-images-api\\index.ts",
+      "supabase\\functions\\material-images-api\\index.ts",
+      "supabase\\functions\\material-images-api\\index.ts"
+    ],
+    "property_analysis_results": [
+      "supabase\\functions\\material-properties-analysis\\index.ts"
+    ],
+    "material_recognition_requests": [
+      "supabase\\functions\\material-recognition\\index.ts",
+      "supabase\\functions\\material-recognition\\index.ts",
+      "supabase\\functions\\material-recognition\\index.ts"
+    ],
+    "material_recognition_results": [
+      "supabase\\functions\\material-recognition\\index.ts"
+    ],
+    "scraping_chunks": [
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts",
+      "supabase\\functions\\material-scraper\\index.ts"
+    ],
+    "following": [
+      "supabase\\functions\\material-scraper\\index.ts"
+    ],
+    "mivaa_api_usage_logs": [
+      "supabase\\functions\\mivaa-gateway\\index.ts"
+    ],
+    "jwt_tokens_log": [
+      "supabase\\functions\\mivaa-jwt-generator\\index.ts"
+    ],
+    "pdf_batch_jobs": [
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-batch-process\\index.ts"
+    ],
+    "pdf_processing_results": [
+      "supabase\\functions\\pdf-batch-process\\index.ts",
+      "supabase\\functions\\pdf-integration-health\\index.ts",
+      "supabase\\functions\\pdf-processor\\index.ts"
+    ],
+    "rag_documents": [
+      "supabase\\functions\\pdf-extract\\index.ts"
+    ],
+    "metafields": [
+      "supabase\\functions\\pdf-extract\\index.ts"
+    ],
+    "available": [
+      "supabase\\functions\\pdf-extract\\index.ts"
+    ],
+    "nerf_reconstructions": [
+      "supabase\\functions\\spaceformer-analysis\\index.ts"
+    ],
+    "content_library": [
+      "supabase\\functions\\style-analysis\\index.ts"
+    ],
+    "style_analysis_results": [
+      "supabase\\functions\\style-analysis\\index.ts"
+    ],
+    "visual_search_analysis": [
+      "supabase\\functions\\visual-search-analyze\\index.ts",
+      "supabase\\functions\\visual-search-batch\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts"
+    ],
+    "visual_search_embeddings": [
+      "supabase\\functions\\visual-search-analyze\\index.ts",
+      "supabase\\functions\\visual-search-query\\index.ts",
+      "supabase\\functions\\visual-search-query\\index.ts"
+    ],
+    "visual_search_batch_jobs": [
+      "supabase\\functions\\visual-search-batch\\index.ts",
+      "supabase\\functions\\visual-search-batch\\index.ts",
+      "supabase\\functions\\visual-search-batch\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts"
+    ],
+    "visual_search_batch_items": [
+      "supabase\\functions\\visual-search-batch\\index.ts",
+      "supabase\\functions\\visual-search-batch\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts"
+    ],
+    "visual_search_queries": [
+      "supabase\\functions\\visual-search-query\\index.ts",
+      "supabase\\functions\\visual-search-status\\index.ts"
+    ],
+    "voice_analysis_results": [
+      "supabase\\functions\\voice-to-material\\index.ts"
+    ],
+    "frequency": [
+      "tests\\integration\\image_analysis\\test_runner.py"
+    ],
+    "material_kai_keys": [
+      "tests\\material-kai-integration-test.js"
+    ]
+  }
+}

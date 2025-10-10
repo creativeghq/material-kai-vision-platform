@@ -46,9 +46,11 @@ export interface WorkflowJob {
   name?: string;
   filename?: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
+  steps: WorkflowStep[];
+  currentStepIndex: number;
   startTime: Date;
   endTime?: Date;
-  steps: WorkflowStep[];
+  metadata: Record<string, unknown>;
 }
 
 interface PDFWorkflowViewerProps {

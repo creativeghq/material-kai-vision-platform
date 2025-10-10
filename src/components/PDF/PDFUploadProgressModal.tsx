@@ -16,7 +16,7 @@ import {
   X,
   RefreshCw,
   Eye,
-  Download,
+
 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -34,9 +34,9 @@ interface WorkflowStep {
   id: string;
   name: string;
   description?: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   progress?: number;
-  details: string[];
+  details?: string[];
   metadata?: Record<string, unknown>;
   result?: unknown;
   startTime?: Date;
@@ -44,6 +44,7 @@ interface WorkflowStep {
   duration?: number;
   error?: string;
   logs?: string[];
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 interface WorkflowJob {
@@ -144,7 +145,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   onViewResults,
 }) => {
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-  const [autoScroll, setAutoScroll] = useState(true);
+  // const [autoScroll, setAutoScroll] = useState(true);
 
   const toggleStepExpansion = (stepId: string) => {
     setExpandedSteps(prev => {
@@ -229,10 +230,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-4">
-            {job.steps.map((step, index) => {
+            {job.steps.map((step, _index) => {
               const StepIcon = getStepIcon(step.id);
               const isExpanded = expandedSteps.has(step.id);
-              const hasDetails = step.details.length > 0 || step.error || (step.logs && step.logs.length > 0);
+              const hasDetails = (step.details && step.details.length > 0) || step.error || (step.logs && step.logs.length > 0);
 
               return (
                 <Card key={step.id} className={cn(
@@ -317,7 +318,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               </div>
                             )}
                             
-                            {step.details.length > 0 && (
+                            {step.details && step.details.length > 0 && (
                               <div className="space-y-1">
                                 <h5 className="text-sm font-medium text-muted-foreground">Details:</h5>
                                 <ul className="text-sm space-y-1">

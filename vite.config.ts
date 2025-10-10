@@ -23,6 +23,21 @@ export default defineConfig(({ mode }) => {
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
       'process.env.MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL),
       'process.env.MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // Vendor libraries
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-ui': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+            'vendor-3d': ['three', '@react-three/fiber', '@react-three/drei'],
+            'vendor-ml': ['onnxruntime-web', 'onnxruntime-common'],
+            'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge'],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 1000, // Increase warning limit to 1MB
     }
   }
 })

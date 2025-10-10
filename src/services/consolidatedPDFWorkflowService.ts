@@ -1,3 +1,4 @@
+import React from 'react';
 import { supabase } from '../integrations/supabase/client';
 
 // Define interfaces locally to avoid importing from React components
@@ -5,9 +6,9 @@ interface WorkflowStep {
   id: string;
   name: string;
   description?: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   progress?: number;
-  details: string[];
+  details?: string[];
   metadata?: Record<string, unknown>;
   result?: unknown;
   startTime?: Date;
@@ -15,7 +16,7 @@ interface WorkflowStep {
   duration?: number;
   error?: string;
   logs?: string[];
-  icon?: unknown;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 interface WorkflowJob {

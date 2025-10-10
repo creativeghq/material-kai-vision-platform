@@ -2,11 +2,6 @@
 export { unifiedMLService, UnifiedMLService } from './unifiedMLService';
 export type { UnifiedMLServiceConfig, UnifiedMLOptions, UnifiedMLResult } from './unifiedMLService';
 
-// Legacy ML services exports (DEPRECATED - use UnifiedMLService instead)
-export { clientMLService, ClientMLService } from './clientMLService';
-export { serverMLService, ServerMLService } from './serverMLService';
-export { hybridMLService, HybridMLService } from './hybridMLService';
-
 // Style analysis services
 export { styleAnalysisService, StyleAnalysisService } from './styleAnalysisService';
 export { hybridStyleAnalysisService, HybridStyleAnalysisService } from './hybridStyleAnalysisService';
@@ -37,10 +32,7 @@ export {
   type DeviceType,
 } from './types';
 
-export {
-  type HybridMLOptions,
-  type HybridMLResult,
-} from './hybridMLService';
+
 
 export {
   type HybridStyleAnalysisOptions,
@@ -52,10 +44,7 @@ export {
   type StyleAnalysisOptions,
 } from './styleAnalysisService';
 
-export {
-  type ServerMLRequest,
-  type ServerMLResult,
-} from './serverMLService';
+
 
 // Import for utility functions
 import { unifiedMLService } from './unifiedMLService';

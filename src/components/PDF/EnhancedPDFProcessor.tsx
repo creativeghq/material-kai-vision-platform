@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { supabase } from '@/integrations/supabase/client';
 import {
 
   Upload,
@@ -26,7 +27,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
+
 import { useToast } from '@/hooks/use-toast';
 
 // Note: hybridPDFPipelineAPI service will be implemented in future phases
@@ -278,7 +279,6 @@ export function EnhancedPDFProcessor() {
       updateJobStatus(jobId, 'processing', 30, 'Processing PDF with MIVAA...');
 
       // Process PDF using MIVAA integration service via Supabase
-      const { supabase } = await import('@/integrations/supabase/client');
       const extractionResponse = await supabase.functions.invoke('mivaa-gateway', {
         body: {
           action: 'pdf_process_document',

@@ -43,6 +43,7 @@ export interface SearchResult {
     processingStatus?: 'completed' | 'processing' | 'failed';
     extractedText?: string;
     confidence?: number;
+    searchType?: string;
   };
   highlights?: string[];
   thumbnail?: string;
