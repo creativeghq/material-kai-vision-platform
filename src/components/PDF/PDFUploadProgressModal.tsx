@@ -288,28 +288,26 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               const isExpanded = expandedSteps.has(step.id);
               const hasDetails = (step.details && step.details.length > 0) || step.error || (step.logs && step.logs.length > 0);
 
-              const isCurrentStep = job.currentStepIndex === _index;
-
               return (
                 <Card key={step.id} className={cn(
                   "transition-all duration-300 border-2",
                   "bg-[#1f2937]", // Background color as requested
+                  // Border colors based on status as requested
                   step.status === 'failed' && "border-red-500",
-                  step.status === 'running' && "border-blue-500",
                   step.status === 'completed' && "border-green-500",
-                  step.status === 'pending' && "border-gray-600",
-                  isCurrentStep && "border-white", // Active step has white border
-                  step.status === 'running' && isCurrentStep && "animate-pulse"
+                  step.status === 'pending' && "border-gray-500",
+                  // Active/running step gets white border as requested
+                  step.status === 'running' && "border-white animate-pulse"
                 )}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 flex-1">
                         <StepIcon className={cn(
                           "h-5 w-5",
-                          step.status === 'completed' && "text-green-600",
-                          step.status === 'failed' && "text-red-600",
-                          step.status === 'running' && "text-blue-600",
-                          step.status === 'pending' && "text-gray-500"
+                          step.status === 'completed' && "text-green-400",
+                          step.status === 'failed' && "text-red-400",
+                          step.status === 'running' && "text-white",
+                          step.status === 'pending' && "text-gray-400"
                         )} />
                         
                         <div className="flex-1">
@@ -364,26 +362,26 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                     
                     {hasDetails && (
                       <Collapsible open={isExpanded}>
-                        <CollapsibleContent className="mt-3 pt-3 border-t">
+                        <CollapsibleContent className="mt-3 pt-3 border-t border-gray-600">
                           <div className="space-y-2">
                             {step.error && (
-                              <div className="bg-red-50 border border-red-200 rounded p-3">
-                                <div className="flex items-center gap-2 text-red-700 font-medium mb-1">
+                              <div className="bg-red-900/20 border border-red-500/30 rounded p-3">
+                                <div className="flex items-center gap-2 text-red-400 font-medium mb-1">
                                   <AlertCircle className="h-4 w-4" />
                                   Error
                                 </div>
-                                <p className="text-sm text-red-600">{step.error}</p>
+                                <p className="text-sm text-red-300">{step.error}</p>
                               </div>
                             )}
-                            
+
                             {step.details && step.details.length > 0 && (
                               <div className="space-y-1">
-                                <h5 className="text-sm font-medium text-muted-foreground">Details:</h5>
+                                <h5 className="text-sm font-medium text-gray-300">Details:</h5>
                                 <ul className="text-sm space-y-1">
                                   {step.details.map((detail, idx) => (
                                     <li key={idx} className="flex items-start gap-2">
-                                      <span className="text-muted-foreground">•</span>
-                                      <span>{detail}</span>
+                                      <span className="text-gray-400">•</span>
+                                      <span className="text-gray-300">{detail}</span>
                                     </li>
                                   ))}
                                 </ul>
@@ -392,20 +390,20 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                             
                             {step.logs && step.logs.length > 0 && (
                               <div className="space-y-1">
-                                <h5 className="text-sm font-medium text-muted-foreground">Logs:</h5>
-                                <div className="bg-gray-50 border rounded p-2 text-xs font-mono max-h-32 overflow-y-auto">
+                                <h5 className="text-sm font-medium text-gray-300">Logs:</h5>
+                                <div className="bg-gray-800 border border-gray-600 rounded p-2 text-xs font-mono max-h-32 overflow-y-auto">
                                   {step.logs.map((log, idx) => (
-                                    <div key={idx}>{log}</div>
+                                    <div key={idx} className="text-gray-300">{log}</div>
                                   ))}
                                 </div>
                               </div>
                             )}
-                            
+
                             {step.metadata && Object.keys(step.metadata).length > 0 && (
                               <div className="space-y-1">
-                                <h5 className="text-sm font-medium text-muted-foreground">Metadata:</h5>
-                                <div className="bg-gray-50 border rounded p-2 text-xs">
-                                  <pre>{JSON.stringify(step.metadata, null, 2)}</pre>
+                                <h5 className="text-sm font-medium text-gray-300">Metadata:</h5>
+                                <div className="bg-gray-800 border border-gray-600 rounded p-2 text-xs">
+                                  <pre className="text-gray-300">{JSON.stringify(step.metadata, null, 2)}</pre>
                                 </div>
                               </div>
                             )}
