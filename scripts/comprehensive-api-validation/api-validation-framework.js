@@ -64,7 +64,7 @@ const API_ENDPOINTS = [
   { path: '/api/images/search', method: 'POST', category: 'images', critical: true, auth: false,
     payload: { query_description: 'carbon fiber material', limit: 5, similarity_threshold: 0.7 } },
   { path: '/api/images/health', method: 'GET', category: 'images', critical: false, auth: false },
-  { path: '/api/images/upload/analyze', method: 'POST', category: 'images', critical: false, auth: false,
+  { path: '/api/images/upload-and-analyze', method: 'POST', category: 'images', critical: false, auth: false,
     multipart: true, file_field: 'file' },
 
   // Material Analysis Endpoints

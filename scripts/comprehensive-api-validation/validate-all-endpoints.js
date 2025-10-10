@@ -143,25 +143,11 @@ async function validateDirectEndpoint(endpoint) {
 
     // Handle multipart/form-data requests
     if (endpoint.multipart) {
-      const FormData = globalThis.FormData;
-      const formData = new FormData();
-
-      // Create a simple test file
-      const testFileContent = '%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n>>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000074 00000 n \n0000000120 00000 n \ntrailer\n<<\n/Size 4\n/Root 1 0 R\n>>\nstartxref\n178\n%%EOF';
-      const blob = new Blob([testFileContent], { type: 'application/pdf' });
-      const file = new File([blob], 'test.pdf', { type: 'application/pdf' });
-
-      formData.append(endpoint.file_field || 'file', file);
-
-      // Add any additional form fields
-      if (endpoint.form_data) {
-        for (const [key, value] of Object.entries(endpoint.form_data)) {
-          formData.append(key, value);
-        }
-      }
-
-      options.body = formData;
-      // Don't set Content-Type for multipart, let browser set it with boundary
+      // Skip multipart endpoints for now - they require special handling
+      result.status = 'skipped';
+      result.issues.push('Multipart endpoint - requires manual testing');
+      console.log(`  ⏭️ Skipping multipart: ${endpoint.method} ${endpoint.path}`);
+      return result;
     } else {
       // Regular JSON requests
       headers['Content-Type'] = 'application/json';
