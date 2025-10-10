@@ -131,14 +131,14 @@ const API_ENDPOINTS = [
 const GATEWAY_ACTIONS = [
   { action: 'health_check', critical: true, payload: {} },
   { action: 'pdf_process_document', critical: true, payload: { documentId: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', extractionType: 'all' } },
-  { action: 'material_recognition', critical: true, payload: { image_url: 'https://example.com/material.jpg' } },
+  { action: 'material_recognition', critical: true, payload: { image_data: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64', analysis_type: 'comprehensive' } },
   { action: 'semantic_search', critical: true, payload: { query: 'carbon fiber materials', limit: 10 } },
-  { action: 'generate_embedding', critical: true, payload: { text: 'sustainable composite materials' } },
-  { action: 'llama_vision_analysis', critical: true, payload: { image_url: 'https://example.com/material.jpg', prompt: 'Analyze this material' } },
-  { action: 'chat_completion', critical: true, payload: { messages: [{ role: 'user', content: 'What are carbon fiber properties?' }] } },
-  { action: 'vector_search', critical: true, payload: { vector: [0.1, 0.2, 0.3], limit: 5 } },
-  { action: 'multimodal_analysis', critical: true, payload: { text: 'material analysis', image_url: 'https://example.com/test.jpg' } },
-  { action: 'clip_embedding_generation', critical: false, payload: { image_url: 'https://example.com/test.jpg' } }
+  { action: 'generate_embedding', critical: true, payload: { image_data: 'https://images.unsplash.com/photo-1567789884554-0b844b597180', embedding_types: ['clip'] } },
+  { action: 'llama_vision_analysis', critical: true, payload: { document_id: 'test-doc-456', analysis_types: ['image', 'material'], enable_llama_vision: true, enable_material_analysis: true } },
+  { action: 'chat_completion', critical: true, payload: { message: 'What are carbon fiber properties?', conversation_id: 'test-123' } },
+  { action: 'vector_search', critical: true, payload: { reference_text: 'carbon fiber composite materials', limit: 5, similarity_threshold: 0.5 } },
+  { action: 'multimodal_analysis', critical: true, payload: { document_id: 'test-doc-123', analysis_types: ['text', 'image'], include_text_analysis: true, include_image_analysis: true } },
+  { action: 'clip_embedding_generation', critical: false, payload: { image_data: 'https://images.unsplash.com/photo-1567789884554-0b844b597180', embedding_types: ['clip'] } }
 ];
 
 // Validation Results Storage
