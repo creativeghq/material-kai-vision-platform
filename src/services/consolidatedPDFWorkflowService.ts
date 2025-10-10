@@ -1,5 +1,6 @@
 import React from 'react';
 import { supabase } from '../integrations/supabase/client';
+import WorkflowErrorHandler, { type WorkflowResponse } from '../utils/WorkflowErrorHandler';
 
 // Define interfaces locally to avoid importing from React components
 interface WorkflowStep {

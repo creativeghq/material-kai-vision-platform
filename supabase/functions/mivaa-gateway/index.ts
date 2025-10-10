@@ -7,6 +7,148 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 };
 
+// Standardized error handling for MIVAA Gateway
+interface WorkflowError {
+  code: string;
+  message: string;
+  details?: Record<string, any>;
+  retryable?: boolean;
+  context?: string;
+  timestamp?: string;
+  requestId?: string;
+}
+
+interface WorkflowResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: WorkflowError;
+  metadata?: {
+    requestId?: string;
+    processingTime?: number;
+    timestamp: string;
+    version?: string;
+    endpoint?: string;
+  };
+}
+
+class MivaaErrorHandler {
+  static handleError(error: any, context: string, requestId?: string): WorkflowResponse {
+    let workflowError: WorkflowError;
+
+    // Classify error type
+    if (error?.status || error?.statusCode) {
+      const status = error.status || error.statusCode;
+      workflowError = this.classifyHttpError(status, error);
+    } else if (error?.name === 'TypeError' && error?.message?.includes('fetch')) {
+      workflowError = {
+        code: 'NETWORK_ERROR',
+        message: 'Network connection failed',
+        details: { originalError: error.message },
+        retryable: true
+      };
+    } else if (error?.message?.includes('timeout')) {
+      workflowError = {
+        code: 'MIVAA_TIMEOUT',
+        message: 'MIVAA service request timed out',
+        details: { originalError: error.message },
+        retryable: true
+      };
+    } else {
+      workflowError = {
+        code: 'MIVAA_PROCESSING_FAILED',
+        message: error?.message || 'MIVAA service processing failed',
+        details: { originalError: error },
+        retryable: true
+      };
+    }
+
+    workflowError.context = context;
+    workflowError.timestamp = new Date().toISOString();
+    workflowError.requestId = requestId;
+
+    console.error(`[${context}] MIVAA Gateway Error:`, workflowError);
+
+    return {
+      success: false,
+      error: workflowError,
+      metadata: {
+        requestId,
+        timestamp: new Date().toISOString(),
+        version: '1.0.0'
+      }
+    };
+  }
+
+  private static classifyHttpError(status: number, error: any): WorkflowError {
+    switch (status) {
+      case 400:
+        return {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid request data',
+          details: { status, originalError: error.message },
+          retryable: false
+        };
+      case 401:
+        return {
+          code: 'API_UNAUTHORIZED',
+          message: 'Authentication required',
+          details: { status, originalError: error.message },
+          retryable: false
+        };
+      case 403:
+        return {
+          code: 'API_FORBIDDEN',
+          message: 'Access forbidden',
+          details: { status, originalError: error.message },
+          retryable: false
+        };
+      case 404:
+        return {
+          code: 'API_NOT_FOUND',
+          message: 'MIVAA endpoint not found',
+          details: { status, originalError: error.message },
+          retryable: false
+        };
+      case 429:
+        return {
+          code: 'API_RATE_LIMIT',
+          message: 'Rate limit exceeded',
+          details: { status, originalError: error.message },
+          retryable: true
+        };
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return {
+          code: 'MIVAA_SERVICE_UNAVAILABLE',
+          message: 'MIVAA service temporarily unavailable',
+          details: { status, originalError: error.message },
+          retryable: true
+        };
+      default:
+        return {
+          code: 'UNKNOWN_ERROR',
+          message: `HTTP ${status} error`,
+          details: { status, originalError: error.message },
+          retryable: status >= 500
+        };
+    }
+  }
+
+  static createSuccessResponse<T>(data: T, metadata?: Record<string, any>): WorkflowResponse<T> {
+    return {
+      success: true,
+      data,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        ...metadata
+      }
+    };
+  }
+}
+
 interface GatewayRequest {
   action: string;
   payload?: any;
@@ -267,51 +409,47 @@ serve(async (req) => {
       console.warn('Failed to log API usage:', logError);
     }
 
-    const gatewayResponse: GatewayResponse = {
-      success: true,
-      data: result,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        processingTime: Date.now() - startTime,
-        version: '1.0.0',
-        mivaaEndpoint: mivaaUrl,
-      },
-    };
+    // Use standardized success response
+    const successResponse = MivaaErrorHandler.createSuccessResponse(result, {
+      processingTime: Date.now() - startTime,
+      mivaaEndpoint: mivaaUrl,
+      endpoint: endpoint.path,
+      requestId: `mivaa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    });
 
-    return new Response(JSON.stringify(gatewayResponse), {
+    return new Response(JSON.stringify(successResponse), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('MIVAA Gateway error:', error);
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    // Use standardized error handling
+    const requestId = `mivaa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const errorResponse = MivaaErrorHandler.handleError(error, 'MIVAA Gateway', requestId);
 
-    const errorResponse: GatewayResponse = {
-      success: false,
-      error: {
-        code: 'GATEWAY_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: {
-          timestamp: new Date().toISOString(),
-          processingTime: Date.now() - startTime,
-          errorType: error instanceof Error ? error.name : 'Unknown',
-          errorStack: error instanceof Error ? error.stack : undefined,
-        },
-      },
-      metadata: {
-        timestamp: new Date().toISOString(),
-        processingTime: Date.now() - startTime,
-        version: '1.0.0',
-      },
-    };
+    // Add processing time to metadata
+    if (errorResponse.metadata) {
+      errorResponse.metadata.processingTime = Date.now() - startTime;
+    }
+
+    // Determine HTTP status based on error type
+    let httpStatus = 500;
+    if (errorResponse.error?.code === 'VALIDATION_ERROR' || errorResponse.error?.code === 'INVALID_PAYLOAD_FORMAT') {
+      httpStatus = 400;
+    } else if (errorResponse.error?.code === 'API_UNAUTHORIZED') {
+      httpStatus = 401;
+    } else if (errorResponse.error?.code === 'API_FORBIDDEN') {
+      httpStatus = 403;
+    } else if (errorResponse.error?.code === 'API_NOT_FOUND') {
+      httpStatus = 404;
+    } else if (errorResponse.error?.code === 'API_RATE_LIMIT') {
+      httpStatus = 429;
+    } else if (errorResponse.error?.code === 'MIVAA_SERVICE_UNAVAILABLE') {
+      httpStatus = 503;
+    }
 
     return new Response(JSON.stringify(errorResponse), {
-      status: 500,
+      status: httpStatus,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
