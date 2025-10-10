@@ -385,15 +385,22 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
+        // Check for Supabase client errors first
         if (response.error) {
           const errorMessage = response.error.message || 'Unknown error';
-          if (errorMessage.includes('Invalid authentication token') || errorMessage.includes('401')) {
-            throw new Error('MIVAA service authentication failed. Please check API key configuration.');
-          }
           throw new Error(`MIVAA gateway request failed: ${errorMessage}`);
         }
 
         const result = response.data;
+
+        // Check for MIVAA gateway errors in the response data
+        if (result && !result.success && result.error) {
+          const errorMessage = result.error.message || 'Unknown error';
+          if (result.error.code === 'API_UNAUTHORIZED' || errorMessage.includes('401')) {
+            throw new Error('MIVAA service authentication failed. Please check API key configuration.');
+          }
+          throw new Error(`MIVAA processing failed: ${errorMessage}`);
+        }
 
         // Update progress: Processing complete
         this.updateJobStep(jobId, 'mivaa-processing', {

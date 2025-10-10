@@ -432,24 +432,10 @@ serve(async (req) => {
       errorResponse.metadata.processingTime = Date.now() - startTime;
     }
 
-    // Determine HTTP status based on error type
-    let httpStatus = 500;
-    if (errorResponse.error?.code === 'VALIDATION_ERROR' || errorResponse.error?.code === 'INVALID_PAYLOAD_FORMAT') {
-      httpStatus = 400;
-    } else if (errorResponse.error?.code === 'API_UNAUTHORIZED') {
-      httpStatus = 401;
-    } else if (errorResponse.error?.code === 'API_FORBIDDEN') {
-      httpStatus = 403;
-    } else if (errorResponse.error?.code === 'API_NOT_FOUND') {
-      httpStatus = 404;
-    } else if (errorResponse.error?.code === 'API_RATE_LIMIT') {
-      httpStatus = 429;
-    } else if (errorResponse.error?.code === 'MIVAA_SERVICE_UNAVAILABLE') {
-      httpStatus = 503;
-    }
-
+    // Always return HTTP 200 to prevent Supabase client from treating as error
+    // The error information is included in the response body for frontend handling
     return new Response(JSON.stringify(errorResponse), {
-      status: httpStatus,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

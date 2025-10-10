@@ -161,6 +161,7 @@ export class MivaaIntegrationService {
         body: { action, payload },
       });
 
+      // Check for Supabase client errors first
       if (error) {
         return {
           success: false,
@@ -170,6 +171,20 @@ export class MivaaIntegrationService {
             details: error,
           },
           metadata: {
+            timestamp: new Date().toISOString(),
+            processingTime: 0,
+            endpoint: `/functions/v1/mivaa-gateway`,
+            version: '1.0.0',
+          },
+        };
+      }
+
+      // Check for MIVAA gateway errors in the response data
+      if (data && !data.success && data.error) {
+        return {
+          success: false,
+          error: data.error,
+          metadata: data.metadata || {
             timestamp: new Date().toISOString(),
             processingTime: 0,
             endpoint: `/functions/v1/mivaa-gateway`,
