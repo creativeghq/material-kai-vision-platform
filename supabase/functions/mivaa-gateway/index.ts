@@ -57,6 +57,7 @@ serve(async (req) => {
     const { action, payload } = body;
 
     console.log(`🚀 MIVAA Gateway: Processing action "${action}"`);
+    console.log(`📊 Request payload:`, JSON.stringify(payload, null, 2));
 
     // Map gateway actions to MIVAA service endpoints
     const endpointMap: Record<string, { path: string; method: string }> = {
@@ -204,6 +205,11 @@ serve(async (req) => {
     }
 
     console.log(`📡 Calling MIVAA: ${endpoint.method} ${mivaaUrl}`);
+    console.log(`🔧 Request options:`, JSON.stringify({
+      method: requestOptions.method,
+      headers: requestOptions.headers,
+      hasBody: !!requestOptions.body
+    }, null, 2));
 
     // Make request to MIVAA service
     const response = await fetch(mivaaUrl, requestOptions);
@@ -252,6 +258,11 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('MIVAA Gateway error:', error);
+    console.error('Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     const errorResponse: GatewayResponse = {
       success: false,
@@ -261,6 +272,8 @@ serve(async (req) => {
         details: {
           timestamp: new Date().toISOString(),
           processingTime: Date.now() - startTime,
+          errorType: error instanceof Error ? error.name : 'Unknown',
+          errorStack: error instanceof Error ? error.stack : undefined,
         },
       },
       metadata: {
