@@ -44,7 +44,7 @@ export const supabase = createClient(url, key, {
   },
   global: {
     headers: {
-      'cache-control': '3600', // Cache for 1 hour
+      // Removed cache-control header to avoid CORS issues with Edge Functions
     },
   },
   db: {
