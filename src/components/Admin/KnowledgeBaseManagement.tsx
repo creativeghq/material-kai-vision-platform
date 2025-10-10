@@ -136,8 +136,11 @@ const KnowledgeBaseManagement: React.FC = () => {
 
         // Save summary to database
         await supabase
-          .from('materials_catalog')
-          .update({ summary: response.data.summary })
+          .from('enhanced_knowledge_base')
+          .update({
+            metadata: { summary: response.data.summary },
+            updated_at: new Date().toISOString()
+          })
           .eq('id', documentId);
 
         toast({
@@ -179,10 +182,11 @@ const KnowledgeBaseManagement: React.FC = () => {
         const tags = materialEntities.map((e: any) => e.text);
 
         await supabase
-          .from('materials_catalog')
+          .from('enhanced_knowledge_base')
           .update({
             semantic_tags: tags,
-            extracted_entities: response.data.entities
+            metadata: { extracted_entities: response.data.entities },
+            updated_at: new Date().toISOString()
           })
           .eq('id', documentId);
 
@@ -242,7 +246,7 @@ const KnowledgeBaseManagement: React.FC = () => {
   const fetchEntries = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('materials_catalog')
+        .from('enhanced_knowledge_base')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -250,9 +254,9 @@ const KnowledgeBaseManagement: React.FC = () => {
       // Handle potential null values from database and map fields to KnowledgeEntry interface
       const processedData = (data || []).map((entry: any) => ({
         id: entry.id,
-        title: entry.name || '',
-        content: entry.description || '',
-        content_type: entry.category || 'material',
+        title: entry.title || '',
+        content: entry.content || '',
+        content_type: entry.content_type || 'article',
         status: 'active', // materials_catalog doesn't have status field
         created_at: entry.created_at || '',
         created_by: entry.created_by || '',
@@ -339,7 +343,7 @@ const KnowledgeBaseManagement: React.FC = () => {
   const handleDeleteEntry = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('materials_catalog')
+        .from('enhanced_knowledge_base')
         .delete()
         .eq('id', id);
 
@@ -365,10 +369,10 @@ const KnowledgeBaseManagement: React.FC = () => {
 
     try {
       const { error } = await supabase
-        .from('materials_catalog')
+        .from('enhanced_knowledge_base')
         .update({
-          name: updatedEntry.title || '',
-          description: updatedEntry.content || '',
+          title: updatedEntry.title || '',
+          content: updatedEntry.content || '',
           updated_at: new Date().toISOString(),
         })
         .eq('id', selectedEntry.id);

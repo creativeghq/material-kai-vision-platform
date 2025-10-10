@@ -178,16 +178,26 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
       if (onSave) {
         await onSave(materialData);
       } else {
-        // Note: materials_catalog table may not exist in current database schema
-        // This is a graceful fallback to prevent build errors
-        console.warn('Material submission disabled due to schema mismatch');
-        const error = null;
+        // Save material to materials_catalog table
+        const { error } = await supabase
+          .from('materials_catalog')
+          .insert({
+            name: materialData.name,
+            description: materialData.description || '',
+            category: materialData.category,
+            properties: materialData.properties,
+            chemical_composition: materialData.chemical_composition,
+            safety_data: materialData.safety_data,
+            standards: materialData.standards,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
 
         if (error) throw error;
 
         toast({
           title: 'Success',
-          description: 'Material saved successfully',
+          description: 'Material saved successfully to catalog',
         });
 
         // Reset form

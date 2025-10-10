@@ -846,9 +846,9 @@ export class VisualFeatureExtractionService {
   ): Promise<void> {
     try {
       const updateData: Record<string, unknown> = {
-        material_type: this.extractMaterialType(llamaResult),
+        category: this.extractMaterialType(llamaResult),  // Fixed: use 'category' not 'material_type'
         updated_at: new Date().toISOString(),
-        analysis_summary: this.extractVisualCharacteristics(llamaResult),
+        llama_analysis: this.extractVisualCharacteristics(llamaResult),  // Fixed: use 'llama_analysis' not 'analysis_summary'
         visual_analysis_confidence: this.extractConfidenceScore(llamaResult)
       };
 

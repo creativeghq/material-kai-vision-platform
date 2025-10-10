@@ -164,16 +164,40 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
 
   const saveMaterialToCatalog = async (material: DetectedMaterial) => {
     try {
-      // Note: materials_catalog table doesn't exist in current schema
-      // This is a placeholder for future implementation
-      console.log('Saving material to catalog - feature not yet implemented', material);
+      // Save material to materials_catalog table
+      const { data, error } = await supabase
+        .from('materials_catalog')
+        .insert({
+          name: material.name,
+          description: material.description || '',
+          category: material.category || 'uncategorized',
+          properties: {
+            confidence: material.confidence,
+            source: 'pdf_extraction',
+            extracted_properties: material.properties || {}
+          },
+          extracted_properties: material.properties || {},
+          confidence_scores: {
+            overall: material.confidence,
+            extraction_method: 'pdf_analysis'
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       toast({
-        title: 'Feature Not Available',
-        description: 'Material catalog saving is not yet implemented.',
+        title: 'Material Saved',
+        description: `${material.name} has been saved to the materials catalog.`,
       });
 
+      console.log('Material saved to catalog:', data);
+
     } catch (error) {
+      console.error('Error saving material to catalog:', error);
       toast({
         title: 'Save Failed',
         description: error instanceof Error ? error.message : 'Unknown error',
