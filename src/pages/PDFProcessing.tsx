@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Activity } from 'lucide-react';
+import { Upload, Activity, Link } from 'lucide-react';
 
 import { PDFWorkflowViewer, WorkflowJob } from '@/components/PDF/PDFWorkflowViewer';
 import { PDFUploadProgressModal } from '@/components/PDF/PDFUploadProgressModal';
@@ -8,6 +8,8 @@ import { PDFUploadProgressModal } from '@/components/PDF/PDFUploadProgressModal'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { consolidatedPDFWorkflowService } from '@/services/consolidatedPDFWorkflowService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +17,8 @@ const PDFProcessing = () => {
   const [workflowJobs, setWorkflowJobs] = useState<WorkflowJob[]>([]);
   const [currentJob, setCurrentJob] = useState<WorkflowJob | null>(null);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [isProcessingUrl, setIsProcessingUrl] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -36,6 +40,13 @@ const PDFProcessing = () => {
 
     // Load existing jobs
     setWorkflowJobs(consolidatedPDFWorkflowService.getAllJobs() as WorkflowJob[]);
+
+    // Check for test URL from localStorage
+    const testUrl = localStorage.getItem('testPdfUrl');
+    if (testUrl) {
+      setPdfUrl(testUrl);
+      localStorage.removeItem('testPdfUrl'); // Remove after using
+    }
 
     return () => {
       unsubscribe();
@@ -65,6 +76,54 @@ const PDFProcessing = () => {
           variant: 'destructive',
         });
       }
+    }
+  };
+
+  const processUrlPdf = async () => {
+    if (!pdfUrl.trim()) {
+      toast({
+        title: 'URL Required',
+        description: 'Please enter a valid PDF URL',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsProcessingUrl(true);
+    try {
+      // Create a mock file object from URL for the workflow service
+      const response = await fetch(pdfUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const fileName = pdfUrl.split('/').pop() || 'document.pdf';
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+
+      const jobId = await consolidatedPDFWorkflowService.startPDFProcessing(file);
+
+      // Get the job and show progress modal
+      const job = consolidatedPDFWorkflowService.getJob(jobId);
+      if (job) {
+        setCurrentJob(job);
+        setIsProgressModalOpen(true);
+      }
+
+      toast({
+        title: 'Processing Started',
+        description: `Started processing PDF from URL. You can monitor the progress in the modal.`,
+      });
+
+      setPdfUrl(''); // Clear the URL input
+    } catch (error) {
+      toast({
+        title: 'Failed to Process URL',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessingUrl(false);
     }
   };
 
@@ -176,6 +235,36 @@ const PDFProcessing = () => {
                     </p>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* URL Processing */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link className="h-5 w-5" />
+                Process PDF from URL
+              </CardTitle>
+              <CardDescription>
+                Enter a direct URL to a PDF file to process it through the workflow
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <Input
+                  type="url"
+                  placeholder="https://example.com/document.pdf"
+                  value={pdfUrl}
+                  onChange={(e) => setPdfUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={processUrlPdf}
+                  disabled={isProcessingUrl || !pdfUrl.trim()}
+                >
+                  {isProcessingUrl ? 'Processing...' : 'Process'}
+                </Button>
               </div>
             </CardContent>
           </Card>

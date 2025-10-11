@@ -249,8 +249,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-4">
+      <DialogContent className="max-w-4xl h-[90vh] p-0 flex flex-col overflow-hidden">
+        <DialogHeader className="p-6 pb-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <FileText className="h-6 w-6 text-primary" />
@@ -275,7 +275,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               </Button>
             </div>
           </div>
-          
+
           {/* Overall Progress */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -286,10 +286,11 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
           </div>
         </DialogHeader>
 
-        <Separator />
+        <Separator className="flex-shrink-0" />
 
-        <ScrollArea className="flex-1 p-6">
-          <div className="space-y-4">
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full w-full">
+            <div className="p-6 space-y-4 max-h-none">
             {job.steps.map((step, _index) => {
               const StepIcon = getStepIcon(step.id);
               const isExpanded = expandedSteps.has(step.id);
@@ -464,12 +465,13 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 </Card>
               );
             })}
-          </div>
-        </ScrollArea>
+            </div>
+          </ScrollArea>
+        </div>
 
-        <Separator />
+        <Separator className="flex-shrink-0" />
 
-        <div className="p-6 pt-4">
+        <div className="p-6 pt-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>Job ID: {job.id}</span>
