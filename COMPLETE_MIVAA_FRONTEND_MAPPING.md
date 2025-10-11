@@ -216,31 +216,40 @@ class MivaaApiService {
 }
 ```
 
-### **Pattern 2: Supabase Function Proxy**
+### **Pattern 2: Direct Fetch (RECOMMENDED)**
 ```typescript
-// Via Supabase functions for authentication and logging
-class SupabaseMivaaService {
-  async callMivaaFunction(action: string, payload: any) {
-    const response = await supabase.functions.invoke('mivaa-gateway', {
-      body: { action, payload }
-    });
-    return response.data;
+// Direct fetch to Edge Function - CORS-free and reliable
+async function callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
+  const supabaseUrl = 'https://bgbavxtjlbvgplozizxu.supabase.co';
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/mivaa-gateway`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${supabaseKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action, payload })
+  });
+
+  const data = await response.json();
+  if (!data.success && data.error) {
+    throw new Error(`MIVAA gateway request failed: ${data.error.message}`);
   }
+  return data;
 }
 ```
 
-### **Pattern 3: Unified API Service**
+### **Pattern 3: Service Integration**
 ```typescript
-// Unified service that handles both patterns
-class UnifiedMivaaService {
-  constructor(private useDirectAccess = false) {}
-
+// All services now use the direct fetch pattern
+class MivaaIntegrationService {
   async processDocument(file: File, options: ProcessingOptions) {
-    if (this.useDirectAccess) {
-      return this.directMivaaCall('/api/v1/documents/process', { file, options });
-    } else {
-      return this.supabaseFunctionCall('document_process', { file, options });
-    }
+    return await callMivaaGatewayDirect('pdf_process_document', {
+      documentId: file.name,
+      extractionType: 'all',
+      outputFormat: 'json'
+    });
   }
 }
 ```
