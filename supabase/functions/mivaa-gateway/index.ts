@@ -215,6 +215,7 @@ const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> = {
   'get_job_status': { path: '/api/jobs/{job_id}/status', method: 'GET' },
   'list_jobs': { path: '/api/jobs', method: 'GET' },
   'cancel_job': { path: '/api/jobs/{job_id}/cancel', method: 'POST' },
+  'bulk_process': { path: '/api/bulk/process', method: 'POST' },
 
   // Material Recognition
   'material_recognition': { path: '/api/vision/analyze', method: 'POST' },

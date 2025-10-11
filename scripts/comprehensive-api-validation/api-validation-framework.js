@@ -114,6 +114,14 @@ const API_ENDPOINTS = [
   { path: '/api/bulk/process', method: 'POST', category: 'jobs', critical: false, auth: true,
     payload: { urls: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'], batch_size: 5 } },
 
+  // Additional Job Management Endpoints (from OpenAPI spec)
+  { path: '/api/jobs/{job_id}', method: 'GET', category: 'jobs', critical: true, auth: true,
+    skip: true, reason: 'Dynamic job_id parameter - tested separately' },
+  { path: '/api/jobs/{job_id}', method: 'DELETE', category: 'jobs', critical: false, auth: true,
+    skip: true, reason: 'Dynamic job_id parameter - tested separately' },
+  { path: '/api/v1/documents/job/{job_id}', method: 'GET', category: 'jobs', critical: true, auth: true,
+    skip: true, reason: 'Dynamic job_id parameter - tested separately' },
+
   // Data Management Endpoints
   { path: '/api/data/export', method: 'GET', category: 'data', critical: false, auth: true },
   { path: '/api/data/backup', method: 'POST', category: 'data', critical: false, auth: true },

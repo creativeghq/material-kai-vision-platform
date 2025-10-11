@@ -91,6 +91,269 @@ options: {
 }
 ```
 
+#### Additional Document Processing Endpoints
+
+**Process Document from URL**:
+```http
+POST /api/documents/process-url
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Analyze Document**:
+```http
+POST /api/documents/analyze
+Content-Type: multipart/form-data
+```
+
+**Batch Process Documents**:
+```http
+POST /api/documents/batch-process-fixed
+Content-Type: application/json
+```
+
+**List Documents**:
+```http
+GET /api/documents/documents
+```
+
+**Document Service Health**:
+```http
+GET /api/documents/health
+```
+
+### PDF Processing Endpoints
+
+**Extract Markdown from PDF**:
+```http
+POST /api/pdf/extract/markdown
+Content-Type: multipart/form-data
+```
+
+**Extract Tables from PDF**:
+```http
+POST /api/pdf/extract/tables
+Content-Type: multipart/form-data
+```
+
+**Extract Images from PDF**:
+```http
+POST /api/pdf/extract/images
+Content-Type: multipart/form-data
+```
+
+### Image Analysis Endpoints
+
+**Analyze Image**:
+```http
+POST /api/images/analyze
+Content-Type: application/json
+```
+
+**Batch Analyze Images**:
+```http
+POST /api/images/analyze/batch
+Content-Type: application/json
+```
+
+**Search Images**:
+```http
+POST /api/images/search
+Content-Type: application/json
+```
+
+**Upload and Analyze Image**:
+```http
+POST /api/images/upload-and-analyze
+Content-Type: multipart/form-data
+```
+
+**Image Service Health**:
+```http
+GET /api/images/health
+```
+
+### Material Analysis Endpoints
+
+**Analyze Material Image**:
+```http
+POST /api/analyze/materials/image
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Visual Material Search**:
+```http
+POST /api/search/materials/visual
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Generate Material Embeddings**:
+```http
+POST /api/embeddings/materials/generate
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Material Search Health**:
+```http
+GET /api/search/materials/health
+Authorization: Bearer {token}
+```
+
+### Search Endpoints
+
+**Semantic Search**:
+```http
+POST /api/search/semantic
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Similarity Search**:
+```http
+POST /api/search/similarity
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Multimodal Search**:
+```http
+POST /api/search/multimodal
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Image Search**:
+```http
+POST /api/search/images
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Search Service Health**:
+```http
+GET /api/search/health
+Authorization: Bearer {token}
+```
+
+### RAG System Endpoints
+
+**RAG Query**:
+```http
+POST /api/rag/query
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**RAG Search**:
+```http
+POST /api/rag/search
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**RAG Chat**:
+```http
+POST /api/rag/chat
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Upload RAG Document**:
+```http
+POST /api/rag/documents/upload
+Content-Type: multipart/form-data
+```
+
+**List RAG Documents**:
+```http
+GET /api/rag/documents
+Authorization: Bearer {token}
+```
+
+**RAG Service Health**:
+```http
+GET /api/rag/health
+Authorization: Bearer {token}
+```
+
+**RAG Statistics**:
+```http
+GET /api/rag/stats
+Authorization: Bearer {token}
+```
+
+### AI Analysis Endpoints
+
+**Semantic Analysis**:
+```http
+POST /api/semantic-analysis
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Multimodal Analysis**:
+```http
+POST /api/analyze/multimodal
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Multimodal Query**:
+```http
+POST /api/query/multimodal
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+### Data Management Endpoints
+
+**Export Data**:
+```http
+GET /api/data/export
+Authorization: Bearer {token}
+```
+
+**Backup Data**:
+```http
+POST /api/data/backup
+Authorization: Bearer {token}
+```
+
+**Cleanup Data**:
+```http
+DELETE /api/data/cleanup
+Authorization: Bearer {token}
+```
+
+### System Endpoints
+
+**List Models**:
+```http
+GET /api/models
+Authorization: Bearer {token}
+```
+
+**Package Status**:
+```http
+GET /api/packages/status
+Authorization: Bearer {token}
+```
+
+**System Health**:
+```http
+GET /api/system/health
+Authorization: Bearer {token}
+```
+
+**System Metrics**:
+```http
+GET /api/system/metrics
+Authorization: Bearer {token}
+```
+
 ## 🤖 MIVAA Service API
 
 ### What is MIVAA?
@@ -934,6 +1197,213 @@ const corsOrigins = process.env.NODE_ENV === 'production'
 2. **Dependency Health**: External service connectivity
 3. **Performance Metrics**: Response times and throughput
 4. **Error Tracking**: Error rates and types
+
+### Job Management Endpoints
+
+#### List All Jobs
+```http
+GET /api/jobs
+Authorization: Bearer {token}
+```
+
+**Query Parameters**:
+- `status` (optional): Filter by job status (queued, running, completed, failed)
+- `job_type` (optional): Filter by job type (document_processing, bulk_processing, etc.)
+- `page` (optional): Page number for pagination (default: 1)
+- `page_size` (optional): Items per page (default: 20, max: 100)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Jobs retrieved successfully",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "jobs": [
+    {
+      "job_id": "bulk_20251011_175237",
+      "job_type": "bulk_processing",
+      "status": "completed",
+      "priority": "normal",
+      "created_at": "2025-01-01T00:00:00Z",
+      "completed_at": "2025-01-01T00:02:00Z",
+      "progress_percentage": 100,
+      "description": "Process research paper",
+      "success": true
+    }
+  ],
+  "total_count": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+#### Get Job Status
+```http
+GET /api/jobs/{job_id}
+Authorization: Bearer {token}
+```
+
+**Note**: This endpoint currently has validation issues. Use the jobs list endpoint as a workaround.
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Job status retrieved successfully",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "data": {
+    "job_id": "job_123",
+    "job_type": "document_processing",
+    "status": "running",
+    "priority": "normal",
+    "created_at": "2025-01-01T00:00:00Z",
+    "progress": {
+      "current_step": "Processing page 5",
+      "completed_steps": 5,
+      "total_steps": 10,
+      "progress_percentage": 50
+    }
+  }
+}
+```
+
+#### Cancel Job
+```http
+DELETE /api/jobs/{job_id}
+Authorization: Bearer {token}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Job cancelled successfully",
+  "timestamp": "2025-01-01T00:00:00Z"
+}
+```
+
+#### Get Job Statistics
+```http
+GET /api/jobs/statistics
+Authorization: Bearer {token}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Job statistics retrieved successfully",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "data": {
+    "total_jobs": 150,
+    "status_counts": {
+      "queued": 5,
+      "running": 3,
+      "completed": 140,
+      "failed": 2
+    },
+    "average_processing_time": 45.2,
+    "success_rate": 0.987
+  }
+}
+```
+
+#### Bulk Processing (Async)
+```http
+POST /api/bulk/process
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "urls": [
+    "https://example.com/document1.pdf",
+    "https://example.com/document2.pdf"
+  ],
+  "batch_size": 5,
+  "processing_options": {
+    "extract_text": true,
+    "extract_images": true,
+    "extract_tables": true
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Bulk processing started successfully",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "data": {
+    "job_id": "bulk_20251011_175237",
+    "total_documents": 2,
+    "estimated_completion_time": "2025-01-01T00:05:00Z"
+  }
+}
+```
+
+### Async Processing Workflow
+
+The Material Kai Vision Platform supports asynchronous processing for large PDFs and bulk operations to avoid timeout issues.
+
+#### When to Use Async Processing
+
+- **Large PDFs** (>20MB): Files that may take longer than 2-3 minutes to process
+- **Bulk Operations**: Processing multiple documents simultaneously
+- **Complex Processing**: Full extraction with images, tables, and text analysis
+- **Timeout Avoidance**: When synchronous processing hits Supabase Edge Function limits
+
+#### Async Workflow Steps
+
+1. **Submit Job**: Use `/api/bulk/process` endpoint to submit documents for async processing
+2. **Get Job ID**: Response contains a unique job ID for tracking
+3. **Poll Status**: Use `/api/jobs` to check job status (recommended: 5-second intervals)
+4. **Retrieve Results**: When status = "completed", results are available in the job data
+
+#### Example Async Implementation
+
+```javascript
+// Step 1: Submit async job
+const response = await fetch('/api/bulk/process', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    urls: [pdfUrl],
+    batch_size: 1
+  })
+});
+
+const { data } = await response.json();
+const jobId = data.job_id;
+
+// Step 2: Poll for completion
+const pollJob = async () => {
+  const jobsResponse = await fetch('/api/jobs', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+
+  const { jobs } = await jobsResponse.json();
+  const job = jobs.find(j => j.job_id === jobId);
+
+  if (job.status === 'completed') {
+    return job; // Processing complete
+  } else if (job.status === 'failed') {
+    throw new Error('Job failed');
+  } else {
+    // Still processing, wait and retry
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    return pollJob();
+  }
+};
+
+const completedJob = await pollJob();
+```
 
 ### Metrics Endpoints
 

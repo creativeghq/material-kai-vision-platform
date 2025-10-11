@@ -230,9 +230,12 @@ const PDFProcessing = () => {
                 ) : (
                   <div>
                     <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground mb-3">
                       Complete workflow with authentication, upload, validation, processing, and knowledge base storage
                     </p>
+                    <div className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded px-3 py-2 inline-block">
+                      🚀 Smart Processing: Large PDFs (>20MB) automatically use async processing
+                    </div>
                   </div>
                 )}
               </div>
@@ -251,20 +254,34 @@ const PDFProcessing = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  type="url"
-                  placeholder="https://example.com/document.pdf"
-                  value={pdfUrl}
-                  onChange={(e) => setPdfUrl(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={processUrlPdf}
-                  disabled={isProcessingUrl || !pdfUrl.trim()}
-                >
-                  {isProcessingUrl ? 'Processing...' : 'Process'}
-                </Button>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    type="url"
+                    placeholder="https://example.com/document.pdf"
+                    value={pdfUrl}
+                    onChange={(e) => setPdfUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={processUrlPdf}
+                    disabled={isProcessingUrl || !pdfUrl.trim()}
+                  >
+                    {isProcessingUrl ? 'Processing...' : 'Process'}
+                  </Button>
+                </div>
+
+                {/* Smart Processing Information */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">🚀 Smart Processing System</h4>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <p>• <strong>Small files (<20MB):</strong> Fast synchronous processing (1-3 minutes)</p>
+                    <p>• <strong>Large files (>20MB):</strong> Automatic async processing (no timeouts)</p>
+                    <p>• <strong>Complex documents:</strong> Signature books, forms with many images supported</p>
+                    <p>• <strong>Real-time updates:</strong> Progress tracking for all processing modes</p>
+                    <p>• <strong>No size limits:</strong> Process PDFs of any size with our async system</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

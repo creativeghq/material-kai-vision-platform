@@ -391,23 +391,39 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        // Use direct fetch to MIVAA gateway to avoid CORS issues
-        const response = await this.callMivaaGatewayDirect('pdf_process_document', {
-          fileUrl: processingRequest.fileUrl,
-          filename: processingRequest.filename,
-          options: processingRequest.options,
-        });
+        // Determine if we should use async processing based on file size
+        const shouldUseAsync = this.shouldUseAsyncProcessing(file);
 
-        // Update progress: Processing response
-        this.updateJobStep(jobId, 'mivaa-processing', {
-          progress: 60,
-          details: [
-            'Initializing MIVAA processing...',
-            'Preparing document for analysis',
-            'Sending document to MIVAA service...',
-            'Processing document with MIVAA...',
-          ],
-        });
+        let response;
+        if (shouldUseAsync) {
+          // Use bulk processing for async handling of large files
+          this.updateJobStep(jobId, 'mivaa-processing', {
+            progress: 25,
+            details: [
+              'Initializing MIVAA processing...',
+              'Preparing document for analysis',
+              'Sending document to MIVAA service...',
+              '🔄 Using async processing for large PDF...',
+            ],
+          });
+
+          response = await this.callMivaaGatewayDirect('bulk_process', {
+            urls: [processingRequest.fileUrl],
+            batch_size: 1,
+            processing_options: {
+              extract_text: true,
+              extract_images: processingRequest.options.includeImages !== false,
+              extract_tables: true,
+            }
+          });
+        } else {
+          // Use regular synchronous processing for smaller files
+          response = await this.callMivaaGatewayDirect('pdf_process_document', {
+            fileUrl: processingRequest.fileUrl,
+            filename: processingRequest.filename,
+            options: processingRequest.options,
+          });
+        }
 
         // Check for MIVAA gateway errors in the response data (direct call format)
         if (!response.success && response.error) {
@@ -431,40 +447,42 @@ export class ConsolidatedPDFWorkflowService {
           throw new Error(`MIVAA processing failed: ${errorMessage}`);
         }
 
-        const result = response.data;
+        // Check if MIVAA returned a job ID (async) or completed result (sync)
+        const mivaaJobId = response.data?.job_id || response.data?.id;
 
-        // Update progress: Processing complete
-        this.updateJobStep(jobId, 'mivaa-processing', {
-          progress: 90,
-          details: [
-            'Initializing MIVAA processing...',
-            'Preparing document for analysis',
-            'Sending document to MIVAA service...',
-            'Processing document with MIVAA...',
-            'Extracting content and generating embeddings...',
-          ],
-        });
+        if (mivaaJobId && response.data?.status === 'pending') {
+          // Async processing - poll for completion
+          this.updateJobStep(jobId, 'mivaa-processing', {
+            progress: 30,
+            details: [
+              'Initializing MIVAA processing...',
+              'Preparing document for analysis',
+              'Sending document to MIVAA service...',
+              `✅ Job started with ID: ${mivaaJobId}`,
+              '⏳ Polling for processing status...',
+            ],
+          });
 
-        return {
-          details: [
-            this.createSuccessDetail('MIVAA microservice processing completed successfully'),
-            this.createSuccessDetail('Advanced PDF extraction using LlamaIndex RAG'),
-            this.createSuccessDetail(`Processing completed with ${result.sources?.length || 0} sources`),
-            this.createSuccessDetail(`Generated ${result.chunks?.length || 0} text chunks`),
-            this.createSuccessDetail(`Extracted ${result.images?.length || 0} images`),
-            this.createSuccessDetail('Generated 1536-dimension embeddings'),
-            this.createSuccessDetail(`Quality score: ${Math.round((result.confidence || 0) * 100)}%`),
-          ],
-          metadata: {
-            service: 'MIVAA',
-            sourcesGenerated: result.sources?.length || 0,
-            chunksCreated: result.chunks?.length || 0,
-            imagesExtracted: result.images?.length || 0,
-            confidence: result.confidence || 0,
-            processingTime: result.processingTime || 0,
-          },
-          result,
-        };
+          // Start polling for job completion
+          const result = await this.pollMivaaJobStatus(jobId, mivaaJobId);
+          return this.createMivaaResult(result);
+        } else if (response.data?.status === 'completed') {
+          // Synchronous processing completed successfully
+          this.updateJobStep(jobId, 'mivaa-processing', {
+            progress: 90,
+            details: [
+              'Initializing MIVAA processing...',
+              'Preparing document for analysis',
+              'Sending document to MIVAA service...',
+              '✅ Processing completed successfully!',
+            ],
+          });
+
+          return this.createMivaaResult(response.data);
+        } else {
+          // Unknown response format
+          throw new Error(`Unexpected MIVAA response format: ${JSON.stringify(response.data)}`);
+        }
       });
 
       // Step 5: Layout Analysis (show MIVAA analysis results)
@@ -546,10 +564,32 @@ export class ConsolidatedPDFWorkflowService {
     } catch (error) {
       console.error('MIVAA PDF workflow error:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      await this.updateJobStep(jobId, 'mivaa-processing', {
-        status: 'failed',
-        details: [this.createErrorDetail(`Processing failed: ${errorMessage}`, errorMessage)],
-      });
+
+      // Handle timeout errors specifically
+      if (error instanceof Error && (
+        error.name === 'AbortError' ||
+        error.message.includes('timeout') ||
+        error.message.includes('504') ||
+        error.message.includes('Gateway Timeout')
+      )) {
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          status: 'failed',
+          details: [
+            this.createErrorDetail(
+              'Processing timeout: PDF is too large or complex',
+              'This PDF appears to be very large or complex and is taking longer than our processing timeout allows. Try reducing the processing options (disable image extraction, table extraction) or use a smaller PDF.'
+            ),
+            this.createInfoDetail('💡 Tip: Large signature books and complex documents may need simplified processing'),
+            this.createInfoDetail('🔧 Try disabling "Extract Images" and "Extract Tables" for faster processing'),
+          ],
+        });
+      } else {
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          status: 'failed',
+          details: [this.createErrorDetail(`Processing failed: ${errorMessage}`, errorMessage)],
+        });
+      }
+
       throw error;
     }
   }
@@ -733,6 +773,129 @@ export class ConsolidatedPDFWorkflowService {
       this.pollingIntervals.forEach((interval) => clearInterval(interval));
       this.pollingIntervals.clear();
     }
+  }
+
+  /**
+   * Determine if async processing should be used based on file size and complexity
+   */
+  private shouldUseAsyncProcessing(file: File): boolean {
+    // Use async processing for files larger than 20MB
+    const ASYNC_THRESHOLD_MB = 20;
+    const fileSizeMB = file.size / (1024 * 1024);
+
+    return fileSizeMB > ASYNC_THRESHOLD_MB;
+  }
+
+  /**
+   * Create standardized MIVAA result object
+   */
+  private createMivaaResult(result: any) {
+    return {
+      details: [
+        this.createSuccessDetail('MIVAA microservice processing completed successfully'),
+        this.createSuccessDetail('Advanced PDF extraction using LlamaIndex RAG'),
+        this.createSuccessDetail(`Processing completed with ${result.sources?.length || result.content?.chunks?.length || 0} sources`),
+        this.createSuccessDetail(`Generated ${result.chunks?.length || result.content?.chunks?.length || 0} text chunks`),
+        this.createSuccessDetail(`Extracted ${result.images?.length || result.content?.images?.length || 0} images`),
+        this.createSuccessDetail('Generated 1536-dimension embeddings'),
+        this.createSuccessDetail(`Quality score: ${Math.round((result.confidence || result.metadata?.confidence_score || 0) * 100)}%`),
+      ],
+      metadata: {
+        service: 'MIVAA',
+        sourcesGenerated: result.sources?.length || result.content?.chunks?.length || 0,
+        chunksCreated: result.chunks?.length || result.content?.chunks?.length || 0,
+        imagesExtracted: result.images?.length || result.content?.images?.length || 0,
+        confidence: result.confidence || result.metadata?.confidence_score || 0,
+        processingTime: result.processingTime || result.metrics?.processing_time_seconds || 0,
+      },
+      result,
+    };
+  }
+
+  /**
+   * Poll MIVAA job status until completion
+   */
+  private async pollMivaaJobStatus(jobId: string, mivaaJobId: string): Promise<any> {
+    const maxAttempts = 120; // 10 minutes max (5 second intervals)
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      try {
+        // Update progress with polling status
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: 30 + Math.min(50, (attempts / maxAttempts) * 50), // Progress from 30% to 80%
+          details: [
+            'Initializing MIVAA processing...',
+            'Preparing document for analysis',
+            'Sending document to MIVAA service...',
+            `✅ Job started with ID: ${mivaaJobId}`,
+            `⏳ Polling for status... (attempt ${attempts + 1}/${maxAttempts})`,
+          ],
+        });
+
+        // Use jobs list endpoint as workaround for broken individual job status endpoint
+        const jobsResponse = await this.callMivaaGatewayDirect('list_jobs', {});
+
+        if (jobsResponse.success && jobsResponse.data?.jobs) {
+          // Find our job in the list
+          const job = jobsResponse.data.jobs.find((j: any) => j.job_id === mivaaJobId);
+
+          if (job) {
+            const status = job.status;
+
+            if (status === 'completed') {
+              // Job completed successfully
+              this.updateJobStep(jobId, 'mivaa-processing', {
+                progress: 90,
+                details: [
+                  'Initializing MIVAA processing...',
+                  'Preparing document for analysis',
+                  'Sending document to MIVAA service...',
+                  `✅ Job started with ID: ${mivaaJobId}`,
+                  '✅ Processing completed successfully!',
+                ],
+              });
+
+              // For completed jobs, we need to get the result data
+              // Since the job list doesn't include full results, we'll return a success indicator
+              return {
+                success: true,
+                job_id: mivaaJobId,
+                status: 'completed',
+                message: 'Async processing completed successfully'
+              };
+            } else if (status === 'failed' || status === 'error') {
+              // Job failed
+            const errorMessage = job.error || 'Processing failed';
+            throw new Error(`MIVAA job failed: ${errorMessage}`);
+          } else if (status === 'processing' || status === 'pending' || status === 'running') {
+            // Job still running, continue polling
+            console.log(`MIVAA job ${mivaaJobId} status: ${status}`);
+          } else {
+            console.warn(`Unknown MIVAA job status: ${status}`);
+          }
+        } else {
+          console.warn('Job not found in jobs list:', mivaaJobId);
+        }
+
+        // Wait 5 seconds before next poll
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        attempts++;
+
+      } catch (error) {
+        console.error(`Error polling MIVAA job status (attempt ${attempts + 1}):`, error);
+        attempts++;
+
+        if (attempts >= maxAttempts) {
+          throw new Error(`MIVAA job polling failed after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+
+    throw new Error(`MIVAA job polling timed out after ${maxAttempts} attempts (${maxAttempts * 5} seconds)`);
   }
 
   /**

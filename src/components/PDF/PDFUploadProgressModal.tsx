@@ -284,6 +284,27 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             </div>
             <Progress value={overallProgress} className="h-2" />
           </div>
+
+          {/* Async Processing Indicator */}
+          {job.steps.some(step =>
+            step.id === 'mivaa-processing' &&
+            step.details?.some(detail =>
+              typeof detail === 'string' && detail.includes('async')
+            )
+          ) && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-blue-600" />
+                <div className="text-sm">
+                  <span className="font-medium text-blue-900">Async Processing Mode</span>
+                  <p className="text-blue-700 mt-1">
+                    Large PDF detected - using background processing to avoid timeouts.
+                    This may take several minutes for complex documents.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogHeader>
 
         <Separator className="flex-shrink-0" />
