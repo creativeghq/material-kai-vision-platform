@@ -323,9 +323,9 @@ export class ConsolidatedPDFWorkflowService {
 
         return {
           details: [
-            `File uploaded: ${fullPath}`,
-            `File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`,
-            'Public URL generated',
+            this.createSuccessDetail(`File uploaded: ${fullPath}`),
+            this.createSuccessDetail(`File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`),
+            this.createSuccessDetail('Public URL generated'),
           ],
           metadata: {
             fileName: fullPath,
@@ -341,9 +341,9 @@ export class ConsolidatedPDFWorkflowService {
         await new Promise(resolve => setTimeout(resolve, 500));
         return {
           details: [
-            'PDF structure validated',
-            'Content accessibility confirmed',
-            'No encryption detected',
+            this.createSuccessDetail('PDF structure validated'),
+            this.createSuccessDetail('Content accessibility confirmed'),
+            this.createSuccessDetail('No encryption detected'),
           ],
           metadata: {
             isValidPDF: true,
@@ -472,12 +472,12 @@ export class ConsolidatedPDFWorkflowService {
         const mivaaData = (mivaaResult as any).result;
         return {
           details: [
-            'Layout analysis completed using MIVAA',
-            'Document structure preserved with advanced algorithms',
-            'Reading order optimized for RAG processing',
-            'Element hierarchy established',
-            `Analyzed ${mivaaData?.pages || 'unknown'} pages`,
-            `Detected ${mivaaData?.elements || 'various'} layout elements`,
+            this.createSuccessDetail('Layout analysis completed using MIVAA'),
+            this.createSuccessDetail('Document structure preserved with advanced algorithms'),
+            this.createSuccessDetail('Reading order optimized for RAG processing'),
+            this.createSuccessDetail('Element hierarchy established'),
+            this.createSuccessDetail(`Analyzed ${mivaaData?.pages || 'unknown'} pages`),
+            this.createSuccessDetail(`Detected ${mivaaData?.elements || 'various'} layout elements`),
           ],
           metadata: {
             layoutAnalysisCompleted: true,
@@ -493,10 +493,10 @@ export class ConsolidatedPDFWorkflowService {
       await this.executeStep(jobId, 'embedding-generation', async () => {
         return {
           details: [
-            'Embeddings generated using MIVAA integration',
-            '1536-dimension embeddings (MIVAA standard)',
-            'Optimized for semantic search and RAG',
-            'Batch processing completed efficiently',
+            this.createSuccessDetail('Embeddings generated using MIVAA integration'),
+            this.createSuccessDetail('1536-dimension embeddings (MIVAA standard)'),
+            this.createSuccessDetail('Optimized for semantic search and RAG'),
+            this.createSuccessDetail('Batch processing completed efficiently'),
           ],
           metadata: {
             embeddingDimensions: 1536,
@@ -510,10 +510,10 @@ export class ConsolidatedPDFWorkflowService {
       await this.executeStep(jobId, 'knowledge-storage', async () => {
         return {
           details: [
-            'Document stored in enhanced knowledge base',
-            'MIVAA processing results integrated',
-            'Metadata and relationships preserved',
-            'Search indexing completed',
+            this.createSuccessDetail('Document stored in enhanced knowledge base'),
+            this.createSuccessDetail('MIVAA processing results integrated'),
+            this.createSuccessDetail('Metadata and relationships preserved'),
+            this.createSuccessDetail('Search indexing completed'),
           ],
           metadata: {
             knowledgeEntryId: (mivaaResult as any).result?.knowledgeEntryId,
@@ -529,10 +529,10 @@ export class ConsolidatedPDFWorkflowService {
 
         return {
           details: [
-            `Overall processing quality: ${Math.round(confidence * 100)}%`,
-            'MIVAA advanced algorithms used',
-            'Quality metrics calculated',
-            'Processing completed successfully',
+            this.createSuccessDetail(`Overall processing quality: ${Math.round(confidence * 100)}%`),
+            this.createSuccessDetail('MIVAA advanced algorithms used'),
+            this.createSuccessDetail('Quality metrics calculated'),
+            this.createSuccessDetail('Processing completed successfully'),
           ],
           metadata: {
             overallQuality: confidence,
