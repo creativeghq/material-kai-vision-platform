@@ -49,6 +49,50 @@ export interface HybridSearchRequest {
   filters?: Record<string, unknown>;
 }
 
+/**
+ * Call MIVAA Gateway directly using fetch to avoid CORS issues
+ */
+async function callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
+  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase configuration not found');
+  }
+
+  const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action,
+        payload
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    // Check for application-level errors
+    if (!data.success && data.error) {
+      throw new Error(`MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Direct MIVAA gateway call failed:', error);
+    throw error;
+  }
+}
+
 export class MivaaSearchIntegration {
   private readonly gatewayUrl: string;
   private readonly apiKey: string;
@@ -96,17 +140,11 @@ export class MivaaSearchIntegration {
    */
   async vectorSearch(request: VectorSearchRequest): Promise<SearchResponse> {
     try {
-      // Use existing Supabase MIVAA gateway
-      const { supabase } = await import('@/integrations/supabase/client');
-      const response = await supabase.functions.invoke('mivaa-gateway', {
-        body: {
-          action: 'vector_search',
-          payload: request,
-        },
-      });
+      // Use direct MIVAA gateway call
+      const response = await callMivaaGatewayDirect('vector_search', request);
 
-      if (response.error) {
-        throw new Error(`MIVAA vector search request failed: ${response.error.message || 'Unknown error'}`);
+      if (!response.success) {
+        throw new Error(`MIVAA vector search request failed: ${response.error?.message || 'Unknown error'}`);
       }
 
       const result = response.data;

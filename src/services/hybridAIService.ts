@@ -163,17 +163,13 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 
   // Call hybrid analysis edge function
   static async callHybridAnalysis(request: HybridRequest): Promise<HybridResponse> {
-    const { supabase } = await import('@/integrations/supabase/client');
+    const response = await callMivaaGatewayDirect('hybrid_material_analysis', request);
 
-    const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
-      body: request,
-    });
-
-    if (error) {
-      throw new Error(`Hybrid analysis failed: ${error.message}`);
+    if (!response.success) {
+      throw new Error(`Hybrid analysis failed: ${response.error?.message || 'Unknown error'}`);
     }
 
-    return data;
+    return response.data;
   }
 
   // MIVAA API calls (primary provider)
