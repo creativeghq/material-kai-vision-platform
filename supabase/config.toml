@@ -7,9 +7,6 @@ schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
-[functions.api-gateway]
-verify_jwt = false
-
 [functions.crewai-3d-generation]
 verify_jwt = false
 
