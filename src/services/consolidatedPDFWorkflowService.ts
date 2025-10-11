@@ -706,6 +706,17 @@ export class ConsolidatedPDFWorkflowService {
     const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
 
     try {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+      console.log(`🔍 Making MIVAA gateway request:`, {
+        action,
+        url,
+        payloadSize: JSON.stringify(payload).length,
+        timestamp: new Date().toISOString()
+      });
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -715,7 +726,17 @@ export class ConsolidatedPDFWorkflowService {
         body: JSON.stringify({
           action,
           payload
-        })
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log(`🔍 MIVAA gateway response:`, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        timestamp: new Date().toISOString()
       });
 
       if (!response.ok) {
