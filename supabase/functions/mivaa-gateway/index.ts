@@ -315,7 +315,7 @@ serve(async (req) => {
     // Log timeout configuration for debugging
     let timeoutMs = 30000; // Default 30 seconds
     if (action.includes('pdf') || action.includes('document') || action.includes('process')) {
-      timeoutMs = 300000; // 5 minutes for PDF/document processing
+      timeoutMs = 600000; // 10 minutes for PDF/document processing (Edge Function max)
     } else if (action.includes('batch') || action.includes('analyze')) {
       timeoutMs = 120000; // 2 minutes for batch operations
     }
@@ -390,7 +390,7 @@ serve(async (req) => {
           options: {
             extract_images: true,
             extract_tables: true,
-            timeout_seconds: 300,
+            timeout_seconds: 600, // 10 minutes for complex PDFs
             quality: 'standard',
             language: 'auto',
             ...payload.options // Allow frontend to override options

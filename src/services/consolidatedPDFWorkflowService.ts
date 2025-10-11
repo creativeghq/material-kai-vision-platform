@@ -749,12 +749,12 @@ export class ConsolidatedPDFWorkflowService {
     const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
 
     try {
-      // Add timeout to prevent hanging requests (5 minutes for PDF processing)
+      // Add timeout to prevent hanging requests (10 minutes for PDF processing)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.error('🚨 Request timeout after 5 minutes');
+        console.error('🚨 Request timeout after 10 minutes');
         controller.abort();
-      }, 300000); // 5 minute timeout for PDF processing
+      }, 600000); // 10 minute timeout for PDF processing
 
       console.log(`🔍 Making MIVAA gateway request:`, {
         action,
@@ -801,7 +801,7 @@ export class ConsolidatedPDFWorkflowService {
       console.error('Direct MIVAA gateway call failed:', error);
 
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`MIVAA gateway request timed out after 5 minutes. The PDF processing is taking longer than expected. Please try with a smaller PDF or try again later.`);
+        throw new Error(`MIVAA gateway request timed out after 10 minutes. This PDF appears to be very complex or large. Please try with a smaller PDF or contact support for assistance with large documents.`);
       }
 
       throw error;
