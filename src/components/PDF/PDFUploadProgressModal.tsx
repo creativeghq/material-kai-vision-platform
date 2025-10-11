@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -251,10 +251,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 <DialogTitle className="text-xl">
                   {job.name || 'PDF Processing Workflow'}
                 </DialogTitle>
-                <p className="text-sm text-muted-foreground mt-1">
+                <DialogDescription className="text-sm text-muted-foreground mt-1">
                   {job.filename} • Started {formatDuration(job.startTime)}
                   {job.endTime && ` • Completed in ${formatDuration(job.startTime, job.endTime)}`}
-                </p>
+                </DialogDescription>
               </div>
             </div>
             <div className="flex items-center gap-2">
