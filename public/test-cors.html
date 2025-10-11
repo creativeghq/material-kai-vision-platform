@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>CORS Test for MIVAA Gateway</h1>
+    <p>This page tests the CORS configuration of the MIVAA Gateway Edge Function.</p>
+    
+    <button onclick="testCORS()">Test CORS</button>
+    <button onclick="testEnvironment()">Test Environment</button>
+    <button onclick="testDifferentOrigins()">Test Different Origins</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        async function testEnvironment() {
+            clearResults();
+            addResult('<h3>Environment Test</h3>');
+            
+            // Test environment variables
+            const supabaseUrl = 'https://bgbavxtjlbvgplozizxu.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+            
+            addResult(`<strong>Supabase URL:</strong> ${supabaseUrl}`);
+            addResult(`<strong>Supabase Key:</strong> ${supabaseKey.substring(0, 50)}...`);
+            addResult(`<strong>Current Origin:</strong> ${window.location.origin}`);
+            addResult(`<strong>User Agent:</strong> ${navigator.userAgent}`);
+        }
+        
+        async function testCORS() {
+            clearResults();
+            addResult('<h3>CORS Test Results</h3>');
+            
+            const supabaseUrl = 'https://bgbavxtjlbvgplozizxu.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+            const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
+            
+            // Test 1: OPTIONS request (CORS preflight)
+            try {
+                addResult('<strong>Test 1: OPTIONS Request (CORS Preflight)</strong>');
+                const optionsResponse = await fetch(url, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'POST',
+                        'Access-Control-Request-Headers': 'authorization, content-type',
+                    }
+                });
+                
+                addResult(`Status: ${optionsResponse.status} ${optionsResponse.statusText}`, 
+                         optionsResponse.ok ? 'success' : 'error');
+                
+                const corsHeaders = {};
+                for (const [key, value] of optionsResponse.headers.entries()) {
+                    if (key.toLowerCase().includes('access-control')) {
+                        corsHeaders[key] = value;
+                    }
+                }
+                addResult(`<pre>CORS Headers: ${JSON.stringify(corsHeaders, null, 2)}</pre>`);
+                
+            } catch (error) {
+                addResult(`OPTIONS Error: ${error.message}`, 'error');
+            }
+            
+            // Test 2: Actual POST request
+            try {
+                addResult('<strong>Test 2: POST Request</strong>');
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'health_check',
+                        payload: {}
+                    })
+                });
+                
+                addResult(`Status: ${response.status} ${response.statusText}`, 
+                         response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`<pre>Response: ${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    const text = await response.text();
+                    addResult(`Error Response: ${text}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`POST Error: ${error.message}`, 'error');
+                addResult(`Error Type: ${error.constructor.name}`, 'error');
+                if (error.stack) {
+                    addResult(`<pre>Stack: ${error.stack}</pre>`, 'error');
+                }
+            }
+        }
+        
+        async function testDifferentOrigins() {
+            clearResults();
+            addResult('<h3>Different Origins Test</h3>');
+            
+            const supabaseUrl = 'https://bgbavxtjlbvgplozizxu.supabase.co';
+            const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
+            
+            const origins = [
+                window.location.origin,
+                'https://app.materialshub.gr',
+                'http://localhost:3000',
+                'https://localhost:3000'
+            ];
+            
+            for (const origin of origins) {
+                try {
+                    addResult(`<strong>Testing Origin: ${origin}</strong>`);
+                    const response = await fetch(url, {
+                        method: 'OPTIONS',
+                        headers: {
+                            'Origin': origin,
+                            'Access-Control-Request-Method': 'POST',
+                            'Access-Control-Request-Headers': 'authorization, content-type',
+                        }
+                    });
+                    
+                    addResult(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+                    
+                } catch (error) {
+                    addResult(`Error for ${origin}: ${error.message}`, 'error');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
