@@ -9,6 +9,8 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/Layout/AuthGuard';
 
 import { monitoringService } from '@/services/monitoring/monitoringService';
+// Import CORS debug utility for troubleshooting
+import './debug/cors-debug';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';

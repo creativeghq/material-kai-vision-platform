@@ -1,0 +1,102 @@
+// Debug utility to test CORS issues in the browser
+export async function debugCORSIssue() {
+  console.log('🔍 CORS Debug - Environment Check');
+  
+  // Check environment variables
+  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+  
+  console.log('Environment Variables:');
+  console.log('  VITE_SUPABASE_URL:', supabaseUrl);
+  console.log('  VITE_SUPABASE_ANON_KEY:', supabaseKey.substring(0, 50) + '...');
+  console.log('  Current Origin:', window.location.origin);
+  console.log('  User Agent:', navigator.userAgent);
+  
+  const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
+  console.log('  Target URL:', url);
+  
+  // Test 1: OPTIONS request
+  try {
+    console.log('\n🔍 Test 1: OPTIONS Request');
+    const optionsResponse = await fetch(url, {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': window.location.origin,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization, content-type',
+      }
+    });
+    
+    console.log('  Status:', optionsResponse.status, optionsResponse.statusText);
+    console.log('  CORS Headers:');
+    for (const [key, value] of optionsResponse.headers.entries()) {
+      if (key.toLowerCase().includes('access-control')) {
+        console.log('    ' + key + ':', value);
+      }
+    }
+    
+    if (!optionsResponse.ok) {
+      console.log('  ❌ OPTIONS failed');
+      return { success: false, error: 'OPTIONS request failed' };
+    }
+    
+  } catch (error) {
+    console.log('  ❌ OPTIONS Error:', error);
+    return { success: false, error: `OPTIONS error: ${error.message}` };
+  }
+  
+  // Test 2: Actual POST request
+  try {
+    console.log('\n🔍 Test 2: POST Request');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'health_check',
+        payload: {}
+      })
+    });
+    
+    console.log('  Status:', response.status, response.statusText);
+    console.log('  Response Headers:');
+    for (const [key, value] of response.headers.entries()) {
+      if (key.toLowerCase().includes('access-control') || key.toLowerCase().includes('content-type')) {
+        console.log('    ' + key + ':', value);
+      }
+    }
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('  ✅ Success:', data);
+      return { success: true, data };
+    } else {
+      const text = await response.text();
+      console.log('  ❌ Error Response:', text);
+      return { success: false, error: `HTTP ${response.status}: ${text}` };
+    }
+    
+  } catch (error) {
+    console.log('  ❌ POST Error:', error);
+    console.log('  Error Type:', error.constructor.name);
+    console.log('  Error Message:', error.message);
+    
+    if (error.message.includes('CORS')) {
+      console.log('  🚨 CORS Error Detected!');
+      console.log('  This suggests the browser is blocking the request');
+      console.log('  Even though our tests show the server has proper CORS headers');
+    }
+    
+    return { success: false, error: `POST error: ${error.message}` };
+  }
+}
+
+// Test function that can be called from browser console
+(window as any).debugCORS = debugCORSIssue;
+
+// Auto-run on load for debugging
+if (typeof window !== 'undefined') {
+  console.log('🔧 CORS Debug utility loaded. Call debugCORS() to test.');
+}
