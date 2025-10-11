@@ -866,16 +866,19 @@ export class ConsolidatedPDFWorkflowService {
               };
             } else if (status === 'failed' || status === 'error') {
               // Job failed
-            const errorMessage = job.error || 'Processing failed';
-            throw new Error(`MIVAA job failed: ${errorMessage}`);
-          } else if (status === 'processing' || status === 'pending' || status === 'running') {
-            // Job still running, continue polling
-            console.log(`MIVAA job ${mivaaJobId} status: ${status}`);
+              const errorMessage = job.error || 'Processing failed';
+              throw new Error(`MIVAA job failed: ${errorMessage}`);
+            } else if (status === 'processing' || status === 'pending' || status === 'running') {
+              // Job still running, continue polling
+              console.log(`MIVAA job ${mivaaJobId} status: ${status}`);
+            } else {
+              console.warn(`Unknown MIVAA job status: ${status}`);
+            }
           } else {
-            console.warn(`Unknown MIVAA job status: ${status}`);
+            console.warn('Job not found in jobs list:', mivaaJobId);
           }
         } else {
-          console.warn('Job not found in jobs list:', mivaaJobId);
+          console.warn('Failed to get jobs list:', jobsResponse);
         }
 
         // Wait 5 seconds before next poll
