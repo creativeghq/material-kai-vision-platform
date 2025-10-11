@@ -28,16 +28,23 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 // Import types from the workflow service
+interface WorkflowStepDetail {
+  message: string;
+  status?: 'success' | 'error' | 'info';
+  error?: string;
+}
+
 interface WorkflowStep {
   id: string;
   name: string;
   description?: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   progress?: number;
-  details?: string[];
+  details?: (string | WorkflowStepDetail)[];
   metadata?: Record<string, unknown>;
   result?: unknown;
   startTime?: Date;
@@ -378,12 +385,54 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               <div className="space-y-1">
                                 <h5 className="text-sm font-medium text-gray-300">Details:</h5>
                                 <ul className="text-sm space-y-1">
-                                  {step.details.map((detail, idx) => (
-                                    <li key={idx} className="flex items-start gap-2">
-                                      <span className="text-gray-400">•</span>
-                                      <span className="text-gray-300">{detail}</span>
-                                    </li>
-                                  ))}
+                                  {step.details.map((detail, idx) => {
+                                    // Handle both string and WorkflowStepDetail types
+                                    const isDetailObject = typeof detail === 'object' && detail !== null;
+                                    const message = isDetailObject ? (detail as WorkflowStepDetail).message : detail as string;
+                                    const status = isDetailObject ? (detail as WorkflowStepDetail).status : 'info';
+                                    const error = isDetailObject ? (detail as WorkflowStepDetail).error : undefined;
+
+                                    // Determine icon and color based on status
+                                    const getStatusIcon = () => {
+                                      switch (status) {
+                                        case 'success':
+                                          return <CheckCircle className="h-4 w-4 text-green-500" />;
+                                        case 'error':
+                                          return error ? (
+                                            <TooltipProvider>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <XCircle className="h-4 w-4 text-red-500 cursor-help" />
+                                                </TooltipTrigger>
+                                                <TooltipContent side="right" className="max-w-xs">
+                                                  <p className="text-sm">{error}</p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          ) : <XCircle className="h-4 w-4 text-red-500" />;
+                                        default:
+                                          return <span className="text-gray-400">•</span>;
+                                      }
+                                    };
+
+                                    const getTextColor = () => {
+                                      switch (status) {
+                                        case 'success':
+                                          return 'text-green-300';
+                                        case 'error':
+                                          return 'text-red-300';
+                                        default:
+                                          return 'text-gray-300';
+                                      }
+                                    };
+
+                                    return (
+                                      <li key={idx} className="flex items-start gap-2">
+                                        {getStatusIcon()}
+                                        <span className={getTextColor()}>{message}</span>
+                                      </li>
+                                    );
+                                  })}
                                 </ul>
                               </div>
                             )}

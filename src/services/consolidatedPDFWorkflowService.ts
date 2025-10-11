@@ -3,13 +3,19 @@ import { supabase } from '../integrations/supabase/client';
 import WorkflowErrorHandler, { type WorkflowResponse } from '../utils/WorkflowErrorHandler';
 
 // Define interfaces locally to avoid importing from React components
+interface WorkflowStepDetail {
+  message: string;
+  status?: 'success' | 'error' | 'info';
+  error?: string;
+}
+
 interface WorkflowStep {
   id: string;
   name: string;
   description?: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
   progress?: number;
-  details?: string[];
+  details?: (string | WorkflowStepDetail)[];
   metadata?: Record<string, unknown>;
   result?: unknown;
   startTime?: Date;
@@ -93,6 +99,19 @@ export class ConsolidatedPDFWorkflowService {
   constructor() {
     // MIVAA integration now handled via API gateway pattern
     // No direct service dependencies needed
+  }
+
+  // Helper functions to create status-aware details
+  private createSuccessDetail(message: string): WorkflowStepDetail {
+    return { message, status: 'success' };
+  }
+
+  private createErrorDetail(message: string, error?: string): WorkflowStepDetail {
+    return { message, status: 'error', error };
+  }
+
+  private createInfoDetail(message: string): WorkflowStepDetail {
+    return { message, status: 'info' };
   }
 
   subscribe(callback: WorkflowEventCallback) {
@@ -273,9 +292,15 @@ export class ConsolidatedPDFWorkflowService {
       // Step 1: Authentication
       await this.executeStep(jobId, 'auth', async () => {
         const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) throw new Error('User not authenticated');
+        if (error || !user) {
+          throw new Error('User not authenticated');
+        }
         return {
-          details: [`Authenticated user: ${user.email}`, `User ID: ${user.id}`],
+          details: [
+            this.createSuccessDetail(`Authenticated user: ${user.email}`),
+            this.createSuccessDetail(`User ID: ${user.id}`),
+            this.createSuccessDetail('Authentication verified successfully')
+          ],
           metadata: { userId: user.id, email: user.email },
         };
       });
@@ -336,7 +361,10 @@ export class ConsolidatedPDFWorkflowService {
         // Update progress: Starting MIVAA processing
         this.updateJobStep(jobId, 'mivaa-processing', {
           progress: 10,
-          details: ['Initializing MIVAA processing...', 'Preparing document for analysis'],
+          details: [
+            this.createInfoDetail('Initializing MIVAA processing...'),
+            this.createInfoDetail('Preparing document for analysis')
+          ],
         });
 
         const processingRequest = {
@@ -384,6 +412,19 @@ export class ConsolidatedPDFWorkflowService {
         // Check for MIVAA gateway errors in the response data (direct call format)
         if (!response.success && response.error) {
           const errorMessage = response.error.message || 'Unknown error';
+          const errorCode = response.error.code || 'UNKNOWN_ERROR';
+
+          // Update step with specific error details
+          this.updateJobStep(jobId, 'mivaa-processing', {
+            progress: 0,
+            details: [
+              this.createInfoDetail('Initializing MIVAA processing...'),
+              this.createInfoDetail('Preparing document for analysis'),
+              this.createInfoDetail('Sending document to MIVAA service...'),
+              this.createErrorDetail(`MIVAA processing failed: ${errorMessage}`, `Error Code: ${errorCode}\nMessage: ${errorMessage}`)
+            ],
+          });
+
           if (response.error.code === 'API_UNAUTHORIZED' || errorMessage.includes('401')) {
             throw new Error('MIVAA service authentication failed. Please check API key configuration.');
           }
@@ -406,13 +447,13 @@ export class ConsolidatedPDFWorkflowService {
 
         return {
           details: [
-            'MIVAA microservice processing completed successfully',
-            'Advanced PDF extraction using LlamaIndex RAG',
-            `Processing completed with ${result.sources?.length || 0} sources`,
-            `Generated ${result.chunks?.length || 0} text chunks`,
-            `Extracted ${result.images?.length || 0} images`,
-            'Generated 1536-dimension embeddings',
-            `Quality score: ${Math.round((result.confidence || 0) * 100)}%`,
+            this.createSuccessDetail('MIVAA microservice processing completed successfully'),
+            this.createSuccessDetail('Advanced PDF extraction using LlamaIndex RAG'),
+            this.createSuccessDetail(`Processing completed with ${result.sources?.length || 0} sources`),
+            this.createSuccessDetail(`Generated ${result.chunks?.length || 0} text chunks`),
+            this.createSuccessDetail(`Extracted ${result.images?.length || 0} images`),
+            this.createSuccessDetail('Generated 1536-dimension embeddings'),
+            this.createSuccessDetail(`Quality score: ${Math.round((result.confidence || 0) * 100)}%`),
           ],
           metadata: {
             service: 'MIVAA',
@@ -504,9 +545,10 @@ export class ConsolidatedPDFWorkflowService {
 
     } catch (error) {
       console.error('MIVAA PDF workflow error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       await this.updateJobStep(jobId, 'mivaa-processing', {
         status: 'failed',
-        details: [`Processing failed: ${error instanceof Error ? error.message : String(error)}`],
+        details: [this.createErrorDetail(`Processing failed: ${errorMessage}`, errorMessage)],
       });
       throw error;
     }
@@ -522,11 +564,11 @@ export class ConsolidatedPDFWorkflowService {
     jobId: string,
     stepId: string,
     stepFunction: () => Promise<{
-      details: string[];
+      details: (string | WorkflowStepDetail)[];
       metadata?: unknown;
       result?: unknown;
     }>,
-  ): Promise<{ details: string[]; metadata?: unknown; result?: unknown }> {
+  ): Promise<{ details: (string | WorkflowStepDetail)[]; metadata?: unknown; result?: unknown }> {
     try {
       // Mark step as running
       this.updateJobStep(jobId, stepId, { status: 'running' });
@@ -544,9 +586,10 @@ export class ConsolidatedPDFWorkflowService {
 
     } catch (error) {
       // Mark step as failed
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.updateJobStep(jobId, stepId, {
         status: 'failed',
-        details: [`Step failed: ${error instanceof Error ? error.message : String(error)}`],
+        details: [this.createErrorDetail(`Step failed: ${errorMessage}`, errorMessage)],
       });
       throw error;
     }
