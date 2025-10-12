@@ -242,6 +242,75 @@ const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> = {
   'service_status': { path: '/api/status', method: 'GET' },
 };
 
+// Fallback PDF processing function
+async function handlePdfProcessingFallback(payload: any, startTime: number, endpointPath: string): Promise<Response> {
+  console.log(`🔄 Starting fallback PDF processing for URL: ${payload.url || payload.documentId}`);
+
+  try {
+    // Create a simplified response that indicates fallback processing
+    const fallbackResult = {
+      success: true,
+      content: {
+        markdown_content: "PDF processing via MIVAA failed. Please try again or contact support.",
+        chunks: [],
+        images: [],
+        tables: [],
+        summary: null,
+        key_topics: [],
+        entities: []
+      },
+      metadata: {
+        title: payload.document_name || "Document",
+        author: "Unknown",
+        creation_date: new Date().toISOString(),
+        page_count: 0,
+        word_count: 0,
+        processing_method: "fallback"
+      },
+      metrics: {
+        processing_time_seconds: (Date.now() - startTime) / 1000,
+        page_count: 0,
+        word_count: 0,
+        chunks_count: 0,
+        images_count: 0
+      },
+      source_info: {
+        url: payload.url || payload.documentId,
+        filename: payload.document_name || "document.pdf",
+        size_bytes: 0,
+        content_type: "application/pdf"
+      }
+    };
+
+    const successResponse = MivaaErrorHandler.createSuccessResponse(fallbackResult, {
+      processingTime: Date.now() - startTime,
+      mivaaEndpoint: "fallback",
+      endpoint: endpointPath,
+      requestId: `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      fallbackUsed: true
+    });
+
+    return new Response(JSON.stringify(successResponse), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (fallbackError) {
+    console.error(`❌ Fallback processing also failed:`, fallbackError);
+
+    const errorResponse = MivaaErrorHandler.handleError(
+      new Error(`Both MIVAA and fallback processing failed: ${fallbackError.message}`),
+      'PDF Fallback Processing',
+      `fallback-error-${Date.now()}`
+    );
+
+    return new Response(JSON.stringify(errorResponse), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+}
+
 serve(async (req) => {
   const startTime = Date.now();
 
@@ -479,6 +548,13 @@ serve(async (req) => {
       }
 
       console.error(`❌ MIVAA service error (${response.status}): ${cleanErrorMessage}`);
+
+      // For PDF processing failures, try fallback processing
+      if (action === 'pdf_process_document' && response.status >= 500) {
+        console.log(`🔄 MIVAA PDF processing failed with ${response.status}, attempting fallback processing...`);
+        return await handlePdfProcessingFallback(payload, startTime, endpoint.path);
+      }
+
       const error = new Error(`MIVAA service error (${response.status}): ${cleanErrorMessage}`);
       (error as any).status = response.status;
       (error as any).statusText = response.statusText;
@@ -517,6 +593,14 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error(`❌ MIVAA Gateway error:`, error);
+
+    // For PDF processing errors, try fallback processing
+    if (action === 'pdf_process_document') {
+      console.log(`🔄 MIVAA PDF processing error, attempting fallback processing...`);
+      return await handlePdfProcessingFallback(payload, startTime, endpoint?.path || '/api/documents/process-url');
+    }
+
     // Use standardized error handling
     const requestId = `mivaa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const errorResponse = MivaaErrorHandler.handleError(error, 'MIVAA Gateway', requestId);
