@@ -212,7 +212,7 @@ const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> = {
   'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
 
   // Job Status and Polling
-  'get_job_status': { path: '/api/jobs/{job_id}/status', method: 'GET' },
+  'get_job_status': { path: '/api/jobs/{job_id}', method: 'GET' },
   'list_jobs': { path: '/api/jobs', method: 'GET' },
   'cancel_job': { path: '/api/jobs/{job_id}/cancel', method: 'POST' },
   'bulk_process': { path: '/api/bulk/process', method: 'POST' },
@@ -404,11 +404,11 @@ serve(async (req) => {
     }
 
     // Handle request body and query parameters
-    if (endpoint.method === 'GET' && payload) {
+    if (endpoint.method === 'GET' && payload && Object.keys(payload).length > 0) {
       // For GET requests, add query parameters
       const queryParams = new URLSearchParams();
       Object.entries(payload).forEach(([key, value]) => {
-        if (key !== 'document_id' && key !== 'job_id' && value !== undefined) {
+        if (key !== 'document_id' && key !== 'job_id' && value !== undefined && value !== null) {
           queryParams.append(key, String(value));
         }
       });
@@ -420,14 +420,13 @@ serve(async (req) => {
     // Prepare request to MIVAA service
     const mivaaUrl = `${MIVAA_SERVICE_URL}${finalPath}`;
 
-    const requestOptions: RequestInit = {
+    const requestOptions: any = {
       method: endpoint.method,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${MIVAA_API_KEY}`,
         'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
       },
-      signal: AbortSignal.timeout(timeoutMs),
     };
 
     // Add payload for POST requests
@@ -486,6 +485,25 @@ serve(async (req) => {
             confidence_threshold: payload.analysis_options?.confidence_threshold ?? payload.confidenceThreshold ?? 0.8,
             ...payload.analysis_options,
             ...payload.options
+          }
+        };
+      } else if (action === 'bulk_process') {
+        // Handle bulk processing requests
+        const urls = payload.urls || payload.documents || [];
+
+        if (!urls || urls.length === 0) {
+          throw new Error('Missing URLs for bulk processing. Expected urls array in payload.');
+        }
+
+        bodyPayload = {
+          urls: urls,
+          batch_size: payload.batch_size || payload.batchSize || 1,
+          options: {
+            extract_images: payload.options?.extract_images ?? payload.extractImages ?? true,
+            enable_multimodal: payload.options?.enable_multimodal ?? payload.enableMultimodal ?? true,
+            ocr_languages: payload.options?.ocr_languages ?? payload.ocrLanguages ?? ['en'],
+            timeout_seconds: payload.options?.timeout_seconds ?? payload.timeoutSeconds ?? 600,
+            ...payload.options // Allow frontend to override options
           }
         };
       }
