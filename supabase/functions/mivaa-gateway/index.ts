@@ -1,498 +1,81 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.5';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
+// Environment variables
+const MIVAA_SERVICE_URL = 'https://v1api.materialshub.gr'
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || 'your-mivaa-api-key'
+
+// CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control, x-api-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
-};
-
-// Standardized error handling for MIVAA Gateway
-interface WorkflowError {
-  code: string;
-  message: string;
-  details?: Record<string, any>;
-  retryable?: boolean;
-  context?: string;
-  timestamp?: string;
-  requestId?: string;
 }
 
-interface WorkflowResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: WorkflowError;
-  metadata?: {
-    requestId?: string;
-    processingTime?: number;
-    timestamp: string;
-    version?: string;
-    endpoint?: string;
-  };
-}
-
-class MivaaErrorHandler {
-  static handleError(error: any, context: string, requestId?: string): WorkflowResponse {
-    let workflowError: WorkflowError;
-
-    // Classify error type
-    if (error?.status || error?.statusCode) {
-      const status = error.status || error.statusCode;
-      workflowError = this.classifyHttpError(status, error);
-    } else if (error?.name === 'TypeError' && error?.message?.includes('fetch')) {
-      workflowError = {
-        code: 'NETWORK_ERROR',
-        message: 'Network connection failed',
-        details: { originalError: error.message },
-        retryable: true
-      };
-    } else if (error?.message?.includes('timeout') || error?.name === 'TimeoutError' || error?.message?.includes('signal')) {
-      workflowError = {
-        code: 'MIVAA_TIMEOUT',
-        message: 'MIVAA service request timed out. PDF processing may take longer for complex documents.',
-        details: {
-          originalError: error.message,
-          suggestion: 'Try again with a smaller file or contact support if the issue persists.'
-        },
-        retryable: true
-      };
-    } else {
-      workflowError = {
-        code: 'MIVAA_PROCESSING_FAILED',
-        message: error?.message || 'MIVAA service processing failed',
-        details: { originalError: error },
-        retryable: true
-      };
-    }
-
-    workflowError.context = context;
-    workflowError.timestamp = new Date().toISOString();
-    workflowError.requestId = requestId;
-
-    console.error(`[${context}] MIVAA Gateway Error:`, workflowError);
-
-    return {
-      success: false,
-      error: workflowError,
-      metadata: {
-        requestId,
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-      }
-    };
-  }
-
-  private static classifyHttpError(status: number, error: any): WorkflowError {
-    switch (status) {
-      case 400:
-        return {
-          code: 'VALIDATION_ERROR',
-          message: 'Invalid request data',
-          details: { status, originalError: error.message },
-          retryable: false
-        };
-      case 401:
-        return {
-          code: 'API_UNAUTHORIZED',
-          message: 'Authentication required',
-          details: { status, originalError: error.message },
-          retryable: false
-        };
-      case 403:
-        return {
-          code: 'API_FORBIDDEN',
-          message: 'Access forbidden',
-          details: { status, originalError: error.message },
-          retryable: false
-        };
-      case 404:
-        return {
-          code: 'API_NOT_FOUND',
-          message: 'MIVAA endpoint not found',
-          details: { status, originalError: error.message },
-          retryable: false
-        };
-      case 429:
-        return {
-          code: 'API_RATE_LIMIT',
-          message: 'Rate limit exceeded',
-          details: { status, originalError: error.message },
-          retryable: true
-        };
-      case 500:
-        return {
-          code: 'MIVAA_INTERNAL_ERROR',
-          message: 'MIVAA service internal error',
-          details: { status, originalError: error.message },
-          retryable: true
-        };
-      case 502:
-        return {
-          code: 'MIVAA_BAD_GATEWAY',
-          message: 'MIVAA service is experiencing connectivity issues',
-          details: {
-            status,
-            originalError: error.message,
-            suggestion: 'The MIVAA service may be temporarily unavailable. Please try again in a few minutes.'
-          },
-          retryable: true
-        };
-      case 503:
-        return {
-          code: 'MIVAA_SERVICE_UNAVAILABLE',
-          message: 'MIVAA service temporarily unavailable',
-          details: {
-            status,
-            originalError: error.message,
-            suggestion: 'The service is under maintenance or overloaded. Please try again later.'
-          },
-          retryable: true
-        };
-      case 504:
-        return {
-          code: 'MIVAA_GATEWAY_TIMEOUT',
-          message: 'MIVAA service is taking longer than expected to respond',
-          details: {
-            status,
-            originalError: error.message,
-            suggestion: 'The document may be complex or the service is under heavy load. Please try again with a smaller file or wait a few minutes.'
-          },
-          retryable: true
-        };
-      default:
-        return {
-          code: 'UNKNOWN_ERROR',
-          message: `HTTP ${status} error`,
-          details: { status, originalError: error.message },
-          retryable: status >= 500
-        };
-    }
-  }
-
-  static createSuccessResponse<T>(data: T, metadata?: Record<string, any>): WorkflowResponse<T> {
-    return {
-      success: true,
-      data,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        version: '1.0.0',
-        ...metadata
-      }
-    };
-  }
-}
-
-interface GatewayRequest {
-  action: string;
-  payload?: any;
-}
-
-interface GatewayResponse {
-  success: boolean;
-  data?: any;
-  error?: {
-    code: string;
-    message: string;
-    details?: any;
-  };
-  metadata: {
-    timestamp: string;
-    processingTime: number;
-    version: string;
-    mivaaEndpoint?: string;
-  };
-}
-
-// Standardized MIVAA action mapping
-const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> = {
-  // PDF Processing
-  'pdf_process_document': { path: '/api/documents/process-url', method: 'POST' },
-  'pdf_extract_markdown': { path: '/api/v1/extract/markdown', method: 'POST' },
-  'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
-  'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
-
-  // Job Status and Polling
-  'get_job_status': { path: '/api/jobs/{job_id}', method: 'GET' },
+// Available MIVAA endpoints
+const MIVAA_ENDPOINTS = {
+  'health_check': { path: '/api/health', method: 'GET' },
+  'bulk_process': { path: '/api/bulk/process', method: 'POST' },
+  'get_job_status': { path: '/api/jobs/{job_id}/status', method: 'GET' },
   'list_jobs': { path: '/api/jobs', method: 'GET' },
   'cancel_job': { path: '/api/jobs/{job_id}/cancel', method: 'POST' },
-  'bulk_process': { path: '/api/bulk/process', method: 'POST' },
-
-  // Material Recognition
   'material_recognition': { path: '/api/vision/analyze', method: 'POST' },
   'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
-
-  // Embeddings
-  'generate_embedding': { path: '/api/embeddings/generate', method: 'POST' },
-  'generate_batch_embeddings': { path: '/api/embeddings/batch', method: 'POST' },
-  'clip_embedding_generation': { path: '/api/embeddings/clip-generate', method: 'POST' },
-
-  // Search
-  'semantic_search': { path: '/api/search/semantic', method: 'POST' },
-  'vector_search': { path: '/api/search/vector', method: 'POST' },
-  'hybrid_search': { path: '/api/search/hybrid', method: 'POST' },
-
-  // Chat & AI
-  'chat_completion': { path: '/api/chat/completions', method: 'POST' },
-  'contextual_response': { path: '/api/chat/contextual', method: 'POST' },
-  'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
-  'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
-
-  // Health & Status
-  'health_check': { path: '/health', method: 'GET' },
-  'service_status': { path: '/api/status', method: 'GET' },
-};
-
-// Fallback PDF processing function
-async function handlePdfProcessingFallback(payload: any, startTime: number, endpointPath: string): Promise<Response> {
-  console.log(`🔄 Starting fallback PDF processing for URL: ${payload.url || payload.documentId}`);
-
-  try {
-    // Create a simplified response that indicates fallback processing
-    const fallbackResult = {
-      success: true,
-      content: {
-        markdown_content: "PDF processing via MIVAA failed. Please try again or contact support.",
-        chunks: [],
-        images: [],
-        tables: [],
-        summary: null,
-        key_topics: [],
-        entities: []
-      },
-      metadata: {
-        title: payload.document_name || "Document",
-        author: "Unknown",
-        creation_date: new Date().toISOString(),
-        page_count: 0,
-        word_count: 0,
-        processing_method: "fallback"
-      },
-      metrics: {
-        processing_time_seconds: (Date.now() - startTime) / 1000,
-        page_count: 0,
-        word_count: 0,
-        chunks_count: 0,
-        images_count: 0
-      },
-      source_info: {
-        url: payload.url || payload.documentId,
-        filename: payload.document_name || "document.pdf",
-        size_bytes: 0,
-        content_type: "application/pdf"
-      }
-    };
-
-    const successResponse = MivaaErrorHandler.createSuccessResponse(fallbackResult, {
-      processingTime: Date.now() - startTime,
-      mivaaEndpoint: "fallback",
-      endpoint: endpointPath,
-      requestId: `fallback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      fallbackUsed: true
-    });
-
-    return new Response(JSON.stringify(successResponse), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
-  } catch (fallbackError) {
-    console.error(`❌ Fallback processing also failed:`, fallbackError);
-
-    const errorResponse = MivaaErrorHandler.handleError(
-      new Error(`Both MIVAA and fallback processing failed: ${fallbackError.message}`),
-      'PDF Fallback Processing',
-      `fallback-error-${Date.now()}`
-    );
-
-    return new Response(JSON.stringify(errorResponse), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
 }
 
 serve(async (req) => {
-  const startTime = Date.now();
-
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { action, payload } = await req.json()
 
-    // Get MIVAA configuration
-    const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://104.248.68.3:8000';
-    const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || 'test-key';
+    console.log(`🚀 MIVAA Gateway Request: ${action}`, payload)
 
-    // MIVAA API key is optional for some endpoints
-    console.log('MIVAA Gateway initialized:', {
-      serviceUrl: MIVAA_SERVICE_URL,
-      hasApiKey: !!MIVAA_API_KEY
-    });
-
-    // Parse request body
-    const body: GatewayRequest = await req.json();
-    const { action, payload } = body;
-
-    console.log(`🚀 MIVAA Gateway v2: Processing action "${action}"`);
-    console.log(`📊 Request payload:`, JSON.stringify(payload, null, 2));
-
-    // Use standardized MIVAA action mapping
-    const endpointMap = MIVAA_ACTION_MAP;
-
-    // Legacy endpoint mappings for backward compatibility
-    const legacyEndpointMap: Record<string, { path: string; method: string }> = {
-      // Legacy mappings that don't match standard format
-      'get_recommendations': { path: '/api/search/recommendations', method: 'POST' },
-      'get_analytics': { path: '/api/analytics', method: 'GET' },
-      'advanced_visual_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
-      'audio_transcription': { path: '/api/audio/transcribe', method: 'POST' },
-      'extract_text': { path: '/api/documents/extract', method: 'POST' },
-      'process_document': { path: '/api/documents/process', method: 'POST' },
-      'analyze_material': { path: '/api/materials/analyze', method: 'POST' },
-      'material_visual_search': { path: '/api/search/materials/visual', method: 'POST' },
-      'material_embeddings': { path: '/api/embeddings/materials/generate', method: 'POST' },
-      'rag_query': { path: '/api/rag/query', method: 'POST' },
-      'rag_upload': { path: '/api/rag/documents/upload', method: 'POST' },
-      'get_related_documents': { path: '/api/documents/{document_id}/related', method: 'GET' },
-      'summarize_document': { path: '/api/documents/{document_id}/summarize', method: 'POST' },
-      'extract_entities': { path: '/api/documents/{document_id}/extract-entities', method: 'POST' },
-      'compare_documents': { path: '/api/documents/compare', method: 'POST' },
-      'vector_similarity_search': { path: '/api/search/similarity', method: 'POST' },
-      'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
-      'get_document_details': { path: '/api/documents/documents/{document_id}', method: 'GET' },
-      'get_document_content': { path: '/api/documents/documents/{document_id}/content', method: 'GET' },
-      'get_job_status': { path: '/api/documents/job/{job_id}', method: 'GET' },
-      'analyze_document': { path: '/api/documents/analyze', method: 'POST' },
-      'batch_image_analysis': { path: '/api/images/analyze/batch', method: 'POST' },
-      'advanced_image_search': { path: '/api/images/search', method: 'POST' },
-    };
-
-    // Try standard mapping first, then legacy mapping
-    let endpoint = endpointMap[action] || legacyEndpointMap[action];
-    if (!endpoint) {
-      console.error(`❌ Unknown action: ${action}. Available actions:`, Object.keys({...endpointMap, ...legacyEndpointMap}));
-      throw new Error(`Unknown action: ${action}. Check MIVAA_ACTION_MAP for supported actions.`);
+    // Validate action
+    if (!action || !MIVAA_ENDPOINTS[action]) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid action',
+          available_actions: Object.keys(MIVAA_ENDPOINTS)
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    console.log(`📍 Resolved action "${action}" to endpoint: ${endpoint.method} ${endpoint.path}`);
+    const endpoint = MIVAA_ENDPOINTS[action]
+    let finalPath = endpoint.path
 
-    // Log timeout configuration for debugging
-    let timeoutMs = 30000; // Default 30 seconds
-    if (action.includes('pdf') || action.includes('document') || action.includes('process')) {
-      timeoutMs = 600000; // 10 minutes for PDF/document processing (Edge Function max)
-    } else if (action.includes('batch') || action.includes('analyze')) {
-      timeoutMs = 120000; // 2 minutes for batch operations
-    }
-    console.log(`⏱️ Timeout configured: ${timeoutMs}ms (${timeoutMs/1000}s) for action "${action}"`);
-
-    // Handle dynamic path parameters
-    let finalPath = endpoint.path;
-    if (payload) {
-      // Replace path parameters with actual values
-      if (payload.document_id && finalPath.includes('{document_id}')) {
-        finalPath = finalPath.replace('{document_id}', payload.document_id);
-      }
-      if (payload.job_id && finalPath.includes('{job_id}')) {
-        finalPath = finalPath.replace('{job_id}', payload.job_id);
-      }
+    // Handle path parameters
+    if (payload && payload.job_id && finalPath.includes('{job_id}')) {
+      finalPath = finalPath.replace('{job_id}', payload.job_id)
     }
 
-    // Handle request body and query parameters
+    // Handle query parameters for GET requests
     if (endpoint.method === 'GET' && payload && Object.keys(payload).length > 0) {
-      // For GET requests, add query parameters
-      const queryParams = new URLSearchParams();
+      const queryParams = new URLSearchParams()
       Object.entries(payload).forEach(([key, value]) => {
-        if (key !== 'document_id' && key !== 'job_id' && value !== undefined && value !== null) {
-          queryParams.append(key, String(value));
+        if (key !== 'job_id' && value !== undefined && value !== null) {
+          queryParams.append(key, String(value))
         }
-      });
+      })
       if (queryParams.toString()) {
-        finalPath += `?${queryParams.toString()}`;
+        finalPath += `?${queryParams.toString()}`
       }
     }
-
-    // Prepare request to MIVAA service
-    const mivaaUrl = `${MIVAA_SERVICE_URL}${finalPath}`;
-
-    const requestOptions: any = {
-      method: endpoint.method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MIVAA_API_KEY}`,
-        'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
-      },
-    };
-
-    // Add payload for POST requests
+    // Prepare request body for POST requests
+    let bodyPayload = null
     if (endpoint.method === 'POST' && payload) {
-      // For POST requests, send payload in body (excluding path parameters)
-      let bodyPayload = { ...payload };
-
-      // Special handling for multimodal analysis - keep document_id in payload
-      if (action === 'llama_vision_analysis' || action === 'multimodal_analysis') {
-        // Keep document_id for multimodal analysis endpoints
-      } else {
-        // For other endpoints, remove path parameters
-        delete bodyPayload.document_id;
-        delete bodyPayload.job_id;
-      }
-
-      // Standardized payload transformation based on action type
-      if (action === 'pdf_process_document') {
-        // Handle different field names from different frontend components
-        const documentUrl = payload.documentId || payload.fileUrl || payload.url;
-        const documentName = payload.document_name || payload.filename || payload.documentName || 'Uploaded Document';
-
-        if (!documentUrl) {
-          throw new Error('Missing document URL. Expected documentId, fileUrl, or url in payload.');
-        }
-
-        bodyPayload = {
-          url: documentUrl,
-          async_processing: false,
-          options: {
-            extract_images: true,
-            extract_tables: true,
-            timeout_seconds: 600, // 10 minutes for complex PDFs
-            quality: 'standard',
-            language: 'auto',
-            ...payload.options // Allow frontend to override options
-          },
-          document_name: documentName,
-          tags: payload.tags || [],
-          metadata: payload.metadata || {}
-        };
-      } else if (action === 'material_recognition' || action === 'llama_vision_analysis') {
-        // Handle material recognition and vision analysis
-        const imageData = payload.image_data || payload.resourceUrl || payload.imageUrl;
-
-        if (!imageData) {
-          throw new Error('Missing image data. Expected image_data, resourceUrl, or imageUrl in payload.');
-        }
-
-        bodyPayload = {
-          image_data: imageData,
-          analysis_type: payload.analysis_type || payload.analysisType || 'material_analysis',
-          analysis_options: {
-            include_properties: payload.analysis_options?.include_properties ?? payload.includeProperties ?? true,
-            include_composition: payload.analysis_options?.include_composition ?? payload.includeComposition ?? true,
-            confidence_threshold: payload.analysis_options?.confidence_threshold ?? payload.confidenceThreshold ?? 0.8,
-            ...payload.analysis_options,
-            ...payload.options
-          }
-        };
-      } else if (action === 'bulk_process') {
+      if (action === 'bulk_process') {
         // Handle bulk processing requests
-        const urls = payload.urls || payload.documents || [];
+        const urls = payload.urls || payload.documents || []
 
         if (!urls || urls.length === 0) {
-          throw new Error('Missing URLs for bulk processing. Expected urls array in payload.');
+          throw new Error('Missing URLs for bulk processing. Expected urls array in payload.')
         }
 
         bodyPayload = {
@@ -502,137 +85,62 @@ serve(async (req) => {
             extract_images: payload.options?.extract_images ?? payload.extractImages ?? true,
             enable_multimodal: payload.options?.enable_multimodal ?? payload.enableMultimodal ?? true,
             ocr_languages: payload.options?.ocr_languages ?? payload.ocrLanguages ?? ['en'],
-            timeout_seconds: payload.options?.timeout_seconds ?? payload.timeoutSeconds ?? 600,
+            timeout_seconds: payload.options?.timeout_seconds ?? payload.timeoutSeconds ?? 900,
             ...payload.options // Allow frontend to override options
           }
-        };
-      }
-
-      requestOptions.body = JSON.stringify(bodyPayload);
-    }
-
-    console.log(`📡 Calling MIVAA: ${endpoint.method} ${mivaaUrl}`);
-    console.log(`🔧 Request options:`, JSON.stringify({
-      method: requestOptions.method,
-      headers: requestOptions.headers,
-      hasBody: !!requestOptions.body
-    }, null, 2));
-
-    // Make request to MIVAA service with retry logic for 504 errors
-    let response: Response;
-    const maxRetries = 2; // Retry up to 2 times for 504 errors
-
-    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-      try {
-        if (attempt > 1) {
-          console.log(`🔄 Retry attempt ${attempt - 1}/${maxRetries} for MIVAA request`);
-          // Wait before retry (exponential backoff: 1s, 2s)
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 2) * 1000));
         }
-
-        response = await fetch(mivaaUrl, requestOptions);
-
-        // If we get a 504, retry (unless it's the last attempt)
-        if (response.status === 504 && attempt <= maxRetries) {
-          console.log(`⚠️ Got 504 Gateway Timeout, will retry (attempt ${attempt}/${maxRetries + 1})`);
-          continue;
-        }
-
-        // Success or non-retryable error, break out of retry loop
-        break;
-
-      } catch (error) {
-        if (attempt <= maxRetries && (error as any).name === 'TimeoutError') {
-          console.log(`⚠️ Request timeout, will retry (attempt ${attempt}/${maxRetries + 1})`);
-          continue;
-        }
-        throw error;
+      } else {
+        bodyPayload = payload
       }
     }
+
+    // Make request to MIVAA service
+    const mivaaUrl = `${MIVAA_SERVICE_URL}${finalPath}`
+    console.log(`📡 Calling MIVAA: ${endpoint.method} ${mivaaUrl}`)
+
+    const fetchOptions: RequestInit = {
+      method: endpoint.method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+      },
+    }
+
+    if (bodyPayload) {
+      fetchOptions.body = JSON.stringify(bodyPayload)
+      console.log(`📤 Request body:`, bodyPayload)
+    }
+
+    const response = await fetch(mivaaUrl, fetchOptions)
+    const responseData = await response.json()
+
+    console.log(`📥 MIVAA Response: ${response.status}`, responseData)
 
     if (!response.ok) {
-      const errorText = await response.text();
-
-      // Clean up HTML error responses (like nginx 504 errors)
-      let cleanErrorMessage = errorText;
-      if (errorText.includes('<html>') && errorText.includes('<title>')) {
-        // Extract title from HTML error page
-        const titleMatch = errorText.match(/<title>(.*?)<\/title>/);
-        if (titleMatch) {
-          cleanErrorMessage = titleMatch[1];
-        } else {
-          cleanErrorMessage = `HTTP ${response.status} ${response.statusText}`;
-        }
-      }
-
-      console.error(`❌ MIVAA service error (${response.status}): ${cleanErrorMessage}`);
-
-      // For PDF processing failures, try fallback processing
-      if (action === 'pdf_process_document' && response.status >= 500) {
-        console.log(`🔄 MIVAA PDF processing failed with ${response.status}, attempting fallback processing...`);
-        return await handlePdfProcessingFallback(payload, startTime, endpoint.path);
-      }
-
-      const error = new Error(`MIVAA service error (${response.status}): ${cleanErrorMessage}`);
-      (error as any).status = response.status;
-      (error as any).statusText = response.statusText;
-      throw error;
+      throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`)
     }
 
-    const result = await response.json();
-    console.log(`✅ MIVAA response received successfully`);
-
-    // Log successful request for analytics
-    try {
-      await supabase
-        .from('mivaa_api_usage_logs')
-        .insert({
-          endpoint_path: endpoint.path,
-          request_method: endpoint.method,
-          response_status: response.status,
-          response_time_ms: Date.now() - startTime,
-          created_at: new Date().toISOString(),
-        });
-    } catch (logError) {
-      console.warn('Failed to log API usage:', logError);
-    }
-
-    // Use standardized success response
-    const successResponse = MivaaErrorHandler.createSuccessResponse(result, {
-      processingTime: Date.now() - startTime,
-      mivaaEndpoint: mivaaUrl,
-      endpoint: endpoint.path,
-      requestId: `mivaa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    });
-
-    return new Response(JSON.stringify(successResponse), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify(responseData),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
 
   } catch (error) {
-    console.error(`❌ MIVAA Gateway error:`, error);
+    console.error('❌ MIVAA Gateway Error:', error)
 
-    // For PDF processing errors, try fallback processing
-    if (action === 'pdf_process_document') {
-      console.log(`🔄 MIVAA PDF processing error, attempting fallback processing...`);
-      return await handlePdfProcessingFallback(payload, startTime, endpoint?.path || '/api/documents/process-url');
-    }
-
-    // Use standardized error handling
-    const requestId = `mivaa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const errorResponse = MivaaErrorHandler.handleError(error, 'MIVAA Gateway', requestId);
-
-    // Add processing time to metadata
-    if (errorResponse.metadata) {
-      errorResponse.metadata.processingTime = Date.now() - startTime;
-    }
-
-    // Always return HTTP 200 to prevent Supabase client from treating as error
-    // The error information is included in the response body for frontend handling
-    return new Response(JSON.stringify(errorResponse), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        error: 'Gateway error',
+        message: error.message,
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
-});
+
