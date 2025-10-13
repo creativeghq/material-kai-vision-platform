@@ -157,6 +157,20 @@ Comprehensive workflow documentation covering 12 major platform flows with detai
 - Bug fixes and improvements tracking
 - Automated updates via GitHub Actions
 
+### 🔍 [Platform Review Findings](./platform-review-findings.md) ⭐ **NEW**
+- Comprehensive platform review results (January 2025)
+- Documentation gaps identified and addressed
+- API endpoint coverage analysis (48/48 endpoints tested)
+- Testing infrastructure status and recommendations
+- Technical issues and improvement recommendations
+
+### 🔄 [MIVAA Documentation Consolidation](./mivaa-documentation-consolidation.md) ⭐ **NEW**
+- Complete MIVAA API documentation consolidation (72 endpoints)
+- Single source of truth for all API documentation
+- MIVAA service documentation removal guide
+- Documentation maintenance simplification
+- Developer and user experience improvements
+
 ### 🤖 [MIVAA Service](./mivaa-service.md)
 - Complete MIVAA service documentation
 - Deployment options and health monitoring
