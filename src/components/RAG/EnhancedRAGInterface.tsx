@@ -5,7 +5,7 @@ import {
   Brain,
   BookOpen,
   Package,
-  Zap,
+  Sparkles,
   TrendingUp,
   Clock,
   ThumbsUp,
@@ -195,7 +195,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               {isSearching ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Zap className="h-4 w-4" />
+                <Sparkles className="h-4 w-4" />
               )}
               Enhanced Search
             </Button>

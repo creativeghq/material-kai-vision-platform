@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Bell, Settings, User, Zap, LogOut } from 'lucide-react';
+import { Search, Bell, Settings, User, Sparkles, LogOut } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) =
       <div className="flex h-16 items-center px-6">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Zap className="w-5 h-5 text-primary-foreground" />
+            <Sparkles className="w-5 h-5 text-primary-foreground" />
           </div>
           <span className="text-xl font-bold">KAI Platform</span>
         </div>

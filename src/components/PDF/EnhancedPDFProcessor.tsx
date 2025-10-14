@@ -12,7 +12,7 @@ import {
   Search,
   Image,
   Layout,
-  Zap,
+  Sparkles,
   Settings,
   BarChart3,
 } from 'lucide-react';
@@ -621,7 +621,7 @@ export function EnhancedPDFProcessor() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
+                  <Sparkles className="h-5 w-5" />
                   Processing Queue
                 </CardTitle>
                 <CardDescription>

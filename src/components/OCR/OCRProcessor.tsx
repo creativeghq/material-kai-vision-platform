@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, Eye, Server, Cpu, Zap } from 'lucide-react';
+import { Upload, FileText, Eye, Server, Cpu, Sparkles } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 
@@ -199,7 +199,7 @@ export const OCRProcessor: React.FC = () => {
                 <div className="flex items-center gap-2 mb-2">
                   {recommendation.method === 'client' && <Cpu className="h-4 w-4 text-blue-500" />}
                   {recommendation.method === 'server' && <Server className="h-4 w-4 text-green-500" />}
-                  {recommendation.method === 'hybrid' && <Zap className="h-4 w-4 text-purple-500" />}
+                  {recommendation.method === 'hybrid' && <Sparkles className="h-4 w-4 text-purple-500" />}
                   <span className="font-medium">Recommended: {recommendation.method} processing</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-2">{recommendation.reason}</p>

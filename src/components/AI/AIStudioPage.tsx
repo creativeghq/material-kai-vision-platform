@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  Upload, Camera, Brain, Zap, Target, CheckCircle, Clock,
+  Upload, Camera, Brain, Sparkles, Target, CheckCircle, Clock,
   Layers, Users, BarChart3, Lightbulb, Home, Ruler, Palette,
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
@@ -574,7 +574,7 @@ export const AIStudioPage: React.FC = () => {
                   disabled={uploadedFiles.length === 0 || !roomType || isProcessing}
                   className="w-full h-11 px-8"
                 >
-                  <Zap className="w-4 h-4 mr-2" />
+                  <Sparkles className="w-4 h-4 mr-2" />
                   Start AI Studio Analysis
                 </Button>
               </CardContent>

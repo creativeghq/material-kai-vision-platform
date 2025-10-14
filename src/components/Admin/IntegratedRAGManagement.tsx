@@ -3,7 +3,7 @@ import {
   Loader2,
   Database,
   Brain,
-  Zap,
+  Sparkles,
   Upload,
   Settings,
   Rocket,
@@ -352,7 +352,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                     {isSearching ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Zap className="h-4 w-4" />
+                      <Sparkles className="h-4 w-4" />
                     )}
                     Enhanced Search
                   </Button>
@@ -824,7 +824,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                         {isTraining ? (
                           <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Training...</>
                         ) : (
-                          <><Zap className="h-4 w-4 mr-2" /> Start CLIP Training</>
+                          <><Sparkles className="h-4 w-4 mr-2" /> Start CLIP Training</>
                         )}
                       </Button>
                     </CardContent>

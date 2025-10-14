@@ -6,7 +6,7 @@ import {
   Upload,
   Star,
   Palette,
-  Zap,
+  Sparkles,
   Target,
   TrendingUp,
   Shield,
@@ -15,7 +15,7 @@ import {
 // Hero Section Configuration
 export const heroConfig = {
   badge: {
-    icon: Zap,
+    icon: Sparkles,
     text: 'Powered by Advanced AI',
   },
   title: 'Material Intelligence',
