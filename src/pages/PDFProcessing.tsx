@@ -206,7 +206,7 @@ const PDFProcessing = () => {
             </Card>
           </div>
 
-          {/* Quick Upload Area */}
+          {/* Unified PDF Processing */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -214,73 +214,70 @@ const PDFProcessing = () => {
                 Quick Start Workflow
               </CardTitle>
               <CardDescription>
-                Drop PDFs here to instantly start the complete processing workflow with real-time monitoring
+                Upload files or enter a URL to start the complete processing workflow with real-time monitoring
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* File Upload Area */}
               <div
                 {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
                   ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}`}
               >
                 <input {...getInputProps()} />
-                <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
+                <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
                 {isDragActive ? (
                   <p className="text-lg text-primary">Drop PDF files here...</p>
                 ) : (
                   <div>
-                    <p className="text-lg mb-2">Drag & drop PDF files here, or click to select</p>
-                    <p className="text-sm text-muted-foreground mb-3">
+                    <p className="text-base mb-2">Drag & drop PDF files here, or click to select</p>
+                    <p className="text-sm text-muted-foreground">
                       Complete workflow with authentication, upload, validation, processing, and knowledge base storage
                     </p>
-                    <div className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded px-3 py-2 inline-block">
-                      🚀 Smart Processing: Large PDFs (&gt;20MB) automatically use async processing
-                    </div>
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
 
-          {/* URL Processing */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Link className="h-5 w-5" />
-                Process PDF from URL
-              </CardTitle>
-              <CardDescription>
-                Enter a direct URL to a PDF file to process it through the workflow
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Input
-                    type="url"
-                    placeholder="https://example.com/document.pdf"
-                    value={pdfUrl}
-                    onChange={(e) => setPdfUrl(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={processUrlPdf}
-                    disabled={isProcessingUrl || !pdfUrl.trim()}
-                  >
-                    {isProcessingUrl ? 'Processing...' : 'Process'}
-                  </Button>
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
                 </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or process from URL</span>
+                </div>
+              </div>
 
-                {/* Smart Processing Information */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">🚀 Smart Processing System</h4>
-                  <div className="text-sm text-blue-800 space-y-1">
-                    <p>• <strong>Small files (&lt;20MB):</strong> Fast synchronous processing (1-3 minutes)</p>
-                    <p>• <strong>Large files (&gt;20MB):</strong> Automatic async processing (no timeouts)</p>
-                    <p>• <strong>Complex documents:</strong> Signature books, forms with many images supported</p>
-                    <p>• <strong>Real-time updates:</strong> Progress tracking for all processing modes</p>
-                    <p>• <strong>No size limits:</strong> Process PDFs of any size with our async system</p>
-                  </div>
+              {/* URL Processing */}
+              <div className="flex gap-2">
+                <Input
+                  type="url"
+                  placeholder="https://example.com/document.pdf"
+                  value={pdfUrl}
+                  onChange={(e) => setPdfUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={processUrlPdf}
+                  disabled={isProcessingUrl || !pdfUrl.trim()}
+                  className="flex items-center gap-2"
+                >
+                  <Link className="h-4 w-4" />
+                  {isProcessingUrl ? 'Processing...' : 'Process'}
+                </Button>
+              </div>
+
+              {/* Smart Processing Information */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
+                  🚀 Smart Processing System
+                </h4>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <p>• <strong>Small files (&lt;20MB):</strong> Fast synchronous processing (1-3 minutes)</p>
+                  <p>• <strong>Large files (&gt;20MB):</strong> Automatic async processing (no timeouts)</p>
+                  <p>• <strong>Complex documents:</strong> Signature books, forms with many images supported</p>
+                  <p>• <strong>Real-time updates:</strong> Progress tracking for all processing modes</p>
+                  <p>• <strong>No size limits:</strong> Process PDFs of any size with our async system</p>
                 </div>
               </div>
             </CardContent>

@@ -119,24 +119,25 @@ async function monitorJob(token, jobId) {
         continue;
       }
 
-      const job = await response.json();
+      const response_data = await response.json();
+      const job = response_data.data || response_data; // Handle nested response structure
       const elapsed = ((Date.now() - new Date(job.created_at).getTime()) / 1000).toFixed(1);
-      
+
       console.log(`${colors.cyan}⏰ [${elapsed}s] Check ${check}/${maxChecks} | Status: ${job.status}${colors.reset}`);
-      
+
       if (job.progress_percentage !== undefined) {
         console.log(`${colors.cyan}   📈 Progress: ${job.progress_percentage}% | Step: ${job.current_step || 'N/A'}${colors.reset}`);
       }
-      
-      // Extract progress details
+
+      // Extract progress details from nested structure
       const details = job.details || {};
-      const pagesProcessed = details.processed_count || 0;
-      const totalPages = details.total_documents || 'N/A';
+      const pagesProcessed = details.pages_processed || 0;
+      const totalPages = details.total_pages || 'N/A';
       const chunksCreated = details.chunks_created || 0;
       const imagesExtracted = details.images_extracted || 0;
-      
+
       console.log(`${colors.cyan}   📄 Pages: ${pagesProcessed}/${totalPages} | 📝 Chunks: ${chunksCreated} | 🖼️ Images: ${imagesExtracted}${colors.reset}`);
-      
+
       if (job.status === 'completed') {
         console.log(`${colors.green}🎉 Job completed successfully!${colors.reset}`);
         return job;
@@ -185,7 +186,7 @@ async function runDirectMivaaTest() {
     console.log('--------------------------------------------------');
     const finalJob = await monitorJob(token, jobId);
     
-    if (finalJob && finalJob.status === 'completed') {
+    if (finalJob && (finalJob.status === 'completed' || finalJob.data?.status === 'completed')) {
       console.log(`\n${colors.green}🎉 SUCCESS: PDF processing completed!${colors.reset}`);
       console.log('================================================================================');
       

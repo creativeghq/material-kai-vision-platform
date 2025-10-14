@@ -479,6 +479,38 @@ export class ConsolidatedPDFWorkflowService {
           });
 
           return this.createMivaaResult(response.data);
+        } else if (response.data?.content || response.data?.metadata) {
+          // Check for fallback response or other valid response formats
+          const processingMethod = response.data?.metadata?.processing_method;
+
+          if (processingMethod === 'fallback') {
+            // Handle fallback response when MIVAA service is unavailable
+            this.updateJobStep(jobId, 'mivaa-processing', {
+              progress: 100,
+              details: [
+                'Initializing MIVAA processing...',
+                'Preparing document for analysis',
+                'Sending document to MIVAA service...',
+                '⚠️ MIVAA service unavailable - using fallback processing',
+                '✅ Processing completed with fallback method',
+              ],
+            });
+
+            return this.createMivaaResult(response.data);
+          } else {
+            // Regular response with content/metadata
+            this.updateJobStep(jobId, 'mivaa-processing', {
+              progress: 100,
+              details: [
+                'Initializing MIVAA processing...',
+                'Preparing document for analysis',
+                'Sending document to MIVAA service...',
+                '✅ Processing completed successfully!',
+              ],
+            });
+
+            return this.createMivaaResult(response.data);
+          }
         } else {
           // Unknown response format
           throw new Error(`Unexpected MIVAA response format: ${JSON.stringify(response.data)}`);
