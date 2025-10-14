@@ -143,4 +143,4 @@ serve(async (req) => {
       }
     )
   }
-
+})
