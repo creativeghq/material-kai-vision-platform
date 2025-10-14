@@ -347,9 +347,9 @@ const AdminDashboard: React.FC = () => {
   const adminSections = [
     {
       title: 'PDF Knowledge Base',
-      description: 'Upload and process PDF documents for material knowledge extraction',
-      icon: FileText,
-      path: '/admin/pdf-processing',
+      description: 'View and manage processed PDF documents, chunks, and knowledge entries',
+      icon: DatabaseIcon,
+      path: '/admin/knowledge-base',
       status: 'active',
       count: 'Primary system',
       priority: 1,
@@ -391,12 +391,12 @@ const AdminDashboard: React.FC = () => {
       priority: 5,
     },
     {
-      title: 'Knowledge Base Management',
-      description: 'Manage enhanced knowledge base entries from PDF processing',
-      icon: DatabaseIcon,
-      path: '/admin/knowledge-base',
+      title: 'PDF Processing',
+      description: 'Upload and process new PDF documents for material knowledge extraction',
+      icon: FileText,
+      path: '/admin/pdf-processing',
       status: 'active',
-      count: '1,247 entries',
+      count: 'Upload system',
       priority: 6,
     },
     {
@@ -501,25 +501,25 @@ const AdminDashboard: React.FC = () => {
             <Card className="border-2 border-primary/20 bg-primary/5">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-xl">
-                  <FileText className="h-6 w-6 text-primary" />
+                  <DatabaseIcon className="h-6 w-6 text-primary" />
                   PDF Knowledge Base - Core System
                 </CardTitle>
                 <CardDescription className="text-base">
-                  Upload PDF documents to extract materials knowledge and enhance the intelligent search system
+                  View and manage processed PDF documents, chunks, images, and knowledge base entries
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-4">
                   <Button asChild className="flex items-center gap-2 px-6 py-3 text-lg">
-                    <Link to="/admin/pdf-processing">
-                      <Upload className="h-5 w-5" />
-                      Upload PDF Documents
+                    <Link to="/admin/knowledge-base">
+                      <DatabaseIcon className="h-5 w-5" />
+                      View Knowledge Base
                     </Link>
                   </Button>
                   <Button asChild className="px-6 py-3 text-lg border border-gray-300 hover:bg-gray-50">
-                    <Link to="/admin/knowledge-base">
-                      <DatabaseIcon className="h-5 w-5" />
-                      Manage Knowledge Base
+                    <Link to="/admin/pdf-processing">
+                      <Upload className="h-5 w-5" />
+                      Upload New PDFs
                     </Link>
                   </Button>
                 </div>

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { RoleDebug } from '../Debug/RoleDebug';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -25,7 +24,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
-      <RoleDebug />
     </div>
   );
 };
