@@ -24,6 +24,10 @@ const MIVAA_ENDPOINTS = {
   'get_job_status': { path: '/api/jobs/{job_id}/status', method: 'GET' },
   'list_jobs': { path: '/api/jobs', method: 'GET' },
   'cancel_job': { path: '/api/jobs/{job_id}/cancel', method: 'DELETE' },
+  'get_document_content': { path: '/api/documents/{document_id}', method: 'GET' },
+  'get_document_chunks': { path: '/api/documents/{document_id}/chunks', method: 'GET' },
+  'get_document_images': { path: '/api/documents/{document_id}/images', method: 'GET' },
+  'get_document_metadata': { path: '/api/documents/{document_id}/metadata', method: 'GET' },
   'material_recognition': { path: '/api/semantic-analysis', method: 'POST' },
   'llama_vision_analysis': { path: '/api/semantic-analysis', method: 'POST' },
   'semantic_search': { path: '/api/search/semantic', method: 'POST' },
@@ -63,12 +67,15 @@ serve(async (req) => {
     if (payload && payload.job_id && finalPath.includes('{job_id}')) {
       finalPath = finalPath.replace('{job_id}', payload.job_id)
     }
+    if (payload && payload.document_id && finalPath.includes('{document_id}')) {
+      finalPath = finalPath.replace('{document_id}', payload.document_id)
+    }
 
     // Handle query parameters for GET requests
     if (endpoint.method === 'GET' && payload && Object.keys(payload).length > 0) {
       const queryParams = new URLSearchParams()
       Object.entries(payload).forEach(([key, value]) => {
-        if (key !== 'job_id' && value !== undefined && value !== null) {
+        if (key !== 'job_id' && key !== 'document_id' && value !== undefined && value !== null) {
           queryParams.append(key, String(value))
         }
       })
