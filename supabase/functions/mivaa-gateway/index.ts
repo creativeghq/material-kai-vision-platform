@@ -11,15 +11,24 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 }
 
-// Available MIVAA endpoints
+// Available MIVAA endpoints (based on OpenAPI spec)
 const MIVAA_ENDPOINTS = {
   'health_check': { path: '/api/health', method: 'GET' },
   'bulk_process': { path: '/api/bulk/process', method: 'POST' },
+  'pdf_process_document': { path: '/api/documents/process', method: 'POST' },
+  'pdf_process_url': { path: '/api/documents/process-url', method: 'POST' },
+  'pdf_extract': { path: '/api/documents/process', method: 'POST' },
+  'pdf_extract_markdown': { path: '/api/pdf/extract/markdown', method: 'POST' },
+  'pdf_extract_tables': { path: '/api/pdf/extract/tables', method: 'POST' },
+  'pdf_extract_images': { path: '/api/pdf/extract/images', method: 'POST' },
   'get_job_status': { path: '/api/jobs/{job_id}/status', method: 'GET' },
   'list_jobs': { path: '/api/jobs', method: 'GET' },
-  'cancel_job': { path: '/api/jobs/{job_id}/cancel', method: 'POST' },
-  'material_recognition': { path: '/api/vision/analyze', method: 'POST' },
-  'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
+  'cancel_job': { path: '/api/jobs/{job_id}/cancel', method: 'DELETE' },
+  'material_recognition': { path: '/api/semantic-analysis', method: 'POST' },
+  'llama_vision_analysis': { path: '/api/semantic-analysis', method: 'POST' },
+  'semantic_search': { path: '/api/search/semantic', method: 'POST' },
+  'generate_embedding': { path: '/api/embeddings/materials/generate', method: 'POST' },
+  'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
 }
 
 serve(async (req) => {

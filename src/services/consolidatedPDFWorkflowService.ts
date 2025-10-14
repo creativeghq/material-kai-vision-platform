@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { supabase } from '../integrations/supabase/client';
 import WorkflowErrorHandler, { type WorkflowResponse } from '../utils/WorkflowErrorHandler';
 
@@ -188,7 +188,7 @@ export class ConsolidatedPDFWorkflowService {
     file: File,
     options: ConsolidatedProcessingOptions = {},
   ): Promise<string> {
-    const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
     // Create MIVAA workflow steps
     const steps = this.createWorkflowSteps();
@@ -391,39 +391,26 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        // Determine if we should use async processing based on file size
-        const shouldUseAsync = this.shouldUseAsyncProcessing(file);
+        // Use bulk processing for all PDFs (more reliable and consistent)
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: 25,
+          details: [
+            'Initializing MIVAA processing...',
+            'Preparing document for analysis',
+            'Sending document to MIVAA service...',
+            '🔄 Using MIVAA bulk processing for reliable handling...',
+          ],
+        });
 
-        let response;
-        if (shouldUseAsync) {
-          // Use bulk processing for async handling of large files
-          this.updateJobStep(jobId, 'mivaa-processing', {
-            progress: 25,
-            details: [
-              'Initializing MIVAA processing...',
-              'Preparing document for analysis',
-              'Sending document to MIVAA service...',
-              '🔄 Using async processing for large PDF...',
-            ],
-          });
-
-          response = await this.callMivaaGatewayDirect('bulk_process', {
-            urls: [processingRequest.fileUrl],
-            batch_size: 1,
-            processing_options: {
-              extract_text: true,
-              extract_images: processingRequest.options.includeImages !== false,
-              extract_tables: true,
-            }
-          });
-        } else {
-          // Use regular synchronous processing for smaller files
-          response = await this.callMivaaGatewayDirect('pdf_process_document', {
-            fileUrl: processingRequest.fileUrl,
-            filename: processingRequest.filename,
-            options: processingRequest.options,
-          });
-        }
+        const response = await this.callMivaaGatewayDirect('bulk_process', {
+          urls: [processingRequest.fileUrl],
+          batch_size: 1,
+          processing_options: {
+            extract_text: true,
+            extract_images: processingRequest.options.includeImages !== false,
+            extract_tables: true,
+          }
+        });
 
         // Check for MIVAA gateway errors in the response data (direct call format)
         if (!response.success && response.error) {
@@ -807,16 +794,7 @@ export class ConsolidatedPDFWorkflowService {
     }
   }
 
-  /**
-   * Determine if async processing should be used based on file size and complexity
-   */
-  private shouldUseAsyncProcessing(file: File): boolean {
-    // Use async processing for files larger than 20MB
-    const ASYNC_THRESHOLD_MB = 20;
-    const fileSizeMB = file.size / (1024 * 1024);
 
-    return fileSizeMB > ASYNC_THRESHOLD_MB;
-  }
 
   /**
    * Create standardized MIVAA result object
