@@ -881,100 +881,55 @@ export class ConsolidatedPDFWorkflowService {
       const mivaaDocumentId = details.document_id || parameters.document_id || mivaaMetadata.document_id;
       const chunksCount = details.chunks_created || parameters.chunks_created || mivaaMetadata.chunks_created || 0;
       const imagesCount = details.images_extracted || parameters.images_extracted || mivaaMetadata.images_extracted || 0;
-      const textLength = details.text_length || parameters.text_length || mivaaMetadata.text_length || 0;
+
 
       console.log(`📊 MIVAA processing completed: ${chunksCount} chunks, ${imagesCount} images, document_id: ${mivaaDocumentId}`);
 
-      // Fetch actual content from MIVAA using document_id
+      // Fetch real data from MIVAA using the fixed endpoints
       let chunks = [];
       let images = [];
 
-      console.log(`🔍 Starting data retrieval/creation process...`);
-
-      console.log(`📋 Storage process starting - will attempt to fetch content from MIVAA`);
+      console.log(`🔍 Fetching real data from MIVAA (chunks: ${chunksCount}, images: ${imagesCount})...`);
 
       if (mivaaDocumentId) {
         try {
-          // Try to fetch chunks from MIVAA
+          // Try to fetch chunks from MIVAA using the fixed endpoint
           const chunksResponse = await this.callMivaaGatewayDirect('get_document_chunks', {
             document_id: mivaaDocumentId
           });
 
           if (chunksResponse.success && chunksResponse.data) {
-            chunks = Array.isArray(chunksResponse.data) ? chunksResponse.data :
-                    chunksResponse.data.chunks || [];
-            console.log(`📝 Fetched ${chunks.length} chunks from MIVAA`);
+            chunks = Array.isArray(chunksResponse.data) ? chunksResponse.data : [];
+            console.log(`📝 Fetched ${chunks.length} real chunks from MIVAA`);
           } else {
             console.warn(`Failed to fetch chunks from MIVAA: ${chunksResponse.error || 'Unknown error'}`);
           }
 
-          // Try to fetch images from MIVAA
+          // Try to fetch images from MIVAA using the fixed endpoint
           const imagesResponse = await this.callMivaaGatewayDirect('get_document_images', {
             document_id: mivaaDocumentId
           });
 
           if (imagesResponse.success && imagesResponse.data) {
-            images = Array.isArray(imagesResponse.data) ? imagesResponse.data :
-                    imagesResponse.data.images || [];
-            console.log(`🖼️ Fetched ${images.length} images from MIVAA`);
+            images = Array.isArray(imagesResponse.data) ? imagesResponse.data : [];
+            console.log(`🖼️ Fetched ${images.length} real images from MIVAA`);
           } else {
             console.warn(`Failed to fetch images from MIVAA: ${imagesResponse.error || 'Unknown error'}`);
           }
 
         } catch (error) {
-          console.warn('Failed to fetch content from MIVAA, will create placeholder data:', error);
+          console.error('Failed to fetch real content from MIVAA:', error);
+          throw new Error(`Cannot retrieve real data from MIVAA: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
 
-      // If we couldn't fetch real data, create meaningful placeholder data based on MIVAA metrics
+      // Validate that we got real data
       if (chunks.length === 0 && chunksCount > 0) {
-        console.log(`📝 Creating ${chunksCount} placeholder chunks based on MIVAA metrics`);
-
-        // Create meaningful chunks with MIVAA data
-
-        chunks = Array.from({ length: chunksCount }, (_, i) => ({
-          content: `Text chunk ${i + 1} extracted from ${file.name} via MIVAA processing. This chunk contains processed content from the PDF document. Total text processed: ${textLength} characters.`,
-          index: i,
-          page_number: Math.floor(i / 4) + 1, // Estimate 4 chunks per page
-          chunk_type: 'text',
-          confidence: 0.95,
-          metadata: {
-            source: 'mivaa_processing',
-            document_id: mivaaDocumentId,
-            chunk_type: 'text',
-            processing_method: 'mivaa_bulk_processing',
-            text_length: Math.floor(textLength / chunksCount), // Estimate chunk size
-            estimated_page: Math.floor(i / 4) + 1,
-            total_chunks: chunksCount,
-            total_text_length: textLength
-          }
-        }));
+        throw new Error(`Expected ${chunksCount} chunks but got 0 from MIVAA. Cannot proceed without real data.`);
       }
 
       if (images.length === 0 && imagesCount > 0) {
-        console.log(`🖼️ Creating ${imagesCount} placeholder images based on MIVAA metrics`);
-        images = Array.from({ length: imagesCount }, (_, i) => ({
-          url: `mivaa_extracted_image_${i + 1}_${mivaaDocumentId}`,
-          image_url: `mivaa_extracted_image_${i + 1}_${mivaaDocumentId}`,
-          caption: `Image ${i + 1} extracted from ${file.name} via MIVAA processing`,
-          description: `Extracted image ${i + 1} from PDF document processing`,
-          page_number: Math.floor(i * (chunksCount / imagesCount / 4)) + 1, // Distribute across estimated pages
-          confidence: 0.95,
-          image_type: 'extracted',
-          analysis: {
-            detected_objects: ['material', 'texture', 'surface'],
-            confidence_score: 0.95,
-            processing_method: 'mivaa_multimodal'
-          },
-          metadata: {
-            source: 'mivaa_processing',
-            document_id: mivaaDocumentId,
-            image_type: 'extracted',
-            processing_method: 'mivaa_bulk_processing',
-            total_images: imagesCount,
-            extraction_order: i + 1
-          }
-        }));
+        throw new Error(`Expected ${imagesCount} images but got 0 from MIVAA. Cannot proceed without real data.`);
       }
 
       console.log(`📋 Final data for storage: ${chunks.length} chunks, ${images.length} images`);
