@@ -844,52 +844,45 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        // Use jobs list endpoint as workaround for broken individual job status endpoint
-        const jobsResponse = await this.callMivaaGatewayDirect('list_jobs', {});
+        // Use direct job status endpoint (this works correctly)
+        const statusResponse = await this.callMivaaGatewayDirect('get_job_status', { job_id: mivaaJobId });
 
-        if (jobsResponse.success && jobsResponse.data?.jobs) {
-          // Find our job in the list
-          const job = jobsResponse.data.jobs.find((j: any) => j.job_id === mivaaJobId);
+        if (statusResponse.success && statusResponse.data) {
+          const job = statusResponse.data;
+          const status = job.status;
 
-          if (job) {
-            const status = job.status;
+          if (status === 'completed') {
+            // Job completed successfully
+            this.updateJobStep(jobId, 'mivaa-processing', {
+              progress: 90,
+              details: [
+                'Initializing MIVAA processing...',
+                'Preparing document for analysis',
+                'Sending document to MIVAA service...',
+                `✅ Job started with ID: ${mivaaJobId}`,
+                '✅ Processing completed successfully!',
+              ],
+            });
 
-            if (status === 'completed') {
-              // Job completed successfully
-              this.updateJobStep(jobId, 'mivaa-processing', {
-                progress: 90,
-                details: [
-                  'Initializing MIVAA processing...',
-                  'Preparing document for analysis',
-                  'Sending document to MIVAA service...',
-                  `✅ Job started with ID: ${mivaaJobId}`,
-                  '✅ Processing completed successfully!',
-                ],
-              });
-
-              // For completed jobs, we need to get the result data
-              // Since the job list doesn't include full results, we'll return a success indicator
-              return {
-                success: true,
-                job_id: mivaaJobId,
-                status: 'completed',
-                message: 'Async processing completed successfully'
-              };
-            } else if (status === 'failed' || status === 'error') {
-              // Job failed
-              const errorMessage = job.error || 'Processing failed';
-              throw new Error(`MIVAA job failed: ${errorMessage}`);
-            } else if (status === 'processing' || status === 'pending' || status === 'running') {
-              // Job still running, continue polling
-              console.log(`MIVAA job ${mivaaJobId} status: ${status}`);
-            } else {
-              console.warn(`Unknown MIVAA job status: ${status}`);
-            }
+            // For completed jobs, we need to get the result data
+            return {
+              success: true,
+              job_id: mivaaJobId,
+              status: 'completed',
+              message: 'Async processing completed successfully'
+            };
+          } else if (status === 'failed' || status === 'error') {
+            // Job failed
+            const errorMessage = job.error_message || job.error || 'Processing failed';
+            throw new Error(`MIVAA job failed: ${errorMessage}`);
+          } else if (status === 'processing' || status === 'pending' || status === 'running') {
+            // Job still running, continue polling
+            console.log(`MIVAA job ${mivaaJobId} status: ${status}, progress: ${job.progress_percentage}%`);
           } else {
-            console.warn('Job not found in jobs list:', mivaaJobId);
+            console.warn(`Unknown MIVAA job status: ${status}`);
           }
         } else {
-          console.warn('Failed to get jobs list:', jobsResponse);
+          console.warn('Failed to get job status:', statusResponse);
         }
 
         // Wait 5 seconds before next poll
