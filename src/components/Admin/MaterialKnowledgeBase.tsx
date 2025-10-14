@@ -241,12 +241,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
               Back to Admin
             </Link>
           </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Material Knowledge Base</h1>
-              <p className="text-muted-foreground">
-                Comprehensive view of processed documents, chunks, images, and embeddings
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold">Material Knowledge Base</h1>
+            <p className="text-muted-foreground">
+              Comprehensive view of processed documents, chunks, images, and embeddings
+            </p>
           </div>
         </div>
         <Button onClick={loadKnowledgeBaseData} variant="outline">
