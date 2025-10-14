@@ -344,98 +344,113 @@ const AdminDashboard: React.FC = () => {
     config.description.toLowerCase().includes(configFilter.toLowerCase()),
   );
 
-  const adminSections = [
-    {
-      title: 'PDF Knowledge Base',
-      description: 'View and manage processed PDF documents, chunks, and knowledge entries',
-      icon: DatabaseIcon,
-      path: '/admin/knowledge-base',
-      status: 'active',
-      count: 'Primary system',
-      priority: 1,
-    },
-    {
-      title: 'Search Hub',
-      description: 'Multi-modal search interface with text, image, and hybrid capabilities',
-      icon: Search,
-      path: '/admin/search-hub',
-      status: 'active',
-      count: 'Enhanced search',
-      priority: 2,
-    },
-    {
-      title: '3D Material Suggestions',
-      description: 'AI-powered material recommendations for 3D generation',
-      icon: Brain,
-      path: '/admin/3d-suggestions',
-      status: 'active',
-      count: 'PDF-integrated',
-      priority: 3,
-    },
-    {
-      title: '3D Model Debugging',
-      description: 'Monitor and debug AI model performance for 3D generation',
-      icon: Microscope,
-      path: '/admin/3d-model-debugging',
-      status: 'active',
-      count: '7 models',
-      priority: 4,
-    },
-    {
-      title: 'Material Scraper',
-      description: 'Scrape material data from websites and external sources',
-      icon: Globe,
-      path: '/admin/material-scraper',
-      status: 'active',
-      count: 'Web scraping',
-      priority: 5,
-    },
-    {
-      title: 'PDF Processing',
-      description: 'Upload and process new PDF documents for material knowledge extraction',
-      icon: FileText,
-      path: '/admin/pdf-processing',
-      status: 'active',
-      count: 'Upload system',
-      priority: 6,
-    },
-    {
-      title: 'Analytics Dashboard',
-      description: 'System performance metrics and usage analytics',
-      icon: BarChart3,
-      path: '/admin/analytics',
-      status: 'active',
-      count: 'Real-time',
-      priority: 7,
-    },
-    {
-      title: 'API Gateway',
-      description: 'Manage API endpoints and access control',
-      icon: Shield,
-      path: '/admin/api-gateway',
-      status: 'active',
-      count: '12 endpoints',
-      priority: 8,
-    },
-    {
-      title: 'System Performance',
-      description: 'Monitor processing queues and system health',
-      icon: Activity,
-      path: '/admin/performance',
-      status: 'active',
-      count: '99.8% uptime',
-      priority: 9,
-    },
-    {
-      title: 'Package Management',
-      description: 'Monitor and manage system dependencies across NodeJS and MIVAA services',
-      icon: Package,
-      path: '/admin/packages',
-      status: 'active',
-      count: 'Dependencies',
-      priority: 10,
-    },
-  ];
+  // Organize admin sections by category
+  const adminSections = {
+    'Core Systems': [
+      {
+        title: 'PDF Knowledge Base',
+        description: 'View and manage processed PDF documents, chunks, and knowledge entries',
+        icon: DatabaseIcon,
+        path: '/admin/knowledge-base',
+        status: 'active',
+        count: 'Primary system',
+      },
+      {
+        title: 'PDF Processing',
+        description: 'Upload and process new PDF documents for material knowledge extraction',
+        icon: FileText,
+        path: '/admin/pdf-processing',
+        status: 'active',
+        count: 'Upload system',
+      },
+    ],
+    'AI & Intelligence': [
+      {
+        title: 'Search Hub',
+        description: 'Multi-modal search interface with text, image, and hybrid capabilities',
+        icon: Search,
+        path: '/admin/search-hub',
+        status: 'active',
+        count: 'Enhanced search',
+      },
+      {
+        title: '3D Material Suggestions',
+        description: 'AI-powered material recommendations for 3D generation',
+        icon: Brain,
+        path: '/admin/3d-suggestions',
+        status: 'active',
+        count: 'PDF-integrated',
+      },
+      {
+        title: 'Agent ML Coordination',
+        description: 'Coordinate multiple AI agents for material intelligence',
+        icon: Brain,
+        path: '/admin/agent-ml',
+        status: 'active',
+        count: 'Multi-agent',
+      },
+      {
+        title: 'AI Testing Panel',
+        description: 'Test and validate AI model responses and performance',
+        icon: Zap,
+        path: '/admin/ai-testing',
+        status: 'active',
+        count: 'Testing suite',
+      },
+    ],
+    'Data Management': [
+      {
+        title: 'Material Scraper',
+        description: 'Scrape material data from websites and external sources',
+        icon: Globe,
+        path: '/admin/material-scraper',
+        status: 'active',
+        count: 'Web scraping',
+      },
+      {
+        title: 'Metadata Fields',
+        description: 'Configure material metadata fields and properties',
+        icon: Tag,
+        path: '/admin/metadata-fields',
+        status: 'active',
+        count: 'Field config',
+      },
+      {
+        title: 'API Gateway Admin',
+        description: 'Manage API endpoints and gateway configuration',
+        icon: Settings,
+        path: '/admin/api-gateway',
+        status: 'active',
+        count: 'API management',
+      },
+    ],
+    'System Monitoring': [
+      {
+        title: 'Analytics Dashboard',
+        description: 'System performance metrics and usage analytics',
+        icon: BarChart3,
+        path: '/admin/analytics',
+        status: 'active',
+        count: 'Real-time',
+      },
+      {
+        title: '3D Model Debugging',
+        description: 'Monitor and debug AI model performance for 3D generation',
+        icon: Microscope,
+        path: '/admin/3d-model-debugging',
+        status: 'active',
+        count: '7 models',
+      },
+      {
+        title: 'Packages Panel',
+        description: 'Monitor system packages and dependencies',
+        icon: Package,
+        path: '/admin/packages',
+        status: 'active',
+        count: 'Dependencies',
+      },
+    ]
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -497,137 +512,15 @@ const AdminDashboard: React.FC = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Hero Section for PDF Upload */}
-            <Card className="border-2 border-primary/20 bg-primary/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <DatabaseIcon className="h-6 w-6 text-primary" />
-                  PDF Knowledge Base - Core System
-                </CardTitle>
-                <CardDescription className="text-base">
-                  View and manage processed PDF documents, chunks, images, and knowledge base entries
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <Button asChild className="flex items-center gap-2 px-6 py-3 text-lg">
-                    <Link to="/admin/knowledge-base">
-                      <DatabaseIcon className="h-5 w-5" />
-                      View Knowledge Base
-                    </Link>
-                  </Button>
-                  <Button asChild className="px-6 py-3 text-lg border border-gray-300 hover:bg-gray-50">
-                    <Link to="/admin/pdf-processing">
-                      <Upload className="h-5 w-5" />
-                      Upload New PDFs
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Package Validation Section */}
-            <Card className="border-2 border-blue-200 bg-blue-50/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-blue-600" />
-                  Deployment Package Validation
-                  {packageLoading && <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />}
-                </CardTitle>
-                <CardDescription>
-                  Verify all required packages from requirements.txt are properly installed
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {packageStatus ? (
-                  <div className="space-y-4">
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center p-3 bg-white rounded-lg border">
-                        <div className="text-2xl font-bold text-green-600">
-                          {packageStatus.data?.summary?.available_packages || 0}
-                        </div>
-                        <div className="text-sm text-gray-600">Installed</div>
-                      </div>
-                      <div className="text-center p-3 bg-white rounded-lg border">
-                        <div className="text-2xl font-bold text-red-600">
-                          {packageStatus.data?.summary?.missing_packages || 0}
-                        </div>
-                        <div className="text-sm text-gray-600">Missing</div>
-                      </div>
-                      <div className="text-center p-3 bg-white rounded-lg border">
-                        <div className="text-2xl font-bold text-orange-600">
-                          {packageStatus.data?.summary?.critical_missing || 0}
-                        </div>
-                        <div className="text-sm text-gray-600">Critical Missing</div>
-                      </div>
-                      <div className="text-center p-3 bg-white rounded-lg border">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {packageStatus.data?.summary?.total_packages || 0}
-                        </div>
-                        <div className="text-sm text-gray-600">Total</div>
-                      </div>
-                    </div>
 
-                    {/* Deployment Status */}
-                    <div className="flex items-center gap-2 p-3 rounded-lg border bg-white">
-                      {packageStatus.data?.summary?.deployment_ready ? (
-                        <>
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                          <span className="font-medium text-green-700">Deployment Ready</span>
-                          <Badge className="bg-green-100 text-green-800">All Critical Packages Installed</Badge>
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="h-5 w-5 text-red-600" />
-                          <span className="font-medium text-red-700">Deployment Issues</span>
-                          <Badge className="bg-red-100 text-red-800">Missing Critical Packages</Badge>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Quick Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={loadPackageStatus}
-                        disabled={packageLoading}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${packageLoading ? 'animate-spin' : ''}`} />
-                        Refresh Status
-                      </Button>
-                      <Button asChild variant="outline" size="sm">
-                        <Link to="/admin/packages">
-                          <Package className="h-4 w-4 mr-2" />
-                          View All Packages
-                        </Link>
-                      </Button>
-                    </div>
-
-                    {/* Critical Missing Packages Alert */}
-                    {packageStatus.data?.summary?.critical_missing > 0 && (
-                      <Alert className="border-red-200 bg-red-50">
-                        <AlertTriangle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-700">
-                          <strong>Critical packages missing:</strong> Some essential packages are not installed.
-                          Check the packages panel for details and run <code className="bg-red-100 px-1 rounded">pip install -r requirements.txt</code> on the server.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <div className="text-gray-500">Loading package status...</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {adminSections
-                .sort((a, b) => (a.priority || 99) - (b.priority || 99))
-                .map((section) => {
+            {/* Admin Sections by Category */}
+            <div className="space-y-8">
+              {Object.entries(adminSections).map(([category, sections]) => (
+                <div key={category}>
+                  <h2 className="text-2xl font-bold mb-4 text-gray-800">{category}</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {sections.map((section) => {
                 const Icon = section.icon;
                 return (
                   <Card key={section.path} className="hover:shadow-md transition-shadow">
@@ -656,8 +549,11 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">

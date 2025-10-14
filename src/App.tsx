@@ -112,7 +112,9 @@ const App = () => (
             <Route path="/admin" element={
               <AuthGuard>
                 <AdminGuard>
-                  <AdminDashboard />
+                  <Layout>
+                    <AdminDashboard />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
@@ -126,70 +128,90 @@ const App = () => (
             <Route path="/admin/knowledge-base" element={
               <AuthGuard>
                 <AdminGuard>
-                  <MaterialKnowledgeBase />
+                  <Layout>
+                    <MaterialKnowledgeBase />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/agent-ml" element={
               <AuthGuard>
                 <AdminGuard>
-                  <AgentMLCoordination />
+                  <Layout>
+                    <AgentMLCoordination />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/material-analysis" element={
               <AuthGuard>
                 <AdminGuard>
-                  <AITestingPanel />
+                  <Layout>
+                    <AITestingPanel />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/training-models" element={
               <AuthGuard>
                 <AdminGuard>
-                  <AdminPanel />
+                  <Layout>
+                    <AdminPanel />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/performance" element={
               <AuthGuard>
                 <AdminGuard>
-                  <SystemPerformance />
+                  <Layout>
+                    <SystemPerformance />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/rag" element={
               <AuthGuard>
                 <AdminGuard>
-                  <IntegratedRAGManagement />
+                  <Layout>
+                    <IntegratedRAGManagement />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/metadata" element={
               <AuthGuard>
                 <AdminGuard>
-                  <MetadataFieldsManagement />
+                  <Layout>
+                    <MetadataFieldsManagement />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/api-gateway" element={
               <AuthGuard>
                 <AdminGuard>
-                  <ApiGatewayAdmin />
+                  <Layout>
+                    <ApiGatewayAdmin />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/packages" element={
               <AuthGuard>
                 <AdminGuard>
-                  <PackagesPanel />
+                  <Layout>
+                    <PackagesPanel />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/svbrdf" element={
               <AuthGuard>
                 <AdminGuard>
-                  <SVBRDFExtractionPage />
+                  <Layout>
+                    <SVBRDFExtractionPage />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
@@ -197,7 +219,9 @@ const App = () => (
             <Route path="/admin/ocr" element={
               <AuthGuard>
                 <AdminGuard>
-                  <OCRProcessor />
+                  <Layout>
+                    <OCRProcessor />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />
@@ -245,7 +269,9 @@ const App = () => (
             <Route path="/admin/3d-model-debugging" element={
               <AuthGuard>
                 <AdminGuard>
-                  <ModelDebuggingPanel />
+                  <Layout>
+                    <ModelDebuggingPanel />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />

@@ -18,6 +18,7 @@ import {
   Info,
   Zap,
   Brain,
+  ArrowLeft,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
 
 interface DocumentChunk {
   id: string;
@@ -232,11 +234,20 @@ export const MaterialKnowledgeBase: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Material Knowledge Base</h1>
-          <p className="text-muted-foreground">
-            Comprehensive view of processed documents, chunks, images, and embeddings
-          </p>
+        <div className="flex items-center gap-4">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Admin
+            </Link>
+          </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Material Knowledge Base</h1>
+              <p className="text-muted-foreground">
+                Comprehensive view of processed documents, chunks, images, and embeddings
+              </p>
+            </div>
+          </div>
         </div>
         <Button onClick={loadKnowledgeBaseData} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
