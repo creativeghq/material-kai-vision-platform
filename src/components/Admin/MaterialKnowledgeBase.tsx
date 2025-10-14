@@ -16,7 +16,6 @@ import {
   ChevronRight,
   ChevronDown,
   Info,
-  Zap,
   Brain,
   ArrowLeft,
 } from 'lucide-react';
@@ -332,7 +331,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Zap className="h-4 w-4 text-yellow-500" />
+                <Brain className="h-4 w-4 text-yellow-500" />
                 <div>
                   <p className="text-2xl font-bold">{stats.avgConfidence}</p>
                   <p className="text-xs text-muted-foreground">Avg Confidence</p>
