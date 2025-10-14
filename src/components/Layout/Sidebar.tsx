@@ -4,9 +4,7 @@ import {
   Palette,
   Settings,
   Box,
-  ScanText,
   Search,
-  Globe,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 

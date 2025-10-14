@@ -179,6 +179,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         await onSave(materialData);
       } else {
         // Save material to materials_catalog table
+        const { supabase } = await import('@/integrations/supabase/client');
         const { error } = await supabase
           .from('materials_catalog')
           .insert({

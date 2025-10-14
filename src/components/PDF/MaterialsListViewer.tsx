@@ -165,11 +165,12 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
   const saveMaterialToCatalog = async (material: DetectedMaterial) => {
     try {
       // Save material to materials_catalog table
+      const { supabase } = await import('@/integrations/supabase/client');
       const { data, error } = await supabase
         .from('materials_catalog')
         .insert({
           name: material.name,
-          description: material.description || '',
+          description: (material as any).description || '',
           category: material.category || 'uncategorized',
           properties: {
             confidence: material.confidence,

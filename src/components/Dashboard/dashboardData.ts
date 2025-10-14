@@ -6,7 +6,6 @@ import {
   Upload,
   Star,
   Palette,
-  Sparkles,
   Target,
   TrendingUp,
   Shield,
