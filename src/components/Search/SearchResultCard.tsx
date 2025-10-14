@@ -10,7 +10,7 @@ import {
   Star,
   Clock,
   User,
-  Tag,
+  Hash,
   TrendingUp,
 } from 'lucide-react';
 
@@ -212,7 +212,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                       className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer"
                       onClick={(e) => handleTagClick(e, tag)}
                     >
-                      <Tag className="h-3 w-3 mr-1" />
+                      <Hash className="h-3 w-3 mr-1" />
                       {tag}
                     </Badge>
                   ))}
@@ -428,7 +428,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer"
                 onClick={(e) => handleTagClick(e, tag)}
               >
-                <Tag className="h-3 w-3 mr-1" />
+                <Hash className="h-3 w-3 mr-1" />
                 {tag}
               </Badge>
             ))}

@@ -411,7 +411,7 @@ const AdminDashboard: React.FC = () => {
       {
         title: 'Metadata Fields',
         description: 'Configure material metadata fields and properties',
-        icon: Tag,
+        icon: Settings,
         path: '/admin/metadata-fields',
         status: 'active',
         count: 'Field config',

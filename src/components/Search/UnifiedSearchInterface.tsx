@@ -11,7 +11,7 @@ import {
   Brain,
   X,
   Filter,
-  Tag,
+  Hash,
   Building,
   MapPin,
   User,
@@ -555,7 +555,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 {/* Material Filters */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2 font-medium">
-                    <Tag className="h-4 w-4" />
+                    <Hash className="h-4 w-4" />
                     Materials ({availableEntities.materials.length})
                   </Label>
                   <div className="max-h-32 overflow-y-auto space-y-1">
@@ -714,7 +714,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 <div className="flex flex-wrap gap-1">
                   {entityFilters.materials.map(material => (
                     <Badge key={material} variant="secondary" className="text-xs">
-                      <Tag className="h-2 w-2 mr-1" />
+                      <Hash className="h-2 w-2 mr-1" />
                       {material}
                       <X
                         className="h-2 w-2 ml-1 cursor-pointer"
@@ -869,7 +869,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                               variant="outline"
                               className="text-xs"
                             >
-                              {entity.type === 'MATERIAL' && <Tag className="h-2 w-2 mr-1" />}
+                              {entity.type === 'MATERIAL' && <Hash className="h-2 w-2 mr-1" />}
                               {entity.type === 'ORG' && <Building className="h-2 w-2 mr-1" />}
                               {entity.type === 'LOCATION' && <MapPin className="h-2 w-2 mr-1" />}
                               {entity.type === 'PERSON' && <User className="h-2 w-2 mr-1" />}

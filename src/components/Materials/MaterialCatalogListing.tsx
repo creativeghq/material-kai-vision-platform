@@ -6,7 +6,7 @@ import {
   Grid3X3,
   List,
   Info,
-  Tag,
+  Hash,
   Image as ImageIcon,
   MapPin,
   Wrench,
@@ -547,7 +547,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
             {showMetaFields && (
               <div className="space-y-3">
                 <Label className="text-sm font-medium flex items-center gap-2">
-                  <Tag className="h-4 w-4" />
+                  <Hash className="h-4 w-4" />
                   Material Properties
                 </Label>
                 

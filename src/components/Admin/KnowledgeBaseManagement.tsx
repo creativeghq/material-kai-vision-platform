@@ -15,7 +15,7 @@ import {
   EyeOff,
   Link,
   FileText,
-  Tag,
+  Hash,
   GitCompare,
   Loader2,
 } from 'lucide-react';
@@ -911,7 +911,7 @@ const KnowledgeBaseManagement: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Tag className="h-4 w-4" />
+                    <Hash className="h-4 w-4" />
                     Extracted Entities
                   </CardTitle>
                   <CardDescription>
@@ -980,7 +980,7 @@ const KnowledgeBaseManagement: React.FC = () => {
             ) : (
               <Card>
                 <CardContent className="text-center py-12">
-                  <Tag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <Hash className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-muted-foreground mb-4">
                     Select a document from the Documents tab to extract entities
                   </p>

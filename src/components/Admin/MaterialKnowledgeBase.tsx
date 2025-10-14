@@ -8,7 +8,6 @@ import {
   Filter,
   RefreshCw,
   Download,
-  Tag,
   Calendar,
   Hash,
   Layers,
@@ -307,7 +306,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Tag className="h-4 w-4 text-red-500" />
+                <Layers className="h-4 w-4 text-red-500" />
                 <div>
                   <p className="text-2xl font-bold">{stats.totalMetadataFields}</p>
                   <p className="text-xs text-muted-foreground">Meta Fields</p>
@@ -838,7 +837,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
             <CardContent>
               {metadataFields.length === 0 ? (
                 <div className="text-center py-8">
-                  <Tag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">
                     No metadata fields configured. Set up fields to enhance material categorization.
                   </p>
