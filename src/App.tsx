@@ -16,7 +16,7 @@ import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
 import AdminDashboard from './components/Admin/AdminDashboard';
-import KnowledgeBaseManagement from './components/Admin/KnowledgeBaseManagement';
+import { MaterialKnowledgeBase } from './components/Admin/MaterialKnowledgeBase';
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
@@ -126,7 +126,7 @@ const App = () => (
             <Route path="/admin/knowledge-base" element={
               <AuthGuard>
                 <AdminGuard>
-                  <KnowledgeBaseManagement />
+                  <MaterialKnowledgeBase />
                 </AdminGuard>
               </AuthGuard>
             } />
