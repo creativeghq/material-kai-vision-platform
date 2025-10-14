@@ -1,6 +1,6 @@
 
 import { supabase } from '../integrations/supabase/client';
-import WorkflowErrorHandler, { type WorkflowResponse } from '../utils/WorkflowErrorHandler';
+
 
 // Define interfaces locally to avoid importing from React components
 interface WorkflowStepDetail {
@@ -437,8 +437,9 @@ export class ConsolidatedPDFWorkflowService {
         // Check if MIVAA returned a job ID (async) or completed result (sync)
         const mivaaJobId = response.data?.job_id || response.data?.id;
 
-        if (mivaaJobId && response.data?.status === 'pending') {
+        if (mivaaJobId) {
           // Async processing - poll for completion
+          // This handles both bulk processing (no status field) and regular async processing (status: 'pending')
           this.updateJobStep(jobId, 'mivaa-processing', {
             progress: 30,
             details: [
