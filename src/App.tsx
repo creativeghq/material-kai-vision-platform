@@ -42,6 +42,7 @@ import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import HealthPage from './pages/Health';
 import { CriticalErrorBoundary, PageErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
+import { MivaaDocsViewer } from './components/Admin/MivaaDocsViewer';
 
 const queryClient = new QueryClient();
 
@@ -271,6 +272,15 @@ const App = () => (
                 <AdminGuard>
                   <Layout>
                     <ModelDebuggingPanel />
+                  </Layout>
+                </AdminGuard>
+              </AuthGuard>
+            } />
+            <Route path="/admin/mivaa-docs" element={
+              <AuthGuard>
+                <AdminGuard>
+                  <Layout>
+                    <MivaaDocsViewer />
                   </Layout>
                 </AdminGuard>
               </AuthGuard>

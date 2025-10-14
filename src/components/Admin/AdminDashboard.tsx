@@ -449,6 +449,14 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'Dependencies',
       },
+      {
+        title: 'MIVAA API Docs',
+        description: 'Access MIVAA service documentation and API specifications',
+        icon: FileText,
+        path: '/admin/mivaa-docs',
+        status: 'active',
+        count: 'Documentation',
+      },
     ]
   };
 
