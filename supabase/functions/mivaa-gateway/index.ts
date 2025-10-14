@@ -33,6 +33,9 @@ const MIVAA_ENDPOINTS = {
   'semantic_search': { path: '/api/search/semantic', method: 'POST' },
   'generate_embedding': { path: '/api/embeddings/materials/generate', method: 'POST' },
   'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
+  'docs': { path: '/docs', method: 'GET' },
+  'redoc': { path: '/redoc', method: 'GET' },
+  'openapi_json': { path: '/openapi.json', method: 'GET' },
 }
 
 serve(async (req) => {
@@ -128,19 +131,36 @@ serve(async (req) => {
     }
 
     const response = await fetch(mivaaUrl, fetchOptions)
-    const responseData = await response.json()
 
-    console.log(`📥 MIVAA Response: ${response.status}`, responseData)
+    // Handle HTML responses for docs endpoints
+    const isDocsEndpoint = ['docs', 'redoc'].includes(action)
+    const isJsonEndpoint = action === 'openapi_json'
+
+    let responseData
+    let contentType = 'application/json'
+
+    if (isDocsEndpoint) {
+      responseData = await response.text()
+      contentType = 'text/html'
+      console.log(`📥 MIVAA Response: ${response.status} [HTML Content]`)
+    } else if (isJsonEndpoint) {
+      responseData = await response.text() // Keep as text for OpenAPI JSON
+      contentType = 'application/json'
+      console.log(`📥 MIVAA Response: ${response.status} [OpenAPI JSON]`)
+    } else {
+      responseData = await response.json()
+      console.log(`📥 MIVAA Response: ${response.status}`, responseData)
+    }
 
     if (!response.ok) {
       throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`)
     }
 
     return new Response(
-      JSON.stringify(responseData),
+      isDocsEndpoint || isJsonEndpoint ? responseData : JSON.stringify(responseData),
       {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': contentType }
       }
     )
 
