@@ -8,7 +8,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Zap,
+  Sparkles,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -545,7 +545,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                   disabled={selectedTiles.size === 0 || workflowActions.size === 0 || processingWorkflow}
                   className="flex-1"
                 >
-                  <Zap className="h-4 w-4 mr-2" />
+                  <Sparkles className="h-4 w-4 mr-2" />
                   Execute Pipeline
                 </Button>
               </div>

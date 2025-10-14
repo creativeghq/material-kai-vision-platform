@@ -11,7 +11,7 @@ import {
   Filter,
   RefreshCw,
   Image as ImageIcon,
-  Zap,
+  Sparkles,
   EyeOff,
   Link,
   FileText,
@@ -478,7 +478,7 @@ const KnowledgeBaseManagement: React.FC = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-amber-500" />
+                    <Sparkles className="h-4 w-4 text-amber-500" />
                     <span className="text-sm font-medium">Functional Metadata Display</span>
                   </div>
                   <Button
@@ -637,7 +637,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                         <TableCell>
                           {(entry.metadata as Record<string, unknown>)?.functional_metadata ? (
                             <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-                              <Zap className="h-3 w-3 mr-1" />
+                              <Sparkles className="h-3 w-3 mr-1" />
                               Available
                             </Badge>
                           ) : (
@@ -678,7 +678,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                               }}
                               title="Analyze with MIVAA"
                             >
-                              <Zap className="h-4 w-4" />
+                              <Sparkles className="h-4 w-4" />
                             </Button>
                             <Button
                               className="border border-border bg-background text-foreground h-8 px-3 text-sm"
@@ -1005,7 +1005,7 @@ const KnowledgeBaseManagement: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-amber-500" />
+                  <Sparkles className="h-5 w-5 text-amber-500" />
                   Enhanced PDF Viewer with Functional Metadata
                 </CardTitle>
                 <CardDescription>
@@ -1117,7 +1117,7 @@ const KnowledgeBaseManagement: React.FC = () => {
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-amber-500" />
+                <Sparkles className="h-5 w-5 text-amber-500" />
                 Enhanced PDF Viewer with Functional Metadata
               </DialogTitle>
             </DialogHeader>

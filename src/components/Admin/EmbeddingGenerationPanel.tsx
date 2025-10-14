@@ -4,7 +4,7 @@ import {
   Activity,
   Database,
   RefreshCw,
-  Zap,
+  Sparkles,
   TrendingUp,
   AlertCircle,
   CheckCircle2,
@@ -163,7 +163,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
             {regenerating ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
             ) : (
-              <Zap className="h-4 w-4 mr-2" />
+              <Sparkles className="h-4 w-4 mr-2" />
             )}
             Regenerate All
           </Button>

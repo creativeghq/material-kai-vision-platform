@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   TestTube,
   Brain,
-  Zap,
+  Sparkles,
   Clock,
   CheckCircle,
   XCircle,
@@ -643,7 +643,7 @@ export const AITestingPanel: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
+              <Sparkles className="h-5 w-5" />
               3D Generation Test
             </CardTitle>
           </CardHeader>
