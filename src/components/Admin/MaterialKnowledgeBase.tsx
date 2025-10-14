@@ -906,7 +906,3 @@ export const MaterialKnowledgeBase: React.FC = () => {
     </div>
   );
 };
-      </Tabs>
-    </div>
-  );
-};
