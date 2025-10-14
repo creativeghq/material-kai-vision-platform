@@ -7,6 +7,7 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/Layout/AuthGuard';
+import { AdminGuard } from './components/Layout/AdminGuard';
 
 import { monitoringService } from '@/services/monitoring/monitoringService';
 // Import CORS debug utility for troubleshooting
@@ -110,75 +111,103 @@ const App = () => (
             } />
             <Route path="/admin" element={
               <AuthGuard>
-                <AdminDashboard />
+                <AdminGuard>
+                  <AdminDashboard />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/analytics" element={
               <AuthGuard>
-                <AnalyticsDashboard />
+                <AdminGuard>
+                  <AnalyticsDashboard />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/knowledge-base" element={
               <AuthGuard>
-                <KnowledgeBaseManagement />
+                <AdminGuard>
+                  <KnowledgeBaseManagement />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/agent-ml" element={
               <AuthGuard>
-                <AgentMLCoordination />
+                <AdminGuard>
+                  <AgentMLCoordination />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/material-analysis" element={
               <AuthGuard>
-                <AITestingPanel />
+                <AdminGuard>
+                  <AITestingPanel />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/training-models" element={
               <AuthGuard>
-                <AdminPanel />
+                <AdminGuard>
+                  <AdminPanel />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/performance" element={
               <AuthGuard>
-                <SystemPerformance />
+                <AdminGuard>
+                  <SystemPerformance />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/rag" element={
               <AuthGuard>
-                <IntegratedRAGManagement />
+                <AdminGuard>
+                  <IntegratedRAGManagement />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/metadata" element={
               <AuthGuard>
-                <MetadataFieldsManagement />
+                <AdminGuard>
+                  <MetadataFieldsManagement />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/api-gateway" element={
               <AuthGuard>
-                <ApiGatewayAdmin />
+                <AdminGuard>
+                  <ApiGatewayAdmin />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/packages" element={
               <AuthGuard>
-                <PackagesPanel />
+                <AdminGuard>
+                  <PackagesPanel />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/svbrdf" element={
               <AuthGuard>
-                <SVBRDFExtractionPage />
+                <AdminGuard>
+                  <SVBRDFExtractionPage />
+                </AdminGuard>
               </AuthGuard>
             } />
 
             <Route path="/admin/ocr" element={
               <AuthGuard>
-                <OCRProcessor />
+                <AdminGuard>
+                  <OCRProcessor />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/pdf-processing" element={
               <AuthGuard>
-                <Layout>
-                  <PDFProcessing />
-                </Layout>
+                <AdminGuard>
+                  <Layout>
+                    <PDFProcessing />
+                  </Layout>
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/pdf-processing" element={
@@ -197,21 +226,27 @@ const App = () => (
             } />
             <Route path="/admin/search-hub" element={
               <AuthGuard>
-                <Layout>
-                  <SearchHub />
-                </Layout>
+                <AdminGuard>
+                  <Layout>
+                    <SearchHub />
+                  </Layout>
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/3d-suggestions" element={
               <AuthGuard>
-                <Layout>
-                  <MaterialSuggestionsPanel />
-                </Layout>
+                <AdminGuard>
+                  <Layout>
+                    <MaterialSuggestionsPanel />
+                  </Layout>
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/admin/3d-model-debugging" element={
               <AuthGuard>
-                <ModelDebuggingPanel />
+                <AdminGuard>
+                  <ModelDebuggingPanel />
+                </AdminGuard>
               </AuthGuard>
             } />
             <Route path="/scraper" element={
