@@ -850,7 +850,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                         {isTraining ? (
                           <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Training...</>
                         ) : (
-                          <><Zap className="h-4 w-4 mr-2" /> Start Classification Training</>
+                          <><Sparkles className="h-4 w-4 mr-2" /> Start Classification Training</>
                         )}
                       </Button>
                     </CardContent>

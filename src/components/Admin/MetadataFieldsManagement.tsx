@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Settings, ArrowLeft, Home, Zap, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, Settings, ArrowLeft, Home, Sparkles, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -722,7 +722,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
+            <Sparkles className="h-5 w-5" />
             Auto-Populate Metadata
           </CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -803,7 +803,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <Zap className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4" />
                   Auto-Populate Metadata
                 </>
               )}

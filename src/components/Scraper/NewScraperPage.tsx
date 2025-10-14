@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe, Loader2, Plus, Settings, Zap, Brain, FileText, Search, Map, MousePointer } from 'lucide-react';
+import { Globe, Loader2, Plus, Settings, Sparkles, Brain, FileText, Search, Map, MousePointer } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -499,7 +499,7 @@ Return a list of materials found on the page.`);
               <SelectContent>
                 <SelectItem value="firecrawl">
                   <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
+                    <Sparkles className="h-4 w-4" />
                     Firecrawl (Advanced AI Extraction)
                   </div>
                 </SelectItem>
@@ -547,7 +547,7 @@ Return a list of materials found on the page.`);
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
+              <Sparkles className="h-5 w-5" />
               Firecrawl Options
             </CardTitle>
           </CardHeader>

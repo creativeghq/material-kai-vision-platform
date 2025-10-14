@@ -15,7 +15,7 @@ import {
   Layers,
   BarChart3,
   TrendingUp,
-  Zap,
+  Sparkles,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -487,7 +487,7 @@ export const SystemPerformance: React.FC = () => {
                 <MetricCard
                   title="Avg Processing Time"
                   value={`${Math.round(documentMetrics.avg_processing_time_per_document / 1000)}s`}
-                  icon={Zap}
+                  icon={Sparkles}
                   description="Per document"
                   trend={documentMetrics.performance_trends.processing_time_trend}
                   status={documentMetrics.avg_processing_time_per_document < 30000 ? 'good' : 'warning'}

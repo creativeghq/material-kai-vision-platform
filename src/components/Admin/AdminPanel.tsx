@@ -5,7 +5,7 @@ import {
   Brain,
   CheckCircle,
   Clock,
-  Zap,
+  Sparkles,
   Star,
   BarChart3,
 } from 'lucide-react';
@@ -239,7 +239,7 @@ export const AdminPanel: React.FC = () => {
         <StatCard
           title="Claude Success"
           value={stats.claudeSuccess}
-          icon={Zap}
+          icon={Sparkles}
           description="Analyses completed by Claude"
         />
         <StatCard

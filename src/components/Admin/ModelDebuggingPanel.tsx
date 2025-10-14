@@ -6,7 +6,7 @@ import {
   Clock,
   RefreshCw,
   Settings,
-  Zap,
+  Sparkles,
   Image,
   FileText,
   ExternalLink,
@@ -155,7 +155,7 @@ const ModelDebuggingPanel: React.FC = () => {
     switch (type) {
       case 'text-to-image': return <FileText className="h-4 w-4" />;
       case 'image-to-image': return <Image className="h-4 w-4" />;
-      case 'hybrid': return <Zap className="h-4 w-4" />;
+      case 'hybrid': return <Sparkles className="h-4 w-4" />;
       default: return <Settings className="h-4 w-4" />;
     }
   };

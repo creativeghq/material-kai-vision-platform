@@ -28,6 +28,7 @@ import {
   Eye,
   RefreshCw,
   Download,
+  Sparkles,
   Filter,
   MoreHorizontal,
   Package,
@@ -392,7 +393,7 @@ const AdminDashboard: React.FC = () => {
       {
         title: 'AI Testing Panel',
         description: 'Test and validate AI model responses and performance',
-        icon: Zap,
+        icon: Sparkles,
         path: '/admin/ai-testing',
         status: 'active',
         count: 'Testing suite',
