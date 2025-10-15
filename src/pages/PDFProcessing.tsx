@@ -304,8 +304,9 @@ const PDFProcessing = () => {
           }
         }}
         onViewResults={() => {
-          setIsProgressModalOpen(false);
+          // Don't auto-close modal - let user review results and close manually
           // Could navigate to results view or show results in another modal
+          console.log('View Results clicked - keeping modal open for review');
         }}
       />
     </div>

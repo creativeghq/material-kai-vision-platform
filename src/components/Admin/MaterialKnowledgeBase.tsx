@@ -121,10 +121,19 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const loadKnowledgeBaseData = async () => {
     setLoading(true);
     try {
-      // Load chunks
+      // Load chunks with document information
       const { data: chunksData, error: chunksError } = await supabase
         .from('document_chunks')
-        .select('*')
+        .select(`
+          *,
+          documents!inner(
+            id,
+            filename,
+            metadata,
+            processing_status,
+            created_at as doc_created_at
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (chunksError) throw chunksError;
@@ -139,10 +148,18 @@ export const MaterialKnowledgeBase: React.FC = () => {
       if (imagesError) throw imagesError;
       setImages(imagesData || []);
 
-      // Load embeddings
+      // Load embeddings with chunk information
       const { data: embeddingsData, error: embeddingsError } = await supabase
         .from('embeddings')
-        .select('*')
+        .select(`
+          *,
+          document_chunks!inner(
+            id,
+            document_id,
+            content,
+            chunk_index
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (embeddingsError) throw embeddingsError;
@@ -213,6 +230,36 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
   const getEmbeddingByChunk = (chunkId: string) => {
     return embeddings.find(embedding => embedding.chunk_id === chunkId);
+  };
+
+  const getDocumentDisplayName = (chunk: DocumentChunk) => {
+    if (!chunk) return 'Unknown Document';
+
+    // Try to get document info from the joined data
+    const doc = (chunk as any).documents;
+    if (doc) {
+      // Check for catalog name in metadata
+      if (doc.metadata?.title) return doc.metadata.title;
+      if (doc.metadata?.catalog_name) return doc.metadata.catalog_name;
+      if (doc.metadata?.document_name) return doc.metadata.document_name;
+
+      // Clean up filename if it's a UUID-based name
+      if (doc.filename && !doc.filename.match(/^[0-9a-f-]{36}\.pdf$/i)) {
+        return doc.filename.replace(/\.[^/.]+$/, ''); // Remove extension
+      }
+
+      // For UUID-based filenames, try to get a better name
+      if (doc.metadata?.source === 'mivaa_processing') {
+        return `PDF Document (${doc.filename.substring(0, 8)}...)`;
+      }
+    }
+
+    // Fallback to chunk metadata
+    if (chunk.metadata?.filename) return chunk.metadata.filename;
+    if (chunk.metadata?.title) return chunk.metadata.title;
+    if (chunk.metadata?.source) return `${chunk.metadata.source} Document`;
+
+    return 'Unknown Document';
   };
 
   if (loading) {
@@ -390,7 +437,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium">
-                                {firstChunk?.metadata?.filename || firstChunk?.metadata?.title || 'Unknown Document'}
+                                {getDocumentDisplayName(firstChunk)}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {docChunks.length} chunks • {docImages.length} images
@@ -475,7 +522,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                 <div className="flex items-center gap-2 mb-2">
                                   <Badge variant="outline">Chunk {chunk.chunk_index}</Badge>
                                   <Badge variant="secondary">
-                                    {chunk.metadata?.filename || 'Unknown File'}
+                                    {getDocumentDisplayName(chunk)}
                                   </Badge>
                                   {relatedImages.length > 0 && (
                                     <Badge variant="outline" className="text-purple-600">
@@ -535,13 +582,21 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             )}
 
                             {/* Embedding Info */}
-                            {embedding && (
+                            {embedding ? (
                               <div>
                                 <h4 className="font-medium mb-2">Embedding Information</h4>
                                 <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
                                   <p><strong>Model:</strong> {embedding.model_name || 'Unknown'}</p>
                                   <p><strong>Dimensions:</strong> {embedding.dimensions || 'Unknown'}</p>
+                                  <p><strong>Vector Status:</strong> <Badge variant="outline" className="text-green-600">Vector Available</Badge></p>
                                   <p><strong>Created:</strong> {new Date(embedding.created_at).toLocaleString()}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <h4 className="font-medium mb-2">Embedding Information</h4>
+                                <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                                  <p className="text-muted-foreground">No embedding generated for this chunk</p>
                                 </div>
                               </div>
                             )}
@@ -772,7 +827,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                               </p>
                               <div className="flex gap-2 mt-2">
                                 <Badge variant="outline" className="text-xs">
-                                  {relatedChunk.metadata?.filename || 'Unknown File'}
+                                  {getDocumentDisplayName(relatedChunk)}
                                 </Badge>
                                 <Badge variant="outline" className="text-xs">
                                   Chunk {relatedChunk.chunk_index}
@@ -800,16 +855,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                           <div className="mt-3 pt-3 border-t">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">Vector Preview</span>
-                              <Badge variant="outline" className="text-xs">
-                                {Array.isArray(embedding.embedding) ? embedding.embedding.length : 0} values
+                              <span className="text-sm font-medium">Vector Status</span>
+                              <Badge variant="outline" className="text-green-600">
+                                ✓ Vector Available ({embedding.dimensions || 0}D)
                               </Badge>
                             </div>
-                            <div className="mt-2 bg-muted/50 rounded p-2 text-xs font-mono">
-                              {Array.isArray(embedding.embedding) ?
-                                `[${embedding.embedding.slice(0, 5).map(v => v.toFixed(4)).join(', ')}...]` :
-                                'No vector data available'
-                              }
+                            <div className="mt-2 bg-muted/50 rounded p-2 text-xs">
+                              <p className="text-muted-foreground">
+                                Vector embedding successfully generated and stored.
+                                This chunk is ready for semantic search and RAG operations.
+                              </p>
                             </div>
                           </div>
                         </CardContent>

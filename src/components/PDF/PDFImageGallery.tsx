@@ -40,13 +40,15 @@ import { supabase } from '@/integrations/supabase/client';
 export interface PDFImage {
   id: string;
   document_id: string;
+  chunk_id?: string;
   image_url: string;
   image_type: string;
   caption?: string;
   alt_text?: string;
+  bbox?: any;
   page_number: number;
+  proximity_score?: number;
   confidence: number;
-  processing_status: string;
   metadata?: {
     filename?: string;
     width?: number;
@@ -59,6 +61,18 @@ export interface PDFImage {
     layout_context?: any;
   };
   created_at: string;
+  workspace_id?: string;
+  ocr_extracted_text?: string;
+  ocr_confidence_score?: number;
+  image_analysis_results?: any;
+  image_embedding?: any;
+  visual_features?: any;
+  processing_status: string;
+  multimodal_metadata?: any;
+  contextual_name?: string;
+  nearest_heading?: string;
+  heading_level?: number;
+  heading_distance?: number;
 }
 
 interface PDFImageGalleryProps {

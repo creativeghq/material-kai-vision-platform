@@ -696,25 +696,30 @@ export class ConsolidatedPDFWorkflowService {
     }>,
   ): Promise<{ details: (string | WorkflowStepDetail)[]; metadata?: unknown; result?: unknown }> {
     try {
-      // Mark step as running
-      this.updateJobStep(jobId, stepId, { status: 'running' });
+      // Mark step as running with 0% progress
+      this.updateJobStep(jobId, stepId, {
+        status: 'running',
+        progress: 0
+      });
 
       // Execute the step
       const result = await stepFunction();
 
-      // Mark step as completed
+      // Mark step as completed with 100% progress
       this.updateJobStep(jobId, stepId, {
         status: 'completed',
+        progress: 100,
         details: result.details,
       });
 
       return result;
 
     } catch (error) {
-      // Mark step as failed
+      // Mark step as failed with 0% progress
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.updateJobStep(jobId, stepId, {
         status: 'failed',
+        progress: 0,
         details: [this.createErrorDetail(`Step failed: ${errorMessage}`, errorMessage)],
       });
       throw error;
@@ -1386,26 +1391,45 @@ export class ConsolidatedPDFWorkflowService {
             const chunksCreated = details.chunks_created || parameters.chunks_created || 0;
             const imagesExtracted = details.images_extracted || parameters.images_extracted || 0;
             const textLength = details.text_length || parameters.text_length || 0;
+            const pagesProcessed = details.pages_processed || parameters.pages_processed || 0;
+            const totalPages = details.total_pages || parameters.total_pages || 0;
+            const currentPage = details.current_page || parameters.current_page || 0;
 
             // Calculate frontend progress (30% to 90% range)
             const frontendProgress = 30 + Math.min(60, (progress / 100) * 60);
 
+            // Build detailed progress information
+            const progressDetails = [
+              'Initializing MIVAA processing...',
+              'Preparing document for analysis',
+              'Sending document to MIVAA service...',
+              `✅ Job started with ID: ${mivaaJobId}`,
+              `⏳ ${currentStep} (${Math.round(frontendProgress)}% complete)`,
+            ];
+
+            // Add page progress if available
+            if (totalPages > 0) {
+              progressDetails.push(`📄 Pages: ${pagesProcessed}/${totalPages} processed`);
+              if (currentPage > 0) {
+                progressDetails.push(`📍 Currently processing page ${currentPage}`);
+              }
+            }
+
+            // Add generation counts
+            progressDetails.push(`📝 Chunks Generated: ${chunksCreated}`);
+            progressDetails.push(`🖼️ Images Extracted: ${imagesExtracted}`);
+
+            if (textLength > 0) {
+              progressDetails.push(`📊 Text Processed: ${(textLength / 1000).toFixed(1)}K characters`);
+            }
+
             // Update progress with real-time data
             this.updateJobStep(jobId, 'mivaa-processing', {
               progress: frontendProgress,
-              details: [
-                'Initializing MIVAA processing...',
-                'Preparing document for analysis',
-                'Sending document to MIVAA service...',
-                `✅ Job started with ID: ${mivaaJobId}`,
-                `⏳ ${currentStep} (MIVAA: ${progress}%, Frontend: ${Math.round(frontendProgress)}%)`,
-                chunksCreated > 0 ? `📝 Chunks Created: ${chunksCreated}` : '📝 Chunks Created: 0',
-                imagesExtracted > 0 ? `🖼️ Images Extracted: ${imagesExtracted}` : '🖼️ Images Extracted: 0',
-                textLength > 0 ? `📄 Text Processed: ${textLength} characters` : '📄 Text Processed: 0 characters',
-              ],
+              details: progressDetails,
             });
 
-            console.log(`MIVAA job ${mivaaJobId} status: ${status}, progress: ${progress}%, chunks: ${chunksCreated}, images: ${imagesExtracted}`);
+            console.log(`MIVAA job ${mivaaJobId} status: ${status}, progress: ${progress}%, pages: ${pagesProcessed}/${totalPages}, chunks: ${chunksCreated}, images: ${imagesExtracted}`);
           } else {
             console.warn(`Unknown MIVAA job status: ${status}`);
           }

@@ -256,7 +256,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   const isRunning = job.status === 'running';
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      // Prevent auto-closing - only allow manual close via button
+      if (!open) return;
+    }}>
       <DialogContent className="max-w-4xl h-[90vh] p-0 flex flex-col overflow-hidden">
         <DialogHeader className="p-6 pb-4 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -339,9 +342,6 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                     compact={false}
                   />
                   <Separator className="my-6" />
-                  <div className="text-sm text-gray-600 mb-4">
-                    <strong>Legacy Progress View:</strong> The detailed step-by-step view below shows the traditional progress tracking.
-                  </div>
                 </div>
               )}
 
@@ -535,6 +535,79 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             </div>
           </ScrollArea>
         </div>
+
+        <Separator className="flex-shrink-0" />
+
+        {/* Completion Summary */}
+        {isCompleted && (
+          <div className="p-6 pt-4 flex-shrink-0 bg-green-50 border-t border-green-200">
+            <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Processing Complete
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {(() => {
+                // Extract completion data from job steps
+                const mivaaStep = job.steps.find(s => s.id === 'mivaa-processing');
+                const knowledgeStep = job.steps.find(s => s.id === 'knowledge-storage');
+                const embeddingStep = job.steps.find(s => s.id === 'embedding-generation');
+
+                // Parse details to extract counts
+                let chunksCreated = 0;
+                let imagesExtracted = 0;
+                let embeddingsGenerated = 0;
+                let kbEntriesStored = 0;
+
+                if (mivaaStep?.details) {
+                  mivaaStep.details.forEach(detail => {
+                    const detailStr = typeof detail === 'string' ? detail : detail.message;
+                    const chunkMatch = detailStr.match(/Generated (\d+) text chunks/);
+                    const imageMatch = detailStr.match(/Extracted (\d+) images/);
+                    if (chunkMatch) chunksCreated = parseInt(chunkMatch[1]);
+                    if (imageMatch) imagesExtracted = parseInt(imageMatch[1]);
+                  });
+                }
+
+                if (knowledgeStep?.details) {
+                  knowledgeStep.details.forEach(detail => {
+                    const detailStr = typeof detail === 'string' ? detail : detail.message;
+                    const kbMatch = detailStr.match(/Stored (\d+) chunks/);
+                    if (kbMatch) kbEntriesStored = parseInt(kbMatch[1]);
+                  });
+                }
+
+                if (embeddingStep?.details) {
+                  embeddingStep.details.forEach(detail => {
+                    const detailStr = typeof detail === 'string' ? detail : detail.message;
+                    const embeddingMatch = detailStr.match(/Generated (\d+) embeddings/);
+                    if (embeddingMatch) embeddingsGenerated = parseInt(embeddingMatch[1]);
+                  });
+                }
+
+                return (
+                  <>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-700">{chunksCreated}</div>
+                      <div className="text-sm text-green-600">Chunks Created</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-700">{embeddingsGenerated || chunksCreated}</div>
+                      <div className="text-sm text-green-600">Embeddings Generated</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-700">{imagesExtracted}</div>
+                      <div className="text-sm text-green-600">Images Processed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-700">{kbEntriesStored || chunksCreated}</div>
+                      <div className="text-sm text-green-600">KB Entries Stored</div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
 
         <Separator className="flex-shrink-0" />
 
