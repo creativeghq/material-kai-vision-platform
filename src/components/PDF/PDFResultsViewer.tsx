@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import { PDFReviewWorkflow } from './PDFReviewWorkflow';
 import { MaterialsListViewer } from './MaterialsListViewer';
+import { PDFImageGallery } from './PDFImageGallery';
 
 interface PDFProcessingResult {
   id: string;
@@ -370,6 +371,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
       <Tabs defaultValue="materials" className="space-y-4">
         <TabsList>
           <TabsTrigger value="materials">Materials Catalog</TabsTrigger>
+          <TabsTrigger value="images">Extracted Images</TabsTrigger>
           <TabsTrigger value="tiles">Tile Analysis</TabsTrigger>
           <TabsTrigger value="review">Review & Workflow</TabsTrigger>
           <TabsTrigger value="metadata">Document Info</TabsTrigger>
@@ -379,6 +381,15 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
           <MaterialsListViewer
             processingId={processingId}
             tiles={tiles}
+          />
+        </TabsContent>
+
+        <TabsContent value="images" className="space-y-4">
+          <PDFImageGallery
+            documentId={processingId}
+            showHeader={true}
+            viewMode="grid"
+            className="w-full"
           />
         </TabsContent>
 

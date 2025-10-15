@@ -296,6 +296,8 @@ const PDFProcessing = () => {
         onClose={() => setIsProgressModalOpen(false)}
         job={currentJob}
         enablePolling={true} // Enable real-time polling
+        useEnhancedMonitor={true} // Enable enhanced WebSocket-based monitoring
+        showImageGallery={true} // Enable image gallery display
         onRetry={() => {
           if (currentJob) {
             handleRetryJob(currentJob.id);

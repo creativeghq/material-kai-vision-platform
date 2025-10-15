@@ -28,6 +28,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
+import { EnhancedProgressMonitor } from './EnhancedProgressMonitor';
+import { PDFImageGallery } from './PDFImageGallery';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -71,9 +73,12 @@ interface PDFUploadProgressModalProps {
   isOpen: boolean;
   onClose: () => void;
   job: WorkflowJob | null;
+  enablePolling?: boolean;
+  useEnhancedMonitor?: boolean;
+  showImageGallery?: boolean;
   onRetry?: () => void;
   onViewResults?: () => void;
-  enablePolling?: boolean; // New prop to enable real-time polling
+
 }
 
 const stepIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -150,9 +155,12 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   isOpen,
   onClose,
   job,
+  enablePolling = false,
+  useEnhancedMonitor = false,
+  showImageGallery = false,
   onRetry,
   onViewResults,
-  enablePolling = false,
+
 }) => {
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
@@ -312,6 +320,44 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full w-full">
             <div className="p-6 space-y-4 max-h-none">
+
+              {/* Enhanced Progress Monitor Option */}
+              {useEnhancedMonitor && job.id && (
+                <div className="mb-6">
+                  <EnhancedProgressMonitor
+                    jobId={job.id}
+                    onComplete={(progress) => {
+                      console.log('Processing completed:', progress);
+                      if (onViewResults) onViewResults();
+                    }}
+                    onError={(error) => {
+                      console.error('Processing error:', error);
+                    }}
+                    onViewResults={onViewResults}
+                    showStatistics={true}
+                    showStepDetails={true}
+                    compact={false}
+                  />
+                  <Separator className="my-6" />
+                  <div className="text-sm text-gray-600 mb-4">
+                    <strong>Legacy Progress View:</strong> The detailed step-by-step view below shows the traditional progress tracking.
+                  </div>
+                </div>
+              )}
+
+              {/* Image Gallery Section */}
+              {showImageGallery && job.id && isCompleted && (
+                <div className="mb-6">
+                  <PDFImageGallery
+                    documentId={job.id}
+                    showHeader={true}
+                    viewMode="grid"
+                    className="w-full"
+                  />
+                  <Separator className="my-6" />
+                </div>
+              )}
+
             {job.steps.map((step, _index) => {
               const StepIcon = getStepIcon(step.id);
               const isExpanded = expandedSteps.has(step.id);

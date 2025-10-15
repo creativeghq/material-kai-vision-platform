@@ -75,6 +75,81 @@ export class MivaaIntegrationService {
   }
 
   /**
+   * Validate and fix image URLs for accessibility
+   */
+  async validateAndFixImageUrls(documentId: string): Promise<{ fixed: number; total: number; errors: string[] }> {
+    const errors: string[] = [];
+    let fixed = 0;
+    let total = 0;
+
+    try {
+      // Get all images for the document
+      const { data: images, error } = await supabase
+        .from('document_images')
+        .select('*')
+        .eq('document_id', documentId);
+
+      if (error) {
+        errors.push(`Failed to fetch images: ${error.message}`);
+        return { fixed: 0, total: 0, errors };
+      }
+
+      total = images?.length || 0;
+
+      if (!images || images.length === 0) {
+        return { fixed: 0, total: 0, errors: ['No images found for document'] };
+      }
+
+      // Check and fix each image URL
+      for (const image of images) {
+        const currentUrl = image.image_url;
+
+        // Check if URL is accessible or needs fixing
+        if (!currentUrl || currentUrl.startsWith('placeholder_') || currentUrl.startsWith('missing_storage_url_')) {
+          console.log(`🔧 Fixing image URL for image ${image.id}`);
+
+          // Try to generate proper storage URL
+          const imageName = image.metadata?.image_filename || image.metadata?.filename || `image_${image.id}.png`;
+          const storagePath = `extracted/${documentId}/${imageName}`;
+
+          const { data: urlData } = supabase.storage
+            .from('pdf-documents')
+            .getPublicUrl(storagePath);
+
+          if (urlData?.publicUrl) {
+            // Update the image with the correct URL
+            const { error: updateError } = await supabase
+              .from('document_images')
+              .update({
+                image_url: urlData.publicUrl,
+                metadata: {
+                  ...image.metadata,
+                  storage_path: storagePath,
+                  url_fixed_at: new Date().toISOString()
+                }
+              })
+              .eq('id', image.id);
+
+            if (updateError) {
+              errors.push(`Failed to update image ${image.id}: ${updateError.message}`);
+            } else {
+              fixed++;
+              console.log(`✅ Fixed URL for image ${image.id}: ${urlData.publicUrl}`);
+            }
+          } else {
+            errors.push(`Could not generate storage URL for image ${image.id}`);
+          }
+        }
+      }
+
+      return { fixed, total, errors };
+    } catch (error) {
+      errors.push(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return { fixed: 0, total, errors };
+    }
+  }
+
+  /**
    * Call MIVAA endpoint directly
    */
   private async callMivaaEndpoint<T>(

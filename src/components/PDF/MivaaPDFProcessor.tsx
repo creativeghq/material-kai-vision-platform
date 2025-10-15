@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { mivaaService } from '@/services/mivaaIntegrationService';
+import { PDFImageGallery } from './PDFImageGallery';
 
 interface PDFProcessingResult {
   id: string;

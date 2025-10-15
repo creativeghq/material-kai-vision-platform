@@ -23,6 +23,7 @@ import {
 
 import { EnhancedFunctionalMetadataCard } from '@/components/FunctionalMetadata/EnhancedFunctionalMetadataCard';
 import { type FunctionalMetadata } from '@/types/materials';
+import { PDFImageGallery } from './PDFImageGallery';
 
 interface PDFChunk {
   id: string;
@@ -266,68 +267,39 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
             </Card>
           )}
 
-          {/* Images Section */}
-          {entry.metadata?.processed_images && Array.isArray(entry.metadata.processed_images) && (
-            <Card>
-              <Collapsible 
-                open={expandedSections.has('images')} 
-                onOpenChange={() => toggleSection('images')}
-              >
-                <CardHeader className="pb-3">
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-between p-0 h-auto">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <ImageIcon className="h-5 w-5" />
-                        Extracted Images ({entry.metadata.processed_images.length})
-                      </CardTitle>
-                      {expandedSections.has('images') ? 
-                        <ChevronDown className="h-4 w-4" /> : 
-                        <ChevronRight className="h-4 w-4" />
-                      }
-                    </Button>
-                  </CollapsibleTrigger>
-                </CardHeader>
-                
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {entry.metadata.processed_images.map((image: Record<string, unknown>, idx: number) => (
-                        <div key={idx} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                          <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                            {image.storage_path ? (
-                              <img
-                                src={(image.storage_path as string) || ''}
-                                alt={`Extracted image ${idx + 1}`}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                }}
-                              />
-                            ) : (
-                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div className="p-3">
-                            <p className="text-xs text-muted-foreground">
-                              {(image.caption as string) || `Image ${idx + 1}`}
-                            </p>
-                            {hasMetadata && metadataVisible && (
-                              <div className="mt-2 pt-2 border-t">
-                                <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
-                                  View functional properties →
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
-          )}
+          {/* Images Section - Enhanced Gallery */}
+          <Card>
+            <Collapsible
+              open={expandedSections.has('images')}
+              onOpenChange={() => toggleSection('images')}
+            >
+              <CardHeader className="pb-3">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <ImageIcon className="h-5 w-5" />
+                      Extracted Images
+                    </CardTitle>
+                    {expandedSections.has('images') ?
+                      <ChevronDown className="h-4 w-4" /> :
+                      <ChevronRight className="h-4 w-4" />
+                    }
+                  </Button>
+                </CollapsibleTrigger>
+              </CardHeader>
+
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <PDFImageGallery
+                    documentId={entry.id}
+                    showHeader={false}
+                    viewMode="grid"
+                    className="w-full"
+                  />
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
         </div>
 
         {/* Functional Metadata Panel */}
