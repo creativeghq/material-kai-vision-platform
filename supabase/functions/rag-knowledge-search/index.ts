@@ -2,6 +2,7 @@ import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { performUnifiedVectorSearch, UnifiedSearchRequest } from '../_shared/unified-vector-search.ts';
+import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -160,6 +161,33 @@ serve(async (req) => {
     const unifiedResponse = await performUnifiedVectorSearch(searchRequest, supabase);
     console.log('Unified search completed:', unifiedResponse.totalResults, 'results');
 
+    // Measure retrieval quality
+    try {
+      const retrievedChunks: RetrievalResult[] = unifiedResponse.results.map((result: any, index: number) => ({
+        chunk_id: result.id || `chunk-${index}`,
+        content: result.content || '',
+        relevance_score: result.similarity_score || 0,
+        rank: index + 1,
+      }));
+
+      // Identify relevant chunks (simplified - based on query term matching)
+      const allChunks = retrievedChunks.map(c => ({ id: c.chunk_id, content: c.content }));
+      const relevantChunkIds = identifyRelevantChunks(requestBody.query, allChunks);
+
+      // Evaluate and store retrieval quality metrics
+      const retrievalMetrics = await evaluateRetrievalQuality(
+        requestBody.query,
+        retrievedChunks,
+        relevantChunkIds,
+        supabase
+      );
+
+      console.log(`✅ Retrieval Quality Metrics: Precision=${(retrievalMetrics.precision * 100).toFixed(1)}%, Recall=${(retrievalMetrics.recall * 100).toFixed(1)}%, MRR=${retrievalMetrics.mrr.toFixed(3)}`);
+    } catch (qualityError) {
+      console.error('Warning: Failed to measure retrieval quality:', qualityError);
+      // Don't fail the search if quality measurement fails
+    }
+
     // Generate contextual response if requested
     let context: string | undefined;
     if (requestBody.include_context) {
@@ -174,7 +202,7 @@ serve(async (req) => {
       processing_time_ms: unifiedResponse.performance.totalTime,
     };
 
-    console.log(`RAG search completed in ${processingTime}ms`);
+    console.log(`RAG search completed in ${unifiedResponse.performance.totalTime}ms`);
 
     return new Response(
       JSON.stringify(result),

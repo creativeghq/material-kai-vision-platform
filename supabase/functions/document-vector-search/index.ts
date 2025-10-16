@@ -1,6 +1,7 @@
 import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -181,6 +182,33 @@ async function processDocumentSearch(request: SearchRequest): Promise<VectorSear
     results = await performSemanticSearch(embedding, documentTypes, limit, threshold);
 
     console.log(`Vector search completed: ${results.length} results found`);
+
+    // Measure retrieval quality
+    try {
+      const retrievedChunks: RetrievalResult[] = results.map((result, index) => ({
+        chunk_id: result.document_id,
+        content: result.content_snippet || '',
+        relevance_score: result.similarity_score,
+        rank: index + 1,
+      }));
+
+      // Identify relevant chunks (simplified - based on query term matching)
+      const allChunks = retrievedChunks.map(c => ({ id: c.chunk_id, content: c.content }));
+      const relevantChunkIds = identifyRelevantChunks(request.query, allChunks);
+
+      // Evaluate and store retrieval quality metrics
+      const retrievalMetrics = await evaluateRetrievalQuality(
+        request.query,
+        retrievedChunks,
+        relevantChunkIds,
+        supabase
+      );
+
+      console.log(`✅ Retrieval Quality: Precision=${(retrievalMetrics.precision * 100).toFixed(1)}%, Recall=${(retrievalMetrics.recall * 100).toFixed(1)}%, MRR=${retrievalMetrics.mrr.toFixed(3)}`);
+    } catch (qualityError) {
+      console.error('Warning: Failed to measure retrieval quality:', qualityError);
+      // Don't fail the search if quality measurement fails
+    }
 
     const processingTime = Date.now() - startTime;
 

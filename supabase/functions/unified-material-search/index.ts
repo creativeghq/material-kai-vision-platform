@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -273,6 +274,33 @@ async function handleSearch(request: Request): Promise<Response> {
       category,
       limit
     );
+
+    // Measure retrieval quality
+    try {
+      const retrievedChunks: RetrievalResult[] = results.map((result: any, index: number) => ({
+        chunk_id: result.id || `material-${index}`,
+        content: result.title || result.content || '',
+        relevance_score: result.search_score || 0,
+        rank: index + 1,
+      }));
+
+      // Identify relevant chunks (simplified - based on query term matching)
+      const allChunks = retrievedChunks.map(c => ({ id: c.chunk_id, content: c.content }));
+      const relevantChunkIds = identifyRelevantChunks(query.trim(), allChunks);
+
+      // Evaluate and store retrieval quality metrics
+      const retrievalMetrics = await evaluateRetrievalQuality(
+        query.trim(),
+        retrievedChunks,
+        relevantChunkIds,
+        supabase
+      );
+
+      console.log(`✅ Retrieval Quality: Precision=${(retrievalMetrics.precision * 100).toFixed(1)}%, Recall=${(retrievalMetrics.recall * 100).toFixed(1)}%, MRR=${retrievalMetrics.mrr.toFixed(3)}`);
+    } catch (qualityError) {
+      console.error('Warning: Failed to measure retrieval quality:', qualityError);
+      // Don't fail the search if quality measurement fails
+    }
 
     return new Response(JSON.stringify({
       success: true,
