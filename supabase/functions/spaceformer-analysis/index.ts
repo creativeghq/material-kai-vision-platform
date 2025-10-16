@@ -1,4 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { evaluateResponseQuality } from '../_shared/response-quality.ts';;
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.5';
 
 const corsHeaders = {

@@ -3,6 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { performUnifiedVectorSearch, UnifiedSearchRequest } from '../_shared/unified-vector-search.ts';
 import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
+import { evaluateResponseQuality, type ResponseQualityMetrics } from '../_shared/response-quality.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -190,8 +191,31 @@ serve(async (req) => {
 
     // Generate contextual response if requested
     let context: string | undefined;
+    let responseMetrics: ResponseQualityMetrics | undefined;
+
     if (requestBody.include_context) {
       context = await generateRAGContext(requestBody.query, unifiedResponse.results);
+
+      // Measure response quality
+      try {
+        const sourceChunks = unifiedResponse.results
+          .map((r: any) => r.content || '')
+          .filter((c: string) => c.length > 0);
+
+        const responseId = `rag-response-${Date.now()}`;
+        responseMetrics = await evaluateResponseQuality(
+          responseId,
+          requestBody.query,
+          context || '',
+          sourceChunks,
+          supabase
+        );
+
+        console.log(`✅ Response Quality: ${responseMetrics.quality_assessment} (${(responseMetrics.overall_quality_score * 100).toFixed(1)}%)`);
+      } catch (qualityError) {
+        console.error('Warning: Failed to measure response quality:', qualityError);
+        // Don't fail the search if quality measurement fails
+      }
     }
 
     const result: RAGSearchResult = {
