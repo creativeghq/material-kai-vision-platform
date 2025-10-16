@@ -1003,6 +1003,7 @@ export class ConsolidatedPDFWorkflowService {
     categoriesAdded: number;
   }> {
     try {
+      console.log(`🚀 Starting storeMivaaResults for job ${jobId}`);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
@@ -1206,6 +1207,7 @@ export class ConsolidatedPDFWorkflowService {
       let embeddingsStored = 0;
 
       // Store document chunks
+      console.log(`📦 Starting to store ${chunks.length} chunks...`);
       if (chunks.length > 0) {
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
