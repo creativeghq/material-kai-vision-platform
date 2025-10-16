@@ -1390,48 +1390,31 @@ export class ConsolidatedPDFWorkflowService {
 
       console.log(`✅ Storage completed: ${chunksStored} chunks, ${imagesStored} images, ${embeddingsStored} embeddings stored in database`);
 
-      // Apply quality scoring to all chunks in the document
-      console.log(`🎯 Fetching all chunks from database for quality scoring...`);
+      // Apply quality scoring via Edge Function
+      console.log(`🎯 Calling apply-quality-scoring Edge Function...`);
       try {
-        const { data: allChunks, error: fetchError } = await supabase
-          .from('document_chunks')
-          .select('*')
-          .eq('document_id', documentId)
-          .order('chunk_index');
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || '';
 
-        if (fetchError) {
-          console.error('Failed to fetch chunks for quality scoring:', fetchError);
-        } else if (allChunks && allChunks.length > 0) {
-          console.log(`🎯 Applying quality scoring to ${allChunks.length} chunks...`);
-          let qualityScoredCount = 0;
-
-          for (let i = 0; i < allChunks.length; i++) {
-            const chunk = allChunks[i];
-            try {
-              const qualityData = chunkQualityService.scoreChunk(
-                chunk.id,
-                chunk.content || '',
-                {
-                  filename: file.name,
-                  document_name: documentName,
-                  page_number: chunk.metadata?.page_number || i + 1,
-                  chunk_index: i,
-                  source_document: documentName,
-                }
-              );
-
-              await chunkQualityService.updateChunkQuality(chunk.id, qualityData);
-              qualityScoredCount++;
-
-              if ((i + 1) % 100 === 0) {
-                console.log(`📊 Quality scored ${i + 1}/${allChunks.length} chunks`);
-              }
-            } catch (qualityError) {
-              console.error(`❌ Failed to score chunk ${chunk.id}:`, qualityError);
-            }
+        const qualityScoringResponse = await fetch(
+          `${process.env.VITE_SUPABASE_URL}/functions/v1/apply-quality-scoring`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ document_id: documentId }),
           }
+        );
 
-          console.log(`✅ Quality scoring completed: ${qualityScoredCount}/${allChunks.length} chunks scored`);
+        if (qualityScoringResponse.ok) {
+          const qualityScoringResult = await qualityScoringResponse.json();
+          console.log(`✅ Quality scoring completed: ${qualityScoringResult.scored_chunks}/${qualityScoringResult.total_chunks} chunks scored`);
+        } else {
+          console.error(`❌ Quality scoring failed with status ${qualityScoringResponse.status}`);
+          const errorText = await qualityScoringResponse.text();
+          console.error('Error details:', errorText);
         }
       } catch (qualityError) {
         console.error('Quality scoring failed:', qualityError);
