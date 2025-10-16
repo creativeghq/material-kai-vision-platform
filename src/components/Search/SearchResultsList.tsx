@@ -26,9 +26,10 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
 import { SearchResultCard, SearchResult } from './SearchResultCard';
+import { applyQualityBasedRanking } from '@/services/qualityBasedRankingService';
 
 // Types for sorting and filtering
-export type SortField = 'relevance' | 'semantic' | 'date' | 'title' | 'views';
+export type SortField = 'relevance' | 'semantic' | 'quality' | 'date' | 'title' | 'views';
 export type SortOrder = 'asc' | 'desc';
 export type ViewMode = 'card' | 'list' | 'compact';
 export type FilterType = 'all' | 'document' | 'image' | 'data' | 'analysis';
@@ -52,6 +53,7 @@ interface SearchResultsListProps {
 const sortOptions = [
   { value: 'relevance', label: 'Relevance', icon: TrendingUp },
   { value: 'semantic', label: 'Semantic Score', icon: TrendingUp },
+  { value: 'quality', label: 'Quality Score', icon: TrendingUp },
   { value: 'date', label: 'Date', icon: Clock },
   { value: 'title', label: 'Title', icon: FileText },
   { value: 'views', label: 'Views', icon: Eye },
@@ -114,31 +116,39 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
     }
 
     // Sort results
-    filtered.sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortField) {
-        case 'relevance':
-          comparison = a.relevanceScore - b.relevanceScore;
-          break;
-        case 'semantic':
-          comparison = (a.semanticScore || 0) - (b.semanticScore || 0);
-          break;
-        case 'date':
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          break;
-        case 'title':
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case 'views':
-          comparison = (a.viewCount || 0) - (b.viewCount || 0);
-          break;
-        default:
-          comparison = 0;
+    if (sortField === 'quality') {
+      // Use quality-based ranking
+      filtered = applyQualityBasedRanking(filtered, true);
+      if (sortOrder === 'asc') {
+        filtered.reverse();
       }
+    } else {
+      filtered.sort((a, b) => {
+        let comparison = 0;
 
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
+        switch (sortField) {
+          case 'relevance':
+            comparison = a.relevanceScore - b.relevanceScore;
+            break;
+          case 'semantic':
+            comparison = (a.semanticScore || 0) - (b.semanticScore || 0);
+            break;
+          case 'date':
+            comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            break;
+          case 'title':
+            comparison = a.title.localeCompare(b.title);
+            break;
+          case 'views':
+            comparison = (a.viewCount || 0) - (b.viewCount || 0);
+            break;
+          default:
+            comparison = 0;
+        }
+
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+    }
 
     return filtered;
   }, [results, filterType, searchTerm, sortField, sortOrder]);
