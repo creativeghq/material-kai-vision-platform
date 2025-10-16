@@ -13,9 +13,9 @@ The Material Kai Vision Platform uses a multi-layered API architecture:
 4. **Supabase Edge Functions** - Serverless functions (including Phase 2-3 quality & validation)
 5. **External API Integrations** - Third-party services
 
-## 📊 Phase 2-3 Quality & Validation APIs
+## 📊 Quality & Validation APIs
 
-### Phase 2: Quality Scoring & Embedding Stability
+### Quality Scoring Endpoint
 
 #### Apply Quality Scoring
 ```http
@@ -45,6 +45,10 @@ Content-Type: application/json
   "timestamp": "2025-10-16T10:30:00Z"
 }
 ```
+
+**Purpose**: Scores all chunks in a document using 5-dimensional quality algorithm
+
+### Embedding Stability Endpoint
 
 #### Analyze Embedding Stability
 ```http
@@ -76,7 +80,9 @@ Content-Type: application/json
 }
 ```
 
-### Phase 3: Chunk Relationships & Validation
+**Purpose**: Analyzes embedding stability and detects anomalies
+
+### Chunk Relationships Endpoint
 
 #### Build Chunk Relationships
 ```http
@@ -101,6 +107,8 @@ Content-Type: application/json
   "timestamp": "2025-10-16T10:30:00Z"
 }
 ```
+
+**Purpose**: Builds semantic, sequential, and hierarchical relationships between chunks
 
 ## 🔗 Internal API Endpoints
 

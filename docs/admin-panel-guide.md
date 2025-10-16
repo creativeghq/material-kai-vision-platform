@@ -508,61 +508,97 @@ This endpoint provides:
 - Package is automatically installed from requirements.txt during deployment
 - Headless version prevents GUI dependency issues on servers
 
-## 📊 Phase 3 Validation Metrics Panel
+## 📊 Quality & Validation Metrics Dashboard
 
-**Access**: `/admin/phase3-metrics`
+**Access**: `/admin/quality-stability-metrics` and `/admin/phase3-metrics`
 
-**Purpose**: Monitor chunk relationships, retrieval quality, and response quality metrics
+**Purpose**: Monitor document quality, embedding stability, chunk relationships, retrieval effectiveness, and response quality
 
-### Chunk Relationships Tab
+### Quality Scoring Dashboard
+
+**Displays**:
+- Average quality score across all documents
+- Quality breakdown by dimension:
+  - Semantic Completeness
+  - Boundary Quality
+  - Context Preservation
+  - Structural Integrity
+  - Metadata Richness
+- Quality distribution histogram
+- Trend analysis over time
+
+**Metrics Explained**:
+- **Semantic Completeness (28%)**: How well each chunk captures the document's meaning
+- **Boundary Quality (30%)**: How well chunk boundaries are defined
+- **Context Preservation (15%)**: How well surrounding context is maintained
+- **Structural Integrity (20%)**: How well document structure is preserved
+- **Metadata Richness (7%)**: How complete metadata is
+
+### Embedding Stability Dashboard
+
+**Displays**:
+- Stability score (0-1 scale)
+- Variance score analysis
+- Consistency score measurement
+- Anomalies detected and flagged
+- Anomaly details with severity scores
+
+**Metrics Explained**:
+- **Stability Score**: Consistency of embeddings across chunks
+- **Variance Score**: Variance in embedding values
+- **Consistency Score**: Cross-chunk consistency
+- **Anomaly Detection**: Identifies outlier embeddings
+
+### Chunk Relationships Dashboard
 
 **Displays**:
 - Total relationships built
-- Sequential relationships (chunk order)
-- Semantic relationships (content similarity)
-- Hierarchical relationships (section structure)
+- Breakdown by relationship type:
+  - Sequential relationships (chunk order)
+  - Semantic relationships (content similarity)
+  - Hierarchical relationships (section structure)
 - Average confidence score
-- Relationship statistics
+- Relationship statistics and trends
 
-**Metrics**:
-- **Sequential Confidence**: 0.95 (chunk order reliability)
-- **Semantic Threshold**: 0.6 (Jaccard similarity)
-- **Hierarchical Levels**: Document structure depth
+**Metrics Explained**:
+- **Sequential**: Chunk order relationships (confidence: 0.95)
+- **Semantic**: Content similarity (Jaccard similarity > 0.6)
+- **Hierarchical**: Section structure (level-based)
 
-### Retrieval Quality Tab
+### Retrieval Quality Dashboard
 
-**Displays** (when integrated):
+**Displays**:
 - Precision: Relevant chunks / retrieved chunks
 - Recall: Relevant chunks retrieved / total relevant
 - Mean Reciprocal Rank (MRR): Ranking quality
 - Latency: Search response time
 
 **Success Criteria**:
-- Precision > 0.85
-- Recall > 0.85
-- MRR > 0.5
-- Latency < 500ms
+- Precision > 0.85 ✅
+- Recall > 0.85 ✅
+- MRR > 0.5 ✅
+- Latency < 500ms ✅
 
-### Response Quality Tab
+### Response Quality Dashboard
 
-**Displays** (when integrated):
+**Displays**:
 - Coherence Score: Response structure and flow
 - Hallucination Score: Factual accuracy vs sources
 - Source Attribution: Citation completeness
 - Factual Consistency: Internal consistency
 
-**Quality Assessment**:
+**Quality Levels**:
 - Excellent: > 0.90
 - Very Good: 0.80-0.90
 - Good: 0.70-0.80
 - Fair: 0.60-0.70
 - Poor: < 0.60
 
-### Overall Health Score
+### Overall Platform Health Score
 
 **Calculation**:
 ```
-Health = (Relationships × 0.3) + (Retrieval × 0.35) + (Response × 0.35)
+Health = (Quality × 0.25) + (Stability × 0.15) + (Relationships × 0.2) + (Retrieval × 0.2) + (Response × 0.2)
 ```
 
 **Interpretation**:
