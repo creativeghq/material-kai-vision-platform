@@ -1094,6 +1094,7 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       // If MIVAA gateway failed, try direct database access as fallback
+      let mivaaChunks: any[] = [];
       if (chunks.length === 0 && chunksCount > 0) {
         console.log(`⚠️ MIVAA gateway returned 0 chunks, trying direct database access...`);
         try {
@@ -1106,6 +1107,7 @@ export class ConsolidatedPDFWorkflowService {
           if (chunksError) {
             console.error('Database chunks query error:', chunksError);
           } else if (dbChunks && dbChunks.length > 0) {
+            mivaaChunks = dbChunks; // Store original chunks for quality scoring
             chunks = dbChunks.map((chunk: any) => ({
               chunk_id: chunk.id,
               content: chunk.content,
@@ -1377,6 +1379,40 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       console.log(`✅ Storage completed: ${chunksStored} chunks, ${imagesStored} images, ${embeddingsStored} embeddings stored in database`);
+
+      // Apply quality scoring to MIVAA chunks
+      if (mivaaChunks.length > 0) {
+        console.log(`🎯 Applying quality scoring to ${mivaaChunks.length} MIVAA chunks...`);
+        let qualityScoredCount = 0;
+
+        for (let i = 0; i < mivaaChunks.length; i++) {
+          const chunk = mivaaChunks[i];
+          try {
+            const qualityData = chunkQualityService.scoreChunk(
+              chunk.id,
+              chunk.content || '',
+              {
+                filename: file.name,
+                document_name: documentName,
+                page_number: chunk.metadata?.page_number || i + 1,
+                chunk_index: i,
+                source_document: documentName,
+              }
+            );
+
+            await chunkQualityService.updateChunkQuality(chunk.id, qualityData);
+            qualityScoredCount++;
+
+            if ((i + 1) % 100 === 0) {
+              console.log(`📊 Quality scored ${i + 1}/${mivaaChunks.length} chunks`);
+            }
+          } catch (qualityError) {
+            console.error(`❌ Failed to score chunk ${chunk.id}:`, qualityError);
+          }
+        }
+
+        console.log(`✅ Quality scoring completed: ${qualityScoredCount}/${mivaaChunks.length} chunks scored`);
+      }
 
       // Extract categories from the document content
       let categoriesAdded = 0;
