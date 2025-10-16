@@ -105,6 +105,15 @@ interface Message {
   materials?: MaterialResult[];
   metadata?: MessageMetadata;
   attachments?: AttachedFile[];
+  // Response quality metrics
+  responseQuality?: {
+    coherence_score?: number;
+    hallucination_score?: number;
+    source_attribution_score?: number;
+    factual_consistency_score?: number;
+    overall_quality_score?: number;
+    quality_assessment?: string;
+  };
 }
 
 interface HybridModelConfig {
@@ -809,6 +818,31 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                         </details>
                       )}
                     </div>
+
+                    {/* Response Quality Metrics */}
+                    {message.responseQuality && message.responseQuality.overall_quality_score !== undefined && (
+                      <div className="text-xs space-y-1 p-2 bg-background/50 rounded border border-border/50">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Response Quality</span>
+                          <Badge
+                            variant={
+                              message.responseQuality.overall_quality_score >= 0.85 ? 'default' :
+                              message.responseQuality.overall_quality_score >= 0.7 ? 'secondary' :
+                              'destructive'
+                            }
+                            className="text-xs"
+                          >
+                            {(message.responseQuality.overall_quality_score * 100).toFixed(0)}%
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                          <div>Coherence: {(message.responseQuality.coherence_score ? message.responseQuality.coherence_score * 100 : 0).toFixed(0)}%</div>
+                          <div>Attribution: {(message.responseQuality.source_attribution_score ? message.responseQuality.source_attribution_score * 100 : 0).toFixed(0)}%</div>
+                          <div>Hallucination: {(message.responseQuality.hallucination_score ? (1 - message.responseQuality.hallucination_score) * 100 : 0).toFixed(0)}%</div>
+                          <div>Consistency: {(message.responseQuality.factual_consistency_score ? message.responseQuality.factual_consistency_score * 100 : 0).toFixed(0)}%</div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Material Results */}
                     {message.materials && message.materials.length > 0 && (

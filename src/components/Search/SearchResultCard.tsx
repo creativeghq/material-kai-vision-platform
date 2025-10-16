@@ -41,6 +41,13 @@ export interface SearchResult {
   isFavorite?: boolean;
   viewCount?: number;
   downloadCount?: number;
+  // Quality metrics
+  qualityMetrics?: {
+    precision?: number;
+    recall?: number;
+    mrr?: number;
+    latency_ms?: number;
+  };
 }
 
 interface SearchResultCardProps {
@@ -88,6 +95,20 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
 
   const formatScore = (score: number) => {
     return Math.round(score * 100);
+  };
+
+  const getQualityColor = (score?: number) => {
+    if (!score) return 'text-gray-500';
+    if (score >= 0.85) return 'text-green-600';
+    if (score >= 0.7) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getQualityBadgeVariant = (score?: number) => {
+    if (!score) return 'outline';
+    if (score >= 0.85) return 'default';
+    if (score >= 0.7) return 'secondary';
+    return 'destructive';
   };
 
   const handleView = () => {
@@ -389,15 +410,33 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
             </div>
           </div>
 
-          <div className="text-right flex-shrink-0">
+          <div className="text-right flex-shrink-0 space-y-1">
             <div className="text-sm font-medium text-gray-900">
               {formatScore(result.relevanceScore)}%
             </div>
             {result.semanticScore && (
-              <div className="text-xs text-gray-500 flex items-center gap-1">
+              <div className="text-xs text-gray-500 flex items-center gap-1 justify-end">
                 <TrendingUp className="h-3 w-3" />
                 {formatScore(result.semanticScore)}%
               </div>
+            )}
+            {result.qualityMetrics?.precision && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant={getQualityBadgeVariant(result.qualityMetrics.precision)} className="text-xs">
+                      Quality: {formatScore(result.qualityMetrics.precision)}%
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-xs space-y-1">
+                      <p>Precision: {formatScore(result.qualityMetrics.precision)}%</p>
+                      {result.qualityMetrics.recall && <p>Recall: {formatScore(result.qualityMetrics.recall)}%</p>}
+                      {result.qualityMetrics.mrr && <p>MRR: {result.qualityMetrics.mrr.toFixed(3)}</p>}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </div>
