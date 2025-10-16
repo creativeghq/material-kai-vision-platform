@@ -464,6 +464,14 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'Phase 2',
       },
+      {
+        title: 'Phase 3 Validation Metrics',
+        description: 'Monitor chunk relationships, retrieval quality, and response quality',
+        icon: BarChart3,
+        path: '/admin/phase3-metrics',
+        status: 'active',
+        count: 'Phase 3',
+      },
     ]
   };
 

@@ -1420,6 +1420,39 @@ export class ConsolidatedPDFWorkflowService {
         console.error('Quality scoring failed:', qualityError);
       }
 
+      // Build chunk relationships via Edge Function (Phase 3)
+      console.log(`🔗 Calling build-chunk-relationships Edge Function...`);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || '';
+
+        const relationshipResponse = await fetch(
+          `${process.env.VITE_SUPABASE_URL}/functions/v1/build-chunk-relationships`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ document_id: documentId }),
+          }
+        );
+
+        if (relationshipResponse.ok) {
+          const relationshipResult = await relationshipResponse.json();
+          console.log(`✅ Chunk relationships built: ${relationshipResult.total_relationships} relationships created`);
+          console.log(`   - Sequential: ${relationshipResult.sequential_relationships}`);
+          console.log(`   - Semantic: ${relationshipResult.semantic_relationships}`);
+          console.log(`   - Hierarchical: ${relationshipResult.hierarchical_relationships}`);
+        } else {
+          console.error(`❌ Relationship building failed with status ${relationshipResponse.status}`);
+          const errorText = await relationshipResponse.text();
+          console.error('Error details:', errorText);
+        }
+      } catch (relationshipError) {
+        console.error('Chunk relationship building failed:', relationshipError);
+      }
+
       // Extract categories from the document content
       let categoriesAdded = 0;
       try {

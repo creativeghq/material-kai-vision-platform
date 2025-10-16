@@ -44,6 +44,7 @@ import HealthPage from './pages/Health';
 import { CriticalErrorBoundary, PageErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { MivaaDocsViewer } from './components/Admin/MivaaDocsViewer';
 import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMetricsPanel';
+import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
 
 const queryClient = new QueryClient();
 
@@ -291,6 +292,15 @@ const App = () => (
                 <AdminGuard>
                   <Layout>
                     <QualityStabilityMetricsPanel />
+                  </Layout>
+                </AdminGuard>
+              </AuthGuard>
+            } />
+            <Route path="/admin/phase3-metrics" element={
+              <AuthGuard>
+                <AdminGuard>
+                  <Layout>
+                    <Phase3MetricsPanel />
                   </Layout>
                 </AdminGuard>
               </AuthGuard>
