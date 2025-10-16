@@ -162,33 +162,50 @@ serve(async (req) => {
 
     console.log(`🎯 Fetching chunks for document ${document_id}...`);
 
-    // Fetch all chunks for the document
-    const { data: chunks, error: fetchError } = await supabase
-      .from("document_chunks")
-      .select("*")
-      .eq("document_id", document_id)
-      .order("chunk_index");
+    // Fetch all chunks with pagination
+    let allChunks: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (fetchError) {
-      console.error("Failed to fetch chunks:", fetchError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch chunks", details: fetchError }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
+    while (hasMore) {
+      const { data: chunks, error: fetchError } = await supabase
+        .from("document_chunks")
+        .select("*")
+        .eq("document_id", document_id)
+        .order("chunk_index")
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (fetchError) {
+        console.error("Failed to fetch chunks:", fetchError);
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch chunks", details: fetchError }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!chunks || chunks.length === 0) {
+        hasMore = false;
+      } else {
+        allChunks = allChunks.concat(chunks);
+        console.log(`📖 Fetched page ${page + 1}: ${chunks.length} chunks (total: ${allChunks.length})`);
+        page++;
+        hasMore = chunks.length === pageSize;
+      }
     }
 
-    if (!chunks || chunks.length === 0) {
+    if (allChunks.length === 0) {
       return new Response(
         JSON.stringify({ message: "No chunks found", scored: 0 }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`📊 Scoring ${chunks.length} chunks...`);
+    console.log(`📊 Scoring ${allChunks.length} chunks...`);
 
     let scoredCount = 0;
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
+    for (let i = 0; i < allChunks.length; i++) {
+      const chunk = allChunks[i];
       try {
         const qualityData = scoreChunk(
           chunk.id,
@@ -213,20 +230,20 @@ serve(async (req) => {
         }
 
         if ((i + 1) % 100 === 0) {
-          console.log(`📊 Scored ${i + 1}/${chunks.length} chunks`);
+          console.log(`📊 Scored ${i + 1}/${allChunks.length} chunks`);
         }
       } catch (error) {
         console.error(`Error scoring chunk ${chunk.id}:`, error);
       }
     }
 
-    console.log(`✅ Quality scoring completed: ${scoredCount}/${chunks.length} chunks scored`);
+    console.log(`✅ Quality scoring completed: ${scoredCount}/${allChunks.length} chunks scored`);
 
     return new Response(
       JSON.stringify({
         message: "Quality scoring completed",
         document_id,
-        total_chunks: chunks.length,
+        total_chunks: allChunks.length,
         scored_chunks: scoredCount,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
