@@ -219,6 +219,18 @@ export class ChunkQualityService {
       quality_assessment: qualityData.quality_assessment,
     });
 
+    // Log to database
+    await supabase
+      .from('quality_scoring_logs')
+      .insert({
+        chunk_id: chunkId,
+        event: 'update_attempt',
+        details: {
+          coherence_score: qualityData.coherence_score,
+          quality_assessment: qualityData.quality_assessment,
+        }
+      });
+
     const { error, data } = await supabase
       .from('document_chunks')
       .update({
@@ -231,10 +243,34 @@ export class ChunkQualityService {
 
     if (error) {
       console.error(`❌ Failed to update chunk quality for ${chunkId}:`, error);
+
+      // Log error to database
+      await supabase
+        .from('quality_scoring_logs')
+        .insert({
+          chunk_id: chunkId,
+          event: 'update_error',
+          details: {
+            error: error.message,
+            code: error.code,
+          }
+        });
+
       throw error;
     }
 
     console.log(`✅ Successfully updated chunk quality for ${chunkId}`);
+
+    // Log success to database
+    await supabase
+      .from('quality_scoring_logs')
+      .insert({
+        chunk_id: chunkId,
+        event: 'update_success',
+        details: {
+          coherence_score: qualityData.coherence_score,
+        }
+      });
   }
 
   /**
