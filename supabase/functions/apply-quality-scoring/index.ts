@@ -26,49 +26,92 @@ interface ChunkQualityData {
 function calculateSemanticCompleteness(content: string): number {
   if (!content || content.length === 0) return 0;
 
+  // Sentence analysis
   const sentences = content.match(/[.!?]+/g) || [];
-  const sentenceRatio = sentences.length / Math.max(1, content.split(/\s+/).length / 10);
+  const words = content.split(/\s+/).filter(w => w.length > 0);
+  const wordCount = words.length;
 
+  // Better sentence ratio calculation
+  const sentenceRatio = wordCount > 0 ? Math.min(sentences.length / (wordCount / 15), 1) : 0;
+
+  // Paragraph structure
   const paragraphs = content.split(/\n\n+/).filter(p => p.trim().length > 0);
-  const hasStructure = paragraphs.length > 0 ? 1 : 0;
+  const paragraphScore = Math.min(paragraphs.length / 3, 1); // Expect 1-3 paragraphs
 
+  // Content completeness indicators
   const startsWithCapital = /^[A-Z]/.test(content.trim()) ? 1 : 0;
   const endsWithPunctuation = /[.!?]$/.test(content.trim()) ? 1 : 0;
 
+  // Vocabulary diversity
+  const uniqueWords = new Set(words.map(w => w.toLowerCase()));
+  const vocabularyDiversity = uniqueWords.size / Math.max(1, wordCount);
+
   return (
-    Math.min(sentenceRatio, 1) * 0.4 +
-    hasStructure * 0.3 +
+    sentenceRatio * 0.3 +
+    paragraphScore * 0.25 +
     startsWithCapital * 0.15 +
-    endsWithPunctuation * 0.15
+    endsWithPunctuation * 0.15 +
+    Math.min(vocabularyDiversity, 1) * 0.15
   );
 }
 
 function calculateBoundaryQuality(content: string): number {
-  const endsSentence = /[.!?]\s*$/.test(content.trim()) ? 0.5 : 0;
-  const endsParagraph = /\n\s*$/.test(content) ? 0.3 : 0;
-  const endsSection = /^#+\s+/.test(content.trim().split('\n').pop() || '') ? 0.2 : 0;
-  const midWordBreak = /\w$/.test(content.trim()) ? -0.1 : 0;
+  const trimmed = content.trim();
+  if (!trimmed) return 0;
 
-  return Math.max(0, Math.min(1, endsSentence + endsParagraph + endsSection + midWordBreak));
+  let score = 0.3; // Base score for any content
+
+  // Sentence boundary (most important)
+  if (/[.!?]\s*$/.test(trimmed)) {
+    score += 0.4;
+  } else if (/[,;:]\s*$/.test(trimmed)) {
+    score += 0.15; // Partial credit for clause boundaries
+  }
+
+  // Paragraph boundary
+  if (/\n\s*$/.test(content)) {
+    score += 0.2;
+  }
+
+  // Section/heading boundary
+  const lastLine = trimmed.split('\n').pop() || '';
+  if (/^#+\s+/.test(lastLine) || /^[A-Z][A-Z\s]+$/.test(lastLine)) {
+    score += 0.15;
+  }
+
+  // Penalize mid-word breaks
+  if (/\w$/.test(trimmed) && !/[.!?,;:\s]$/.test(trimmed)) {
+    score -= 0.15;
+  }
+
+  return Math.max(0, Math.min(1, score));
 }
 
 function calculateContextPreservation(content: string): number {
-  let score = 0.5;
+  let score = 0.4;
 
-  if (/\b(this|these|that|those|aforementioned)\b/i.test(content)) {
-    score += 0.2;
+  // Contextual references (pronouns, demonstratives)
+  const contextualRefs = (content.match(/\b(this|these|that|those|aforementioned|aforementioned|such|same)\b/gi) || []).length;
+  if (contextualRefs > 0) {
+    score += Math.min(contextualRefs * 0.1, 0.25);
   }
 
-  if (/\b(following|below|above|next|previous)\b/i.test(content)) {
-    score += 0.2;
+  // Sequential/relational words
+  const relationalWords = (content.match(/\b(following|below|above|next|previous|before|after|then|thus|therefore|however|moreover|furthermore)\b/gi) || []).length;
+  if (relationalWords > 0) {
+    score += Math.min(relationalWords * 0.08, 0.25);
   }
 
-  const words = content.toLowerCase().split(/\s+/);
+  // Vocabulary diversity (indicates good context)
+  const words = content.toLowerCase().split(/\s+/).filter(w => w.length > 0);
   const uniqueWords = new Set(words);
-  const wordDiversity = uniqueWords.size / words.length;
+  const wordDiversity = words.length > 0 ? uniqueWords.size / words.length : 0;
 
-  if (wordDiversity > 0.5 && wordDiversity < 0.9) {
-    score += 0.1;
+  // Optimal diversity is 0.6-0.8 (not too repetitive, not too scattered)
+  if (wordDiversity >= 0.6 && wordDiversity <= 0.8) {
+    score += 0.15;
+  } else if (wordDiversity > 0.8) {
+    score += 0.08; // Too scattered
   }
 
   return Math.min(score, 1);
@@ -84,11 +127,33 @@ function calculateMetadataRichness(metadata: Record<string, any>): number {
 }
 
 function calculateStructuralIntegrity(content: string): number {
-  let score = 0.5;
+  let score = 0.3;
 
-  if (content.length > 50) score += 0.2;
-  if (content.length > 200) score += 0.15;
-  if (content.split(/\s+/).length > 20) score += 0.15;
+  const length = content.length;
+  const words = content.split(/\s+/).filter(w => w.length > 0);
+  const wordCount = words.length;
+
+  // Content length scoring (optimal: 200-500 chars)
+  if (length >= 200 && length <= 500) {
+    score += 0.35;
+  } else if (length > 500) {
+    score += 0.25; // Longer is okay but not ideal for chunks
+  } else if (length >= 100) {
+    score += 0.15; // Minimum acceptable
+  }
+
+  // Word count scoring (optimal: 30-80 words)
+  if (wordCount >= 30 && wordCount <= 80) {
+    score += 0.25;
+  } else if (wordCount > 80) {
+    score += 0.15;
+  } else if (wordCount >= 15) {
+    score += 0.1;
+  }
+
+  // Formatting/structure indicators
+  const hasFormatting = /[\*_\-\#\[\]]/.test(content) ? 0.1 : 0;
+  score += hasFormatting;
 
   return Math.min(score, 1);
 }
@@ -113,16 +178,27 @@ function scoreChunk(
   const metadataRichness = calculateMetadataRichness(metadata);
   const structuralIntegrity = calculateStructuralIntegrity(content);
 
+  // Optimized weights for better quality assessment
+  // Boundary quality is most important (prevents mid-sentence breaks)
+  // Semantic completeness is second (ensures meaningful content)
+  // Structural integrity is third (ensures proper chunk size)
   const overallCoherence = (
-    semanticCompleteness * 0.25 +
-    boundaryQuality * 0.25 +
-    contextPreservation * 0.2 +
-    metadataRichness * 0.15 +
-    structuralIntegrity * 0.15
+    boundaryQuality * 0.30 +
+    semanticCompleteness * 0.28 +
+    structuralIntegrity * 0.20 +
+    contextPreservation * 0.15 +
+    metadataRichness * 0.07
   );
 
   const coherenceScore = Math.round(overallCoherence * 100) / 100;
   const qualityAssessment = getQualityAssessment(coherenceScore);
+
+  // Generate recommendations based on weak areas
+  const recommendations: string[] = [];
+  if (semanticCompleteness < 0.6) recommendations.push("Improve semantic completeness");
+  if (boundaryQuality < 0.6) recommendations.push("Check chunk boundaries");
+  if (structuralIntegrity < 0.6) recommendations.push("Adjust chunk size");
+  if (contextPreservation < 0.5) recommendations.push("Add contextual references");
 
   return {
     chunk_id: chunkId,
@@ -136,7 +212,7 @@ function scoreChunk(
       overall_coherence: coherenceScore,
     },
     quality_assessment: qualityAssessment,
-    quality_recommendations: [],
+    quality_recommendations: recommendations,
   };
 }
 
