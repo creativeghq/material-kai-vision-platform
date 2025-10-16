@@ -43,6 +43,7 @@ import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import HealthPage from './pages/Health';
 import { CriticalErrorBoundary, PageErrorBoundary } from './components/ErrorBoundary/ErrorBoundary';
 import { MivaaDocsViewer } from './components/Admin/MivaaDocsViewer';
+import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMetricsPanel';
 
 const queryClient = new QueryClient();
 
@@ -281,6 +282,15 @@ const App = () => (
                 <AdminGuard>
                   <Layout>
                     <MivaaDocsViewer />
+                  </Layout>
+                </AdminGuard>
+              </AuthGuard>
+            } />
+            <Route path="/admin/quality-stability-metrics" element={
+              <AuthGuard>
+                <AdminGuard>
+                  <Layout>
+                    <QualityStabilityMetricsPanel />
                   </Layout>
                 </AdminGuard>
               </AuthGuard>

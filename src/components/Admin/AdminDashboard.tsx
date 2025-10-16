@@ -456,6 +456,14 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'Documentation',
       },
+      {
+        title: 'Quality & Stability Metrics',
+        description: 'Monitor PDF chunk quality scoring and embedding stability analysis',
+        icon: BarChart3,
+        path: '/admin/quality-stability-metrics',
+        status: 'active',
+        count: 'Phase 2',
+      },
     ]
   };
 
