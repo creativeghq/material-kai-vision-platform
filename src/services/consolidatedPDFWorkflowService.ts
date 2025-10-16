@@ -620,6 +620,7 @@ export class ConsolidatedPDFWorkflowService {
             this.createSuccessDetail(`Stored ${storageResult.chunksStored} text chunks`),
             this.createSuccessDetail(`Stored ${storageResult.imagesStored} images`),
             this.createSuccessDetail(`Generated ${storageResult.embeddingsStored} embeddings`),
+            this.createSuccessDetail(`Added to ${storageResult.categoriesAdded} categories`),
             this.createSuccessDetail('Metadata and relationships preserved'),
             this.createSuccessDetail('Search indexing completed'),
           ],
@@ -629,6 +630,7 @@ export class ConsolidatedPDFWorkflowService {
             chunksStored: storageResult.chunksStored,
             imagesStored: storageResult.imagesStored,
             embeddingsStored: storageResult.embeddingsStored,
+            categoriesAdded: storageResult.categoriesAdded,
             storageCompleted: true,
           },
         };
@@ -724,11 +726,29 @@ export class ConsolidatedPDFWorkflowService {
     } catch (error) {
       // Mark step as failed with 0% progress
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : '';
+
+      // Create detailed error information
+      const errorDetails = [
+        this.createErrorDetail(`Step failed: ${errorMessage}`, errorMessage),
+        ...(errorStack ? [this.createInfoDetail(`Stack trace: ${errorStack.split('\n')[0]}`)] : []),
+      ];
+
       this.updateJobStep(jobId, stepId, {
         status: 'failed',
         progress: 0,
-        details: [this.createErrorDetail(`Step failed: ${errorMessage}`, errorMessage)],
+        details: errorDetails,
+        error: errorMessage,
       });
+
+      // Also update the job status to failed
+      const job = this.jobs.get(jobId);
+      if (job) {
+        job.status = 'failed';
+        job.endTime = new Date();
+        this.jobs.set(jobId, job);
+      }
+
       throw error;
     }
   }
@@ -888,13 +908,21 @@ export class ConsolidatedPDFWorkflowService {
     chunksStored: number;
     imagesStored: number;
     embeddingsStored: number;
+    categoriesAdded: number;
   }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Generate a document ID
-      const documentId = `doc_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      // Generate a proper UUID-format document ID
+      const generateUUID = () => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+      const documentId = generateUUID();
 
       // Extract metrics from MIVAA result
       const details = mivaaData?.details || {};
@@ -1181,11 +1209,44 @@ export class ConsolidatedPDFWorkflowService {
 
       console.log(`✅ Storage completed: ${chunksStored} chunks, ${imagesStored} images, ${embeddingsStored} embeddings stored in database`);
 
+      // Extract categories from the document content
+      let categoriesAdded = 0;
+      try {
+        if (chunksStored > 0) {
+          // Get the first chunk content for category extraction
+          const { data: firstChunk } = await supabase
+            .from('document_chunks')
+            .select('content')
+            .eq('document_id', documentId)
+            .limit(1)
+            .single();
+
+          if (firstChunk?.content) {
+            const extractedCategories = await categoryExtractionService.extractCategories(
+              firstChunk.content,
+              documentId,
+              {
+                includeProductCategories: true,
+                includeMaterialCategories: true,
+                confidenceThreshold: 0.6,
+                maxCategories: 8
+              }
+            );
+
+            categoriesAdded = extractedCategories.categories.length;
+            console.log(`🏷️ Extracted ${categoriesAdded} categories for document`);
+          }
+        }
+      } catch (categoryError) {
+        console.warn('Category extraction failed:', categoryError);
+      }
+
       return {
         documentId,
         chunksStored,
         imagesStored,
-        embeddingsStored
+        embeddingsStored,
+        categoriesAdded
       };
 
     } catch (error) {
@@ -1229,19 +1290,6 @@ export class ConsolidatedPDFWorkflowService {
 
     while (attempts < maxAttempts) {
       try {
-        // Update progress with polling status
-        this.updateJobStep(jobId, 'mivaa-processing', {
-          progress: 30 + Math.min(50, (attempts / maxAttempts) * 50), // Progress from 30% to 80%
-          details: [
-            'Initializing MIVAA processing...',
-            'Preparing document for analysis',
-            'Sending document to MIVAA service...',
-            `✅ Job started with ID: ${mivaaJobId}`,
-            `⏳ Polling for status... (attempt ${attempts + 1}/${maxAttempts})`,
-            `🔄 Checking job progress every 5 seconds...`,
-          ],
-        });
-
         // Use direct job status endpoint (this works correctly)
         const statusResponse = await this.callMivaaGatewayDirect('get_job_status', { job_id: mivaaJobId });
 
@@ -1251,7 +1299,31 @@ export class ConsolidatedPDFWorkflowService {
           status: statusResponse.data?.status,
           progress: statusResponse.data?.progress_percentage,
           chunks: statusResponse.data?.details?.chunks_created || statusResponse.data?.parameters?.chunks_created,
-          images: statusResponse.data?.details?.images_extracted || statusResponse.data?.parameters?.images_extracted
+          images: statusResponse.data?.details?.images_extracted || statusResponse.data?.parameters?.images_extracted,
+          currentPage: statusResponse.data?.details?.current_page || statusResponse.data?.parameters?.current_page,
+          totalPages: statusResponse.data?.details?.total_pages || statusResponse.data?.parameters?.total_pages
+        });
+
+        // Extract progress details
+        const progressPercentage = statusResponse.data?.progress_percentage || 0;
+        const currentPage = statusResponse.data?.details?.current_page || statusResponse.data?.parameters?.current_page || 0;
+        const totalPages = statusResponse.data?.details?.total_pages || statusResponse.data?.parameters?.total_pages || 0;
+        const chunksCreated = statusResponse.data?.details?.chunks_created || statusResponse.data?.parameters?.chunks_created || 0;
+        const imagesExtracted = statusResponse.data?.details?.images_extracted || statusResponse.data?.parameters?.images_extracted || 0;
+
+        // Update progress with real-time page and count information
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: Math.max(30, Math.min(80, progressPercentage || (30 + (attempts / maxAttempts) * 50))),
+          details: [
+            'Initializing MIVAA processing...',
+            'Preparing document for analysis',
+            'Sending document to MIVAA service...',
+            `✅ Job started with ID: ${mivaaJobId}`,
+            `⏳ Starting PDF download and analysis (${Math.max(30, Math.min(80, progressPercentage || (30 + (attempts / maxAttempts) * 50)))}% complete)`,
+            `📄 Pages: ${currentPage}/${totalPages} processed`,
+            `📝 Chunks Generated: ${chunksCreated}`,
+            `🖼️ Images Extracted: ${imagesExtracted}`,
+          ],
         });
 
         if (statusResponse.success && statusResponse.data) {
@@ -1452,8 +1524,25 @@ export class ConsolidatedPDFWorkflowService {
         console.error(`Error polling MIVAA job status (attempt ${attempts + 1}):`, error);
         attempts++;
 
+        // Update job with polling error details
+        this.updateJobStep(jobId, 'mivaa-processing', {
+          progress: Math.max(30, Math.min(80, progressPercentage || (30 + (attempts / maxAttempts) * 50))),
+          details: [
+            `⏳ Polling attempt ${attempts}/${maxAttempts}`,
+            `⚠️ Temporary polling error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            `🔄 Retrying in 5 seconds...`,
+          ],
+        });
+
         if (attempts >= maxAttempts) {
-          throw new Error(`MIVAA job polling failed after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          const timeoutError = `MIVAA job polling failed after ${maxAttempts} attempts (${maxAttempts * 5} seconds). The PDF processing may still be running in the background. Please check back later or contact support.`;
+          this.updateJobStep(jobId, 'mivaa-processing', {
+            status: 'failed',
+            progress: 0,
+            details: [this.createErrorDetail('Polling Timeout', timeoutError)],
+            error: timeoutError,
+          });
+          throw new Error(timeoutError);
         }
 
         // Wait before retrying
@@ -1461,7 +1550,14 @@ export class ConsolidatedPDFWorkflowService {
       }
     }
 
-    throw new Error(`MIVAA job polling timed out after ${maxAttempts} attempts (${maxAttempts * 5} seconds)`);
+    const timeoutError = `MIVAA job polling timed out after ${maxAttempts} attempts (${maxAttempts * 5} seconds). The PDF processing may still be running in the background.`;
+    this.updateJobStep(jobId, 'mivaa-processing', {
+      status: 'failed',
+      progress: 0,
+      details: [this.createErrorDetail('Processing Timeout', timeoutError)],
+      error: timeoutError,
+    });
+    throw new Error(timeoutError);
   }
 
   /**
@@ -1529,11 +1625,29 @@ export class ConsolidatedPDFWorkflowService {
     } catch (error) {
       console.error('Direct MIVAA gateway call failed:', error);
 
+      // Provide specific error messages based on error type
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`MIVAA gateway request timed out after 10 minutes. This PDF appears to be very complex or large. Please try with a smaller PDF or contact support for assistance with large documents.`);
+        const timeoutError = 'MIVAA gateway request timed out after 10 minutes. This PDF appears to be very complex or large. Please try with a smaller PDF or contact support for assistance with large documents.';
+        console.error('🚨 Request timeout:', timeoutError);
+        throw new Error(timeoutError);
       }
 
-      throw error;
+      if (error instanceof Error && error.message.includes('Failed to fetch')) {
+        const networkError = 'Network connection failed. Please check your internet connection and try again.';
+        console.error('🌐 Network error:', networkError);
+        throw new Error(networkError);
+      }
+
+      if (error instanceof Error && error.message.includes('401')) {
+        const authError = 'Authentication failed. Please check your API key configuration.';
+        console.error('🔐 Auth error:', authError);
+        throw new Error(authError);
+      }
+
+      // Generic error with helpful message
+      const genericError = error instanceof Error ? error.message : String(error);
+      console.error('❌ MIVAA gateway error:', genericError);
+      throw new Error(`MIVAA gateway error: ${genericError}`);
     }
   }
 }

@@ -15,7 +15,8 @@ import {
   BarChart3,
   X,
   RefreshCw,
-
+  AlertTriangle,
+  HelpCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -27,10 +28,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EnhancedProgressMonitor } from './EnhancedProgressMonitor';
 import { PDFImageGallery } from './PDFImageGallery';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getErrorFeedback, getSuccessFeedback } from '@/utils/errorMessages';
 
 // Import types from the workflow service
 interface WorkflowStepDetail {
@@ -252,6 +255,12 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   const isFailed = job.status === 'failed';
   const isRunning = job.status === 'running';
 
+  // Get error feedback if job failed
+  const failedStep = job.steps.find(step => step.status === 'failed');
+  const errorFeedback = isFailed && failedStep?.error
+    ? getErrorFeedback(failedStep.error, failedStep.id)
+    : null;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       // Prevent auto-closing - only allow manual close via button
@@ -284,15 +293,6 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             </div>
           </div>
 
-          {/* Overall Progress */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Overall Progress</span>
-              <span>{Math.round(overallProgress)}%</span>
-            </div>
-            <Progress value={overallProgress} className="h-2" />
-          </div>
-
           {/* Async Processing Indicator */}
           {job.steps.some(step =>
             step.id === 'mivaa-processing' &&
@@ -316,6 +316,46 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
         </DialogHeader>
 
         <Separator className="flex-shrink-0" />
+
+        {/* Error Alert Section */}
+        {isFailed && errorFeedback && (
+          <div className="px-6 pt-4 flex-shrink-0">
+            <Alert variant="destructive" className="border-red-300 bg-red-50">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-red-900">{errorFeedback.title}</AlertTitle>
+              <AlertDescription className="text-red-800 mt-2 space-y-2">
+                <p>{errorFeedback.message}</p>
+                {errorFeedback.details && (
+                  <details className="text-sm cursor-pointer">
+                    <summary className="font-medium hover:underline">Technical Details</summary>
+                    <p className="mt-2 p-2 bg-red-100 rounded text-xs font-mono break-words">
+                      {errorFeedback.details}
+                    </p>
+                  </details>
+                )}
+                {errorFeedback.suggestion && (
+                  <div className="flex gap-2 items-start mt-3 p-2 bg-red-100 rounded">
+                    <HelpCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm"><strong>Suggestion:</strong> {errorFeedback.suggestion}</p>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
+        {/* Success Alert Section */}
+        {isCompleted && !isFailed && (
+          <div className="px-6 pt-4 flex-shrink-0">
+            <Alert className="border-green-300 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-900">Processing Complete</AlertTitle>
+              <AlertDescription className="text-green-800 mt-2">
+                Your PDF has been successfully processed and added to the knowledge base.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full w-full">
@@ -358,33 +398,40 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
         <Separator className="flex-shrink-0" />
 
-        {/* Completion Summary */}
+        {/* Completion Summary - Full Details */}
         {isCompleted && (
-          <div className="p-6 pt-4 flex-shrink-0 bg-green-50 border-t border-green-200">
-            <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+          <div className="p-6 pt-4 flex-shrink-0 bg-green-50 border-t border-green-200 space-y-4">
+            <h3 className="text-lg font-semibold text-green-900 flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              Processing Complete
+              Processing Complete - Full Summary
             </h3>
+
+            {/* Key Metrics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {(() => {
                 // Extract completion data from job steps
                 const mivaaStep = job.steps.find(s => s.id === 'mivaa-processing');
                 const knowledgeStep = job.steps.find(s => s.id === 'knowledge-storage');
                 const embeddingStep = job.steps.find(s => s.id === 'embedding-generation');
+                const layoutStep = job.steps.find(s => s.id === 'layout-analysis');
 
                 // Parse details to extract counts
                 let chunksCreated = 0;
                 let imagesExtracted = 0;
                 let embeddingsGenerated = 0;
                 let kbEntriesStored = 0;
+                let pagesProcessed = 0;
+                let categoriesAdded = 0;
 
                 if (mivaaStep?.details) {
                   mivaaStep.details.forEach(detail => {
                     const detailStr = typeof detail === 'string' ? detail : detail.message;
                     const chunkMatch = detailStr.match(/Generated (\d+) text chunks/);
                     const imageMatch = detailStr.match(/Extracted (\d+) images/);
+                    const pageMatch = detailStr.match(/Processed (\d+) pages?/);
                     if (chunkMatch) chunksCreated = parseInt(chunkMatch[1]);
                     if (imageMatch) imagesExtracted = parseInt(imageMatch[1]);
+                    if (pageMatch) pagesProcessed = parseInt(pageMatch[1]);
                   });
                 }
 
@@ -392,7 +439,9 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                   knowledgeStep.details.forEach(detail => {
                     const detailStr = typeof detail === 'string' ? detail : detail.message;
                     const kbMatch = detailStr.match(/Stored (\d+) chunks/);
+                    const catMatch = detailStr.match(/Added to (\d+) categories?/);
                     if (kbMatch) kbEntriesStored = parseInt(kbMatch[1]);
+                    if (catMatch) categoriesAdded = parseInt(catMatch[1]);
                   });
                 }
 
@@ -406,25 +455,74 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
                 return (
                   <>
-                    <div className="text-center">
+                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
+                      <div className="text-2xl font-bold text-green-700">{pagesProcessed}</div>
+                      <div className="text-sm text-green-600">Pages Processed</div>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
                       <div className="text-2xl font-bold text-green-700">{chunksCreated}</div>
                       <div className="text-sm text-green-600">Chunks Created</div>
                     </div>
-                    <div className="text-center">
+                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
+                      <div className="text-2xl font-bold text-green-700">{imagesExtracted}</div>
+                      <div className="text-sm text-green-600">Images Extracted</div>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
                       <div className="text-2xl font-bold text-green-700">{embeddingsGenerated || chunksCreated}</div>
                       <div className="text-sm text-green-600">Embeddings Generated</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-700">{imagesExtracted}</div>
-                      <div className="text-sm text-green-600">Images Processed</div>
-                    </div>
-                    <div className="text-center">
+                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
                       <div className="text-2xl font-bold text-green-700">{kbEntriesStored || chunksCreated}</div>
                       <div className="text-sm text-green-600">KB Entries Stored</div>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
+                      <div className="text-2xl font-bold text-green-700">{categoriesAdded}</div>
+                      <div className="text-sm text-green-600">Categories Added</div>
                     </div>
                   </>
                 );
               })()}
+            </div>
+
+            {/* Detailed Step Information */}
+            <div className="space-y-3 mt-4">
+              <h4 className="font-semibold text-green-900 text-sm">Processing Details:</h4>
+              <div className="space-y-2 text-sm">
+                {job.steps.map(step => (
+                  <div key={step.id} className="flex items-start gap-2 p-2 bg-white rounded border border-green-200">
+                    <div className="flex-shrink-0 mt-0.5">
+                      {step.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                      {step.status === 'failed' && <XCircle className="h-4 w-4 text-red-600" />}
+                      {step.status === 'running' && <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />}
+                      {step.status === 'pending' && <Clock className="h-4 w-4 text-gray-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-green-900">{step.name}</div>
+                      {step.details && step.details.length > 0 && (
+                        <div className="text-xs text-green-700 mt-1 space-y-1">
+                          {step.details.slice(0, 2).map((detail, idx) => (
+                            <div key={idx} className="truncate">
+                              • {typeof detail === 'string' ? detail : detail.message}
+                            </div>
+                          ))}
+                          {step.details.length > 2 && (
+                            <div className="text-xs text-green-600">
+                              +{step.details.length - 2} more details
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Job Metadata */}
+            <div className="text-xs text-green-700 p-2 bg-white rounded border border-green-200 space-y-1">
+              <div><strong>Job ID:</strong> {job.id}</div>
+              <div><strong>Document ID:</strong> {(job.metadata?.documentId as string) || 'N/A'}</div>
+              <div><strong>Processing Time:</strong> {job.endTime ? formatDuration(job.startTime, job.endTime) : 'In progress'}</div>
             </div>
           </div>
         )}

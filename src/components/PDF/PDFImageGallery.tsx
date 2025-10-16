@@ -15,13 +15,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Image as ImageIcon, 
-  Download, 
-  Search, 
-  Grid, 
-  List, 
-  ZoomIn, 
+import {
+  Image as ImageIcon,
+  Download,
+  Search,
+  Grid,
+  List,
+  ZoomIn,
   ZoomOut,
   ChevronLeft,
   ChevronRight,
@@ -32,7 +32,9 @@ import {
   Eye,
   Filter,
   SortAsc,
-  SortDesc
+  SortDesc,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -110,6 +112,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
       setLoading(true);
       setError(null);
 
+      // Validate document ID format
+      if (!documentId) {
+        throw new Error('Document ID is missing. Cannot load images.');
+      }
+
       const { data, error: fetchError } = await supabase
         .from('document_images')
         .select('*')
@@ -117,13 +124,18 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
         .order('page_number', { ascending: true });
 
       if (fetchError) {
+        // Provide specific error messages
+        if (fetchError.message.includes('invalid input syntax for type uuid')) {
+          throw new Error(`Invalid document ID format: "${documentId}". This may indicate a database schema issue.`);
+        }
         throw new Error(`Failed to load images: ${fetchError.message}`);
       }
 
       setImages(data || []);
     } catch (err) {
       console.error('Error loading images:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load images');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load images';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -339,12 +351,24 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
     return (
       <Card className={className}>
         <CardContent className="p-6">
-          <div className="text-center">
-            <div className="text-red-500 mb-2">Error loading images</div>
-            <p className="text-gray-500 text-sm">{error}</p>
-            <Button onClick={loadImages} className="mt-4">
-              Retry
-            </Button>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900">Failed to Load Images</h3>
+                <p className="text-red-700 text-sm mt-1">{error}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={loadImages} variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+              <details className="text-xs text-gray-500 cursor-pointer">
+                <summary className="hover:underline">Technical Details</summary>
+                <p className="mt-2 p-2 bg-gray-100 rounded font-mono break-words">{error}</p>
+              </details>
+            </div>
           </div>
         </CardContent>
       </Card>
