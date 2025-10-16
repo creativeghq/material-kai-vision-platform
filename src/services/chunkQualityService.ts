@@ -214,7 +214,12 @@ export class ChunkQualityService {
     chunkId: string,
     qualityData: ChunkQualityData
   ): Promise<void> {
-    const { error } = await supabase
+    console.log(`📝 Updating chunk quality for ${chunkId}:`, {
+      coherence_score: qualityData.coherence_score,
+      quality_assessment: qualityData.quality_assessment,
+    });
+
+    const { error, data } = await supabase
       .from('document_chunks')
       .update({
         coherence_score: qualityData.coherence_score,
@@ -225,9 +230,11 @@ export class ChunkQualityService {
       .eq('id', chunkId);
 
     if (error) {
-      console.error('Failed to update chunk quality:', error);
+      console.error(`❌ Failed to update chunk quality for ${chunkId}:`, error);
       throw error;
     }
+
+    console.log(`✅ Successfully updated chunk quality for ${chunkId}`);
   }
 
   /**
