@@ -110,6 +110,94 @@ Content-Type: application/json
 
 **Purpose**: Builds semantic, sequential, and hierarchical relationships between chunks
 
+### Retrieval Quality Metrics Endpoint
+
+#### Measure Retrieval Quality
+```http
+POST /functions/v1/rag-knowledge-search
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "query": "fire resistant materials",
+  "include_context": true,
+  "measure_quality": true
+}
+```
+
+**Response** (includes quality metrics):
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "id": "chunk-123",
+      "content": "...",
+      "similarity_score": 0.92
+    }
+  ],
+  "quality_metrics": {
+    "precision": 0.88,
+    "recall": 0.85,
+    "mrr": 0.95,
+    "latency_ms": 245
+  },
+  "context": "...",
+  "response_quality": {
+    "coherence_score": 0.92,
+    "hallucination_score": 0.05,
+    "source_attribution_score": 0.88,
+    "factual_consistency_score": 0.90,
+    "overall_quality_score": 0.88,
+    "quality_assessment": "Excellent"
+  }
+}
+```
+
+**Purpose**: Measures retrieval quality (precision, recall, MRR) and response quality (coherence, hallucination detection, attribution)
+
+**Quality Metrics Stored In**:
+- `retrieval_quality_metrics` table - Stores precision, recall, MRR, latency
+- `response_quality_metrics` table - Stores coherence, hallucination, attribution, consistency scores
+
+### Response Quality Metrics Endpoint
+
+#### Measure Response Quality
+```http
+POST /functions/v1/rag-knowledge-search
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "query": "material properties",
+  "include_context": true
+}
+```
+
+**Response Quality Metrics**:
+```json
+{
+  "response_quality": {
+    "response_id": "resp-123",
+    "query": "material properties",
+    "coherence_score": 0.92,
+    "hallucination_score": 0.05,
+    "source_attribution_score": 0.88,
+    "factual_consistency_score": 0.90,
+    "overall_quality_score": 0.88,
+    "quality_assessment": "Excellent",
+    "issues_detected": []
+  }
+}
+```
+
+**Quality Assessment Levels**:
+- **Excellent**: overall_quality_score >= 0.85
+- **Good**: overall_quality_score >= 0.70
+- **Poor**: overall_quality_score < 0.70
+
+**Purpose**: Validates LLM response quality and detects hallucinations
+
 ## 🔗 Internal API Endpoints
 
 ### Health Check Endpoints
