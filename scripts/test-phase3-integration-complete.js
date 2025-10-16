@@ -163,28 +163,28 @@ async function testExistingLLMFunctionality() {
   console.log('======================================\n');
 
   try {
-    // Test 4a: Check if chat_history table still works
-    console.log('4a. Checking chat_history table...');
-    const { data: chats, error: chatsError } = await supabase
-      .from('chat_history')
+    // Test 4a: Check if moodboards table works (for user interactions)
+    console.log('4a. Checking moodboards table...');
+    const { data: moodboards, error: moodboardsError } = await supabase
+      .from('moodboards')
       .select('id')
       .limit(1);
 
-    if (chatsError && chatsError.code !== 'PGRST116') {
-      console.log(`   ℹ️  Table not available (schema issue, not integration issue)\n`);
+    if (moodboardsError && moodboardsError.code !== 'PGRST116') {
+      console.log(`   ℹ️  Table not available (expected if no moodboards)\n`);
     } else {
       console.log('   ✅ Table accessible\n');
     }
 
-    // Test 4b: Check if conversations table still works
-    console.log('4b. Checking conversations table...');
-    const { data: conversations, error: conversationsError } = await supabase
-      .from('conversations')
+    // Test 4b: Check if processing_jobs table works (for async operations)
+    console.log('4b. Checking processing_jobs table...');
+    const { data: jobs, error: jobsError } = await supabase
+      .from('processing_jobs')
       .select('id')
       .limit(1);
 
-    if (conversationsError && conversationsError.code !== 'PGRST116') {
-      console.log(`   ℹ️  Table not available (schema issue, not integration issue)\n`);
+    if (jobsError && jobsError.code !== 'PGRST116') {
+      console.log(`   ℹ️  Table not available (expected if no jobs)\n`);
     } else {
       console.log('   ✅ Table accessible\n');
     }
