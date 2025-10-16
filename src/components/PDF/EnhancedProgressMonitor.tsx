@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+
 import { Separator } from '@/components/ui/separator';
 import { 
   CheckCircle, 
@@ -20,9 +20,7 @@ import {
   Image, 
   Database, 
   Tag,
-  Activity,
-  Eye,
-  Download
+  Activity
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -36,7 +34,6 @@ interface EnhancedProgressMonitorProps {
   jobId: string;
   onComplete?: (progress: PDFProcessingProgress) => void;
   onError?: (error: string) => void;
-  onViewResults?: () => void;
   showStatistics?: boolean;
   showStepDetails?: boolean;
   compact?: boolean;
@@ -47,7 +44,6 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
   jobId,
   onComplete,
   onError,
-  onViewResults,
   showStatistics = true,
   showStepDetails = true,
   compact = false,
@@ -101,15 +97,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
     }
   };
 
-  const getStatusColor = (status: PDFProcessingProgress['status']) => {
-    switch (status) {
-      case 'running': return 'bg-blue-500';
-      case 'completed': return 'bg-green-500';
-      case 'failed': return 'bg-red-500';
-      case 'cancelled': return 'bg-gray-500';
-      default: return 'bg-gray-400';
-    }
-  };
+
 
   const getStepStatusIcon = (status: PDFProcessingStep['status']) => {
     switch (status) {
@@ -189,12 +177,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
             <Badge variant={progress.status === 'completed' ? 'default' : 'secondary'}>
               {progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
             </Badge>
-            {progress.status === 'completed' && onViewResults && (
-              <Button size="sm" onClick={onViewResults}>
-                <Eye className="h-4 w-4 mr-1" />
-                View Results
-              </Button>
-            )}
+
           </div>
         </div>
       </CardHeader>
@@ -254,14 +237,46 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{step.name}</span>
-                      <span className="text-xs text-gray-500">{Math.round(step.progress)}%</span>
+                      <span className="text-xs text-gray-500">
+                        {step.status === 'completed' ? '100%' :
+                         step.status === 'running' ? `${Math.round(step.progress || 0)}%` :
+                         step.status === 'failed' ? '0%' : '0%'}
+                      </span>
                     </div>
                     <div className="text-xs text-gray-600">{step.description}</div>
+
+                    {/* Real-time counts for MIVAA processing */}
+                    {step.id === 'mivaa-processing' && step.status === 'running' && step.details && (
+                      <div className="text-xs text-gray-500 mt-1 space-y-1">
+                        {(() => {
+                          // Extract counts from step details
+                          const details = Array.isArray(step.details) ? step.details : [];
+                          const chunksMatch = details.find(d => typeof d === 'string' && d.includes('Chunks Generated:'));
+                          const imagesMatch = details.find(d => typeof d === 'string' && d.includes('Images Extracted:'));
+                          const pagesMatch = details.find(d => typeof d === 'string' && d.includes('Pages:'));
+
+                          const chunks = chunksMatch ? chunksMatch.match(/(\d+)/)?.[1] || '0' : '0';
+                          const images = imagesMatch ? imagesMatch.match(/(\d+)/)?.[1] || '0' : '0';
+                          const pages = pagesMatch ? pagesMatch.match(/(\d+)\/(\d+)/)?.[0] || '0/0' : '0/0';
+
+                          return (
+                            <div className="flex gap-4 text-xs">
+                              <span>📄 Pages: {pages}</span>
+                              <span>📝 Chunks: {chunks}</span>
+                              <span>🖼️ Images: {images}</span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
-                {step.progress > 0 && (
-                  <Progress value={step.progress} className="h-1 ml-6" />
+                {(step.status === 'running' || step.status === 'completed') && (
+                  <Progress
+                    value={step.status === 'completed' ? 100 : (step.progress || 0)}
+                    className="h-1 ml-6"
+                  />
                 )}
 
                 {/* Substeps */}

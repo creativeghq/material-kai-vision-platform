@@ -15,7 +15,6 @@ import {
   BarChart3,
   X,
   RefreshCw,
-  Eye,
 
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -77,7 +76,6 @@ interface PDFUploadProgressModalProps {
   useEnhancedMonitor?: boolean;
   showImageGallery?: boolean;
   onRetry?: () => void;
-  onViewResults?: () => void;
 
 }
 
@@ -159,7 +157,6 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   useEnhancedMonitor = false,
   showImageGallery = false,
   onRetry,
-  onViewResults,
 
 }) => {
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
@@ -331,12 +328,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                     jobId={job.id}
                     onComplete={(progress) => {
                       console.log('Processing completed:', progress);
-                      if (onViewResults) onViewResults();
                     }}
                     onError={(error) => {
                       console.error('Processing error:', error);
                     }}
-                    onViewResults={onViewResults}
                     showStatistics={true}
                     showStepDetails={true}
                     compact={false}
@@ -346,10 +341,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               )}
 
               {/* Image Gallery Section */}
-              {showImageGallery && job.id && isCompleted && (
+              {showImageGallery && job.metadata?.documentId && isCompleted && (
                 <div className="mb-6">
                   <PDFImageGallery
-                    documentId={job.id}
+                    documentId={job.metadata.documentId}
                     showHeader={true}
                     viewMode="grid"
                     className="w-full"
@@ -357,181 +352,6 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                   <Separator className="my-6" />
                 </div>
               )}
-
-            {job.steps.map((step, _index) => {
-              const StepIcon = getStepIcon(step.id);
-              const isExpanded = expandedSteps.has(step.id);
-              const hasDetails = (step.details && step.details.length > 0) || step.error || (step.logs && step.logs.length > 0);
-
-              return (
-                <Card key={step.id} className={cn(
-                  "transition-all duration-300 border-2",
-                  "bg-[#1f2937]", // Background color as requested
-                  // Border colors based on status as requested
-                  step.status === 'failed' && "border-red-500",
-                  step.status === 'completed' && "border-green-500",
-                  step.status === 'pending' && "border-gray-500",
-                  // Active/running step gets white border as requested
-                  step.status === 'running' && "border-white animate-pulse"
-                )}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 flex-1">
-                        <StepIcon className={cn(
-                          "h-5 w-5",
-                          step.status === 'completed' && "text-green-400",
-                          step.status === 'failed' && "text-red-400",
-                          step.status === 'running' && "text-white",
-                          step.status === 'pending' && "text-gray-400"
-                        )} />
-                        
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-white">{step.name}</h4>
-                            <div className="flex items-center gap-2">
-                              {step.status === 'running' && step.progress !== undefined && (
-                                <span className="text-xs text-gray-400">
-                                  {Math.round(step.progress)}%
-                                </span>
-                              )}
-                              {getStatusIcon(step.status)}
-                            </div>
-                          </div>
-
-                          {step.description && (
-                            <p className="text-sm text-gray-400 mt-1">
-                              {step.description}
-                            </p>
-                          )}
-                          
-                          {step.status === 'running' && step.progress !== undefined && (
-                            <Progress value={step.progress} className="h-1 mt-2" />
-                          )}
-                          
-                          {step.duration !== undefined && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Duration: {step.duration}ms
-                            </p>
-                          )}
-                        </div>
-                        
-                        {hasDetails && (
-                          <Collapsible>
-                            <CollapsibleTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleStepExpansion(step.id)}
-                                className="p-1"
-                              >
-                                {isExpanded ? 
-                                  <ChevronDown className="h-4 w-4" /> : 
-                                  <ChevronRight className="h-4 w-4" />
-                                }
-                              </Button>
-                            </CollapsibleTrigger>
-                          </Collapsible>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {hasDetails && (
-                      <Collapsible open={isExpanded}>
-                        <CollapsibleContent className="mt-3 pt-3 border-t border-gray-600">
-                          <div className="space-y-2">
-                            {step.error && (
-                              <div className="bg-red-900/20 border border-red-500/30 rounded p-3">
-                                <div className="flex items-center gap-2 text-red-400 font-medium mb-1">
-                                  <AlertCircle className="h-4 w-4" />
-                                  Error
-                                </div>
-                                <p className="text-sm text-red-300">{step.error}</p>
-                              </div>
-                            )}
-
-                            {step.details && step.details.length > 0 && (
-                              <div className="space-y-1">
-                                <h5 className="text-sm font-medium text-gray-300">Details:</h5>
-                                <ul className="text-sm space-y-1">
-                                  {step.details.map((detail, idx) => {
-                                    // Handle both string and WorkflowStepDetail types
-                                    const isDetailObject = typeof detail === 'object' && detail !== null;
-                                    const message = isDetailObject ? (detail as WorkflowStepDetail).message : detail as string;
-                                    const status = isDetailObject ? (detail as WorkflowStepDetail).status : 'info';
-                                    const error = isDetailObject ? (detail as WorkflowStepDetail).error : undefined;
-
-                                    // Determine icon and color based on status
-                                    const getStatusIcon = () => {
-                                      switch (status) {
-                                        case 'success':
-                                          return <CheckCircle className="h-4 w-4 text-green-500" />;
-                                        case 'error':
-                                          return error ? (
-                                            <TooltipProvider>
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <XCircle className="h-4 w-4 text-red-500 cursor-help" />
-                                                </TooltipTrigger>
-                                                <TooltipContent side="right" className="max-w-xs">
-                                                  <p className="text-sm">{error}</p>
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            </TooltipProvider>
-                                          ) : <XCircle className="h-4 w-4 text-red-500" />;
-                                        default:
-                                          return <span className="text-gray-400">•</span>;
-                                      }
-                                    };
-
-                                    const getTextColor = () => {
-                                      switch (status) {
-                                        case 'success':
-                                          return 'text-green-300';
-                                        case 'error':
-                                          return 'text-red-300';
-                                        default:
-                                          return 'text-gray-300';
-                                      }
-                                    };
-
-                                    return (
-                                      <li key={idx} className="flex items-start gap-2">
-                                        {getStatusIcon()}
-                                        <span className={getTextColor()}>{message}</span>
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              </div>
-                            )}
-                            
-                            {step.logs && step.logs.length > 0 && (
-                              <div className="space-y-1">
-                                <h5 className="text-sm font-medium text-gray-300">Logs:</h5>
-                                <div className="bg-gray-800 border border-gray-600 rounded p-2 text-xs font-mono max-h-32 overflow-y-auto">
-                                  {step.logs.map((log, idx) => (
-                                    <div key={idx} className="text-gray-300">{log}</div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {step.metadata && Object.keys(step.metadata).length > 0 && (
-                              <div className="space-y-1">
-                                <h5 className="text-sm font-medium text-gray-300">Metadata:</h5>
-                                <div className="bg-gray-800 border border-gray-600 rounded p-2 text-xs">
-                                  <pre className="text-gray-300">{JSON.stringify(step.metadata, null, 2)}</pre>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
             </div>
           </ScrollArea>
         </div>
@@ -630,12 +450,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 </Button>
               )}
               
-              {isCompleted && onViewResults && (
-                <Button variant="outline" size="sm" onClick={onViewResults}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Results
-                </Button>
-              )}
+
               
               <Button variant="outline" size="sm" onClick={onClose}>
                 Close

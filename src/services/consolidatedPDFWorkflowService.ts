@@ -606,6 +606,13 @@ export class ConsolidatedPDFWorkflowService {
           jobId
         );
 
+        // Store document ID in job metadata for image gallery access
+        const job = this.jobs.get(jobId);
+        if (job) {
+          job.metadata.documentId = storageResult.documentId;
+          this.jobs.set(jobId, job);
+        }
+
         return {
           details: [
             this.createSuccessDetail('Document stored in enhanced knowledge base'),

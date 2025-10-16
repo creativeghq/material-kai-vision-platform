@@ -73,9 +73,14 @@ class PDFProcessingWebSocketService {
 
   private initializeWebSocket() {
     try {
-      // Use environment variable or default WebSocket URL
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws/pdf-processing';
-      
+      // Disable WebSocket in production until properly configured
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+
+      if (!wsUrl) {
+        console.log('📡 WebSocket disabled - NEXT_PUBLIC_WS_URL not configured');
+        return;
+      }
+
       this.wsManager = new WebSocketManager(wsUrl, {
         reconnectAttempts: 5,
         reconnectInterval: 3000,

@@ -131,7 +131,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
             filename,
             metadata,
             processing_status,
-            created_at as doc_created_at
+            created_at
           )
         `)
         .order('created_at', { ascending: false });
