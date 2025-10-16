@@ -129,6 +129,7 @@ export class ChunkQualityService {
     content: string,
     metadata: Record<string, any>
   ): ChunkQualityData {
+    console.log(`🎯 scoreChunk called for ${chunkId}`);
     const semanticCompleteness = this.calculateSemanticCompleteness(content);
     const boundaryQuality = this.calculateBoundaryQuality(content);
     const contextPreservation = this.calculateContextPreservation(content);
