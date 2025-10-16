@@ -1,5 +1,8 @@
 # API Documentation
 
+**Last Updated**: 2025-10-16
+**Phase Status**: Phase 2 ✅ Complete, Phase 3 ⏳ Partial (Chunk Relationships Integrated)
+
 ## 🌐 API Architecture Overview
 
 The Material Kai Vision Platform uses a multi-layered API architecture:
@@ -7,8 +10,97 @@ The Material Kai Vision Platform uses a multi-layered API architecture:
 1. **Frontend API Layer** - React application API calls
 2. **Backend API Gateway** - Node.js/TypeScript API routing
 3. **MIVAA Microservice** - Python FastAPI service
-4. **Supabase Edge Functions** - Serverless functions
+4. **Supabase Edge Functions** - Serverless functions (including Phase 2-3 quality & validation)
 5. **External API Integrations** - Third-party services
+
+## 📊 Phase 2-3 Quality & Validation APIs
+
+### Phase 2: Quality Scoring & Embedding Stability
+
+#### Apply Quality Scoring
+```http
+POST /functions/v1/apply-quality-scoring
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "document_id": "doc-123"
+}
+```
+
+**Response**:
+```json
+{
+  "document_id": "doc-123",
+  "total_chunks": 45,
+  "chunks_scored": 45,
+  "average_quality_score": 38.7,
+  "quality_breakdown": {
+    "semantic_completeness": 42.3,
+    "boundary_quality": 35.8,
+    "context_preservation": 38.1,
+    "structural_integrity": 40.2,
+    "metadata_richness": 28.5
+  },
+  "timestamp": "2025-10-16T10:30:00Z"
+}
+```
+
+#### Analyze Embedding Stability
+```http
+POST /functions/v1/analyze-embedding-stability
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "document_id": "doc-123"
+}
+```
+
+**Response**:
+```json
+{
+  "document_id": "doc-123",
+  "stability_score": 0.87,
+  "variance_score": 0.12,
+  "consistency_score": 0.91,
+  "anomalies_detected": 2,
+  "anomaly_details": [
+    {
+      "chunk_id": "chunk-5",
+      "anomaly_score": 0.78,
+      "reason": "High variance in embedding"
+    }
+  ],
+  "timestamp": "2025-10-16T10:30:00Z"
+}
+```
+
+### Phase 3: Chunk Relationships & Validation
+
+#### Build Chunk Relationships
+```http
+POST /functions/v1/build-chunk-relationships
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "document_id": "doc-123"
+}
+```
+
+**Response**:
+```json
+{
+  "document_id": "doc-123",
+  "total_relationships": 156,
+  "sequential_relationships": 44,
+  "semantic_relationships": 89,
+  "hierarchical_relationships": 23,
+  "average_confidence": 0.82,
+  "timestamp": "2025-10-16T10:30:00Z"
+}
+```
 
 ## 🔗 Internal API Endpoints
 

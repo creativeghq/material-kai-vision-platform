@@ -51,6 +51,8 @@ The following service categories were analyzed and found to have **proper separa
 
 ### PDF Processing Services
 - **ConsolidatedPDFWorkflowService** - Main PDF processing orchestrator with MIVAA integration
+  - ✅ **Phase 3 Integration**: Calls `build-chunk-relationships` Edge Function after quality scoring
+  - Includes quality scoring and embedding stability analysis (Phase 2)
 - **PDFContentService** - High-level PDF content extraction and processing
 - **DocumentChunkingService** - Intelligent document segmentation for RAG
 - **DocumentVectorStoreService** - Vector storage and retrieval for PDF content
@@ -58,6 +60,42 @@ The following service categories were analyzed and found to have **proper separa
 - **LayoutAwareChunker** - Advanced chunking with layout awareness
 - **MivaaIntegrationService** - Direct integration with MIVAA microservice
 - **ValidationIntegrationService** - Validate and ensure quality of content
+
+### Phase 2-3: Quality & Validation Services ⭐ NEW
+- **QualityScoringService** - ✅ **Phase 2** - 5-dimensional quality scoring algorithm
+  - Semantic Completeness (28% weight)
+  - Boundary Quality (30% weight)
+  - Context Preservation (15% weight)
+  - Structural Integrity (20% weight)
+  - Metadata Richness (7% weight)
+  - Integrated into PDF workflow via `apply-quality-scoring` Edge Function
+
+- **EmbeddingStabilityService** - ✅ **Phase 2** - Embedding stability analysis
+  - Stability score calculation
+  - Variance analysis
+  - Consistency checking
+  - Anomaly detection
+  - Integrated into PDF workflow via `analyze-embedding-stability` Edge Function
+
+- **ChunkRelationshipGraphService** - ✅ **Phase 3** - Build chunk relationships
+  - Sequential relationships (chunk order, confidence: 0.95)
+  - Semantic relationships (Jaccard similarity > 0.6)
+  - Hierarchical relationships (section structure)
+  - ✅ **INTEGRATED** into PDF workflow via `build-chunk-relationships` Edge Function
+
+- **RetrievalQualityService** - ⏳ **Phase 3** - Measure retrieval quality
+  - Precision: Relevant chunks / retrieved chunks
+  - Recall: Relevant chunks retrieved / total relevant
+  - Mean Reciprocal Rank (MRR): Ranking quality
+  - Latency tracking
+  - ⏳ **PENDING INTEGRATION** into search services
+
+- **ResponseQualityService** - ⏳ **Phase 3** - Validate LLM responses
+  - Coherence score (25% weight)
+  - Hallucination detection (35% weight)
+  - Source attribution (20% weight)
+  - Factual consistency (20% weight)
+  - ⏳ **PENDING INTEGRATION** into LLM services
 
 ### RAG & Knowledge Services ✅ CONSOLIDATED
 - **RAGKnowledgeService** - ✅ **CONSOLIDATED** - Unified RAG functionality, knowledge base management, and training
@@ -148,6 +186,17 @@ The following service categories were analyzed and found to have **proper separa
 - **AnalyticsDashboard** - Comprehensive analytics and reporting
 - **SystemPerformance** - System performance monitoring and optimization
 - **MaterialSuggestionsPanel** - 3D material suggestions management
+- **QualityStabilityMetricsPanel** - ✅ **Phase 2** - Quality scoring and embedding stability visualization
+  - Real-time quality metrics display
+  - Embedding stability analysis
+  - Health score calculation
+  - Route: `/admin/quality-stability-metrics`
+- **Phase3MetricsPanel** - ✅ **Phase 3** - Chunk relationships, retrieval, and response quality metrics
+  - Chunk relationship statistics
+  - Retrieval quality metrics (when integrated)
+  - Response quality metrics (when integrated)
+  - Overall platform health score
+  - Route: `/admin/phase3-metrics`
 - **ModelDebuggingPanel** - Debug and optimize AI model performance
 - **MetadataFieldsManagement** - Manage custom metadata fields
 - **IntegratedRAGManagement** - Consolidated RAG system configuration, optimization, and training
