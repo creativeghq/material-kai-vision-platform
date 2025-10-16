@@ -1004,6 +1004,16 @@ export class ConsolidatedPDFWorkflowService {
   }> {
     try {
       console.log(`🚀 Starting storeMivaaResults for job ${jobId}`);
+
+      // Log to database to track execution
+      await supabase
+        .from('quality_scoring_logs')
+        .insert({
+          chunk_id: `job_${jobId}`,
+          event: 'storeMivaaResults_start',
+          details: { jobId }
+        });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
