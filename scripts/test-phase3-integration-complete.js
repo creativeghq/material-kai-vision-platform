@@ -11,15 +11,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+// Supabase credentials (from Vercel environment)
+const SUPABASE_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing Supabase credentials');
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function testRetrievalQualityIntegration() {
   console.log('\n🔍 TEST 1: Retrieval Quality Integration');
