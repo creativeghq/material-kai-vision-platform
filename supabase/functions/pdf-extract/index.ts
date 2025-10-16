@@ -180,12 +180,7 @@ interface MaterialMetaExtraction {
   [key: string]: any;
 }
 
-interface EnhancedExtractionResult {
-  originalResult: any;
-  materialMetadata?: MaterialMetaExtraction;
-  extractionSource: 'mivaa_only' | 'mivaa_with_ai_analysis';
-  aiAnalysisTime?: number;
-}
+
 
 // MIVAA Gateway configuration
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
@@ -197,6 +192,31 @@ const USE_MIVAA_PROXY = Deno.env.get('USE_MIVAA_TEXT_ANALYSIS') !== 'false';
 /**
  * Analyze extracted text content using MIVAA proxy to extract material meta fields and categories
  */
+/**
+ * Hybrid metadata extraction: combines AI-based extraction with pattern matching
+ * This ensures we capture both semantic understanding and structured data
+ */
+async function extractMetadataHybrid(textContent: string): Promise<MaterialMetaExtraction & Record<string, any>> {
+  const startTime = Date.now();
+
+  // Get pattern-matched structured metadata
+  const structuredMetadata = extractStructuredMetadata(textContent);
+
+  // Get AI-based metadata from MIVAA
+  const aiMetadata = await analyzeTextWithMivaa(textContent);
+
+  // Merge results: AI metadata takes precedence, but include structured data
+  const mergedMetadata: MaterialMetaExtraction & Record<string, any> = {
+    ...structuredMetadata,
+    ...aiMetadata,
+    extractionMethod: 'hybrid',
+    extractedAt: new Date().toISOString(),
+    extractionTime: Date.now() - startTime,
+  };
+
+  return mergedMetadata;
+}
+
 async function analyzeTextWithMivaa(textContent: string): Promise<MaterialMetaExtraction> {
   if (!MIVAA_API_KEY) {
     console.warn('MIVAA API key not configured, returning empty analysis');
@@ -338,6 +358,203 @@ Extract all relevant meta fields and provide material category classification. F
   }
 }
 
+
+/**
+ * Extract structured metadata from text content using pattern matching
+ * This is used as a fallback/complement to AI-based extraction
+ */
+function extractStructuredMetadata(text: string): Record<string, any> {
+  const metadata: Record<string, any> = {
+    productCodes: extractProductCodes(text),
+    specifications: extractSpecifications(text),
+    dimensions: extractDimensions(text),
+    colors: extractColors(text),
+    finishes: extractFinishes(text),
+    materialTypes: extractMaterialTypes(text),
+    certifications: extractCertifications(text),
+    standards: extractStandards(text),
+    extractionMethod: 'pattern_matching',
+    extractedAt: new Date().toISOString(),
+  };
+
+  // Calculate overall confidence
+  const totalExtracted =
+    metadata.productCodes.length +
+    metadata.specifications.length +
+    (metadata.dimensions ? 1 : 0) +
+    metadata.colors.length +
+    metadata.finishes.length +
+    metadata.materialTypes.length +
+    metadata.certifications.length +
+    metadata.standards.length;
+
+  metadata.confidence = totalExtracted > 0 ? Math.min(0.95, 0.5 + (totalExtracted * 0.05)) : 0.3;
+
+  return metadata;
+}
+
+function extractProductCodes(text: string): Array<any> {
+  const codes: Array<any> = [];
+
+  const patterns = [
+    { regex: /SKU[:\s]+([A-Z0-9\-\.]+)/gi, type: 'sku' as const },
+    { regex: /Model[:\s]+([A-Z0-9\-\.]+)/gi, type: 'model' as const },
+    { regex: /Part\s*(?:Number|No\.?)[:\s]+([A-Z0-9\-\.]+)/gi, type: 'part_number' as const },
+    { regex: /Catalog[:\s]+([A-Z0-9\-\.]+)/gi, type: 'catalog_number' as const },
+  ];
+
+  patterns.forEach(({ regex, type }) => {
+    const matches = text.matchAll(regex);
+    for (const match of matches) {
+      if (match[1]) {
+        codes.push({
+          code: match[1].trim(),
+          type,
+          confidence: type === 'sku' ? 0.95 : 0.9,
+        });
+      }
+    }
+  });
+
+  return Array.from(new Map(codes.map((c: any) => [c.code, c])).values());
+}
+
+function extractSpecifications(text: string): Array<any> {
+  const specs: Array<any> = [];
+
+  const patterns = [
+    { name: 'Slip Resistance', regex: /slip\s+resistance[:\s]+([R0-9]+)/gi, unit: 'DIN 51130' },
+    { name: 'Water Absorption', regex: /water\s+absorption[:\s]+([0-9.]+)%?/gi, unit: '%' },
+    { name: 'Hardness', regex: /hardness[:\s]+([0-9.]+)/gi, unit: 'Mohs' },
+    { name: 'Density', regex: /density[:\s]+([0-9.]+)/gi, unit: 'kg/m³' },
+    { name: 'Thermal Conductivity', regex: /thermal\s+conductivity[:\s]+([0-9.]+)/gi, unit: 'W/mK' },
+    { name: 'Fire Rating', regex: /fire\s+(?:rating|class)[:\s]+([A-Z0-9]+)/gi, unit: 'Class' },
+    { name: 'Sound Absorption', regex: /sound\s+absorption[:\s]+([0-9.]+)/gi, unit: 'NRC' },
+    { name: 'VOC Emissions', regex: /VOC\s+emissions?[:\s]+([0-9.]+)/gi, unit: 'g/L' },
+  ];
+
+  patterns.forEach(({ name, regex, unit }) => {
+    const matches = text.matchAll(regex);
+    for (const match of matches) {
+      if (match[1]) {
+        specs.push({
+          name,
+          value: match[1].trim(),
+          unit,
+          confidence: 0.85,
+        });
+      }
+    }
+  });
+
+  return specs;
+}
+
+function extractDimensions(text: string): Record<string, any> | undefined {
+  const dimensions: Record<string, any> = {};
+
+  const patterns = {
+    length: /length[:\s]+([0-9.]+)/gi,
+    width: /width[:\s]+([0-9.]+)/gi,
+    height: /height[:\s]+([0-9.]+)/gi,
+    thickness: /thickness[:\s]+([0-9.]+)/gi,
+    weight: /weight[:\s]+([0-9.]+)/gi,
+  };
+
+  Object.entries(patterns).forEach(([key, regex]) => {
+    const match = text.match(regex);
+    if (match && match[1]) {
+      dimensions[key] = parseFloat(match[1]);
+    }
+  });
+
+  return Object.keys(dimensions).length > 0 ? dimensions : undefined;
+}
+
+function extractColors(text: string) {
+  const colors = new Set<string>();
+  const colorKeywords = [
+    'white', 'black', 'gray', 'grey', 'red', 'blue', 'green', 'yellow', 'orange', 'purple',
+    'brown', 'beige', 'cream', 'ivory', 'silver', 'gold', 'bronze', 'copper', 'natural',
+  ];
+
+  const pattern = new RegExp(`\\b(${colorKeywords.join('|')})\\b`, 'gi');
+  const matches = text.matchAll(pattern);
+
+  for (const match of matches) {
+    colors.add(match[1].toLowerCase());
+  }
+
+  return Array.from(colors);
+}
+
+function extractFinishes(text: string) {
+  const finishes = new Set<string>();
+  const finishKeywords = [
+    'polished', 'matte', 'glossy', 'satin', 'brushed', 'honed', 'textured', 'smooth',
+    'natural', 'stained', 'painted', 'varnished', 'oiled', 'waxed', 'lacquered',
+  ];
+
+  const pattern = new RegExp(`\\b(${finishKeywords.join('|')})\\b`, 'gi');
+  const matches = text.matchAll(pattern);
+
+  for (const match of matches) {
+    finishes.add(match[1].toLowerCase());
+  }
+
+  return Array.from(finishes);
+}
+
+function extractMaterialTypes(text: string) {
+  const materials = new Set<string>();
+  const materialKeywords = [
+    'wood', 'metal', 'ceramic', 'stone', 'glass', 'plastic', 'rubber', 'fabric',
+    'leather', 'marble', 'granite', 'limestone', 'slate', 'tile', 'porcelain',
+  ];
+
+  const pattern = new RegExp(`\\b(${materialKeywords.join('|')})\\b`, 'gi');
+  const matches = text.matchAll(pattern);
+
+  for (const match of matches) {
+    materials.add(match[1].toLowerCase());
+  }
+
+  return Array.from(materials);
+}
+
+function extractCertifications(text: string) {
+  const certs = new Set<string>();
+  const patterns = [
+    /(?:ISO|ASTM|DIN|EN|BS|JIS)\s*[\d\-]+/gi,
+    /(?:Greenguard|FloorScore|LEED|WELL|Cradle to Cradle)/gi,
+  ];
+
+  patterns.forEach(pattern => {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      certs.add(match[0].trim());
+    }
+  });
+
+  return Array.from(certs);
+}
+
+function extractStandards(text: string) {
+  const standards = new Set<string>();
+  const patterns = [
+    /(?:DIN|ISO|ASTM|EN|BS|JIS)\s+[\d\-\.]+/gi,
+    /(?:R9|R10|R11|R12|R13)\s+(?:rating|classification)?/gi,
+  ];
+
+  patterns.forEach(pattern => {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      standards.add(match[0].trim());
+    }
+  });
+
+  return Array.from(standards);
+}
 
 /**
  * Validate extracted meta fields against MATERIAL_CATEGORIES
@@ -494,14 +711,14 @@ serve(async (req) => {
     let enhancedResult: EnhancedExtractionResult;
     
     if (extractionResult.data?.markdown && requestBody.options?.includeMetadata !== false) {
-      console.log('Analyzing extracted text with MIVAA for material meta fields...');
+      console.log('Analyzing extracted text with hybrid metadata extraction (AI + pattern matching)...');
       const aiAnalysisStart = Date.now();
-      
+
       try {
         const rawMetadata = USE_MIVAA_PROXY
-          ? await analyzeTextWithMivaa(extractionResult.data.markdown)
+          ? await extractMetadataHybrid(extractionResult.data.markdown)
           : { confidence: 0 }; // MIVAA-only architecture, no OpenAI fallback
-          
+
         materialMetadata = validateMetaFields(rawMetadata);
         
         enhancedResult = {
@@ -555,6 +772,11 @@ serve(async (req) => {
       processingTime: extractionResult.processing_time,
       completedAt: new Date().toISOString(),
     });
+
+    // Store extracted metadata in documents table
+    if (materialMetadata && Object.keys(materialMetadata).length > 0) {
+      await storeDocumentMetadata(supabase, requestBody.documentId, materialMetadata);
+    }
 
     // Store RAG documents if generated
     if (ragDocuments.length > 0) {
@@ -952,6 +1174,33 @@ function chunkText(text: string, chunkSize: number, overlapSize: number): string
   }
 
   return chunks;
+}
+
+/**
+ * Store extracted metadata in the documents table
+ */
+async function storeDocumentMetadata(
+  supabase: any,
+  documentId: string,
+  metadata: Record<string, any>,
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('documents')
+      .update({
+        metadata: metadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', documentId);
+
+    if (error) {
+      console.error('Error storing document metadata:', error);
+    } else {
+      console.log(`Stored metadata for document: ${documentId}`);
+    }
+  } catch (error) {
+    console.error('Error storing document metadata:', error);
+  }
 }
 
 async function storeRagDocuments(
