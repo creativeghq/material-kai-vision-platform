@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 // RAGManagementPanel removed - functionality consolidated into IntegratedRAGManagement
 import { MetadataFieldsManagement } from './MetadataFieldsManagement';
 import { AITestingPanel } from './AITestingPanel';
+import { QualityMetricsDashboard } from './QualityMetricsDashboard';
 
 interface AnalyticsEvent {
   id: string;
@@ -251,11 +252,12 @@ export const AdminPanel: React.FC = () => {
       </div>
 
       <Tabs defaultValue="recent" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="recent">Recent Activity</TabsTrigger>
           <TabsTrigger value="scores">Score Analysis</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="rag">RAG System</TabsTrigger>
+          <TabsTrigger value="quality">Quality Metrics</TabsTrigger>
           <TabsTrigger value="metadata">Metadata Fields</TabsTrigger>
           <TabsTrigger value="testing">AI Testing</TabsTrigger>
         </TabsList>
@@ -430,6 +432,10 @@ export const AdminPanel: React.FC = () => {
               Please use the main RAG interface for all RAG operations.
             </p>
           </div>
+        </TabsContent>
+
+        <TabsContent value="quality" className="space-y-4">
+          <QualityMetricsDashboard />
         </TabsContent>
 
         <TabsContent value="metadata" className="space-y-4">
