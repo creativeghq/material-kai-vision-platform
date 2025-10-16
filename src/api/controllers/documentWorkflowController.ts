@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { supabase } from '../../integrations/supabase/client';
 
 import { RateLimitHelper, ApiResponse, AuthContext } from './consolidatedPDFController';
+import { DocumentVectorStoreService, createDocumentVectorStoreService } from '../../services/documentVectorStoreService';
+import { EmbeddingGenerationService } from '../../services/embeddingGenerationService';
 
 /**
  * Request/Response types for document workflow API
@@ -171,9 +173,13 @@ const DocumentSearchRequestSchema = z.object({
  */
 export class DocumentWorkflowController {
   private activeJobs: Map<string, DocumentWorkflowJob> = new Map();
+  private vectorStoreService: DocumentVectorStoreService;
 
   constructor() {
     console.log('DocumentWorkflowController initialized');
+    // Initialize vector store service with embedding service
+    const embeddingService = new EmbeddingGenerationService();
+    this.vectorStoreService = createDocumentVectorStoreService(embeddingService);
   }
 
   /**
@@ -481,24 +487,31 @@ export class DocumentWorkflowController {
         };
       }
 
-      // Simulate search results (in production, this would use vector store)
-      const mockResults: DocumentSearchResponse = {
-        results: [
-          {
-            documentId: 'doc_1',
-            chunkId: 'chunk_1',
-            content: `Sample content related to "${request.query}"`,
-            similarity: 0.85,
-            metadata: {
-              filename: 'sample.pdf',
-              pageNumber: 1,
-              chunkIndex: 0,
-              tags: ['sample', 'document'],
-            },
+      // Perform real vector search using DocumentVectorStoreService
+      const searchResults = await this.vectorStoreService.search({
+        query: request.query,
+        workspaceId: request.workspaceId,
+        limit: request.options?.limit || 10,
+        threshold: request.options?.threshold || 0.7,
+        metadata: request.options?.includeMetadata ? {} : undefined,
+      });
+
+      // Transform results to match DocumentSearchResponse format
+      const transformedResults: DocumentSearchResponse = {
+        results: searchResults.results.map(result => ({
+          documentId: result.documentId,
+          chunkId: result.chunkId,
+          content: result.content,
+          similarity: result.similarity,
+          metadata: {
+            filename: (result.metadata?.filename as string) || 'unknown',
+            pageNumber: (result.metadata?.pageNumber as number) || 0,
+            chunkIndex: (result.metadata?.chunkIndex as number) || 0,
+            tags: (result.metadata?.tags as string[]) || [],
           },
-        ],
-        totalResults: 1,
-        searchTime: Date.now() - startTime,
+        })),
+        totalResults: searchResults.totalMatches,
+        searchTime: searchResults.processingTime,
       };
 
       // Log usage
@@ -513,7 +526,7 @@ export class DocumentWorkflowController {
 
       return {
         success: true,
-        data: mockResults,
+        data: transformedResults,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {

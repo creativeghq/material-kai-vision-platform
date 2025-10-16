@@ -4,6 +4,8 @@ import { MivaaIntegrationService, PdfExtractionRequest, defaultMivaaConfig } fro
 import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
 import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAuthMiddleware';
 import { supabase } from '../../integrations/supabase/client';
+import { DocumentVectorStoreService, createDocumentVectorStoreService } from '../../services/documentVectorStoreService';
+import { EmbeddingGenerationService } from '../../services/embeddingGenerationService';
 
 /**
  * Request/Response types for unified PDF API
@@ -357,10 +359,14 @@ export class RateLimitHelper {
  */
 export class ConsolidatedPDFController {
   private mivaaService: MivaaIntegrationService;
+  private vectorStoreService: DocumentVectorStoreService;
   private activeJobs: Map<string, ProcessingJob> = new Map();
 
   constructor() {
     this.mivaaService = new MivaaIntegrationService(defaultMivaaConfig);
+    // Initialize vector store service with embedding service
+    const embeddingService = new EmbeddingGenerationService();
+    this.vectorStoreService = createDocumentVectorStoreService(embeddingService);
   }
 
   /**
@@ -875,24 +881,31 @@ export class ConsolidatedPDFController {
         };
       }
 
-      // Simulate search results (in production, this would use vector store)
-      const mockResults: DocumentSearchResponse = {
-        results: [
-          {
-            documentId: 'doc_1',
-            chunkId: 'chunk_1',
-            content: `Sample content related to "${request.query}"`,
-            similarity: 0.85,
-            metadata: {
-              filename: 'sample.pdf',
-              pageNumber: 1,
-              chunkIndex: 0,
-              tags: ['sample', 'document'],
-            },
+      // Perform real vector search using DocumentVectorStoreService
+      const searchResults = await this.vectorStoreService.search({
+        query: request.query,
+        workspaceId: request.workspaceId,
+        limit: request.options?.limit || 10,
+        threshold: request.options?.threshold || 0.7,
+        metadata: request.options?.includeMetadata ? {} : undefined,
+      });
+
+      // Transform results to match DocumentSearchResponse format
+      const transformedResults: DocumentSearchResponse = {
+        results: searchResults.results.map(result => ({
+          documentId: result.documentId,
+          chunkId: result.chunkId,
+          content: result.content,
+          similarity: result.similarity,
+          metadata: {
+            filename: (result.metadata?.filename as string) || 'unknown',
+            pageNumber: (result.metadata?.pageNumber as number) || 0,
+            chunkIndex: (result.metadata?.chunkIndex as number) || 0,
+            tags: (result.metadata?.tags as string[]) || [],
           },
-        ],
-        totalResults: 1,
-        searchTime: Date.now() - startTime,
+        })),
+        totalResults: searchResults.totalMatches,
+        searchTime: searchResults.processingTime,
       };
 
       // Log usage
@@ -907,7 +920,7 @@ export class ConsolidatedPDFController {
 
       return {
         success: true,
-        data: mockResults,
+        data: transformedResults,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
@@ -1038,12 +1051,40 @@ export class ConsolidatedPDFController {
         };
       }
 
+      // Calculate real metrics from active jobs
+      const completedJobs = Array.from(this.activeJobs.values()).filter(job => job.status === 'completed');
+      const failedJobs = Array.from(this.activeJobs.values()).filter(job => job.status === 'failed');
+
+      // Calculate average processing time from completed jobs
+      let averageProcessingTime = 0;
+      if (completedJobs.length > 0) {
+        const totalTime = completedJobs.reduce((sum, job) => {
+          if (job.completedAt && job.startedAt) {
+            return sum + (new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime());
+          }
+          return sum;
+        }, 0);
+        averageProcessingTime = totalTime / completedJobs.length;
+      }
+
+      // Query database for additional metrics
+      const { data: jobMetrics, error: metricsError } = await supabase
+        .from('processing_jobs')
+        .select('status, created_at, completed_at')
+        .eq('user_id', authContext.user.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
       const metrics = {
         activeJobs: this.activeJobs.size,
-        totalProcessed: Array.from(this.activeJobs.values()).filter(job => job.status === 'completed').length,
-        totalFailed: Array.from(this.activeJobs.values()).filter(job => job.status === 'failed').length,
-        averageProcessingTime: 2500, // Mock data
-        systemHealth: 'healthy',
+        totalProcessed: completedJobs.length,
+        totalFailed: failedJobs.length,
+        averageProcessingTime: Math.round(averageProcessingTime),
+        systemHealth: failedJobs.length === 0 ? 'healthy' : 'degraded',
+        databaseMetrics: {
+          totalJobs: jobMetrics?.length || 0,
+          successRate: jobMetrics ? ((jobMetrics.filter(j => j.status === 'completed').length / jobMetrics.length) * 100).toFixed(2) : 'N/A',
+        },
       };
 
       return {
@@ -1051,7 +1092,8 @@ export class ConsolidatedPDFController {
         data: metrics,
         timestamp: new Date().toISOString(),
       };
-    } catch {
+    } catch (error) {
+      console.error('Failed to get metrics:', error);
       return {
         success: false,
         error: 'Failed to get metrics',
