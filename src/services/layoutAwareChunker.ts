@@ -95,15 +95,15 @@ export class LayoutAwareChunker {
     try {
       console.log('Starting layout-aware chunking for document:', documentId);
 
-      // Set default options
+      // Set default options - optimized for context stability and embedding quality
       const chunkingOptions: ChunkingOptions = {
-        chunkSize: 1000,
-        overlap: 200,
-        preserveStructure: true,
-        includeImages: true,
-        minChunkSize: 300,
-        maxChunkSize: 2000,
-        respectHierarchy: true,
+        chunkSize: 1500,           // Larger chunks for better context
+        overlap: 100,              // Reduced overlap to minimize redundancy
+        preserveStructure: true,   // Maintain semantic boundaries
+        includeImages: true,       // Associate images with chunks
+        minChunkSize: 500,         // Higher minimum for semantic completeness
+        maxChunkSize: 3000,        // Higher maximum for complex sections
+        respectHierarchy: true,    // Keep hierarchical elements together
         ...options,
       };
 

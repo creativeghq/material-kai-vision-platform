@@ -235,9 +235,17 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const getDocumentDisplayName = (chunk: DocumentChunk) => {
     if (!chunk) return 'Unknown Document';
 
+    // First, check chunk metadata for document_name (newly added field)
+    if (chunk.metadata?.document_name) {
+      return chunk.metadata.document_name;
+    }
+
     // Try to get document info from the joined data
     const doc = (chunk as any).documents;
     if (doc) {
+      // Check for title first
+      if (doc.title) return doc.title;
+
       // Check for catalog name in metadata
       if (doc.metadata?.title) return doc.metadata.title;
       if (doc.metadata?.catalog_name) return doc.metadata.catalog_name;
@@ -255,7 +263,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }
 
     // Fallback to chunk metadata
-    if (chunk.metadata?.filename) return chunk.metadata.filename;
+    if (chunk.metadata?.filename) {
+      // Remove extension from filename
+      return chunk.metadata.filename.replace(/\.[^/.]+$/, '');
+    }
     if (chunk.metadata?.title) return chunk.metadata.title;
     if (chunk.metadata?.source) return `${chunk.metadata.source} Document`;
 
