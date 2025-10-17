@@ -160,7 +160,9 @@ async function step3_MonitorProgress(jobId, maxWaitTime = 300000) {
         },
         body: JSON.stringify({
           action: 'get_job_status',
-          job_id: jobId
+          payload: {
+            job_id: jobId
+          }
         })
       });
 

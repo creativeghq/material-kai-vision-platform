@@ -364,30 +364,56 @@ async function runComprehensiveWorkflow() {
       })
     });
 
-    // Debug: Check response status and content type
-    log('WORKFLOW', `Processing response status: ${processingResponse.status}`, 'info');
-    const contentType = processingResponse.headers.get('content-type');
-    log('WORKFLOW', `Content-Type: ${contentType}`, 'info');
-
+    // Handle response - may be 504 timeout for large PDFs
     let processingResult;
-    try {
+
+    if (processingResponse.status === 504) {
+      // 504 timeout is expected for large PDFs - MIVAA is processing asynchronously
+      log('WORKFLOW', `Processing started (504 timeout expected for large PDFs)`, 'info');
+
+      // For large PDFs, we need to use bulk_process endpoint which returns job_id
+      log('WORKFLOW', `Retrying with bulk_process endpoint...`, 'info');
+
+      const bulkResponse = await fetch(processingUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'bulk_process',
+          payload: {
+            urls: [TEST_PDF_URL],
+            batch_size: 1,
+            options: {
+              extract_text: true,
+              extract_images: true,
+              extract_tables: true
+            }
+          }
+        })
+      });
+
+      const bulkResult = await bulkResponse.json();
+      if (!bulkResult.data || !bulkResult.data.job_id) {
+        throw new Error(`No job_id from bulk_process: ${JSON.stringify(bulkResult)}`);
+      }
+      processingResult = bulkResult.data;
+    } else {
       const responseText = await processingResponse.text();
-      log('WORKFLOW', `Raw response: ${responseText.substring(0, 500)}`, 'info');
+      if (!responseText) {
+        throw new Error('Empty response from processing endpoint');
+      }
       processingResult = JSON.parse(responseText);
-    } catch (parseError) {
-      throw new Error(`Failed to parse response: ${parseError.message}`);
     }
 
     recordPerformanceMetric('Processing Trigger', Date.now() - processingStart);
-
-    // Debug: Log full response
-    log('WORKFLOW', `Processing response: ${JSON.stringify(processingResult)}`, 'info');
 
     if (!processingResult.job_id) {
       throw new Error(`No job_id in response: ${JSON.stringify(processingResult)}`);
     }
 
-    log('WORKFLOW', `Processing triggered: ${processingResult.job_id}`, 'success');
+    log('WORKFLOW', `Processing triggered: Job ID ${processingResult.job_id}`, 'success');
 
     // Step 3: Monitor Progress
     const monitorStart = Date.now();
@@ -404,7 +430,9 @@ async function runComprehensiveWorkflow() {
         },
         body: JSON.stringify({
           action: 'get_job_status',
-          job_id: processingResult.job_id
+          payload: {
+            job_id: processingResult.job_id
+          }
         })
       });
 
