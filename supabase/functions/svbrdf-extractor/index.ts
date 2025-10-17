@@ -94,39 +94,16 @@ serve(async (req: Request) => {
 
     console.log('Starting SVBRDF extraction for image:', imageUrl);
 
-    // Create processing record using the processing_results table
-    const { data: processingRecord, error: insertError } = await supabase
-      .from('processing_results')
-      .insert({
-        document_id: `svbrdf_${Date.now()}`, // Generate unique document ID
-        user_id: userId,
-        workspace_id: workspaceId || null,
-        extraction_type: 'svbrdf_extraction',
-        status: 'processing',
-        started_at: new Date().toISOString(),
-        processing_options: {
-          source_image_url: imageUrl,
-          extraction_mode: 'full_svbrdf',
-          quality: 'high',
-        },
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Failed to create processing record:', insertError);
-      throw new Error(`Failed to create processing record: ${insertError.message}`);
-    }
-
     // Perform SVBRDF extraction
     const { properties, confidence, processingTime } = performSVBRDFExtraction();
 
     // Generate realistic map URLs
-    const maps = generateMapUrls(processingRecord.id);
+    const extractionId = `svbrdf_${Date.now()}`;
+    const maps = generateMapUrls(extractionId);
 
     // Prepare comprehensive results
     const extractionResults = {
-      extraction_id: processingRecord.id,
+      extraction_id: extractionId,
       source_image_url: imageUrl,
       material_properties: properties,
       texture_maps: maps,
@@ -138,23 +115,6 @@ serve(async (req: Request) => {
         map_resolution: '512x512',
       },
     };
-
-    // Update processing record with results
-    const { error: updateError } = await supabase
-      .from('processing_results')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        processing_time_ms: Math.round(processingTime),
-        results: extractionResults,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', processingRecord.id);
-
-    if (updateError) {
-      console.error('Failed to update processing record:', updateError);
-      throw new Error(`Failed to update processing record: ${updateError.message}`);
-    }
 
     // Also store in svbrdf_extraction_results table for consistency
     try {
@@ -194,7 +154,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        extraction_id: processingRecord.id,
+        extraction_id: extractionId,
         material_properties: properties,
         texture_maps: maps,
         confidence_score: confidence,

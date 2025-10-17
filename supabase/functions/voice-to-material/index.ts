@@ -425,21 +425,7 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
       },
     };
 
-    // Store analysis results in voice_analysis_results table
-    await supabase
-      .from('voice_analysis_results')
-      .insert({
-        transcription_text: result.transcription.full_text,
-        materials_identified: materialAnalysis.materials_identified,
-        material_categories: materialAnalysis.material_categories,
-        audio_duration: result.transcription.duration_seconds,
-        processing_time_ms: processingTime,
-        confidence_score: materialAnalysis.confidence_score,
-        user_id: request.user_id,
-        created_at: new Date().toISOString(),
-      });
-
-    // Also store in voice_conversion_results table for consistency
+    // Store in voice_conversion_results table
     try {
       const { error: storageError } = await supabase
         .from('voice_conversion_results')

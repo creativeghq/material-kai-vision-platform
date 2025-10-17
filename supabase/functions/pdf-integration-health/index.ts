@@ -161,7 +161,7 @@ async function checkSupabaseHealth(supabase: any): Promise<{
   try {
     // Test database connectivity with a simple query
     const { data, error } = await supabase
-      .from('pdf_processing_results')
+      .from('pdf_integration_health_results')
       .select('id')
       .limit(1);
 

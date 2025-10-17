@@ -537,26 +537,8 @@ Deno.serve(async (req: Request) => {
         (material: RecognizedMaterial) => material.confidence >= confidenceThreshold,
       );
 
-      // Store results in database
-      if (recognitionRecord && filteredMaterials.length > 0) {
-        const { error: resultsError } = await supabase
-          .from('material_recognition_results')
-          .insert(
-            filteredMaterials.map((material: RecognizedMaterial) => ({
-              request_id: recognitionRecord.id,
-              material_name: material.name,
-              confidence: material.confidence,
-              properties: material.properties,
-              bounding_box: material.bounding_box,
-              created_at: new Date().toISOString(),
-            })),
-          );
-
-        if (resultsError) {
-          console.error('Failed to store recognition results:', resultsError);
-        }
-
-        // Update request status
+      // Update request status
+      if (recognitionRecord) {
         await supabase
           .from('material_recognition_requests')
           .update({
