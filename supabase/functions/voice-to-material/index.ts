@@ -425,7 +425,7 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
       },
     };
 
-    // Store analysis results
+    // Store analysis results in voice_analysis_results table
     await supabase
       .from('voice_analysis_results')
       .insert({
@@ -438,6 +438,39 @@ async function processVoiceToMaterial(request: VoiceToMaterialRequest): Promise<
         user_id: request.user_id,
         created_at: new Date().toISOString(),
       });
+
+    // Also store in voice_conversion_results table for consistency
+    try {
+      const { error: storageError } = await supabase
+        .from('voice_conversion_results')
+        .insert({
+          user_id: request.user_id,
+          input_data: {
+            audio_format: request.audio_format,
+            language: request.language,
+            processing_options: request.processing_options,
+            output_format: request.output_format,
+          },
+          result_data: {
+            transcription: result.transcription,
+            material_analysis: materialAnalysis,
+            audio_analysis: result.audio_analysis,
+            insights: result.insights,
+          },
+          confidence_score: materialAnalysis.confidence_score,
+          processing_time_ms: processingTime,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (storageError) {
+        console.error('Failed to store voice conversion results:', storageError);
+      } else {
+        console.log('✅ Voice conversion results stored successfully');
+      }
+    } catch (storageError) {
+      console.error('Error storing voice conversion results:', storageError);
+    }
 
     // Log analytics
     if (request.user_id) {

@@ -594,6 +594,49 @@ Deno.serve(async (req: Request) => {
 
     const processingTime = Date.now() - startTime;
 
+    // Store recognition results in recognition_results table
+    try {
+      if (filteredMaterials.length > 0) {
+        const { error: storageError } = await supabase
+          .from('recognition_results')
+          .insert({
+            user_id: body.user_id,
+            input_data: {
+              image_url: body.image_url,
+              analysis_type: analysisType,
+              confidence_threshold: confidenceThreshold,
+            },
+            result_data: {
+              materials: filteredMaterials.map((material: any) => ({
+                name: material.name,
+                confidence: material.confidence,
+                properties: material.properties,
+                bounding_box: material.bounding_box,
+              })),
+              processing_method: processingMethod,
+              analysis_metadata: {
+                analysis_type: analysisType,
+                total_materials_found: filteredMaterials.length,
+              },
+            },
+            confidence_score: filteredMaterials.length > 0
+              ? filteredMaterials.reduce((sum: number, m: any) => sum + m.confidence, 0) / filteredMaterials.length
+              : 0,
+            processing_time_ms: processingTime,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (storageError) {
+          console.error('Failed to store recognition results:', storageError);
+        } else {
+          console.log('✅ Recognition results stored successfully');
+        }
+      }
+    } catch (storageError) {
+      console.error('Error storing recognition results:', storageError);
+    }
+
     // Create standardized success response matching frontend expectations
     const responseData = {
       materials: filteredMaterials.map((material: any, index: number) => ({

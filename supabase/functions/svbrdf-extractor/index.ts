@@ -156,6 +156,39 @@ serve(async (req: Request) => {
       throw new Error(`Failed to update processing record: ${updateError.message}`);
     }
 
+    // Also store in svbrdf_extraction_results table for consistency
+    try {
+      const { error: storageError } = await supabase
+        .from('svbrdf_extraction_results')
+        .insert({
+          user_id: userId,
+          input_data: {
+            image_url: imageUrl,
+            workspace_id: workspaceId,
+            extraction_mode: 'full_svbrdf',
+          },
+          result_data: {
+            material_properties: properties,
+            texture_maps: maps,
+            algorithm_version: '2.1.0',
+            image_resolution: '1024x1024',
+            map_resolution: '512x512',
+          },
+          confidence_score: confidence,
+          processing_time_ms: Math.round(processingTime),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (storageError) {
+        console.error('Failed to store SVBRDF extraction results:', storageError);
+      } else {
+        console.log('✅ SVBRDF extraction results stored successfully');
+      }
+    } catch (storageError) {
+      console.error('Error storing SVBRDF extraction results:', storageError);
+    }
+
     console.log(`SVBRDF extraction completed successfully in ${processingTime}ms`);
 
     return new Response(

@@ -84,6 +84,38 @@ Safety Information:
       extraction_time: new Date().toISOString(),
     };
 
+    // Store OCR results
+    try {
+      const { error: storageError } = await supabase
+        .from('ocr_results')
+        .insert({
+          user_id: userId,
+          input_data: {
+            image_url: imageUrl,
+            language: options.language || 'en',
+            document_type: options.documentType || 'material_specification',
+            extract_structured_data: options.extractStructuredData || false,
+          },
+          result_data: {
+            extracted_text: extractedText,
+            structured_data: options.extractStructuredData ? structuredData : null,
+            metadata: metadata,
+          },
+          confidence_score: 0.95,
+          processing_time_ms: 500, // Simulated processing time
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (storageError) {
+        console.error('Failed to store OCR results:', storageError);
+      } else {
+        console.log('✅ OCR results stored successfully');
+      }
+    } catch (storageError) {
+      console.error('Error storing OCR results:', storageError);
+    }
+
     console.log('OCR processing completed successfully');
 
     return new Response(

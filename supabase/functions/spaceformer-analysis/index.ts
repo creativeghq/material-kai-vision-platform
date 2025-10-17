@@ -121,15 +121,16 @@ class SpaceFormerProcessor {
 
       // Update database with results
       await this.updateAnalysisRecord(analysisId, {
-        spatial_features: spatialFeatures,
-        layout_suggestions: layoutSuggestions,
-        material_placements: materialPlacements,
-        accessibility_analysis: accessibilityAnalysis,
-        flow_optimization: flowOptimization,
-        reasoning_explanation: reasoningExplanation,
+        result_data: {
+          spatial_features: spatialFeatures,
+          layout_suggestions: layoutSuggestions,
+          material_placements: materialPlacements,
+          accessibility_analysis: accessibilityAnalysis,
+          flow_optimization: flowOptimization,
+          reasoning_explanation: reasoningExplanation,
+        },
         confidence_score: confidenceScore,
         processing_time_ms: processingTime,
-        status: 'completed',
       });
 
       return {
@@ -548,27 +549,53 @@ class SpaceFormerProcessor {
   }
 
   private async createAnalysisRecord(analysisId: string, request: SpaceFormerRequest): Promise<void> {
-    const { error } = await supabase
-      .from('spatial_analysis')
-      .insert({
-        id: analysisId,
-        user_id: request.user_id,
-        nerf_reconstruction_id: request.nerf_reconstruction_id,
-        room_type: request.room_type,
-        room_dimensions: request.room_dimensions || {},
-        status: 'processing',
-      });
+    try {
+      const { error } = await supabase
+        .from('spaceformer_analysis_results')
+        .insert({
+          id: analysisId,
+          user_id: request.user_id,
+          input_data: {
+            nerf_reconstruction_id: request.nerf_reconstruction_id,
+            room_type: request.room_type,
+            room_dimensions: request.room_dimensions || {},
+            user_preferences: request.user_preferences,
+            constraints: request.constraints,
+          },
+          result_data: {},
+          confidence_score: 0,
+          processing_time_ms: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
 
-    if (error) throw error;
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to create analysis record:', error);
+      throw error;
+    }
   }
 
   private async updateAnalysisRecord(analysisId: string, updates: any): Promise<void> {
-    const { error } = await supabase
-      .from('spatial_analysis')
-      .update(updates)
-      .eq('id', analysisId);
+    try {
+      const { error } = await supabase
+        .from('spaceformer_analysis_results')
+        .update({
+          result_data: updates.result_data || {},
+          confidence_score: updates.confidence_score || 0,
+          processing_time_ms: updates.processing_time_ms || 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', analysisId);
 
-    if (error) console.error('Failed to update spatial analysis record:', error);
+      if (error) {
+        console.error('Failed to update spatial analysis record:', error);
+      } else {
+        console.log(`✅ Analysis record updated: ${analysisId}`);
+      }
+    } catch (error) {
+      console.error('Error updating analysis record:', error);
+    }
   }
 }
 
