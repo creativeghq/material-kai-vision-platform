@@ -365,7 +365,8 @@ async function logHealthCheck(
   responseTime: number,
 ): Promise<void> {
   try {
-    const { error } = await supabase
+    // Log to api_usage_logs
+    const { error: usageError } = await supabase
       .from('api_usage_logs')
       .insert({
         endpoint_id: null,
@@ -380,8 +381,34 @@ async function logHealthCheck(
         rate_limit_exceeded: false,
       });
 
-    if (error) {
-      console.error('Error logging health check:', error);
+    if (usageError) {
+      console.error('Error logging health check to api_usage_logs:', usageError);
+    }
+
+    // Also store in pdf_integration_health_results table
+    const { error: healthError } = await supabase
+      .from('pdf_integration_health_results')
+      .insert({
+        user_id: null,
+        input_data: {
+          check_type: 'integration_health',
+          timestamp: new Date().toISOString(),
+        },
+        result_data: {
+          status: healthResponse.status,
+          services: healthResponse.services,
+          metrics: healthResponse.metrics,
+        },
+        confidence_score: healthResponse.status === 'healthy' ? 1.0 : healthResponse.status === 'degraded' ? 0.5 : 0.0,
+        processing_time_ms: responseTime,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (healthError) {
+      console.error('Error logging health check to pdf_integration_health_results:', healthError);
+    } else {
+      console.log('✅ Health check results stored successfully');
     }
   } catch (error) {
     console.error('Error logging health check:', error);

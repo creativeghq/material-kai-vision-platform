@@ -226,6 +226,41 @@ serve(async (req) => {
       processing_time_ms: unifiedResponse.performance.totalTime,
     };
 
+    // Store search results
+    try {
+      const { error: storageError } = await supabase
+        .from('search_analytics')
+        .insert({
+          user_id: requestBody.user_id,
+          input_data: {
+            query: requestBody.query,
+            search_type: requestBody.search_type || 'hybrid',
+            embedding_types: requestBody.embedding_types,
+            match_threshold: requestBody.match_threshold,
+            match_count: requestBody.match_count,
+          },
+          result_data: {
+            results: unifiedResponse.results,
+            context: context,
+            total_results: unifiedResponse.results.length,
+          },
+          confidence_score: unifiedResponse.results.length > 0
+            ? unifiedResponse.results.reduce((sum: number, r: any) => sum + (r.similarity || 0), 0) / unifiedResponse.results.length
+            : 0,
+          processing_time_ms: unifiedResponse.performance.totalTime,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (storageError) {
+        console.error('Failed to store search results:', storageError);
+      } else {
+        console.log('✅ Search results stored successfully');
+      }
+    } catch (storageError) {
+      console.error('Error storing search results:', storageError);
+    }
+
     console.log(`RAG search completed in ${unifiedResponse.performance.totalTime}ms`);
 
     return new Response(

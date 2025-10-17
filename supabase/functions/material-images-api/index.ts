@@ -125,6 +125,43 @@ async function handleGetMaterialImages(request: Request): Promise<Response> {
       created_by: img.created_by
     }));
     
+    // Store search results
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+
+      const { error: storageError } = await supabase
+        .from('search_analytics')
+        .insert({
+          user_id: url.searchParams.get('user_id'),
+          input_data: {
+            material_id: material_id,
+            image_type: image_type,
+            is_featured: is_featured,
+            limit: limit,
+            offset: offset,
+          },
+          result_data: {
+            images: formattedImages,
+            total_count: count || images?.length || 0,
+          },
+          confidence_score: formattedImages.length > 0 ? 1.0 : 0,
+          processing_time_ms: Date.now() - startTime,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (storageError) {
+        console.error('Failed to store search results:', storageError);
+      } else {
+        console.log('✅ Search results stored successfully');
+      }
+    } catch (storageError) {
+      console.error('Error storing search results:', storageError);
+    }
+
     const response: StandardApiResponse<MaterialImage[]> = {
       success: true,
       data: formattedImages,
@@ -138,7 +175,7 @@ async function handleGetMaterialImages(request: Request): Promise<Response> {
         }
       }
     };
-    
+
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

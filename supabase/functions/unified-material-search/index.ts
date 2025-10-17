@@ -302,6 +302,40 @@ async function handleSearch(request: Request): Promise<Response> {
       // Don't fail the search if quality measurement fails
     }
 
+    // Store search results
+    try {
+      const { error: storageError } = await supabase
+        .from('search_analytics')
+        .insert({
+          user_id: params.get('user_id'),
+          input_data: {
+            query: query,
+            search_type: searchType,
+            category: category,
+            limit: limit,
+          },
+          result_data: {
+            results: results,
+            total_count: results.length,
+            methods_used: metadata.methods_used,
+          },
+          confidence_score: results.length > 0
+            ? results.reduce((sum: number, r: any) => sum + (r.search_score || 0), 0) / results.length
+            : 0,
+          processing_time_ms: metadata.processing_time_ms,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (storageError) {
+        console.error('Failed to store search results:', storageError);
+      } else {
+        console.log('✅ Search results stored successfully');
+      }
+    } catch (storageError) {
+      console.error('Error storing search results:', storageError);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       data: results,

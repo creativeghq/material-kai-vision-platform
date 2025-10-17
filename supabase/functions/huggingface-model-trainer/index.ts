@@ -54,16 +54,22 @@ serve(async (req) => {
       throw new Error(`Failed to create model record: ${modelError.message}`);
     }
 
-    // Create training job
+    // Create training job with proper schema
     const { data: trainingJob, error: jobError } = await supabase
       .from('ml_training_jobs')
       .insert({
-        model_id: model.id,
-        training_config: trainingConfig,
-        dataset_info: datasetInfo || {},
-        status: 'running',
-        created_by: userId,
-        started_at: new Date().toISOString(),
+        user_id: userId,
+        input_data: {
+          model_type: modelType,
+          training_config: trainingConfig,
+          dataset_info: datasetInfo || {},
+          model_id: model.id,
+        },
+        result_data: {},
+        confidence_score: 0,
+        processing_time_ms: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -76,6 +82,7 @@ serve(async (req) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Complete training
+    const startTime = Date.now();
     const finalMetrics = {
       training_loss: 0.1234,
       validation_loss: 0.1456,
@@ -85,15 +92,28 @@ serve(async (req) => {
       recall: 0.8432,
     };
 
-    await supabase
+    const processingTime = Date.now() - startTime;
+
+    // Update training job with results
+    const { error: updateJobError } = await supabase
       .from('ml_training_jobs')
       .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        metrics: finalMetrics,
-        progress_percentage: 100,
+        result_data: {
+          metrics: finalMetrics,
+          model_path: `huggingface-models/${model.id}/model.bin`,
+          status: 'completed',
+        },
+        confidence_score: finalMetrics.validation_accuracy,
+        processing_time_ms: processingTime,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', trainingJob.id);
+
+    if (updateJobError) {
+      console.error('Failed to update training job:', updateJobError);
+    } else {
+      console.log('✅ Training job results stored successfully');
+    }
 
     // Update model status
     await supabase
