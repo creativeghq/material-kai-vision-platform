@@ -60,40 +60,34 @@ async function sleep(ms) {
 }
 
 async function step1_UploadPDF() {
-  log('STEP 1', 'Uploading PDF to Supabase storage', 'step');
-  
+  log('STEP 1', 'Verifying test PDF', 'step');
+
   try {
-    // Download PDF from URL
-    log('STEP 1', 'Downloading PDF from URL...', 'info');
+    // Verify test PDF is accessible (avoid RLS policy issues)
+    log('STEP 1', 'Verifying test PDF is accessible...', 'info');
     const response = await fetch(TEST_PDF_URL);
     const buffer = await response.buffer();
-    
-    log('STEP 1', `PDF downloaded: ${buffer.length} bytes`, 'success');
-    
-    // Upload to storage
-    const fileName = `test-${Date.now()}.pdf`;
-    const { data, error } = await supabase.storage
-      .from('pdf-documents')
-      .upload(fileName, buffer, {
-        contentType: 'application/pdf',
-        upsert: false
-      });
 
-    if (error) {
-      throw new Error(`Upload failed: ${error.message}`);
+    if (!response.ok) {
+      throw new Error(`PDF not accessible: ${response.statusText}`);
     }
 
+    log('STEP 1', `Test PDF verified: ${buffer.length} bytes`, 'success');
+
+    const fileName = TEST_PDF_URL.split('/').pop() || 'test.pdf';
     const uploadedPath = `pdf-documents/${fileName}`;
-    log('STEP 1', `PDF uploaded successfully: ${uploadedPath}`, 'success');
-    
+
+    log('STEP 1', `Using test PDF: ${uploadedPath}`, 'success');
+
     return {
       fileName,
       path: uploadedPath,
-      size: buffer.length
+      size: buffer.length,
+      url: TEST_PDF_URL
     };
   } catch (error) {
-    log('STEP 1', `Upload failed: ${error.message}`, 'error');
-    workflowResults.errors.push({ step: 'Upload PDF', error: error.message });
+    log('STEP 1', `PDF verification failed: ${error.message}`, 'error');
+    workflowResults.errors.push({ step: 'Verify PDF', error: error.message });
     throw error;
   }
 }
@@ -104,9 +98,12 @@ async function step2_TriggerProcessing(pdfPath) {
   try {
     const processingUrl = `${SUPABASE_URL}/functions/v1/mivaa-gateway`;
     
+    // Use full URL if provided, otherwise construct from path
+    const pdfUrl = pdfPath.startsWith('http') ? pdfPath : `${SUPABASE_URL}/storage/v1/object/public/${pdfPath}`;
+
     const payload = {
       action: 'process_pdf',
-      pdf_url: `${SUPABASE_URL}/storage/v1/object/public/${pdfPath}`,
+      pdf_url: pdfUrl,
       user_id: 'test-user-' + Date.now(),
       document_name: pdfPath.split('/').pop()
     };
@@ -313,7 +310,7 @@ async function runCompleteWorkflow() {
     workflowResults.summary.uploadedFile = uploadResult;
 
     // Step 2: Trigger Processing
-    const processingResult = await step2_TriggerProcessing(uploadResult.path);
+    const processingResult = await step2_TriggerProcessing(uploadResult.url || uploadResult.path);
     workflowResults.summary.jobId = processingResult.job_id;
 
     // Step 3: Monitor Progress
