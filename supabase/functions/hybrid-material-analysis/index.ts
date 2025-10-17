@@ -1129,18 +1129,36 @@ async function processHybridAnalysis(request: HybridAnalysisRequest): Promise<Hy
     };
 
     // Store results in database
-    await supabase
-      .from('hybrid_analysis_results')
-      .insert({
-        file_id: request.file_id,
-        analysis_modes: request.analysis_modes,
-        results: analysisResults,
-        consensus: consensusAnalysis,
-        recommendations,
-        processing_summary: response.processing_summary,
-        user_id: request.user_id,
-        created_at: new Date().toISOString(),
-      });
+    try {
+      const { error: storageError } = await supabase
+        .from('hybrid_analysis_results')
+        .insert({
+          user_id: request.user_id,
+          input_data: {
+            file_id: request.file_id,
+            analysis_modes: request.analysis_modes,
+            confidence_threshold: request.confidence_threshold,
+          },
+          result_data: {
+            analysis_results: analysisResults,
+            consensus_analysis: consensusAnalysis,
+            recommendations,
+            processing_summary: response.processing_summary,
+          },
+          confidence_score: consensusAnalysis.confidence,
+          processing_time_ms: response.processing_summary.total_time_ms,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (storageError) {
+        console.error('Failed to store hybrid analysis results:', storageError);
+      } else {
+        console.log('✅ Hybrid analysis results stored successfully');
+      }
+    } catch (storageError) {
+      console.error('Error storing hybrid analysis results:', storageError);
+    }
 
     // Log analytics
     if (request.user_id) {

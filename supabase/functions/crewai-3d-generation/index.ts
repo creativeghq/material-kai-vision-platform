@@ -90,6 +90,57 @@ function validateImageRequirements(request: any): { isValid: boolean; errors: st
 // Global workflow tracking
 let workflowSteps: any[] = [];
 let currentGenerationId: string | null = null;
+
+// Storage function for generation results
+async function storeGenerationResult(
+  userId: string,
+  prompt: string,
+  roomType: string | undefined,
+  style: string | undefined,
+  materialsUsed: string[] | undefined,
+  materialIds: string[] | undefined,
+  generationStatus: string,
+  resultData: any,
+  imageUrls: string[] | undefined,
+  modelUsed: string | undefined,
+  processingTimeMs: number,
+  errorMessage?: string
+): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('generation_3d')
+      .insert({
+        user_id: userId,
+        prompt,
+        room_type: roomType,
+        style,
+        materials_used: materialsUsed,
+        material_ids: materialIds,
+        generation_status: generationStatus,
+        result_data: resultData,
+        image_urls: imageUrls,
+        model_used: modelUsed,
+        processing_time_ms: processingTimeMs,
+        error_message: errorMessage,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Failed to store generation result:', error);
+      throw error;
+    }
+
+    console.log(`✅ Generation result stored with ID: ${data.id}`);
+    return data.id;
+  } catch (error) {
+    console.error('Error storing generation result:', error);
+    throw error;
+  }
+}
+
 // Function to process models directly without database operations
 async function processModelsDirectly(request: any, hasReferenceImage: boolean): Promise<GenerationResult[]> {
   const results: GenerationResult[] = [];
