@@ -1,0 +1,60 @@
+{
+  "steps": [
+    {
+      "step": "STEP 1",
+      "message": "Verifying test PDF",
+      "type": "step",
+      "timestamp": "2025-10-17T17:50:52.046Z"
+    },
+    {
+      "step": "STEP 1",
+      "message": "Verifying test PDF is accessible...",
+      "type": "info",
+      "timestamp": "2025-10-17T17:50:52.048Z"
+    },
+    {
+      "step": "STEP 1",
+      "message": "Test PDF verified: 11238163 bytes",
+      "type": "success",
+      "timestamp": "2025-10-17T17:50:53.777Z"
+    },
+    {
+      "step": "STEP 1",
+      "message": "Using test PDF: pdf-documents/1760462185826-harmony-signature-book-24-25.pdf",
+      "type": "success",
+      "timestamp": "2025-10-17T17:50:53.779Z"
+    },
+    {
+      "step": "STEP 2",
+      "message": "Triggering PDF processing via MIVAA gateway",
+      "type": "step",
+      "timestamp": "2025-10-17T17:50:53.780Z"
+    },
+    {
+      "step": "STEP 2",
+      "message": "Sending processing request to https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/mivaa-gateway",
+      "type": "info",
+      "timestamp": "2025-10-17T17:50:53.782Z"
+    },
+    {
+      "step": "STEP 2",
+      "message": "Processing trigger failed: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-17T17:53:24.085Z"
+    }
+  ],
+  "errors": [
+    {
+      "step": "Trigger Processing",
+      "error": "Unexpected end of JSON input"
+    }
+  ],
+  "summary": {
+    "uploadedFile": {
+      "fileName": "1760462185826-harmony-signature-book-24-25.pdf",
+      "path": "pdf-documents/1760462185826-harmony-signature-book-24-25.pdf",
+      "size": 11238163,
+      "url": "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/49f683ad-ebf2-4296-a410-0d8c011ce0be/1760462185826-harmony-signature-book-24-25.pdf"
+    }
+  }
+}

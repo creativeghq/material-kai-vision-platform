@@ -1,0 +1,119 @@
+{
+  "flows": {
+    "PDF Processing": {
+      "tests": [
+        {
+          "name": "PDF Accessible",
+          "passed": true,
+          "details": "Status: 200",
+          "timestamp": "2025-10-17T17:08:01.778Z"
+        },
+        {
+          "name": "Processing Triggered",
+          "passed": true,
+          "details": "Status: 504",
+          "timestamp": "2025-10-17T17:10:32.028Z"
+        }
+      ],
+      "passed": 2,
+      "failed": 0
+    },
+    "Data Storage": {
+      "tests": [
+        {
+          "name": "Storage Tables Exist",
+          "passed": true,
+          "details": "OK",
+          "timestamp": "2025-10-17T17:10:34.224Z"
+        },
+        {
+          "name": "Data Retrieval Works",
+          "passed": true,
+          "details": "OK",
+          "timestamp": "2025-10-17T17:10:34.528Z"
+        },
+        {
+          "name": "Pagination Works",
+          "passed": true,
+          "details": "OK",
+          "timestamp": "2025-10-17T17:10:34.713Z"
+        }
+      ],
+      "passed": 3,
+      "failed": 0
+    },
+    "Search & Retrieval": {
+      "tests": [
+        {
+          "name": "Text Search Works",
+          "passed": true,
+          "details": "OK",
+          "timestamp": "2025-10-17T17:10:35.177Z"
+        },
+        {
+          "name": "Vector Search Available",
+          "passed": false,
+          "details": "relation \"public.document_embeddings\" does not exist",
+          "timestamp": "2025-10-17T17:10:35.336Z"
+        }
+      ],
+      "passed": 1,
+      "failed": 1
+    },
+    "Quality Scoring": {
+      "tests": [
+        {
+          "name": "Quality Scores Exist",
+          "passed": false,
+          "details": "column document_chunks.quality_score does not exist",
+          "timestamp": "2025-10-17T17:10:35.483Z"
+        }
+      ],
+      "passed": 0,
+      "failed": 1
+    },
+    "Authentication": {
+      "tests": [
+        {
+          "name": "Auth System Available",
+          "passed": false,
+          "details": "Auth session missing!",
+          "timestamp": "2025-10-17T17:10:35.486Z"
+        },
+        {
+          "name": "RLS Policies Enforced",
+          "passed": true,
+          "details": "OK",
+          "timestamp": "2025-10-17T17:10:35.625Z"
+        }
+      ],
+      "passed": 1,
+      "failed": 1
+    },
+    "Error Handling": {
+      "tests": [
+        {
+          "name": "Invalid Query Handled",
+          "passed": true,
+          "details": "relation \"public.nonexistent_table\" does not exist",
+          "timestamp": "2025-10-17T17:10:35.768Z"
+        },
+        {
+          "name": "Invalid PDF Handled",
+          "passed": true,
+          "details": "Status: 404",
+          "timestamp": "2025-10-17T17:10:51.630Z"
+        }
+      ],
+      "passed": 2,
+      "failed": 0
+    }
+  },
+  "summary": {
+    "total": 12,
+    "passed": 9,
+    "failed": 3,
+    "skipped": 0
+  },
+  "timestamp": "2025-10-17T17:08:01.188Z"
+}
