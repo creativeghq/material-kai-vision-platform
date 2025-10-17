@@ -351,15 +351,42 @@ async function runComprehensiveWorkflow() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        action: 'process_pdf',
-        pdf_url: TEST_PDF_URL,
-        user_id: 'test-user-' + Date.now(),
-        document_name: fileName
+        action: 'pdf_process_url',
+        payload: {
+          url: TEST_PDF_URL,
+          document_name: fileName,
+          options: {
+            extract_text: true,
+            extract_images: true,
+            extract_tables: true
+          }
+        }
       })
     });
 
-    const processingResult = await processingResponse.json();
+    // Debug: Check response status and content type
+    log('WORKFLOW', `Processing response status: ${processingResponse.status}`, 'info');
+    const contentType = processingResponse.headers.get('content-type');
+    log('WORKFLOW', `Content-Type: ${contentType}`, 'info');
+
+    let processingResult;
+    try {
+      const responseText = await processingResponse.text();
+      log('WORKFLOW', `Raw response: ${responseText.substring(0, 500)}`, 'info');
+      processingResult = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error(`Failed to parse response: ${parseError.message}`);
+    }
+
     recordPerformanceMetric('Processing Trigger', Date.now() - processingStart);
+
+    // Debug: Log full response
+    log('WORKFLOW', `Processing response: ${JSON.stringify(processingResult)}`, 'info');
+
+    if (!processingResult.job_id) {
+      throw new Error(`No job_id in response: ${JSON.stringify(processingResult)}`);
+    }
+
     log('WORKFLOW', `Processing triggered: ${processingResult.job_id}`, 'success');
 
     // Step 3: Monitor Progress
@@ -382,7 +409,7 @@ async function runComprehensiveWorkflow() {
       });
 
       jobStatus = await statusResponse.json();
-      
+
       if (jobStatus.status === 'completed') {
         recordPerformanceMetric('Job Processing', Date.now() - monitorStart);
         log('WORKFLOW', `Job completed: ${jobStatus.chunks_count} chunks, ${jobStatus.images_count} images`, 'success');

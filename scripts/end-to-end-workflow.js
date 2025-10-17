@@ -102,10 +102,16 @@ async function step2_TriggerProcessing(pdfPath) {
     const pdfUrl = pdfPath.startsWith('http') ? pdfPath : `${SUPABASE_URL}/storage/v1/object/public/${pdfPath}`;
 
     const payload = {
-      action: 'process_pdf',
-      pdf_url: pdfUrl,
-      user_id: 'test-user-' + Date.now(),
-      document_name: pdfPath.split('/').pop()
+      action: 'pdf_process_url',
+      payload: {
+        url: pdfUrl,
+        document_name: pdfPath.split('/').pop(),
+        options: {
+          extract_text: true,
+          extract_images: true,
+          extract_tables: true
+        }
+      }
     };
 
     log('STEP 2', `Sending processing request to ${processingUrl}`, 'info');

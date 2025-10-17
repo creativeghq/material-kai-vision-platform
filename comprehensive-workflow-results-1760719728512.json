@@ -1,0 +1,60 @@
+{
+  "timestamp": "2025-10-17T16:46:16.068Z",
+  "steps": [
+    {
+      "step": "WORKFLOW",
+      "message": "Starting comprehensive workflow",
+      "type": "step",
+      "timestamp": "2025-10-17T16:46:16.069Z"
+    },
+    {
+      "step": "WORKFLOW",
+      "message": "Verifying test PDF is accessible...",
+      "type": "info",
+      "timestamp": "2025-10-17T16:46:16.069Z"
+    },
+    {
+      "step": "PERFORMANCE",
+      "message": "PDF Verification: 2163ms",
+      "type": "metric",
+      "timestamp": "2025-10-17T16:46:18.232Z"
+    },
+    {
+      "step": "WORKFLOW",
+      "message": "Test PDF verified: 1760462185826-harmony-signature-book-24-25.pdf (11238163 bytes)",
+      "type": "success",
+      "timestamp": "2025-10-17T16:46:18.232Z"
+    },
+    {
+      "step": "WORKFLOW",
+      "message": "Processing response status: 504",
+      "type": "info",
+      "timestamp": "2025-10-17T16:48:48.509Z"
+    },
+    {
+      "step": "WORKFLOW",
+      "message": "Content-Type: null",
+      "type": "info",
+      "timestamp": "2025-10-17T16:48:48.509Z"
+    },
+    {
+      "step": "WORKFLOW",
+      "message": "Raw response: ",
+      "type": "info",
+      "timestamp": "2025-10-17T16:48:48.512Z"
+    }
+  ],
+  "metrics": {
+    "performance": {
+      "PDF Verification": [
+        2163
+      ]
+    },
+    "quality": {},
+    "similarity": {},
+    "layout": {},
+    "scores": {}
+  },
+  "errors": [],
+  "summary": {}
+}
