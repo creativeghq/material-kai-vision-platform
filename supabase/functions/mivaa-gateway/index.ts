@@ -182,14 +182,23 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ MIVAA Gateway Error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ MIVAA Gateway Error:', errorMessage)
+    console.error('❌ Full error:', error)
+
+    // Provide more detailed error information
+    const errorDetails = {
+      error: 'Gateway error',
+      message: errorMessage,
+      timestamp: new Date().toISOString(),
+      mivaaServiceUrl: MIVAA_SERVICE_URL,
+      apiKeyConfigured: !!Deno.env.get('MIVAA_API_KEY'),
+    }
+
+    console.error('❌ Error details:', errorDetails)
 
     return new Response(
-      JSON.stringify({
-        error: 'Gateway error',
-        message: error.message,
-        timestamp: new Date().toISOString()
-      }),
+      JSON.stringify(errorDetails),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

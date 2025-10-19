@@ -65,6 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           emailRedirectTo: redirectUrl,
           data: {
             display_name: displayName,
+            role: 'member', // Default role for new users
           },
         },
       });

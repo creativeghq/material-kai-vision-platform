@@ -47,11 +47,22 @@ export const AuthCallbackPage: React.FC = () => {
           // Get the default user role
           const { data: userRole } = await supabase
             .from('roles')
-            .select('id')
+            .select('id, name')
             .eq('name', 'user')
             .single();
 
           if (userRole) {
+            // Update user metadata with role
+            const { error: updateError } = await supabase.auth.updateUser({
+              data: {
+                role: userRole.name,
+              },
+            });
+
+            if (updateError) {
+              console.error('Error updating user metadata:', updateError);
+            }
+
             const { error: profileError } = await supabase
               .from('user_profiles')
               .insert({
