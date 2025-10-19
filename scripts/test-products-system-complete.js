@@ -34,6 +34,7 @@ function log(message, color = 'reset') {
 }
 
 const testStats = {
+  products_created: 0,
   carts_created: 0,
   items_added: 0,
   quote_requests: 0,
@@ -43,9 +44,12 @@ const testStats = {
   errors: 0,
 };
 
+// Store created products for display
+const createdProducts = [];
+
 async function testProductsSystem() {
   log('\n🚀 Complete Products System End-to-End Test\n', 'cyan');
-  log('Testing: Cart → Quote → Proposal → Commission\n', 'yellow');
+  log('Testing: Products → Cart → Quote → Proposal → Commission\n', 'yellow');
 
   try {
     // Get a test user (or create one)
@@ -57,6 +61,106 @@ async function testProductsSystem() {
 
     const testUser = users[0];
     log(`✅ Using test user: ${testUser.email}\n`, 'green');
+
+    // ============ Step 0: Create Products ============
+    log('📋 Step 0: Create Products with Metadata', 'blue');
+
+    const testProductsData = [
+      {
+        name: `Premium Italian Marble - ${Date.now()}`,
+        description: 'Premium Italian marble with white veining',
+        long_description: 'High-quality marble sourced from Italian quarries, featuring elegant white veining patterns. Perfect for luxury interiors.',
+        properties: {
+          material_type: 'natural_stone',
+          color: 'white',
+          finish: 'polished',
+          durability: 'high',
+          hardness: '3-4 Mohs',
+        },
+        metadata: {
+          supplier: 'Italian Quarries Inc',
+          origin: 'Italy',
+          price_range: '$100-200 per sq ft',
+          availability: 'in_stock',
+          certifications: ['ISO 9001', 'CE Marked'],
+        },
+      },
+      {
+        name: `Engineered Wood Flooring - ${Date.now()}`,
+        description: 'Durable engineered wood with oak veneer',
+        long_description: 'Premium engineered wood flooring with authentic oak veneer top layer. Resistant to moisture and temperature changes.',
+        properties: {
+          material_type: 'engineered_wood',
+          color: 'natural_oak',
+          finish: 'matte',
+          durability: 'medium-high',
+          thickness_mm: 14,
+        },
+        metadata: {
+          supplier: 'European Wood Co',
+          origin: 'Germany',
+          price_range: '$40-80 per sq ft',
+          availability: 'in_stock',
+          warranty_years: 10,
+        },
+      },
+      {
+        name: `Ceramic Tile Collection - ${Date.now()}`,
+        description: 'Modern ceramic tiles with matte finish',
+        long_description: 'Contemporary ceramic tiles suitable for both walls and floors. Available in multiple colors and sizes.',
+        properties: {
+          material_type: 'ceramic',
+          color: 'charcoal_gray',
+          finish: 'matte',
+          durability: 'high',
+          water_absorption: 'low',
+        },
+        metadata: {
+          supplier: 'Spanish Ceramics Ltd',
+          origin: 'Spain',
+          price_range: '$15-35 per sq ft',
+          availability: 'in_stock',
+          sizes_available: ['300x300mm', '600x600mm', '300x600mm'],
+        },
+      },
+    ];
+
+    for (const productData of testProductsData) {
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .insert({
+          name: productData.name,
+          description: productData.description,
+          long_description: productData.long_description,
+          properties: productData.properties,
+          metadata: productData.metadata,
+          status: 'published',
+          created_from_type: 'test',
+          embedding_model: 'text-embedding-3-small',
+          created_by: testUser.id,
+        })
+        .select()
+        .single();
+
+      if (productError) {
+        log(`  ❌ Failed to create product: ${productError.message}`, 'red');
+        testStats.errors++;
+      } else {
+        testStats.products_created++;
+        createdProducts.push(product);
+        log(`  ✅ Product created: ${product.id}`, 'green');
+        log(`     Name: ${product.name}`, 'cyan');
+        log(`     Description: ${product.description}`, 'cyan');
+        log(`     Status: ${product.status}`, 'cyan');
+        log(`     Properties: ${JSON.stringify(product.properties)}`, 'cyan');
+        log(`     Metadata: ${JSON.stringify(product.metadata)}`, 'cyan');
+      }
+    }
+
+    if (createdProducts.length === 0) {
+      log('❌ Cannot proceed without products', 'red');
+      process.exit(1);
+    }
 
     // ============ Step 1: Create Shopping Cart ============
     log('📋 Step 1: Create Shopping Cart', 'blue');
@@ -88,17 +192,18 @@ async function testProductsSystem() {
     log('\n📋 Step 2: Add Items to Cart', 'blue');
 
     const testItems = [
-      { product_id: '550e8400-e29b-41d4-a716-446655440001', quantity: 2, unit_price: 99.99 },
-      { product_id: '550e8400-e29b-41d4-a716-446655440002', quantity: 1, unit_price: 149.99 },
-      { product_id: '550e8400-e29b-41d4-a716-446655440003', quantity: 3, unit_price: 49.99 },
+      { product: createdProducts[0], quantity: 2, unit_price: 150.00 },
+      { product: createdProducts[1], quantity: 1, unit_price: 75.00 },
+      { product: createdProducts[2], quantity: 3, unit_price: 25.00 },
     ];
 
+    const cartItemsCreated = [];
     for (const item of testItems) {
       const { data: cartItem, error: itemError } = await supabase
         .from('cart_items')
         .insert({
           cart_id: cart.id,
-          product_id: item.product_id,
+          product_id: item.product.id,
           quantity: item.quantity,
           unit_price: item.unit_price,
         })
@@ -110,7 +215,13 @@ async function testProductsSystem() {
         testStats.errors++;
       } else {
         testStats.items_added++;
-        log(`  ✅ Item added: ${item.product_id} (qty: ${item.quantity})`, 'green');
+        cartItemsCreated.push(cartItem);
+        log(`  ✅ Item added to cart`, 'green');
+        log(`     Product: ${item.product.name}`, 'cyan');
+        log(`     Product ID: ${item.product.id}`, 'cyan');
+        log(`     Quantity: ${item.quantity}`, 'cyan');
+        log(`     Unit Price: $${item.unit_price.toFixed(2)}`, 'cyan');
+        log(`     Line Total: $${(item.unit_price * item.quantity).toFixed(2)}`, 'cyan');
       }
     }
 
@@ -252,11 +363,68 @@ async function testProductsSystem() {
       }
     }
 
+    // ============ Display Created Products ============
+    log('\n' + '='.repeat(80), 'magenta');
+    log('📦 CREATED PRODUCTS DETAILS', 'magenta');
+    log('='.repeat(80), 'magenta');
+
+    for (let i = 0; i < createdProducts.length; i++) {
+      const product = createdProducts[i];
+      log(`\n📌 Product ${i + 1}:`, 'yellow');
+      log(`   ID: ${product.id}`, 'cyan');
+      log(`   Name: ${product.name}`, 'cyan');
+      log(`   Description: ${product.description}`, 'cyan');
+      log(`   Long Description: ${product.long_description}`, 'cyan');
+      log(`   Status: ${product.status}`, 'cyan');
+      log(`   Created From Type: ${product.created_from_type}`, 'cyan');
+      log(`   Embedding Model: ${product.embedding_model}`, 'cyan');
+      log(`   Created At: ${product.created_at}`, 'cyan');
+      log(`   Updated At: ${product.updated_at}`, 'cyan');
+
+      if (product.properties) {
+        log(`   Properties:`, 'yellow');
+        Object.entries(product.properties).forEach(([key, value]) => {
+          log(`      - ${key}: ${value}`, 'cyan');
+        });
+      }
+
+      if (product.metadata) {
+        log(`   Metadata:`, 'yellow');
+        Object.entries(product.metadata).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            log(`      - ${key}: [${value.join(', ')}]`, 'cyan');
+          } else {
+            log(`      - ${key}: ${value}`, 'cyan');
+          }
+        });
+      }
+    }
+
+    // ============ Display Cart Items ============
+    log('\n' + '='.repeat(80), 'magenta');
+    log('🛒 CART ITEMS DETAILS', 'magenta');
+    log('='.repeat(80), 'magenta');
+
+    for (let i = 0; i < cartItemsCreated.length; i++) {
+      const item = cartItemsCreated[i];
+      const product = createdProducts[i];
+      const lineTotal = item.unit_price * item.quantity;
+
+      log(`\n📦 Cart Item ${i + 1}:`, 'yellow');
+      log(`   Item ID: ${item.id}`, 'cyan');
+      log(`   Product: ${product.name}`, 'cyan');
+      log(`   Product ID: ${item.product_id}`, 'cyan');
+      log(`   Quantity: ${item.quantity}`, 'cyan');
+      log(`   Unit Price: $${item.unit_price.toFixed(2)}`, 'cyan');
+      log(`   Line Total: $${lineTotal.toFixed(2)}`, 'cyan');
+    }
+
     // ============ Final Report ============
-    log('\n' + '='.repeat(60), 'magenta');
+    log('\n' + '='.repeat(80), 'magenta');
     log('📊 TEST SUMMARY REPORT', 'magenta');
-    log('='.repeat(60), 'magenta');
-    log(`\n✅ Carts Created: ${testStats.carts_created}`, 'green');
+    log('='.repeat(80), 'magenta');
+    log(`\n✅ Products Created: ${testStats.products_created}`, 'green');
+    log(`✅ Carts Created: ${testStats.carts_created}`, 'green');
     log(`✅ Items Added: ${testStats.items_added}`, 'green');
     log(`✅ Quote Requests: ${testStats.quote_requests}`, 'green');
     log(`✅ Proposals Created: ${testStats.proposals_created}`, 'green');
