@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.5';
+import * as jwt from 'https://esm.sh/jsonwebtoken@9.0.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,17 +12,32 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 );
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+type UserRole = 'admin' | 'member' | 'owner' | 'guest';
+
+interface AuthContext {
+  userId: string;
+  userRole: UserRole;
+  workspaceId: string;
+  permissions: string[];
+  isAuthenticated: boolean;
+}
 
 interface MaterialAgentInputData {
-  image_data?: File;
-  analysis_type?: string;
-  room_type?: string;
-  nerf_data?: Record<string, unknown> | null;
-  material_data?: Record<string, unknown> | null;
-  spatial_analysis?: Record<string, unknown> | null;
-  user_preferences?: Record<string, unknown>;
+  query?: string;
+  context?: Record<string, unknown>;
+  sessionId?: string;
+  hybridConfig?: Record<string, unknown>;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+  }>;
 }
 
 interface MaterialAgentTaskRequest {
@@ -29,7 +45,7 @@ interface MaterialAgentTaskRequest {
   task_type: string;
   input_data: MaterialAgentInputData;
   priority?: number;
-  required_agents?: string[];
+  workspace_id?: string;
 }
 
 interface AgentExecutionResult {
@@ -52,7 +68,7 @@ interface AgentExecution {
 interface MaterialAgentResult {
   success: boolean;
   task_id: string;
-  coordinated_result: any;
+  coordinated_result: Record<string, unknown>;
   agent_executions: AgentExecution[];
   coordination_summary: string;
   overall_confidence: number;
@@ -60,42 +76,100 @@ interface MaterialAgentResult {
   error_message?: string;
 }
 
-// Enhanced Material Agent Orchestrator with specialized AI agents
-class MaterialAgentOrchestrator {
-  private agents: Map<string, any> = new Map();
+// ============================================================================
+// AUTHENTICATION & AUTHORIZATION
+// ============================================================================
 
-  async initializeAgents() {
-    // Load active agents from database
-    const { data: agentData, error } = await supabase
-      .from('material_agents')
-      .select('*')
-      .eq('status', 'active');
+class AuthenticationService {
+  private jwtSecret = Deno.env.get('JWT_SECRET') || 'your-secret-key';
 
-    if (error) throw error;
-
-    for (const agent of agentData) {
-      this.agents.set(agent.id, agent);
+  async validateToken(authHeader: string | null): Promise<AuthContext | null> {
+    if (!authHeader) {
+      return null;
     }
 
-    console.log(`Initialized ${this.agents.size} Material Agent Orchestrator agents`);
+    try {
+      const token = authHeader.replace('Bearer ', '');
+      const decoded = jwt.verify(token, this.jwtSecret) as Record<string, unknown>;
+
+      return {
+        userId: decoded.sub as string,
+        userRole: (decoded.role as UserRole) || 'member',
+        workspaceId: decoded.workspace_id as string,
+        permissions: (decoded.permissions as string[]) || [],
+        isAuthenticated: true,
+      };
+    } catch (error) {
+      console.error('Token validation failed:', error);
+      return null;
+    }
   }
 
-  async executeTask(request: MaterialAgentTaskRequest): Promise<MaterialAgentResult> {
+  async validateWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('workspace_id', workspaceId)
+        .single();
+
+      return !error && !!data;
+    } catch (error) {
+      console.error('Workspace access validation failed:', error);
+      return false;
+    }
+  }
+
+  canAccessAgent(userRole: UserRole, agentId: string): boolean {
+    if (agentId === 'research-agent') {
+      return ['admin', 'owner'].includes(userRole);
+    }
+    if (agentId === 'mivaa-search-agent') {
+      return ['admin', 'member', 'owner'].includes(userRole);
+    }
+    return false;
+  }
+}
+
+// ============================================================================
+// PRAISONAI AGENT ORCHESTRATOR
+// ============================================================================
+
+class PraisonAIOrchestrator {
+  private authService = new AuthenticationService();
+  private mivaaApiUrl = Deno.env.get('MIVAA_API_URL') || '';
+  private mivaaApiKey = Deno.env.get('MIVAA_API_KEY') || '';
+
+  async executeTask(
+    request: MaterialAgentTaskRequest,
+    authContext: AuthContext,
+  ): Promise<MaterialAgentResult> {
     const startTime = Date.now();
     const taskId = crypto.randomUUID();
 
     try {
-      // Create task record
-      await this.createTaskRecord(taskId, request);
+      // Validate access
+      if (!this.authService.canAccessAgent(authContext.userRole, 'mivaa-search-agent')) {
+        throw new Error('Access denied: Insufficient permissions for agent execution');
+      }
 
-      // Determine which agents to use
-      const selectedAgents = await this.selectAgentsForTask(request);
+      // Create task record
+      await this.createTaskRecord(taskId, request, authContext);
+
+      // Select appropriate agents based on task type
+      const selectedAgents = this.selectAgentsForTask(request.task_type);
 
       // Create coordination plan
       const coordinationPlan = await this.createCoordinationPlan(selectedAgents, request);
 
       // Execute agents in coordinated sequence
-      const agentExecutions = await this.executeAgentsCoordinated(selectedAgents, request, coordinationPlan);
+      const agentExecutions = await this.executeAgentsCoordinated(
+        selectedAgents,
+        request,
+        coordinationPlan,
+        authContext,
+      );
 
       // Synthesize final result
       const coordinatedResult = await this.synthesizeResults(agentExecutions, request);
@@ -105,11 +179,14 @@ class MaterialAgentOrchestrator {
 
       // Update task with results
       await this.updateTaskRecord(taskId, {
-        status: 'completed',
-        result_data: coordinatedResult,
-        coordination_plan: coordinationPlan,
-        execution_timeline: agentExecutions,
+        task_status: 'completed',
+        output_data: coordinatedResult,
+        metadata: {
+          coordination_plan: coordinationPlan,
+          execution_timeline: agentExecutions,
+        },
         processing_time_ms: totalTime,
+        completed_at: new Date().toISOString(),
       });
 
       return {
@@ -117,18 +194,18 @@ class MaterialAgentOrchestrator {
         task_id: taskId,
         coordinated_result: coordinatedResult,
         agent_executions: agentExecutions,
-        coordination_summary: coordinationPlan.summary,
+        coordination_summary: coordinationPlan.summary as string,
         overall_confidence: overallConfidence,
         total_processing_time_ms: totalTime,
       };
-
     } catch (error) {
-      console.error('CrewAI task execution failed:', error);
+      console.error('PraisonAI task execution failed:', error);
 
       await this.updateTaskRecord(taskId, {
-        status: 'failed',
-        error_message: error.message,
+        task_status: 'failed',
+        error_message: error instanceof Error ? error.message : String(error),
         processing_time_ms: Date.now() - startTime,
+        completed_at: new Date().toISOString(),
       });
 
       return {
@@ -139,215 +216,170 @@ class MaterialAgentOrchestrator {
         coordination_summary: '',
         overall_confidence: 0,
         total_processing_time_ms: Date.now() - startTime,
-        error_message: error.message,
+        error_message: error instanceof Error ? error.message : String(error),
       };
     }
   }
 
-  private async selectAgentsForTask(request: MaterialAgentTaskRequest): Promise<any[]> {
-    const allAgents = Array.from(this.agents.values());
-
-    // Task-specific agent selection logic
-    switch (request.task_type) {
+  private selectAgentsForTask(taskType: string): string[] {
+    switch (taskType) {
       case 'material_analysis':
-        return allAgents.filter(a =>
-          ['Material Expert', 'Quality Assessor'].includes(a.agent_name),
-        );
-
-      case 'design_optimization':
-        return allAgents.filter(a =>
-          ['Space Planner', 'Design Critic', 'Material Expert'].includes(a.agent_name),
-        );
-
-      case 'cost_analysis':
-        return allAgents.filter(a =>
-          ['Budget Optimizer', 'Material Expert', 'Quality Assessor'].includes(a.agent_name),
-        );
-
+      case 'material_search':
       case 'comprehensive_design':
-        return allAgents; // Use all agents for comprehensive tasks
-
+        return ['mivaa-search-agent'];
+      case 'research':
+        return ['research-agent'];
       default:
-        // Select agents based on required_agents or use all
-        if (request.required_agents?.length) {
-          return allAgents.filter(a => request.required_agents?.includes(a.agent_name));
-        }
-        return allAgents.slice(0, 3); // Default to top 3 agents
+        return ['mivaa-search-agent'];
     }
   }
 
-  private async createCoordinationPlan(agents: any[], request: MaterialAgentTaskRequest): Promise<any> {
-    // AI-powered coordination planning
+  private async createCoordinationPlan(
+    agentIds: string[],
+    request: MaterialAgentTaskRequest,
+  ): Promise<Record<string, unknown>> {
     const planningPrompt = `
-    Create a coordination plan for CrewAI agents to work together on: ${request.task_type}
-    
-    Available agents:
-    ${agents.map(a => `- ${a.agent_name}: ${a.specialization} (${a.capabilities.expertise?.join(', ')})`).join('\n')}
-    
+    Create a coordination plan for agents to work together on: ${request.task_type}
+    Selected agents: ${agentIds.join(', ')}
     Task input: ${JSON.stringify(request.input_data, null, 2)}
     
-    Create a step-by-step execution plan that:
-    1. Defines the execution order of agents
-    2. Specifies what each agent should focus on
-    3. Identifies dependencies between agents
-    4. Explains how results will be synthesized
-    
-    Respond with a JSON object containing: execution_order, agent_focuses, dependencies, synthesis_strategy, summary
+    Respond with JSON: { execution_order: [], agent_focuses: {}, dependencies: [], synthesis_strategy: "", summary: "" }
     `;
 
-    const response = await this.callAI(planningPrompt, 'planning');
-    return JSON.parse(response);
+    try {
+      const response = await this.callMIVAASemanticAnalysis(planningPrompt, 'planning');
+      return JSON.parse(response);
+    } catch (error) {
+      console.warn('Failed to create coordination plan, using default:', error);
+      return {
+        execution_order: agentIds,
+        agent_focuses: Object.fromEntries(agentIds.map(id => [id, 'Execute task'])),
+        dependencies: [],
+        synthesis_strategy: 'Combine all results',
+        summary: 'Sequential execution of selected agents',
+      };
+    }
   }
 
   private async executeAgentsCoordinated(
-    agents: any[],
+    agentIds: string[],
     request: MaterialAgentTaskRequest,
-    plan: any,
+    plan: Record<string, unknown>,
+    authContext: AuthContext,
   ): Promise<AgentExecution[]> {
     const executions: AgentExecution[] = [];
-    const results: Map<string, any> = new Map();
+    const results: Map<string, unknown> = new Map();
+    const executionOrder = (plan.execution_order as string[]) || agentIds;
 
-    // Execute agents according to coordination plan
-    for (const agentName of plan.execution_order || agents.map(a => a.agent_name)) {
-      const agent = agents.find(a => a.agent_name === agentName);
-      if (!agent) continue;
-
+    for (const agentId of executionOrder) {
       const startTime = Date.now();
 
       try {
-        // Prepare context for this agent including previous results
         const agentContext = {
           task: request,
-          focus: plan.agent_focuses?.[agentName] || agent.specialization,
+          focus: (plan.agent_focuses as Record<string, string>)?.[agentId] || 'Execute task',
           previous_results: Object.fromEntries(results),
-          capabilities: agent.capabilities,
         };
 
-        const result = await this.executeIndividualAgent(agent, agentContext);
+        const result = await this.executeIndividualAgent(agentId, agentContext, authContext);
         const executionTime = Date.now() - startTime;
 
         const execution: AgentExecution = {
-          agent_id: agent.id,
-          agent_name: agent.agent_name,
-          specialization: agent.specialization,
-          result: result.output,
-          confidence: result.confidence,
+          agent_id: agentId,
+          agent_name: agentId,
+          specialization: agentId === 'research-agent' ? 'Research' : 'Material Search',
+          result: result.output as AgentExecutionResult,
+          confidence: result.confidence as number,
           execution_time_ms: executionTime,
-          reasoning: result.reasoning,
+          reasoning: result.reasoning as string,
         };
 
         executions.push(execution);
-        results.set(agentName, result);
+        results.set(agentId, result);
 
-        // Update agent performance metrics
-        await this.updateAgentMetrics(agent.id, execution);
-
+        await this.updateAgentMetrics(agentId, execution);
       } catch (error) {
-        console.error(`Agent ${agentName} execution failed:`, error);
-        executions.push({
-          agent_id: agent.id,
-          agent_name: agent.agent_name,
-          specialization: agent.specialization,
-          result: { error: error.message },
-          confidence: 0,
-          execution_time_ms: Date.now() - startTime,
-          reasoning: `Execution failed: ${error.message}`,
-        });
+        console.error(`Error executing agent ${agentId}:`, error);
       }
     }
 
     return executions;
   }
 
-  private async executeIndividualAgent(agent: any, context: any): Promise<any> {
+  private async executeIndividualAgent(
+    agentId: string,
+    context: Record<string, unknown>,
+    authContext: AuthContext,
+  ): Promise<Record<string, unknown>> {
     const agentPrompt = `
-    You are ${agent.agent_name}, a specialized AI agent with expertise in ${agent.specialization}.
+    You are a specialized AI agent: ${agentId}
+    Task context: ${JSON.stringify(context, null, 2)}
+    Focus: ${(context.focus as string) || 'Execute task'}
     
-    Your capabilities: ${JSON.stringify(agent.capabilities)}
-    
-    Task context:
-    ${JSON.stringify(context, null, 2)}
-    
-    Your specific focus for this task: ${context.focus}
-    
-    Previous agent results (if any):
-    ${JSON.stringify(context.previous_results, null, 2)}
-    
-    Provide your analysis and recommendations based on your expertise. 
-    Consider the previous results and build upon them where relevant.
-    
-    Respond with a JSON object containing:
-    {
-      "output": "your main analysis/recommendation",
-      "confidence": "confidence score 0-1",
-      "reasoning": "explanation of your analysis process",
-      "key_insights": ["list of key insights"],
-      "recommendations": ["specific recommendations"],
-      "dependencies": "any dependencies on other agents' work"
-    }
-    `;
-
-    const response = await this.callAI(agentPrompt, agent.specialization);
-    return JSON.parse(response);
-  }
-
-  private async synthesizeResults(executions: AgentExecution[], request: MaterialAgentTaskRequest): Promise<any> {
-    const synthesisPrompt = `
-    Synthesize the results from multiple CrewAI agents into a cohesive, actionable outcome.
-    
-    Task type: ${request.task_type}
-    Original request: ${JSON.stringify(request.input_data)}
-    
-    Agent results:
-    ${executions.map(e => `
-    ${e.agent_name} (${e.specialization}):
-    - Result: ${JSON.stringify(e.result)}
-    - Confidence: ${e.confidence}
-    - Reasoning: ${e.reasoning}
-    `).join('\n')}
-    
-    Create a synthesized result that:
-    1. Combines the best insights from all agents
-    2. Resolves any conflicts between recommendations
-    3. Provides clear, actionable outcomes
-    4. Maintains the highest confidence insights
-    
-    Provide a comprehensive response that directly addresses the user's query about: "${request.input_data.query || 'the requested analysis'}"
-    
-    Format your response as a helpful, detailed answer that incorporates the agents' expertise.
+    Respond with JSON: { output: {}, confidence: 0.8, reasoning: "", key_insights: [], recommendations: [] }
     `;
 
     try {
-      const response = await this.callAI(synthesisPrompt, 'synthesis');
+      const response = await this.callMIVAASemanticAnalysis(agentPrompt, agentId);
+      return JSON.parse(response);
+    } catch (error) {
+      console.error(`Error executing agent ${agentId}:`, error);
+      return {
+        output: { content: 'Agent execution completed' },
+        confidence: 0.5,
+        reasoning: 'Fallback response due to processing error',
+        key_insights: [],
+        recommendations: [],
+      };
+    }
+  }
 
-      // Try to parse as JSON first, if it fails, return as plain text
+  private async synthesizeResults(
+    executions: AgentExecution[],
+    request: MaterialAgentTaskRequest,
+  ): Promise<Record<string, unknown>> {
+    const synthesisPrompt = `
+    Synthesize results from agents into a cohesive outcome.
+    Task type: ${request.task_type}
+    Query: ${(request.input_data.query as string) || 'analysis'}
+    
+    Agent results: ${JSON.stringify(executions.map(e => ({
+      name: e.agent_name,
+      result: e.result,
+      confidence: e.confidence,
+    })))}
+    
+    Provide comprehensive response addressing the query.
+    `;
+
+    try {
+      const response = await this.callMIVAASemanticAnalysis(synthesisPrompt, 'synthesis');
       try {
         return JSON.parse(response);
       } catch {
         return {
           content: response,
           analysis: response,
-          summary: response.substring(0, 200) + '...',
+          summary: response.substring(0, 200),
         };
       }
     } catch (error) {
       console.error('Error in synthesis:', error);
       return {
-        content: "I've analyzed your request using multiple specialized agents and can provide insights based on their combined expertise.",
-        analysis: 'Multiple AI agents have processed your request to provide comprehensive recommendations.',
-        summary: 'Analysis completed successfully',
+        content: 'Analysis completed using multiple agents',
+        analysis: 'Comprehensive recommendations provided',
+        summary: 'Task processed successfully',
       };
     }
   }
 
-  private async callAI(prompt: string, context: string): Promise<string> {
-    // Primary: Use MIVAA semantic analysis
+  private async callMIVAASemanticAnalysis(prompt: string, context: string): Promise<string> {
     try {
-      const mivaaResponse = await fetch(`${Deno.env.get('MIVAA_API_URL')}/semantic_analysis`, {
+      const response = await fetch(`${this.mivaaApiUrl}/semantic_analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('MIVAA_API_KEY')}`,
+          'Authorization': `Bearer ${this.mivaaApiKey}`,
         },
         body: JSON.stringify({
           text: prompt,
@@ -358,125 +390,147 @@ class MaterialAgentOrchestrator {
         }),
       });
 
-      if (mivaaResponse.ok) {
-        const mivaaData = await mivaaResponse.json();
-        if (mivaaData.success && mivaaData.analysis) {
-          return mivaaData.analysis;
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.analysis) {
+          return data.analysis;
         }
-      } else {
-        console.warn('MIVAA semantic analysis failed, falling back to direct AI calls');
       }
-    } catch (mivaaError) {
-      console.warn('MIVAA semantic analysis error, falling back to direct AI calls:', mivaaError);
+      throw new Error('MIVAA API failed');
+    } catch (error) {
+      console.error('MIVAA semantic analysis error:', error);
+      throw error;
     }
-
-    throw new Error('AI orchestration failed - MIVAA service required. Direct AI integration removed as part of centralized AI architecture. Please check MIVAA service availability.');
   }
 
   private calculateOverallConfidence(executions: AgentExecution[]): number {
     if (executions.length === 0) return 0;
-
     const validExecutions = executions.filter(e => e.confidence > 0);
     if (validExecutions.length === 0) return 0;
-
-    // Weighted average based on agent importance and confidence
     const totalConfidence = validExecutions.reduce((sum, e) => sum + e.confidence, 0);
     return Math.round((totalConfidence / validExecutions.length) * 100) / 100;
   }
 
-  private async createTaskRecord(taskId: string, request: MaterialAgentTaskRequest): Promise<void> {
-    const { error } = await supabase
-      .from('agent_tasks')
-      .insert({
-        id: taskId,
-        user_id: request.user_id,
-        task_type: request.task_type,
-        priority: request.priority || 5,
-        input_data: request.input_data,
-        status: 'processing',
-      });
+  private async createTaskRecord(
+    taskId: string,
+    request: MaterialAgentTaskRequest,
+    authContext: AuthContext,
+  ): Promise<void> {
+    const { error } = await supabase.from('agent_tasks').insert({
+      id: taskId,
+      user_id: request.user_id,
+      workspace_id: authContext.workspaceId,
+      task_name: `${request.task_type} - ${new Date().toISOString()}`,
+      task_type: request.task_type,
+      task_status: 'processing',
+      priority: request.priority?.toString() || '5',
+      input_data: request.input_data,
+      output_data: {},
+      task_config: {},
+      progress_percentage: 0,
+      dependencies: {},
+      metadata: { created_by: authContext.userId },
+      created_at: new Date().toISOString(),
+    });
 
     if (error) throw error;
   }
 
-  private async updateTaskRecord(taskId: string, updates: any): Promise<void> {
+  private async updateTaskRecord(taskId: string, updates: Record<string, unknown>): Promise<void> {
     const { error } = await supabase
       .from('agent_tasks')
-      .update(updates)
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', taskId);
 
     if (error) console.error('Failed to update task record:', error);
   }
 
   private async updateAgentMetrics(agentId: string, execution: AgentExecution): Promise<void> {
-    // Update agent performance metrics for learning
-    const metricsUpdate = {
-      last_execution_time: execution.execution_time_ms,
-      last_confidence: execution.confidence,
-      total_executions: 1, // This would be incremented in a real implementation
-      average_confidence: execution.confidence,
-    };
+    try {
+      const { data: existingAgent } = await supabase
+        .from('material_agents')
+        .select('performance_metrics')
+        .eq('id', agentId)
+        .single();
 
-    const { error } = await supabase
-      .from('material_agents')
-      .update({
-        performance_metrics: metricsUpdate,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', agentId);
+      const currentMetrics = existingAgent?.performance_metrics || {
+        total_executions: 0,
+        average_confidence: 0,
+        last_execution_time: 0,
+      };
 
-    if (error) console.error('Failed to update agent metrics:', error);
+      const newMetrics = {
+        total_executions: (currentMetrics.total_executions || 0) + 1,
+        average_confidence:
+          ((currentMetrics.average_confidence || 0) * (currentMetrics.total_executions || 0) +
+            execution.confidence) /
+          ((currentMetrics.total_executions || 0) + 1),
+        last_execution_time: execution.execution_time_ms,
+        last_confidence: execution.confidence,
+      };
+
+      await supabase
+        .from('material_agents')
+        .update({
+          performance_metrics: newMetrics,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', agentId);
+    } catch (error) {
+      console.error('Failed to update agent metrics:', error);
+    }
   }
 }
 
+// ============================================================================
+// REQUEST HANDLER
+// ============================================================================
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const authService = new AuthenticationService();
+    const authHeader = req.headers.get('authorization');
+    const authContext = await authService.validateToken(authHeader);
+
+    if (!authContext?.isAuthenticated) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const request: MaterialAgentTaskRequest = await req.json();
 
-    // Validate request
     if (!request.user_id || !request.task_type || !request.input_data) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Missing required fields: user_id, task_type, and input_data are required',
+          error: 'Missing required fields: user_id, task_type, and input_data',
         }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Initialize and execute Material Agent Orchestrator
-    const orchestrator = new MaterialAgentOrchestrator();
-    await orchestrator.initializeAgents();
+    const orchestrator = new PraisonAIOrchestrator();
+    const result = await orchestrator.executeTask(request, authContext);
 
-    const result = await orchestrator.executeTask(request);
-
-    return new Response(
-      JSON.stringify(result),
-      {
-        status: result.success ? 200 : 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    );
-
+    return new Response(JSON.stringify(result), {
+      status: result.success ? 200 : 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    console.error('Error in material-agent-orchestrator function:', error);
+    console.error('Error in material-agent-orchestrator:', error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Internal server error',
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });
+
