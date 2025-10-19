@@ -615,6 +615,77 @@ The admin panel provides comprehensive system management through multiple tabs:
 - **Quality Metrics**: Phase 2-3 quality and validation metrics
 - **Relationship Analytics**: Chunk relationship statistics and trends
 
+### 11. 🛍️ Products & E-Commerce System
+
+#### Shopping Cart Management
+- **Cart Creation**: Users can create shopping carts for product collections
+- **Item Management**: Add, remove, and update items in cart
+- **Cart Status Tracking**: Active, submitted, quoted, ordered states
+- **Automatic Totals**: Real-time calculation of cart totals and item counts
+- **Cart Persistence**: Carts saved to database with user association
+
+#### Quote Request System
+- **Quote Submission**: Users submit carts as quote requests
+- **Admin Review**: Admins review and manage pending quote requests
+- **Status Tracking**: Pending → Updated → Approved/Rejected workflow
+- **Item Tracking**: Automatic count and total estimation
+- **Notes & Comments**: Support for special requests and notes
+
+#### Proposal Management
+- **Proposal Creation**: Admins create proposals from quote requests
+- **Pricing Control**: Admins set subtotal, tax, and discount
+- **Automatic Calculations**: Total calculated automatically
+- **Proposal Status**: Draft → Sent → Accepted/Rejected workflow
+- **User Acceptance**: Users can accept proposals to proceed to order
+
+#### Moodboard Integration
+- **Product Collections**: Add products to moodboards
+- **Position Tracking**: Store product positions within moodboard
+- **Quote from Moodboard**: Users can request quotes for entire moodboards
+- **Product Management**: Add/remove products from moodboards
+
+#### Commission System
+- **Moodboard Creator Commissions**: Track commissions for moodboard creators
+- **Commission Percentage**: Configurable commission rates (default 10%)
+- **Commission Tracking**: Pending → Approved → Paid workflow
+- **Commission Dashboard**: View and manage all commissions
+- **Commission Calculations**: Automatic calculation based on proposal totals
+
+#### Edge Functions
+- **shopping-cart-api**: Cart CRUD operations
+- **quote-request-api**: Quote request management
+- **proposals-api**: Proposal creation and management
+- **moodboard-products-api**: Moodboard product operations
+- **moodboard-quote-api**: Moodboard quote requests and commissions
+
+#### Frontend Services
+- **ShoppingCartService**: Cart operations and calculations
+- **QuoteRequestService**: Quote request management
+- **ProposalsService**: Proposal operations
+- **MoodboardProductsService**: Moodboard product management
+- **CommissionService**: Commission tracking and calculations
+
+#### React Components
+- **ShoppingCart**: Display and manage cart items
+- **QuoteRequestForm**: Submit quote requests
+- **QuoteStatusTracker**: Track quote and proposal status
+- **QuoteRequestsPanel**: Admin panel for managing requests
+- **ProposalEditor**: Create and edit proposals
+- **CommissionTracker**: View and manage commissions
+- **MoodboardProductSelector**: Add/remove products from moodboards
+
+#### Database Tables
+- **shopping_carts**: User shopping carts
+- **cart_items**: Items in shopping carts
+- **quote_requests**: Quote requests from users
+- **proposals**: Proposals created by admins
+- **moodboard_products**: Products linked to moodboards
+- **moodboard_quote_requests**: Commission tracking for moodboard quotes
+
+#### Testing
+- **test-products-complete-flow.js**: Product creation and search tests
+- **test-products-system-complete.js**: End-to-end cart → quote → proposal → commission tests
+
 ## 🔗 Related Documentation
 
 - [API Documentation](./api-documentation.md) - Complete API reference

@@ -2764,6 +2764,320 @@ Host: mivaa-pdf-extractor:8000
 }
 ```
 
+## 🛍️ Products & E-Commerce APIs
+
+### Shopping Cart API
+
+#### Create Shopping Cart
+```http
+POST /functions/v1/shopping-cart-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "workspace_id": "workspace-123"
+}
+```
+
+**Response**:
+```json
+{
+  "data": {
+    "id": "cart-123",
+    "user_id": "user-456",
+    "workspace_id": "workspace-123",
+    "status": "active",
+    "total_items": 0,
+    "created_at": "2025-10-19T10:00:00Z",
+    "updated_at": "2025-10-19T10:00:00Z"
+  }
+}
+```
+
+#### Get Cart with Items
+```http
+GET /functions/v1/shopping-cart-api?cart_id=cart-123
+Authorization: Bearer {token}
+```
+
+#### Add Item to Cart
+```http
+POST /functions/v1/shopping-cart-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "cart_id": "cart-123",
+  "product_id": "prod-001",
+  "quantity": 2,
+  "unit_price": 99.99,
+  "notes": "Optional notes"
+}
+```
+
+#### Remove Item from Cart
+```http
+DELETE /functions/v1/shopping-cart-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "cart_id": "cart-123",
+  "item_id": "item-456"
+}
+```
+
+#### Update Cart Status
+```http
+PATCH /functions/v1/shopping-cart-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "cart_id": "cart-123",
+  "status": "submitted"
+}
+```
+
+### Quote Request API
+
+#### Submit Quote Request
+```http
+POST /functions/v1/quote-request-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "cart_id": "cart-123",
+  "workspace_id": "workspace-123",
+  "notes": "Special requests"
+}
+```
+
+**Response**:
+```json
+{
+  "data": {
+    "id": "quote-123",
+    "user_id": "user-456",
+    "cart_id": "cart-123",
+    "status": "pending",
+    "items_count": 3,
+    "total_estimated": 349.97,
+    "notes": "Special requests",
+    "created_at": "2025-10-19T10:00:00Z"
+  }
+}
+```
+
+#### Get Quote Requests
+```http
+GET /functions/v1/quote-request-api?limit=50&offset=0&admin=false
+Authorization: Bearer {token}
+```
+
+#### Get Quote Request Details
+```http
+GET /functions/v1/quote-request-api?request_id=quote-123
+Authorization: Bearer {token}
+```
+
+#### Update Quote Request Status
+```http
+PATCH /functions/v1/quote-request-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "request_id": "quote-123",
+  "status": "updated"
+}
+```
+
+### Proposals API
+
+#### Create Proposal (Admin Only)
+```http
+POST /functions/v1/proposals-api
+Authorization: Bearer {admin_token}
+Content-Type: application/json
+
+{
+  "quote_request_id": "quote-123",
+  "items": [
+    {
+      "product_id": "prod-001",
+      "quantity": 2,
+      "unit_price": 99.99,
+      "total": 199.98
+    }
+  ],
+  "subtotal": 349.97,
+  "tax": 34.99,
+  "discount": 0,
+  "notes": "Proposal notes"
+}
+```
+
+**Response**:
+```json
+{
+  "data": {
+    "id": "proposal-123",
+    "quote_request_id": "quote-123",
+    "user_id": "user-456",
+    "status": "draft",
+    "items": [...],
+    "subtotal": 349.97,
+    "tax": 34.99,
+    "discount": 0,
+    "total": 384.96,
+    "created_at": "2025-10-19T10:00:00Z"
+  }
+}
+```
+
+#### Get Proposals
+```http
+GET /functions/v1/proposals-api?limit=50&offset=0
+Authorization: Bearer {token}
+```
+
+#### Get Proposal Details
+```http
+GET /functions/v1/proposals-api?proposal_id=proposal-123
+Authorization: Bearer {token}
+```
+
+#### Update Proposal Pricing
+```http
+PATCH /functions/v1/proposals-api
+Authorization: Bearer {admin_token}
+Content-Type: application/json
+
+{
+  "proposal_id": "proposal-123",
+  "subtotal": 349.97,
+  "tax": 34.99,
+  "discount": 10.00,
+  "notes": "Updated notes"
+}
+```
+
+#### Send Proposal to User
+```http
+PATCH /functions/v1/proposals-api
+Authorization: Bearer {admin_token}
+Content-Type: application/json
+
+{
+  "proposal_id": "proposal-123",
+  "action": "send"
+}
+```
+
+#### Accept Proposal (User)
+```http
+PATCH /functions/v1/proposals-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "proposal_id": "proposal-123",
+  "action": "accept"
+}
+```
+
+### Moodboard Products API
+
+#### Add Product to Moodboard
+```http
+POST /functions/v1/moodboard-products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "moodboard_id": "moodboard-123",
+  "product_id": "prod-001",
+  "position_x": 100,
+  "position_y": 200,
+  "notes": "Optional notes"
+}
+```
+
+#### Get Moodboard Products
+```http
+GET /functions/v1/moodboard-products-api?moodboard_id=moodboard-123&limit=50&offset=0
+Authorization: Bearer {token}
+```
+
+#### Remove Product from Moodboard
+```http
+DELETE /functions/v1/moodboard-products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "moodboard_id": "moodboard-123",
+  "product_id": "prod-001"
+}
+```
+
+### Moodboard Quote API
+
+#### Request Quote for Moodboard
+```http
+POST /functions/v1/moodboard-quote-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "moodboard_id": "moodboard-123",
+  "workspace_id": "workspace-123",
+  "notes": "Quote request notes"
+}
+```
+
+**Response**:
+```json
+{
+  "data": {
+    "id": "moodboard-quote-123",
+    "moodboard_id": "moodboard-123",
+    "moodboard_creator_id": "user-789",
+    "requester_id": "user-456",
+    "quote_request_id": "quote-123",
+    "commission_percentage": 10.0,
+    "status": "pending",
+    "created_at": "2025-10-19T10:00:00Z"
+  }
+}
+```
+
+#### Get Moodboard Quote Requests
+```http
+GET /functions/v1/moodboard-quote-api?moodboard_id=moodboard-123&limit=50&offset=0
+Authorization: Bearer {token}
+```
+
+#### Get User Commissions
+```http
+GET /functions/v1/moodboard-quote-api?endpoint=commissions&limit=50&offset=0
+Authorization: Bearer {token}
+```
+
+**Response**:
+```json
+{
+  "data": [...],
+  "count": 5,
+  "totals": {
+    "total_commission": 1500.00,
+    "pending_commission": 500.00
+  }
+}
+```
+
 ## 🔗 Related Documentation
 
 - [Security & Authentication](./security-authentication.md) - API security
