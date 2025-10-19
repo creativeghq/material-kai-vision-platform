@@ -3,7 +3,7 @@
  * Tests for role-based access control and agent execution
  */
 
-import { agentAccessControl, type UserRole } from '../agentRoleAccessControl';
+import { agentAccessControl } from '../agentRoleAccessControl';
 import { toolAccessControl } from '../toolAccessControl';
 import { agentManager } from '../agentManager';
 

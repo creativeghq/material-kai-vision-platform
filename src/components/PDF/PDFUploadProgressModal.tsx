@@ -4,15 +4,7 @@ import {
   XCircle,
   Clock,
   Loader2,
-  AlertCircle,
-  ChevronDown,
-  ChevronRight,
   FileText,
-  Upload,
-  Shield,
-  Sparkles,
-  Database,
-  BarChart3,
   X,
   RefreshCw,
   AlertTriangle,
@@ -21,19 +13,14 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EnhancedProgressMonitor } from './EnhancedProgressMonitor';
 import { PDFImageGallery } from './PDFImageGallery';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { getErrorFeedback, getSuccessFeedback } from '@/utils/errorMessages';
+import { getErrorFeedback } from '@/utils/errorMessages';
 
 // Import types from the workflow service
 interface WorkflowStepDetail {
@@ -82,34 +69,6 @@ interface PDFUploadProgressModalProps {
 
 }
 
-const stepIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  auth: Shield,
-  upload: Upload,
-  validation: FileText,
-  'mivaa-processing': Sparkles,
-  'layout-analysis': BarChart3,
-  'embedding-generation': Database,
-  'knowledge-storage': Database,
-  'quality-assessment': CheckCircle,
-};
-
-const getStepIcon = (stepId: string) => {
-  return stepIcons[stepId] || Clock;
-};
-
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return <CheckCircle className="h-4 w-4 text-green-600" />;
-    case 'failed':
-      return <XCircle className="h-4 w-4 text-red-600" />;
-    case 'running':
-      return <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />;
-    default:
-      return <Clock className="h-4 w-4 text-gray-500" />;
-  }
-};
-
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'completed':
@@ -135,23 +94,6 @@ const formatDuration = (startTime?: Date, endTime?: Date) => {
   return `${Math.floor(duration / 3600)}h ${Math.floor((duration % 3600) / 60)}m`;
 };
 
-const calculateOverallProgress = (steps: WorkflowStep[]) => {
-  if (steps.length === 0) return 0;
-  
-  const completedSteps = steps.filter(step => step.status === 'completed').length;
-  const runningSteps = steps.filter(step => step.status === 'running');
-  
-  let progress = (completedSteps / steps.length) * 100;
-  
-  // Add partial progress for running steps
-  if (runningSteps.length > 0) {
-    const runningProgress = runningSteps.reduce((acc, step) => acc + (step.progress || 50), 0) / runningSteps.length;
-    progress += (runningProgress / 100) * (1 / steps.length) * 100;
-  }
-  
-  return Math.min(progress, 100);
-};
-
 export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   isOpen,
   onClose,
@@ -160,36 +102,13 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   useEnhancedMonitor = false,
   showImageGallery = false,
   onRetry,
-
-}) => {
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+}: PDFUploadProgressModalProps) => {
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   // const [autoScroll, setAutoScroll] = useState(true);
 
-  const toggleStepExpansion = (stepId: string) => {
-    setExpandedSteps(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(stepId)) {
-        newSet.delete(stepId);
-      } else {
-        newSet.add(stepId);
-      }
-      return newSet;
-    });
-  };
-
-  // Auto-expand failed steps and handle completion
+  // Auto-close modal after successful completion (optional)
   useEffect(() => {
     if (job) {
-      const failedSteps = job.steps.filter(step => step.status === 'failed');
-      if (failedSteps.length > 0) {
-        setExpandedSteps(prev => {
-          const newSet = new Set(prev);
-          failedSteps.forEach(step => newSet.add(step.id));
-          return newSet;
-        });
-      }
-
       // Auto-close modal after successful completion (optional)
       // if (job.status === 'completed') {
       //   setTimeout(() => {
@@ -250,15 +169,15 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
   if (!job) return null;
 
-  const overallProgress = calculateOverallProgress(job.steps);
   const isCompleted = job.status === 'completed';
   const isFailed = job.status === 'failed';
   const isRunning = job.status === 'running';
+  const showEnhancedMonitor = Boolean(useEnhancedMonitor && job.id);
 
   // Get error feedback if job failed
   const failedStep = job.steps.find(step => step.status === 'failed');
   const errorFeedback = isFailed && failedStep?.error
-    ? getErrorFeedback(failedStep.error, failedStep.id)
+    ? getErrorFeedback(failedStep.error)
     : null;
 
   return (
@@ -362,31 +281,31 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             <div className="p-6 space-y-4 max-h-none">
 
               {/* Enhanced Progress Monitor Option */}
-              {useEnhancedMonitor && job.id && (
-                <div className="mb-6">
-                  <EnhancedProgressMonitor
-                    jobId={job.id}
-                    onComplete={(progress) => {
-                      console.log('Processing completed:', progress);
-                    }}
-                    onError={(error) => {
-                      console.error('Processing error:', error);
-                    }}
-                    showStatistics={true}
-                    showStepDetails={true}
-                    compact={false}
-                  />
-                  <Separator className="my-6" />
-                </div>
-              )}
+              {(showEnhancedMonitor ? (
+                  <div className="mb-6">
+                    <EnhancedProgressMonitor
+                      jobId={job.id as string}
+                      onComplete={(progress: any) => {
+                        console.log('Processing completed:', progress);
+                      }}
+                      onError={(error: unknown) => {
+                        console.error('Processing error:', error);
+                      }}
+                      showStatistics={true}
+                      showStepDetails={true}
+                      compact={false}
+                    />
+                    <Separator className="my-6" />
+                  </div>
+                ) : null) as any}
 
               {/* Image Gallery Section */}
               {showImageGallery && job.metadata?.documentId && isCompleted && (
                 <div className="mb-6">
                   <PDFImageGallery
-                    documentId={job.metadata.documentId}
+                    documentId={job.metadata.documentId as string}
                     showHeader={true}
-                    viewMode="grid"
+                    viewMode={'grid'}
                     className="w-full"
                   />
                   <Separator className="my-6" />
@@ -413,7 +332,6 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 const mivaaStep = job.steps.find(s => s.id === 'mivaa-processing');
                 const knowledgeStep = job.steps.find(s => s.id === 'knowledge-storage');
                 const embeddingStep = job.steps.find(s => s.id === 'embedding-generation');
-                const layoutStep = job.steps.find(s => s.id === 'layout-analysis');
 
                 // Parse details to extract counts
                 let chunksCreated = 0;
@@ -424,8 +342,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 let categoriesAdded = 0;
 
                 if (mivaaStep?.details) {
-                  mivaaStep.details.forEach(detail => {
-                    const detailStr = typeof detail === 'string' ? detail : detail.message;
+                  mivaaStep.details.forEach((detail: unknown) => {
+                    const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
                     const chunkMatch = detailStr.match(/Generated (\d+) text chunks/);
                     const imageMatch = detailStr.match(/Extracted (\d+) images/);
                     const pageMatch = detailStr.match(/Processed (\d+) pages?/);
@@ -436,8 +354,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 }
 
                 if (knowledgeStep?.details) {
-                  knowledgeStep.details.forEach(detail => {
-                    const detailStr = typeof detail === 'string' ? detail : detail.message;
+                  knowledgeStep.details.forEach((detail: unknown) => {
+                    const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
                     const kbMatch = detailStr.match(/Stored (\d+) chunks/);
                     const catMatch = detailStr.match(/Added to (\d+) categories?/);
                     if (kbMatch) kbEntriesStored = parseInt(kbMatch[1]);
@@ -446,8 +364,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 }
 
                 if (embeddingStep?.details) {
-                  embeddingStep.details.forEach(detail => {
-                    const detailStr = typeof detail === 'string' ? detail : detail.message;
+                  embeddingStep.details.forEach((detail: unknown) => {
+                    const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
                     const embeddingMatch = detailStr.match(/Generated (\d+) embeddings/);
                     if (embeddingMatch) embeddingsGenerated = parseInt(embeddingMatch[1]);
                   });

@@ -69,12 +69,11 @@ export class AgentFileUploadService {
 
       // Generate unique file path
       const timestamp = Date.now();
-      const fileExtension = file.name.split('.').pop() || 'bin';
       const fileName = `${options.userId}/${options.agentId}/${timestamp}_${file.name}`;
       const storagePath = `agent-uploads/${fileName}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('agent-files')
         .upload(storagePath, file, {
           cacheControl: '3600',
@@ -160,7 +159,7 @@ export class AgentFileUploadService {
         throw error;
       }
 
-      return (data || []).map(file => ({
+      return (data || []).map((file: any) => ({
         id: file.id,
         name: file.file_name,
         type: file.file_type,

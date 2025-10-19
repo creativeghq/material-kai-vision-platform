@@ -135,7 +135,7 @@ export class AgentManager {
       throw new Error('Research Agent not initialized');
     }
 
-    const query = request.parameters as ResearchQuery;
+    const query = request.parameters as unknown as ResearchQuery;
     return this.researchAgent.research(query);
   }
 
@@ -147,7 +147,7 @@ export class AgentManager {
       throw new Error('MIVAA Search Agent not initialized');
     }
 
-    const query = request.parameters as MaterialSearchQuery;
+    const query = request.parameters as unknown as MaterialSearchQuery;
     return this.mivaaSearchAgent.searchMaterials(query);
   }
 

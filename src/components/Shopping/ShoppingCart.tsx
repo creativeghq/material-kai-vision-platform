@@ -15,7 +15,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
   const [cart, setCart] = useState<CartWithItems | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const cartService = ShoppingCartService.getInstance();
+  const cartService = new ShoppingCartService();
 
   useEffect(() => {
     loadCart();

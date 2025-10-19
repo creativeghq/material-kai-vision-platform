@@ -1,4 +1,3 @@
-import { Singleton } from '../base/Singleton';
 import { SupabaseApiService } from '../base/ApiService';
 
 export interface Cart {
@@ -29,12 +28,11 @@ export interface CartWithItems extends Cart {
  * Shopping Cart Service
  * Manages shopping cart operations through the shopping-cart-api Edge Function
  */
-export class ShoppingCartService extends Singleton {
+export class ShoppingCartService {
   private apiService: SupabaseApiService;
 
   constructor() {
-    super();
-    this.apiService = SupabaseApiService.getInstance();
+    this.apiService = new SupabaseApiService();
   }
 
   /**
@@ -44,14 +42,10 @@ export class ShoppingCartService extends Singleton {
     try {
       const response = await this.apiService.call<
         { workspace_id?: string },
-        { data: Cart }
+        Cart
       >('shopping-cart-api', { workspace_id: workspaceId }, { method: 'POST' });
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to create cart');
-      }
-
-      return response.data.data;
+      return response as unknown as Cart;
     } catch (error) {
       console.error('Error creating cart:', error);
       throw error;
@@ -65,14 +59,10 @@ export class ShoppingCartService extends Singleton {
     try {
       const response = await this.apiService.call<
         { cart_id: string },
-        { data: CartWithItems }
+        CartWithItems
       >('shopping-cart-api', { cart_id: cartId }, { method: 'GET' });
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get cart');
-      }
-
-      return response.data.data;
+      return response as unknown as CartWithItems;
     } catch (error) {
       console.error('Error getting cart:', error);
       throw error;
@@ -98,7 +88,7 @@ export class ShoppingCartService extends Singleton {
           unit_price?: number;
           notes?: string;
         },
-        { data: CartItem }
+        CartItem
       >(
         'shopping-cart-api',
         {
@@ -111,11 +101,7 @@ export class ShoppingCartService extends Singleton {
         { method: 'POST' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to add item');
-      }
-
-      return response.data.data;
+      return response as unknown as CartItem;
     } catch (error) {
       console.error('Error adding item to cart:', error);
       throw error;
@@ -127,7 +113,7 @@ export class ShoppingCartService extends Singleton {
    */
   async removeItem(cartId: string, itemId: string): Promise<void> {
     try {
-      const response = await this.apiService.call<
+      await this.apiService.call<
         { cart_id: string; item_id: string },
         { success: boolean }
       >(
@@ -135,10 +121,6 @@ export class ShoppingCartService extends Singleton {
         { cart_id: cartId, item_id: itemId },
         { method: 'DELETE' }
       );
-
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to remove item');
-      }
     } catch (error) {
       console.error('Error removing item from cart:', error);
       throw error;
@@ -152,18 +134,14 @@ export class ShoppingCartService extends Singleton {
     try {
       const response = await this.apiService.call<
         { cart_id: string; status: string },
-        { data: Cart }
+        Cart
       >(
         'shopping-cart-api',
         { cart_id: cartId, status },
-        { method: 'PATCH' }
+        { method: 'PUT' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to update cart');
-      }
-
-      return response.data.data;
+      return response as unknown as Cart;
     } catch (error) {
       console.error('Error updating cart:', error);
       throw error;

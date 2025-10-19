@@ -1,4 +1,3 @@
-import { Singleton } from '../base/Singleton';
 import { SupabaseApiService } from '../base/ApiService';
 
 export interface Commission {
@@ -25,12 +24,11 @@ export interface CommissionSummary {
  * Commission Service
  * Manages commission tracking through the moodboard-quote-api Edge Function
  */
-export class CommissionService extends Singleton {
+export class CommissionService {
   private apiService: SupabaseApiService;
 
   constructor() {
-    super();
-    this.apiService = SupabaseApiService.getInstance();
+    this.apiService = new SupabaseApiService();
   }
 
   /**
@@ -58,11 +56,7 @@ export class CommissionService extends Singleton {
         { method: 'GET' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get commissions');
-      }
-
-      return response.data;
+      return response;
     } catch (error) {
       console.error('Error getting commissions:', error);
       throw error;

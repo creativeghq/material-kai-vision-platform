@@ -232,7 +232,7 @@ export class ChunkQualityService {
         }
       });
 
-    const { error, data } = await supabase
+    const { error } = await supabase
       .from('document_chunks')
       .update({
         coherence_score: qualityData.coherence_score,
@@ -291,8 +291,8 @@ export class ChunkQualityService {
 
     // Calculate aggregated metrics
     const coherenceScores = chunks
-      .map(c => c.coherence_score)
-      .filter(s => s !== null) as number[];
+      .map((c: any) => c.coherence_score)
+      .filter((s: any) => s !== null) as number[];
 
     const averageCoherence = coherenceScores.length > 0
       ? Math.round((coherenceScores.reduce((a, b) => a + b, 0) / coherenceScores.length) * 100) / 100

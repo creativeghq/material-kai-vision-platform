@@ -378,8 +378,8 @@ class PDFImageService {
         throw new Error(`Failed to fetch image types: ${error.message}`);
       }
 
-      const types = new Set(data?.map(item => item.image_type) || []);
-      return Array.from(types).sort();
+      const types = new Set(data?.map((item: any) => item.image_type) || []);
+      return Array.from(types).sort() as string[];
     } catch (error) {
       console.error('Error fetching image types:', error);
       throw error;

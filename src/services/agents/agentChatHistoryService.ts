@@ -122,7 +122,7 @@ export class AgentChatHistoryService {
         throw error;
       }
 
-      return (data || []).map(conv => ({
+      return (data || []).map((conv: any) => ({
         id: conv.id,
         userId: conv.user_id,
         agentId: conv.agent_id,
@@ -249,7 +249,7 @@ export class AgentChatHistoryService {
         throw error;
       }
 
-      return (data || []).map(msg => ({
+      return (data || []).map((msg: any) => ({
         id: msg.id,
         conversationId: msg.conversation_id,
         role: msg.role,

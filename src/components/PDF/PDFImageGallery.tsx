@@ -11,10 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import {
   Image as ImageIcon,
   Download,
@@ -22,15 +20,10 @@ import {
   Grid,
   List,
   ZoomIn,
-  ZoomOut,
   ChevronLeft,
   ChevronRight,
   X,
   FileText,
-  MapPin,
-  Tag,
-  Eye,
-  Filter,
   SortAsc,
   SortDesc,
   AlertCircle,

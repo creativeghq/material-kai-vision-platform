@@ -10,8 +10,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AlertTriangle } from 'lucide-react';
+
+// Type assertions for recharts components
+const RechartResponsiveContainer = ResponsiveContainer as any;
+const RechartBarChart = BarChart as any;
+const RechartLineChart = LineChart as any;
+const RechartXAxis = XAxis as any;
+const RechartYAxis = YAxis as any;
+const RechartCartesianGrid = CartesianGrid as any;
+const RechartTooltip = Tooltip as any;
+const RechartLegend = Legend as any;
+const RechartLine = Line as any;
+const RechartBar = Bar as any;
 
 interface RetrievalMetric {
   id: string;
@@ -89,10 +101,10 @@ export const QualityMetricsDashboard: React.FC = () => {
 
       // Calculate statistics
       if (retrievalData && retrievalData.length > 0) {
-        const avgPrecision = retrievalData.reduce((sum, m) => sum + (m.precision || 0), 0) / retrievalData.length;
-        const avgRecall = retrievalData.reduce((sum, m) => sum + (m.recall || 0), 0) / retrievalData.length;
-        const avgMRR = retrievalData.reduce((sum, m) => sum + (m.mrr || 0), 0) / retrievalData.length;
-        const avgLatency = retrievalData.reduce((sum, m) => sum + (m.latency_ms || 0), 0) / retrievalData.length;
+        const avgPrecision = retrievalData.reduce((sum: number, m: any) => sum + (m.precision || 0), 0) / retrievalData.length;
+        const avgRecall = retrievalData.reduce((sum: number, m: any) => sum + (m.recall || 0), 0) / retrievalData.length;
+        const avgMRR = retrievalData.reduce((sum: number, m: any) => sum + (m.mrr || 0), 0) / retrievalData.length;
+        const avgLatency = retrievalData.reduce((sum: number, m: any) => sum + (m.latency_ms || 0), 0) / retrievalData.length;
 
         setStats(prev => ({
           ...prev,
@@ -104,11 +116,11 @@ export const QualityMetricsDashboard: React.FC = () => {
       }
 
       if (responseData && responseData.length > 0) {
-        const avgCoherence = responseData.reduce((sum, m) => sum + (m.coherence_score || 0), 0) / responseData.length;
-        const avgHallucination = responseData.reduce((sum, m) => sum + (m.hallucination_score || 0), 0) / responseData.length;
-        const avgAttribution = responseData.reduce((sum, m) => sum + (m.source_attribution_score || 0), 0) / responseData.length;
-        const avgConsistency = responseData.reduce((sum, m) => sum + (m.factual_consistency_score || 0), 0) / responseData.length;
-        const avgResponseQuality = responseData.reduce((sum, m) => sum + (m.overall_quality_score || 0), 0) / responseData.length;
+        const avgCoherence = responseData.reduce((sum: number, m: any) => sum + (m.coherence_score || 0), 0) / responseData.length;
+        const avgHallucination = responseData.reduce((sum: number, m: any) => sum + (m.hallucination_score || 0), 0) / responseData.length;
+        const avgAttribution = responseData.reduce((sum: number, m: any) => sum + (m.source_attribution_score || 0), 0) / responseData.length;
+        const avgConsistency = responseData.reduce((sum: number, m: any) => sum + (m.factual_consistency_score || 0), 0) / responseData.length;
+        const avgResponseQuality = responseData.reduce((sum: number, m: any) => sum + (m.overall_quality_score || 0), 0) / responseData.length;
 
         setStats(prev => ({
           ...prev,
@@ -226,27 +238,27 @@ export const QualityMetricsDashboard: React.FC = () => {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <h4 className="font-semibold mb-2">Precision Distribution</h4>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={retrievalMetrics.slice(0, 10)}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="query" width={50} />
-                          <YAxis />
-                          <Tooltip />
-                          <Bar dataKey="precision" fill="#8884d8" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <RechartResponsiveContainer width="100%" height={200}>
+                        <RechartBarChart data={retrievalMetrics.slice(0, 10)}>
+                          <RechartCartesianGrid strokeDasharray="3 3" />
+                          <RechartXAxis dataKey="query" width={50} />
+                          <RechartYAxis />
+                          <RechartTooltip />
+                          <RechartBar dataKey="precision" fill="#8884d8" />
+                        </RechartBarChart>
+                      </RechartResponsiveContainer>
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">Recall Distribution</h4>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={retrievalMetrics.slice(0, 10)}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="query" width={50} />
-                          <YAxis />
-                          <Tooltip />
-                          <Bar dataKey="recall" fill="#82ca9d" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <RechartResponsiveContainer width="100%" height={200}>
+                        <RechartBarChart data={retrievalMetrics.slice(0, 10)}>
+                          <RechartCartesianGrid strokeDasharray="3 3" />
+                          <RechartXAxis dataKey="query" width={50} />
+                          <RechartYAxis />
+                          <RechartTooltip />
+                          <RechartBar dataKey="recall" fill="#82ca9d" />
+                        </RechartBarChart>
+                      </RechartResponsiveContainer>
                     </div>
                   </div>
                 </div>
@@ -274,15 +286,15 @@ export const QualityMetricsDashboard: React.FC = () => {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <h4 className="font-semibold mb-2">Quality Scores</h4>
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={responseMetrics.slice(0, 10)}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="query" width={50} />
-                          <YAxis />
-                          <Tooltip />
-                          <Bar dataKey="overall_quality_score" fill="#ffc658" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <RechartResponsiveContainer width="100%" height={200}>
+                        <RechartBarChart data={responseMetrics.slice(0, 10)}>
+                          <RechartCartesianGrid strokeDasharray="3 3" />
+                          <RechartXAxis dataKey="query" width={50} />
+                          <RechartYAxis />
+                          <RechartTooltip />
+                          <RechartBar dataKey="overall_quality_score" fill="#ffc658" />
+                        </RechartBarChart>
+                      </RechartResponsiveContainer>
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">Assessment Distribution</h4>
@@ -312,17 +324,17 @@ export const QualityMetricsDashboard: React.FC = () => {
               <div className="space-y-4">
                 <div>
                   <h4 className="font-semibold mb-2">Retrieval Quality Trend</h4>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={retrievalMetrics.slice(0, 20).reverse()}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="created_at" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="precision" stroke="#8884d8" name="Precision" />
-                      <Line type="monotone" dataKey="recall" stroke="#82ca9d" name="Recall" />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <RechartResponsiveContainer width="100%" height={250}>
+                    <RechartLineChart data={retrievalMetrics.slice(0, 20).reverse()}>
+                      <RechartCartesianGrid strokeDasharray="3 3" />
+                      <RechartXAxis dataKey="created_at" />
+                      <RechartYAxis />
+                      <RechartTooltip />
+                      <RechartLegend />
+                      <RechartLine type="monotone" dataKey="precision" stroke="#8884d8" name="Precision" />
+                      <RechartLine type="monotone" dataKey="recall" stroke="#82ca9d" name="Recall" />
+                    </RechartLineChart>
+                  </RechartResponsiveContainer>
                 </div>
               </div>
             </CardContent>

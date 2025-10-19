@@ -97,13 +97,6 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
     return Math.round(score * 100);
   };
 
-  const getQualityColor = (score?: number) => {
-    if (!score) return 'text-gray-500';
-    if (score >= 0.85) return 'text-green-600';
-    if (score >= 0.7) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
   const getQualityBadgeVariant = (score?: number) => {
     if (!score) return 'outline';
     if (score >= 0.85) return 'default';

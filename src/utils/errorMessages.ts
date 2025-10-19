@@ -27,9 +27,9 @@ export interface ErrorFeedback {
 }
 
 /**
- * Get user-friendly error message based on error type and context
+ * Get user-friendly error message based on error type
  */
-export function getErrorFeedback(error: unknown, context?: string): ErrorFeedback {
+export function getErrorFeedback(error: unknown): ErrorFeedback {
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   // Network errors

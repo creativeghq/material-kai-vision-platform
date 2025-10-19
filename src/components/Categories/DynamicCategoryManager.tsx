@@ -23,7 +23,7 @@ import {
   getMaterialCategories,
   getCategoriesHierarchy
 } from '@/services/dynamicCategoryManagementService';
-import { Plus, Edit, Eye, Tag, Folder, Package } from 'lucide-react';
+import { Plus, Tag, Folder, Package } from 'lucide-react';
 
 interface DynamicCategoryManagerProps {
   onCategorySelect?: (category: CategoryHierarchy) => void;

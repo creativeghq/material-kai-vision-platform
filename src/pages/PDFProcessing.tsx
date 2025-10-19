@@ -59,7 +59,7 @@ const PDFProcessing = () => {
         const jobId = await consolidatedPDFWorkflowService.startPDFProcessing(file);
 
         // Get the job and show progress modal
-        const job = consolidatedPDFWorkflowService.getJob(jobId);
+        const job = consolidatedPDFWorkflowService.getJob(jobId) as WorkflowJob | undefined;
         if (job) {
           setCurrentJob(job);
           setIsProgressModalOpen(true);
@@ -104,7 +104,7 @@ const PDFProcessing = () => {
       const jobId = await consolidatedPDFWorkflowService.startPDFProcessing(file);
 
       // Get the job and show progress modal
-      const job = consolidatedPDFWorkflowService.getJob(jobId);
+      const job = consolidatedPDFWorkflowService.getJob(jobId) as WorkflowJob | undefined;
       if (job) {
         setCurrentJob(job);
         setIsProgressModalOpen(true);

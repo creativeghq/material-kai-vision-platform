@@ -1,15 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  BarChart3,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  Activity,
-  ArrowLeft,
   RefreshCw,
-  Download,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
@@ -62,7 +55,7 @@ interface DocumentMetrics {
 }
 
 const QualityStabilityMetricsPanel: React.FC = () => {
-  const navigate = useNavigate();
+
   const { toast } = useToast();
   const [documents, setDocuments] = useState<DocumentMetrics[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,17 +84,17 @@ const QualityStabilityMetricsPanel: React.FC = () => {
           .eq('document_id', doc.id);
 
         // Get stability metrics
-        const { data: stabilityMetrics } = await supabase
+        const { data: stabilityMetricsData } = await supabase
           .from('embedding_stability_metrics')
           .select('stability_score, consistency_score, variance_score, anomaly_detected')
           .eq('document_id', doc.id);
 
         if (qualityChunks && qualityChunks.length > 0) {
           const scores = qualityChunks
-            .map(c => c.coherence_score)
-            .filter(s => s !== null) as number[];
+            .map((c: any) => c.coherence_score)
+            .filter((s: any) => s !== null) as number[];
 
-          const assessments = qualityChunks.map(c => c.quality_assessment);
+          const assessments = qualityChunks.map((c: any) => c.quality_assessment);
 
           const qualityMetrics: QualityMetrics = {
             total_chunks: qualityChunks.length,
@@ -109,15 +102,15 @@ const QualityStabilityMetricsPanel: React.FC = () => {
             average_score: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
             min_score: scores.length > 0 ? Math.min(...scores) : 0,
             max_score: scores.length > 0 ? Math.max(...scores) : 0,
-            excellent_count: assessments.filter(a => a === 'Excellent').length,
-            very_good_count: assessments.filter(a => a === 'Very Good').length,
-            good_count: assessments.filter(a => a === 'Good').length,
-            fair_count: assessments.filter(a => a === 'Fair').length,
-            acceptable_count: assessments.filter(a => a === 'Acceptable').length,
-            poor_count: assessments.filter(a => a === 'Poor').length,
+            excellent_count: assessments.filter((a: any) => a === 'Excellent').length,
+            very_good_count: assessments.filter((a: any) => a === 'Very Good').length,
+            good_count: assessments.filter((a: any) => a === 'Good').length,
+            fair_count: assessments.filter((a: any) => a === 'Fair').length,
+            acceptable_count: assessments.filter((a: any) => a === 'Acceptable').length,
+            poor_count: assessments.filter((a: any) => a === 'Poor').length,
           };
 
-          let stabilityMetrics: StabilityMetrics = {
+          let stabilityMetricsResult: StabilityMetrics = {
             total_chunks: 0,
             average_stability: 0,
             average_consistency: 0,
@@ -126,26 +119,26 @@ const QualityStabilityMetricsPanel: React.FC = () => {
             anomaly_rate: 0,
           };
 
-          if (stabilityMetrics && stabilityMetrics.length > 0) {
-            const stabilityScores = stabilityMetrics.map(m => m.stability_score);
-            const consistencyScores = stabilityMetrics.map(m => m.consistency_score);
-            const varianceScores = stabilityMetrics.map(m => m.variance_score);
-            const anomalies = stabilityMetrics.filter(m => m.anomaly_detected).length;
+          if (stabilityMetricsData && Array.isArray(stabilityMetricsData) && stabilityMetricsData.length > 0) {
+            const stabilityScores = stabilityMetricsData.map((m: any) => m.stability_score);
+            const consistencyScores = stabilityMetricsData.map((m: any) => m.consistency_score);
+            const varianceScores = stabilityMetricsData.map((m: any) => m.variance_score);
+            const anomalies = stabilityMetricsData.filter((m: any) => m.anomaly_detected).length;
 
-            stabilityMetrics = {
-              total_chunks: stabilityMetrics.length,
-              average_stability: stabilityScores.reduce((a, b) => a + b, 0) / stabilityScores.length,
-              average_consistency: consistencyScores.reduce((a, b) => a + b, 0) / consistencyScores.length,
-              average_variance: varianceScores.reduce((a, b) => a + b, 0) / varianceScores.length,
+            stabilityMetricsResult = {
+              total_chunks: stabilityMetricsData.length,
+              average_stability: stabilityScores.reduce((a: number, b: number) => a + b, 0) / stabilityScores.length,
+              average_consistency: consistencyScores.reduce((a: number, b: number) => a + b, 0) / consistencyScores.length,
+              average_variance: varianceScores.reduce((a: number, b: number) => a + b, 0) / varianceScores.length,
               anomalies_detected: anomalies,
-              anomaly_rate: anomalies / stabilityMetrics.length,
+              anomaly_rate: anomalies / stabilityMetricsData.length,
             };
           }
 
           const overallHealth = (
             qualityMetrics.average_score * 0.4 +
-            stabilityMetrics.average_stability * 0.35 +
-            stabilityMetrics.average_consistency * 0.25
+            stabilityMetricsResult.average_stability * 0.35 +
+            stabilityMetricsResult.average_consistency * 0.25
           );
 
           metricsData.push({
@@ -153,7 +146,7 @@ const QualityStabilityMetricsPanel: React.FC = () => {
             document_name: doc.document_name || 'Unknown',
             created_at: doc.created_at,
             quality_metrics: qualityMetrics,
-            stability_metrics: stabilityMetrics,
+            stability_metrics: stabilityMetricsResult,
             overall_health: overallHealth,
           });
         }

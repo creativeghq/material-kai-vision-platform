@@ -1,4 +1,3 @@
-import { Singleton } from '../base/Singleton';
 import { SupabaseApiService } from '../base/ApiService';
 
 export interface ProposalItem {
@@ -31,12 +30,11 @@ export interface Proposal {
  * Proposals Service
  * Manages proposal operations through the proposals-api Edge Function
  */
-export class ProposalsService extends Singleton {
+export class ProposalsService {
   private apiService: SupabaseApiService;
 
   constructor() {
-    super();
-    this.apiService = SupabaseApiService.getInstance();
+    this.apiService = new SupabaseApiService();
   }
 
   /**
@@ -74,11 +72,7 @@ export class ProposalsService extends Singleton {
         { method: 'POST' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to create proposal');
-      }
-
-      return response.data.data;
+      return response as unknown as Proposal;
     } catch (error) {
       console.error('Error creating proposal:', error);
       throw error;
@@ -102,11 +96,7 @@ export class ProposalsService extends Singleton {
         { method: 'GET' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get proposals');
-      }
-
-      return response.data;
+      return response as { data: Proposal[]; count: number };
     } catch (error) {
       console.error('Error getting proposals:', error);
       throw error;
@@ -120,18 +110,14 @@ export class ProposalsService extends Singleton {
     try {
       const response = await this.apiService.call<
         { proposal_id: string },
-        { data: Proposal }
+        Proposal
       >(
         'proposals-api',
         { proposal_id: proposalId },
         { method: 'GET' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get proposal');
-      }
-
-      return response.data.data;
+      return response as Proposal;
     } catch (error) {
       console.error('Error getting proposal:', error);
       throw error;
@@ -157,7 +143,7 @@ export class ProposalsService extends Singleton {
           discount?: number;
           notes?: string;
         },
-        { data: Proposal }
+        Proposal
       >(
         'proposals-api',
         {
@@ -167,14 +153,10 @@ export class ProposalsService extends Singleton {
           discount,
           notes,
         },
-        { method: 'PATCH' }
+        { method: 'PUT' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to update proposal');
-      }
-
-      return response.data.data;
+      return response as Proposal;
     } catch (error) {
       console.error('Error updating proposal:', error);
       throw error;
@@ -188,18 +170,14 @@ export class ProposalsService extends Singleton {
     try {
       const response = await this.apiService.call<
         { proposal_id: string },
-        { data: Proposal }
+        Proposal
       >(
         'proposals-api',
         { proposal_id: proposalId },
-        { method: 'PATCH' }
+        { method: 'PUT' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to send proposal');
-      }
-
-      return response.data.data;
+      return response as Proposal;
     } catch (error) {
       console.error('Error sending proposal:', error);
       throw error;
@@ -213,18 +191,14 @@ export class ProposalsService extends Singleton {
     try {
       const response = await this.apiService.call<
         { proposal_id: string },
-        { data: Proposal }
+        Proposal
       >(
         'proposals-api',
         { proposal_id: proposalId },
-        { method: 'PATCH' }
+        { method: 'PUT' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to accept proposal');
-      }
-
-      return response.data.data;
+      return response as Proposal;
     } catch (error) {
       console.error('Error accepting proposal:', error);
       throw error;

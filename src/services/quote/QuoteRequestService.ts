@@ -1,4 +1,3 @@
-import { Singleton } from '../base/Singleton';
 import { SupabaseApiService } from '../base/ApiService';
 
 export interface QuoteRequest {
@@ -22,12 +21,11 @@ export interface QuoteRequestWithItems extends QuoteRequest {
  * Quote Request Service
  * Manages quote request operations through the quote-request-api Edge Function
  */
-export class QuoteRequestService extends Singleton {
+export class QuoteRequestService {
   private apiService: SupabaseApiService;
 
   constructor() {
-    super();
-    this.apiService = SupabaseApiService.getInstance();
+    this.apiService = new SupabaseApiService();
   }
 
   /**
@@ -48,11 +46,7 @@ export class QuoteRequestService extends Singleton {
         { method: 'POST' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to submit quote request');
-      }
-
-      return response.data.data;
+      return response as unknown as QuoteRequest;
     } catch (error) {
       console.error('Error submitting quote request:', error);
       throw error;
@@ -77,11 +71,7 @@ export class QuoteRequestService extends Singleton {
         { method: 'GET' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get quote requests');
-      }
-
-      return response.data;
+      return response as unknown as { data: QuoteRequest[]; count: number };
     } catch (error) {
       console.error('Error getting quote requests:', error);
       throw error;
@@ -95,18 +85,14 @@ export class QuoteRequestService extends Singleton {
     try {
       const response = await this.apiService.call<
         { request_id: string },
-        { data: QuoteRequestWithItems }
+        QuoteRequestWithItems
       >(
         'quote-request-api',
         { request_id: requestId },
         { method: 'GET' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get quote request');
-      }
-
-      return response.data.data;
+      return response as unknown as QuoteRequestWithItems;
     } catch (error) {
       console.error('Error getting quote request:', error);
       throw error;
@@ -120,18 +106,14 @@ export class QuoteRequestService extends Singleton {
     try {
       const response = await this.apiService.call<
         { request_id: string; status: string },
-        { data: QuoteRequest }
+        QuoteRequest
       >(
         'quote-request-api',
         { request_id: requestId, status },
-        { method: 'PATCH' }
+        { method: 'PUT' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to update quote request');
-      }
-
-      return response.data.data;
+      return response as unknown as QuoteRequest;
     } catch (error) {
       console.error('Error updating quote request:', error);
       throw error;

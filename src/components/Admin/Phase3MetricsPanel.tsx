@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,8 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { RefreshCw, BarChart3, Link2, Search, MessageSquare } from 'lucide-react';
+import { RefreshCw, Link2, Search, MessageSquare } from 'lucide-react';
 
 interface RelationshipStats {
   total_relationships: number;
@@ -36,9 +35,7 @@ interface ResponseMetrics {
 }
 
 const Phase3MetricsPanel: React.FC = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const [relationshipStats, setRelationshipStats] = useState<RelationshipStats>({
@@ -103,10 +100,10 @@ const Phase3MetricsPanel: React.FC = () => {
 
       if (retrievalData && retrievalData.length > 0) {
         setRetrievalMetrics({
-          avg_precision: retrievalData.reduce((sum, m) => sum + m.precision, 0) / retrievalData.length,
-          avg_recall: retrievalData.reduce((sum, m) => sum + m.recall, 0) / retrievalData.length,
-          avg_mrr: retrievalData.reduce((sum, m) => sum + m.mrr, 0) / retrievalData.length,
-          avg_latency_ms: retrievalData.reduce((sum, m) => sum + m.latency_ms, 0) / retrievalData.length,
+          avg_precision: retrievalData.reduce((sum: number, m: any) => sum + m.precision, 0) / retrievalData.length,
+          avg_recall: retrievalData.reduce((sum: number, m: any) => sum + m.recall, 0) / retrievalData.length,
+          avg_mrr: retrievalData.reduce((sum: number, m: any) => sum + m.mrr, 0) / retrievalData.length,
+          avg_latency_ms: retrievalData.reduce((sum: number, m: any) => sum + m.latency_ms, 0) / retrievalData.length,
           total_queries: retrievalData.length,
         });
       }
@@ -120,11 +117,11 @@ const Phase3MetricsPanel: React.FC = () => {
 
       if (responseData && responseData.length > 0) {
         setResponseMetrics({
-          avg_coherence: responseData.reduce((sum, m) => sum + m.coherence_score, 0) / responseData.length,
-          avg_hallucination: responseData.reduce((sum, m) => sum + m.hallucination_score, 0) / responseData.length,
-          avg_attribution: responseData.reduce((sum, m) => sum + m.source_attribution_score, 0) / responseData.length,
-          avg_consistency: responseData.reduce((sum, m) => sum + m.factual_consistency_score, 0) / responseData.length,
-          avg_overall: responseData.reduce((sum, m) => sum + m.overall_quality_score, 0) / responseData.length,
+          avg_coherence: responseData.reduce((sum: number, m: any) => sum + m.coherence_score, 0) / responseData.length,
+          avg_hallucination: responseData.reduce((sum: number, m: any) => sum + m.hallucination_score, 0) / responseData.length,
+          avg_attribution: responseData.reduce((sum: number, m: any) => sum + m.source_attribution_score, 0) / responseData.length,
+          avg_consistency: responseData.reduce((sum: number, m: any) => sum + m.factual_consistency_score, 0) / responseData.length,
+          avg_overall: responseData.reduce((sum: number, m: any) => sum + m.overall_quality_score, 0) / responseData.length,
           total_responses: responseData.length,
         });
       }
@@ -136,7 +133,6 @@ const Phase3MetricsPanel: React.FC = () => {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   }, [toast]);

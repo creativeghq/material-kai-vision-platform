@@ -42,7 +42,8 @@ export async function debugCORSIssue() {
     
   } catch (error) {
     console.log('  ❌ OPTIONS Error:', error);
-    return { success: false, error: `OPTIONS error: ${error.message}` };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: `OPTIONS error: ${errorMessage}` };
   }
   
   // Test 2: Actual POST request
@@ -80,16 +81,17 @@ export async function debugCORSIssue() {
     
   } catch (error) {
     console.log('  ❌ POST Error:', error);
-    console.log('  Error Type:', error.constructor.name);
-    console.log('  Error Message:', error.message);
-    
-    if (error.message.includes('CORS')) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log('  Error Type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.log('  Error Message:', errorMessage);
+
+    if (errorMessage.includes('CORS')) {
       console.log('  🚨 CORS Error Detected!');
       console.log('  This suggests the browser is blocking the request');
       console.log('  Even though our tests show the server has proper CORS headers');
     }
-    
-    return { success: false, error: `POST error: ${error.message}` };
+
+    return { success: false, error: `POST error: ${errorMessage}` };
   }
 }
 

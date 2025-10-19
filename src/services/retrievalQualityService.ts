@@ -135,10 +135,10 @@ export class RetrievalQualityService {
         };
       }
 
-      const avgPrecision = data.reduce((sum, m) => sum + m.precision, 0) / data.length;
-      const avgRecall = data.reduce((sum, m) => sum + m.recall, 0) / data.length;
-      const avgMrr = data.reduce((sum, m) => sum + m.mrr, 0) / data.length;
-      const avgLatency = data.reduce((sum, m) => sum + m.latency_ms, 0) / data.length;
+      const avgPrecision = data.reduce((sum: number, m: any) => sum + m.precision, 0) / data.length;
+      const avgRecall = data.reduce((sum: number, m: any) => sum + m.recall, 0) / data.length;
+      const avgMrr = data.reduce((sum: number, m: any) => sum + m.mrr, 0) / data.length;
+      const avgLatency = data.reduce((sum: number, m: any) => sum + m.latency_ms, 0) / data.length;
 
       return {
         avg_precision: avgPrecision,

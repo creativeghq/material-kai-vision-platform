@@ -32,15 +32,8 @@ export interface ResearchResult {
  */
 export class ResearchAgent {
   private agent: Agent;
-  private config: Required<ResearchAgentConfig>;
 
-  constructor(config: ResearchAgentConfig = {}) {
-    this.config = {
-      model: config.model || 'gpt-4',
-      temperature: config.temperature ?? 0.7,
-      maxTokens: config.maxTokens || 2000,
-    };
-
+  constructor(_config: ResearchAgentConfig = {}) {
     this.agent = new Agent({
       name: 'Research Agent',
       role: 'Senior Research Analyst',
@@ -50,8 +43,6 @@ export class ResearchAgent {
         well-sourced insights. You excel at identifying patterns, synthesizing information,
         and providing actionable recommendations.`,
       verbose: true,
-      temperature: this.config.temperature,
-      maxTokens: this.config.maxTokens,
     });
   }
 

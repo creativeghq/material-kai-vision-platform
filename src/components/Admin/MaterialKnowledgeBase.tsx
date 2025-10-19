@@ -114,8 +114,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [stats, setStats] = useState<KnowledgeBaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
-  const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null);
+
   const [activeTab, setActiveTab] = useState('overview');
   const { toast } = useToast();
 
@@ -190,11 +189,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
       setProducts(productsData || []);
 
       // Calculate stats
-      const uniqueDocuments = new Set(chunksData?.map(c => c.document_id) || []).size;
-      const avgChunkSize = chunksData?.length ? 
-        chunksData.reduce((sum, chunk) => sum + chunk.content.length, 0) / chunksData.length : 0;
-      const avgConfidence = imagesData?.length ? 
-        imagesData.reduce((sum, img) => sum + (img.confidence || 0), 0) / imagesData.length : 0;
+      const uniqueDocuments = new Set(chunksData?.map((c: any) => c.document_id) || []).size;
+      const avgChunkSize = chunksData?.length ?
+        chunksData.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / chunksData.length : 0;
+      const avgConfidence = imagesData?.length ?
+        imagesData.reduce((sum: number, img: any) => sum + (img.confidence || 0), 0) / imagesData.length : 0;
 
       setStats({
         totalChunks: chunksData?.length || 0,
@@ -510,15 +509,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             </Badge>
                           </div>
 
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedDocument(docId)}
-                            className="w-full"
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </Button>
+
                         </div>
                       );
                     })}
@@ -740,14 +731,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                             {/* Actions */}
                             <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSelectedChunk(chunk)}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </Button>
+
                               <Button variant="outline" size="sm">
                                 <Download className="h-4 w-4 mr-2" />
                                 Export

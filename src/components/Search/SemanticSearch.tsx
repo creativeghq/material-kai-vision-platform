@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
 
 import { SemanticSearchInput, SearchOptions } from './SemanticSearchInput';
 

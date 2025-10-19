@@ -119,7 +119,7 @@ export interface UnifiedMLOptions {
  * Unified ML result interface
  */
 export interface UnifiedMLResult extends MLResult {
-  processingMethod: 'server' | 'huggingface';
+  processingMethod: 'client' | 'server' | 'huggingface';
   serverJobId?: string;
   provider?: string;
   modelVersion?: string;
@@ -291,7 +291,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
         case 'huggingface':
           return await this.processHuggingFace(file, description, finalOptions);
         default:
-          return await this.processHybrid(file, description, finalOptions);
+          return await this.processServerSide(file, description, finalOptions);
       }
     }, 'analyzeMaterial');
   }
@@ -423,29 +423,6 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
       provider: 'huggingface',
       modelVersion: 'huggingface-inference',
     };
-  }
-
-  /**
-   * Server-side processing with HuggingFace fallback
-   */
-  private async processServerWithFallback(
-    file: File | string,
-    description?: string,
-    options: UnifiedMLOptions = {}
-  ): Promise<UnifiedMLResult> {
-    try {
-      return await this.processServerSide(file, description, options);
-    } catch (error) {
-      console.warn('Server processing failed, trying HuggingFace:', error);
-
-      if (this.huggingFaceService) {
-        const result = await this.processHuggingFace(file, description, options);
-        result.processingMethod = 'huggingface';
-        return result;
-      }
-
-      throw error;
-    }
   }
 
   /**
@@ -591,7 +568,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
             result: {
               success: false,
               error: error instanceof Error ? error.message : 'Processing failed',
-              processingMethod: 'hybrid' as const,
+              processingMethod: 'server' as const,
               confidence: 0,
               processingTime: 0,
             },

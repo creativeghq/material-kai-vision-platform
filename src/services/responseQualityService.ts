@@ -206,7 +206,6 @@ export class ResponseQualityService {
     }
 
     // Check for consistency with sources
-    const responseWords = new Set(responseText.toLowerCase().split(/\s+/));
     const sourceWords = new Set();
 
     for (const chunk of sourceChunks) {
@@ -278,11 +277,11 @@ export class ResponseQualityService {
       }
 
       return {
-        avg_coherence: data.reduce((sum, m) => sum + m.coherence_score, 0) / data.length,
-        avg_hallucination: data.reduce((sum, m) => sum + m.hallucination_score, 0) / data.length,
-        avg_attribution: data.reduce((sum, m) => sum + m.source_attribution_score, 0) / data.length,
-        avg_consistency: data.reduce((sum, m) => sum + m.factual_consistency_score, 0) / data.length,
-        avg_overall: data.reduce((sum, m) => sum + m.overall_quality_score, 0) / data.length,
+        avg_coherence: data.reduce((sum: number, m: any) => sum + m.coherence_score, 0) / data.length,
+        avg_hallucination: data.reduce((sum: number, m: any) => sum + m.hallucination_score, 0) / data.length,
+        avg_attribution: data.reduce((sum: number, m: any) => sum + m.source_attribution_score, 0) / data.length,
+        avg_consistency: data.reduce((sum: number, m: any) => sum + m.factual_consistency_score, 0) / data.length,
+        avg_overall: data.reduce((sum: number, m: any) => sum + m.overall_quality_score, 0) / data.length,
         total_responses: data.length,
       };
     } catch (error) {

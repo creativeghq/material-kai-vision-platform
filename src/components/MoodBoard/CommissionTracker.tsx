@@ -15,7 +15,7 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
 
-  const commissionService = CommissionService.getInstance();
+  const commissionService = new CommissionService();
 
   useEffect(() => {
     loadCommissions();

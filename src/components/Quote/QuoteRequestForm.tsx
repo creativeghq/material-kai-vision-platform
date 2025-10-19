@@ -21,8 +21,8 @@ export const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const quoteService = QuoteRequestService.getInstance();
-  const cartService = ShoppingCartService.getInstance();
+  const quoteService = new QuoteRequestService();
+  const cartService = new ShoppingCartService();
 
   React.useEffect(() => {
     loadCart();

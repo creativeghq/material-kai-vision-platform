@@ -291,9 +291,6 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
    * Make HTTP request to MIVAA service through gateway with retry logic
    */
   private async makeRequest(endpoint: string, options: RequestInit, retries = 3): Promise<Response> {
-    // Use existing Supabase MIVAA gateway
-    const { supabase } = await import('@/integrations/supabase/client');
-
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const controller = new AbortController();

@@ -8,7 +8,7 @@ interface QuoteStatusTrackerProps {
 }
 
 export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
-  userId,
+  userId: _userId,
   onProposalAccepted,
 }) => {
   const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
@@ -17,8 +17,8 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<QuoteRequest | null>(null);
 
-  const quoteService = QuoteRequestService.getInstance();
-  const proposalService = ProposalsService.getInstance();
+  const quoteService = new QuoteRequestService();
+  const proposalService = new ProposalsService();
 
   useEffect(() => {
     loadData();

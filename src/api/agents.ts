@@ -3,22 +3,26 @@
  * Endpoints for agent execution with role-based access control
  */
 
-import { Router, Request, Response } from 'express';
-import multer from 'multer';
+// NOTE: This file is for Express.js backend API routes
+// It should not be in the frontend src directory
+// Commenting out imports to prevent TypeScript errors in frontend build
+
+// import { Router, Request, Response } from 'express';
+// import multer from 'multer';
 import { agentManager } from '@/services/agents/agentManager';
 import { agentFileUploadService } from '@/services/agents/agentFileUploadService';
 import { agentChatHistoryService } from '@/services/agents/agentChatHistoryService';
-import { useUserRole } from '@/hooks/useUserRole';
+// import { useUserRole } from '@/hooks/useUserRole';
 
-const router = Router();
+// const router = Router();
 
 // Configure multer for file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
-  },
-});
+// const upload = multer({
+//   storage: multer.memoryStorage(),
+//   limits: {
+//     fileSize: 50 * 1024 * 1024, // 50MB
+//   },
+// });
 
 /**
  * GET /api/agents

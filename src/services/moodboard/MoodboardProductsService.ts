@@ -1,4 +1,3 @@
-import { Singleton } from '../base/Singleton';
 import { SupabaseApiService } from '../base/ApiService';
 
 export interface MoodboardProduct {
@@ -15,12 +14,11 @@ export interface MoodboardProduct {
  * Moodboard Products Service
  * Manages moodboard product operations through the moodboard-products-api Edge Function
  */
-export class MoodboardProductsService extends Singleton {
+export class MoodboardProductsService {
   private apiService: SupabaseApiService;
 
   constructor() {
-    super();
-    this.apiService = SupabaseApiService.getInstance();
+    this.apiService = new SupabaseApiService();
   }
 
   /**
@@ -55,11 +53,7 @@ export class MoodboardProductsService extends Singleton {
         { method: 'POST' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to add product to moodboard');
-      }
-
-      return response.data.data;
+      return response as unknown as MoodboardProduct;
     } catch (error) {
       console.error('Error adding product to moodboard:', error);
       throw error;
@@ -84,11 +78,7 @@ export class MoodboardProductsService extends Singleton {
         { method: 'GET' }
       );
 
-      if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to get moodboard products');
-      }
-
-      return response.data;
+      return response;
     } catch (error) {
       console.error('Error getting moodboard products:', error);
       throw error;
@@ -110,7 +100,7 @@ export class MoodboardProductsService extends Singleton {
       );
 
       if (!response.success) {
-        throw new Error(response.error?.message || 'Failed to remove product from moodboard');
+        throw new Error('Failed to remove product from moodboard');
       }
     } catch (error) {
       console.error('Error removing product from moodboard:', error);

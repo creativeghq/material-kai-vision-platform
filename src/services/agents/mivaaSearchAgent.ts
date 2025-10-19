@@ -42,15 +42,8 @@ export interface MaterialMatch {
  */
 export class MivaaSearchAgent {
   private agent: Agent;
-  private config: Required<MivaaSearchAgentConfig>;
 
-  constructor(config: MivaaSearchAgentConfig = {}) {
-    this.config = {
-      model: config.model || 'gpt-3.5-turbo',
-      temperature: config.temperature ?? 0.5,
-      maxTokens: config.maxTokens || 1500,
-    };
-
+  constructor(_config: MivaaSearchAgentConfig = {}) {
     this.agent = new Agent({
       name: 'MIVAA Search Agent',
       role: 'Material Database Specialist',
@@ -59,8 +52,6 @@ export class MivaaSearchAgent {
         material properties, classifications, and retrieval. You help users find the most
         relevant materials based on their queries and requirements.`,
       verbose: true,
-      temperature: this.config.temperature,
-      maxTokens: this.config.maxTokens,
     });
   }
 
@@ -113,7 +104,7 @@ export class MivaaSearchAgent {
   /**
    * Build search context from database
    */
-  private async buildSearchContext(query: MaterialSearchQuery): Promise<string> {
+  private async buildSearchContext(_query: MaterialSearchQuery): Promise<string> {
     try {
       // Get material categories and properties for context
       const { data: categories } = await supabase
@@ -122,7 +113,7 @@ export class MivaaSearchAgent {
         .limit(10);
 
       const categoryContext = categories
-        ? `Available categories: ${categories.map(c => c.name).join(', ')}`
+        ? `Available categories: ${categories.map((c: any) => c.name).join(', ')}`
         : '';
 
       return categoryContext;

@@ -21,7 +21,7 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
   const [notes, setNotes] = useState('');
   const [adding, setAdding] = useState(false);
 
-  const moodboardService = MoodboardProductsService.getInstance();
+  const moodboardService = new MoodboardProductsService();
 
   useEffect(() => {
     loadProducts();

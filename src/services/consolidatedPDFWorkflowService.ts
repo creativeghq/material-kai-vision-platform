@@ -563,7 +563,6 @@ export class ConsolidatedPDFWorkflowService {
         const mivaaData = (mivaaResult as any).result;
         const details = mivaaData?.details || {};
         const parameters = mivaaData?.parameters || {};
-        const metadata = mivaaData?.metadata || {};
 
         // Extract layout information from MIVAA results
         const sections = details.sections || parameters.sections || [];
@@ -1104,7 +1103,6 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       // If MIVAA gateway failed, try direct database access as fallback
-      let mivaaChunks: any[] = [];
       if (chunks.length === 0 && chunksCount > 0) {
         console.log(`⚠️ MIVAA gateway returned 0 chunks, trying direct database access...`);
         try {
@@ -1117,7 +1115,6 @@ export class ConsolidatedPDFWorkflowService {
           if (chunksError) {
             console.error('Database chunks query error:', chunksError);
           } else if (dbChunks && dbChunks.length > 0) {
-            mivaaChunks = dbChunks; // Store original chunks for quality scoring
             chunks = dbChunks.map((chunk: any) => ({
               chunk_id: chunk.id,
               content: chunk.content,
