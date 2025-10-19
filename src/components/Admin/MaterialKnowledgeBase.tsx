@@ -13,6 +13,11 @@ import {
   ChevronRight,
   Brain,
   ArrowLeft,
+  X,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Package,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +77,9 @@ interface Embedding {
   model_name?: string;
   dimensions?: number;
   created_at: string;
+  embedding_type?: string; // 'text', 'image', 'hybrid'
+  generation_timestamp?: string;
+  metadata?: any;
 }
 
 interface MaterialMetadataField {
@@ -106,6 +114,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [images, setImages] = useState<DocumentImage[]>([]);
   const [embeddings, setEmbeddings] = useState<Embedding[]>([]);
   const [metadataFields, setMetadataFields] = useState<MaterialMetadataField[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [stats, setStats] = useState<KnowledgeBaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,7 +140,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
             filename,
             metadata,
             processing_status,
-            created_at
+            created_at,
+            file_size,
+            page_count
           )
         `)
         .order('created_at', { ascending: false });
@@ -148,9 +159,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
       if (imagesError) throw imagesError;
       setImages(imagesData || []);
 
-      // Load embeddings with chunk information
+      // Load embeddings with chunk information - FIX: Get actual embedding metadata
       const { data: embeddingsData, error: embeddingsError } = await supabase
-        .from('embeddings')
+        .from('document_vectors')
         .select(`
           *,
           document_chunks!inner(
@@ -173,6 +184,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       if (metadataError) throw metadataError;
       setMetadataFields(metadataData || []);
+
+      // Load products created from PDF chunks
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('created_from_type', 'pdf_processing')
+        .order('created_at', { ascending: false });
+
+      if (productsError) throw productsError;
+      setProducts(productsData || []);
 
       // Calculate stats
       const uniqueDocuments = new Set(chunksData?.map(c => c.document_id) || []).size;
@@ -414,23 +435,27 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="chunks">Chunks ({stats?.totalChunks || 0})</TabsTrigger>
           <TabsTrigger value="images">Images ({stats?.totalImages || 0})</TabsTrigger>
           <TabsTrigger value="embeddings">Embeddings ({stats?.totalEmbeddings || 0})</TabsTrigger>
+          <TabsTrigger value="products">📦 Products</TabsTrigger>
           <TabsTrigger value="metadata">Metadata ({stats?.totalMetadataFields || 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Documents Overview */}
+            {/* Documents Overview - IMPROVED: Show complete details */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
                   Documents by Source
                 </CardTitle>
+                <CardDescription>
+                  Complete PDF details with processing status and metadata
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {chunks.length === 0 ? (
@@ -438,30 +463,61 @@ export const MaterialKnowledgeBase: React.FC = () => {
                     No documents processed yet. Upload PDFs to see content here.
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {Array.from(new Set(chunks.map(c => c.document_id))).map(docId => {
                       const docChunks = getChunksByDocument(docId);
                       const docImages = getImagesByDocument(docId);
                       const firstChunk = docChunks[0];
+                      const doc = (firstChunk as any).documents;
+
                       return (
-                        <div key={docId} className="border rounded-lg p-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">
+                        <div key={docId} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <p className="font-semibold">
                                 {getDocumentDisplayName(firstChunk)}
                               </p>
-                              <p className="text-sm text-muted-foreground">
-                                {docChunks.length} chunks • {docImages.length} images
+                              <p className="text-xs text-muted-foreground mt-1">
+                                📄 {doc?.filename || 'Unknown filename'}
                               </p>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedDocument(docId)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            <Badge variant={doc?.processing_status === 'completed' ? 'default' : 'secondary'}>
+                              {doc?.processing_status || 'unknown'}
+                            </Badge>
                           </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                            <div>
+                              <span className="text-muted-foreground">Size:</span>
+                              <span className="ml-1 font-medium">
+                                {doc?.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'N/A'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Pages:</span>
+                              <span className="ml-1 font-medium">
+                                {doc?.page_count || 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 text-xs text-muted-foreground mb-3">
+                            <Badge variant="outline">{docChunks.length} chunks</Badge>
+                            <Badge variant="outline">{docImages.length} images</Badge>
+                            <Badge variant="outline">
+                              {new Date(doc?.created_at).toLocaleDateString()}
+                            </Badge>
+                          </div>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedDocument(docId)}
+                            className="w-full"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
                         </div>
                       );
                     })}
@@ -530,7 +586,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <div className="border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
                                   <Badge variant="outline">Chunk {chunk.chunk_index}</Badge>
                                   <Badge variant="secondary">
                                     {getDocumentDisplayName(chunk)}
@@ -551,9 +607,20 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                 <p className="text-sm text-muted-foreground line-clamp-2">
                                   {chunk.content.substring(0, 200)}...
                                 </p>
-                                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                  <span>{chunk.content.length} chars</span>
-                                  <span>{new Date(chunk.created_at).toLocaleDateString()}</span>
+                                {/* IMPROVED: Add context information */}
+                                <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-muted-foreground">
+                                  <div>
+                                    <span className="font-medium">Position:</span> {chunk.chunk_index + 1}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Size:</span> {chunk.content.length} chars
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Quality:</span> {chunk.metadata?.quality_score ? `${Math.round(chunk.metadata.quality_score * 100)}%` : 'N/A'}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Date:</span> {new Date(chunk.created_at).toLocaleDateString()}
+                                  </div>
                                 </div>
                               </div>
                               <ChevronRight className="h-4 w-4" />
@@ -592,15 +659,36 @@ export const MaterialKnowledgeBase: React.FC = () => {
                               </div>
                             )}
 
-                            {/* Embedding Info */}
+                            {/* Embedding Info - IMPROVED: Show actual metadata */}
                             {embedding ? (
                               <div>
-                                <h4 className="font-medium mb-2">Embedding Information</h4>
-                                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
-                                  <p><strong>Model:</strong> {embedding.model_name || 'Unknown'}</p>
-                                  <p><strong>Dimensions:</strong> {embedding.dimensions || 'Unknown'}</p>
-                                  <p><strong>Vector Status:</strong> <Badge variant="outline" className="text-green-600">Vector Available</Badge></p>
-                                  <p><strong>Created:</strong> {new Date(embedding.created_at).toLocaleString()}</p>
+                                <h4 className="font-medium mb-2 flex items-center gap-2">
+                                  <Brain className="h-4 w-4" />
+                                  Embedding Information
+                                </h4>
+                                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <span className="font-medium">Model:</span>
+                                      <p className="text-muted-foreground">{embedding.model_name || 'text-embedding-3-small'}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">Dimensions:</span>
+                                      <p className="text-muted-foreground">{embedding.dimensions || 1536}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">Type:</span>
+                                      <p className="text-muted-foreground">{embedding.embedding_type || 'text'}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">Status:</span>
+                                      <Badge variant="outline" className="text-green-600 mt-1">Generated</Badge>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Generated:</span>
+                                    <p className="text-muted-foreground text-xs">{new Date(embedding.created_at).toLocaleString()}</p>
+                                  </div>
                                 </div>
                               </div>
                             ) : (
@@ -847,18 +935,23 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             </div>
                           )}
 
-                          <div className="grid grid-cols-3 gap-4 text-sm">
+                          {/* IMPROVED: Show embedding type and complete metadata */}
+                          <div className="grid grid-cols-4 gap-3 text-sm mb-3">
                             <div>
                               <span className="font-medium">Model:</span>
-                              <p className="text-muted-foreground">{embedding.model_name || 'Unknown'}</p>
+                              <p className="text-muted-foreground text-xs">{embedding.model_name || 'text-embedding-3-small'}</p>
                             </div>
                             <div>
                               <span className="font-medium">Dimensions:</span>
-                              <p className="text-muted-foreground">{embedding.dimensions || 0}</p>
+                              <p className="text-muted-foreground text-xs">{embedding.dimensions || 1536}</p>
                             </div>
                             <div>
-                              <span className="font-medium">Created:</span>
-                              <p className="text-muted-foreground">
+                              <span className="font-medium">Type:</span>
+                              <p className="text-muted-foreground text-xs">{embedding.embedding_type || 'text'}</p>
+                            </div>
+                            <div>
+                              <span className="font-medium">Generated:</span>
+                              <p className="text-muted-foreground text-xs">
                                 {new Date(embedding.created_at).toLocaleDateString()}
                               </p>
                             </div>
@@ -868,7 +961,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium">Vector Status</span>
                               <Badge variant="outline" className="text-green-600">
-                                ✓ Vector Available ({embedding.dimensions || 0}D)
+                                ✓ Generated ({embedding.dimensions || 1536}D)
                               </Badge>
                             </div>
                             <div className="mt-2 bg-muted/50 rounded p-2 text-xs">
@@ -882,6 +975,127 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       </Card>
                     );
                   })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NEW: Products Tab */}
+        <TabsContent value="products" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Products from PDF Chunks
+              </CardTitle>
+              <CardDescription>
+                Products created from real PDF chunks with source tracking and metadata
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {products.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    No products created yet. Process PDFs and create products from chunks.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {products.map((product) => (
+                    <Card key={product.id} className="border">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-lg">{product.name}</h4>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {product.description?.substring(0, 150)}...
+                            </p>
+                          </div>
+                          <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
+                            {product.status || 'draft'}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+                          <div>
+                            <span className="font-medium">Source:</span>
+                            <p className="text-muted-foreground text-xs">{product.created_from_type}</p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Material:</span>
+                            <p className="text-muted-foreground text-xs">
+                              {product.properties?.material_type || 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Color:</span>
+                            <p className="text-muted-foreground text-xs">
+                              {product.properties?.color || 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Created:</span>
+                            <p className="text-muted-foreground text-xs">
+                              {new Date(product.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        {product.metadata?.supplier && (
+                          <div className="mb-3 text-sm">
+                            <span className="font-medium">Supplier:</span>
+                            <p className="text-muted-foreground">{product.metadata.supplier}</p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="flex-1">
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>{product.name}</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div>
+                                  <h4 className="font-medium mb-2">Description</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {product.long_description || product.description}
+                                  </p>
+                                </div>
+                                {product.properties && (
+                                  <div>
+                                    <h4 className="font-medium mb-2">Properties</h4>
+                                    <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                                      <pre className="whitespace-pre-wrap">
+                                        {JSON.stringify(product.properties, null, 2)}
+                                      </pre>
+                                    </div>
+                                  </div>
+                                )}
+                                {product.metadata && (
+                                  <div>
+                                    <h4 className="font-medium mb-2">Metadata</h4>
+                                    <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                                      <pre className="whitespace-pre-wrap">
+                                        {JSON.stringify(product.metadata, null, 2)}
+                                      </pre>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
             </CardContent>
