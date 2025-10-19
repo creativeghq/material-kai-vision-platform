@@ -1228,9 +1228,85 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            {/* IMPROVED: Implement eye icon functionality with metadata detail modal */}
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>{field.display_name}</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <h4 className="font-medium mb-2">Field Information</h4>
+                                      <div className="space-y-2 text-sm">
+                                        <p><strong>Field Name:</strong> {field.field_name}</p>
+                                        <p><strong>Display Name:</strong> {field.display_name}</p>
+                                        <p><strong>Type:</strong> {field.field_type}</p>
+                                        <p><strong>Required:</strong> {field.is_required ? 'Yes' : 'No'}</p>
+                                        <p><strong>Global:</strong> {field.is_global ? 'Yes' : 'No'}</p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <h4 className="font-medium mb-2">Configuration</h4>
+                                      <div className="space-y-2 text-sm">
+                                        <p><strong>Sort Order:</strong> {field.sort_order || 'N/A'}</p>
+                                        <p><strong>Created:</strong> {new Date(field.created_at).toLocaleDateString()}</p>
+                                        <p><strong>Updated:</strong> {new Date(field.updated_at).toLocaleDateString()}</p>
+                                        {field.created_by && (
+                                          <p><strong>Created By:</strong> {field.created_by}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* IMPROVED: Show relationships */}
+                                  {field.applies_to_categories && field.applies_to_categories.length > 0 && (
+                                    <div>
+                                      <h4 className="font-medium mb-2">Applied Categories</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {field.applies_to_categories?.map((cat) => (
+                                          <Badge key={cat} variant="outline">
+                                            {cat}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {field.description && (
+                                    <div>
+                                      <h4 className="font-medium mb-2">Description</h4>
+                                      <p className="text-sm text-muted-foreground">{field.description}</p>
+                                    </div>
+                                  )}
+
+                                  {field.extraction_hints && (
+                                    <div>
+                                      <h4 className="font-medium mb-2">Extraction Hints</h4>
+                                      <p className="text-sm text-muted-foreground">{field.extraction_hints}</p>
+                                    </div>
+                                  )}
+
+                                  {field.dropdown_options && field.dropdown_options.length > 0 && (
+                                    <div>
+                                      <h4 className="font-medium mb-2">Dropdown Options</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {field.dropdown_options?.map((opt) => (
+                                          <Badge key={opt} variant="secondary">
+                                            {opt}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                           </TableCell>
                         </TableRow>
                       ))}
