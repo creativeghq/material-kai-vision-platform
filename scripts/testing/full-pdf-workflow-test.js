@@ -127,10 +127,10 @@ async function testFullWorkflow() {
       log('STEP 4', `Found ${images?.length || 0} images in database`, 'success');
     }
 
-    // Step 5: Check for embeddings
+    // Step 5: Check for embeddings (stored in document_vectors table)
     log('STEP 5', 'Checking for generated embeddings', 'step');
     const { data: embeddings, error: embeddingsError } = await supabase
-      .from('document_embeddings')
+      .from('document_vectors')
       .select('id, chunk_id')
       .limit(5);
 
