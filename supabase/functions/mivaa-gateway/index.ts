@@ -48,6 +48,8 @@ serve(async (req) => {
     const { action, payload } = await req.json()
 
     console.log(`🚀 MIVAA Gateway Request: ${action}`, payload)
+    console.log(`📋 MIVAA Service URL: ${MIVAA_SERVICE_URL}`)
+    console.log(`🔑 MIVAA API Key configured: ${!!Deno.env.get('MIVAA_API_KEY')}`)
 
     // Validate action
     if (!action || !MIVAA_ENDPOINTS[action]) {
