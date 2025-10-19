@@ -539,7 +539,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 </Badge>
               )}
             </div>
-            
+
             <div className="flex items-center gap-2">
               {isFailed && onRetry && (
                 <Button variant="outline" size="sm" onClick={onRetry}>
@@ -547,12 +547,6 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                   Retry
                 </Button>
               )}
-              
-
-              
-              <Button variant="outline" size="sm" onClick={onClose}>
-                Close
-              </Button>
             </div>
           </div>
         </div>

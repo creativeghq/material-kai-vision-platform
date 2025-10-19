@@ -18,8 +18,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       />
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 p-6 bg-gradient-to-br from-transparent to-accent/5">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 bg-gradient-to-br from-transparent to-accent/5">
+          <div className="w-full h-full">
             {children}
           </div>
         </main>
