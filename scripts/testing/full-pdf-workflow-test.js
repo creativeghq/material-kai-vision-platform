@@ -102,7 +102,7 @@ async function testFullWorkflow() {
 
     const { data: chunks, error: chunksError } = await supabase
       .from('document_chunks')
-      .select('id, content, embedding')
+      .select('id, content, quality_score')
       .limit(5);
 
     if (chunksError) {
@@ -118,7 +118,7 @@ async function testFullWorkflow() {
     log('STEP 4', 'Checking for extracted images', 'step');
     const { data: images, error: imagesError } = await supabase
       .from('document_images')
-      .select('id, file_path')
+      .select('id, image_url, caption')
       .limit(5);
 
     if (imagesError) {
