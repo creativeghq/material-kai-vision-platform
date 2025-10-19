@@ -136,9 +136,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
             filename,
             metadata,
             processing_status,
-            created_at,
-            file_size,
-            page_count
+            created_at
           )
         `)
         .order('created_at', { ascending: false });
@@ -495,16 +493,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                           <div className="grid grid-cols-2 gap-2 text-sm mb-2">
                             <div>
-                              <span className="text-muted-foreground">Size:</span>
-                              <span className="ml-1 font-medium">
-                                {doc?.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'N/A'}
-                              </span>
+                              <span className="text-muted-foreground">Chunks:</span>
+                              <span className="ml-1 font-medium">{docChunks.length}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Pages:</span>
-                              <span className="ml-1 font-medium">
-                                {doc?.page_count || 'N/A'}
-                              </span>
+                              <span className="text-muted-foreground">Images:</span>
+                              <span className="ml-1 font-medium">{docImages.length}</span>
                             </div>
                           </div>
 
