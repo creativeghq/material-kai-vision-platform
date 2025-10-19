@@ -21,42 +21,99 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY || SUPABASE_ANO
 
 // Tables to KEEP
 const TABLES_TO_KEEP = [
+  // Workspace & Auth
   'workspaces',
-  'workspace_members', 
+  'workspace_members',
   'workspace_permissions',
   'api_keys',
   'material_kai_keys',
   'rate_limit_rules',
+
+  // Configuration
   'category_validation_rules',
   'material_metadata_fields',
+  'material_categories',
+  'api_endpoints',
+
+  // AI/ML Models
   'ml_models',
   'crewai_agents',
   'material_agents',
   'internal_networks',
-  'api_endpoints',
-  'material_categories',
+
+  // User Management (NEW)
+  'user_profiles',
+  'user_subscriptions',
+  'user_credits',
+  'credit_transactions',
+  'roles',
+  'role_permissions',
+
+  // CRM System (NEW)
+  'crm_contacts',
+  'crm_contact_relationships',
+
+  // E-Commerce (NEW)
+  'products',
+  'product_images',
+  'shopping_carts',
+  'cart_items',
+  'quote_requests',
+  'proposals',
+  'subscription_plans',
+  'credit_packages',
 ];
 
-// Tables to CLEAR
+// Tables to CLEAR (PDF Processing & Test Data)
 const TABLES_TO_CLEAR = [
+  // PDF Processing (PRIORITY - 30k+ rows)
   'documents', 'document_chunks', 'document_embeddings', 'document_images',
-  'document_vectors', 'document_layout_analysis', 'document_processing_status',
-  'document_quality_metrics', 'embeddings', 'processed_documents', 'uploaded_files',
-  'pdf_processing_results', 'pdf_integration_health_results', 'processing_jobs',
-  'processing_queue', 'processing_results', 'processing_metrics',
+  'document_vectors', 'embeddings', 'pdf_processing_results',
+
+  // Document Analysis
+  'document_layout_analysis', 'document_processing_status',
+  'document_quality_metrics', 'processed_documents', 'uploaded_files',
+  'pdf_integration_health_results',
+
+  // Processing & Jobs
+  'processing_jobs', 'processing_queue', 'processing_results', 'processing_metrics',
+  'batch_jobs', 'category_extractions',
+
+  // Knowledge Base
   'knowledge_base_entries', 'knowledge_relationships', 'enhanced_knowledge_base',
+  'material_knowledge_extraction', 'query_intelligence',
+
+  // Materials & Analysis
   'materials_catalog', 'material_properties', 'material_images',
-  'material_knowledge_extraction', 'material_style_analysis', 'material_visual_analysis',
+  'material_style_analysis', 'material_visual_analysis',
   'scraped_materials_temp', 'recognition_results', 'property_analysis_results',
   'style_analysis_results', 'spaceformer_analysis_results', 'svbrdf_extraction_results',
-  'hybrid_analysis_results', 'voice_conversion_results', 'ocr_results',
+  'hybrid_analysis_results',
+
+  // Media & OCR
+  'voice_conversion_results', 'ocr_results',
+
+  // Visual Search
   'visual_search_embeddings', 'visual_search_queries', 'visual_search_batch_jobs',
-  'visual_search_analysis', 'visual_analysis_queue', 'ml_training_jobs',
-  'moodboards', 'moodboard_items', 'scraping_sessions', 'scraping_pages',
-  'generation_3d', 'analytics_events', 'api_usage_logs', 'mivaa_api_usage_logs',
-  'jwt_tokens_log', 'search_analytics', 'quality_scoring_logs', 'query_intelligence',
-  'response_quality_metrics', 'retrieval_quality_metrics', 'embedding_stability_metrics',
-  'health_check',
+  'visual_search_analysis', 'visual_analysis_queue',
+
+  // ML & Training
+  'ml_training_jobs',
+
+  // Moodboards & Scraping
+  'moodboards', 'moodboard_items', 'moodboard_products', 'moodboard_quote_requests',
+  'scraping_sessions', 'scraping_pages',
+
+  // Generation & 3D
+  'generation_3d',
+
+  // Logging & Analytics
+  'analytics_events', 'api_usage_logs', 'jwt_tokens_log', 'search_analytics',
+  'quality_scoring_logs', 'response_quality_metrics', 'retrieval_quality_metrics',
+  'embedding_stability_metrics', 'health_check',
+
+  // Agent System
+  'agent_chat_conversations', 'agent_chat_messages', 'agent_uploaded_files',
 ];
 
 async function runQuery(query) {
