@@ -63,7 +63,7 @@ serve(async (req) => {
       )
     }
 
-    const endpoint = MIVAA_ENDPOINTS[action]
+    let endpoint = MIVAA_ENDPOINTS[action]
     let finalPath = endpoint.path
 
     // Handle path parameters
@@ -88,28 +88,45 @@ serve(async (req) => {
     }
     // Prepare request body for POST requests
     let bodyPayload = null
-    if (endpoint.method === 'POST' && payload) {
-      if (action === 'bulk_process') {
-        // Handle bulk processing requests
-        const urls = payload.urls || payload.documents || []
-
-        if (!urls || urls.length === 0) {
-          throw new Error('Missing URLs for bulk processing. Expected urls array in payload.')
-        }
-
+    if (payload) {
+      // Force asynchronous processing for single PDF URL by using bulk endpoint
+      if (action === 'pdf_process_url' && payload.url) {
+        endpoint = MIVAA_ENDPOINTS['bulk_process']
+        finalPath = endpoint.path
         bodyPayload = {
-          urls: urls,
-          batch_size: payload.batch_size || payload.batchSize || 1,
+          urls: [payload.url],
+          batch_size: 1,
           options: {
             extract_images: payload.options?.extract_images ?? payload.extractImages ?? true,
             enable_multimodal: payload.options?.enable_multimodal ?? payload.enableMultimodal ?? true,
             ocr_languages: payload.options?.ocr_languages ?? payload.ocrLanguages ?? ['en'],
             timeout_seconds: payload.options?.timeout_seconds ?? payload.timeoutSeconds ?? 900,
-            ...payload.options // Allow frontend to override options
+            ...payload.options
           }
         }
-      } else {
-        bodyPayload = payload
+      } else if (endpoint.method === 'POST') {
+        if (action === 'bulk_process') {
+          // Handle bulk processing requests
+          const urls = payload.urls || payload.documents || []
+
+          if (!urls || urls.length === 0) {
+            throw new Error('Missing URLs for bulk processing. Expected urls array in payload.')
+          }
+
+          bodyPayload = {
+            urls: urls,
+            batch_size: payload.batch_size || payload.batchSize || 1,
+            options: {
+              extract_images: payload.options?.extract_images ?? payload.extractImages ?? true,
+              enable_multimodal: payload.options?.enable_multimodal ?? payload.enableMultimodal ?? true,
+              ocr_languages: payload.options?.ocr_languages ?? payload.ocrLanguages ?? ['en'],
+              timeout_seconds: payload.options?.timeout_seconds ?? payload.timeoutSeconds ?? 900,
+              ...payload.options // Allow frontend to override options
+            }
+          }
+        } else {
+          bodyPayload = payload
+        }
       }
     }
 

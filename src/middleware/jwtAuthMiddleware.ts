@@ -383,15 +383,23 @@ export class JWTAuthMiddleware {
 
   /**
    * Check workspace access for user
-   * Note: workspace_members table doesn't exist in current schema
-   * For now, return true to allow access (implement proper workspace logic later)
+   * Verifies that the user is a member of the specified workspace
    */
-  static async checkWorkspaceAccess(userId: string, _workspaceId: string): Promise<boolean> {
+  static async checkWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
     try {
-      // TODO: Implement proper workspace access control when workspace_members table is created
-      // For now, allow access if user ID is provided
-      // workspaceId parameter prefixed with underscore to indicate intentional non-use
-      return !!userId;
+      const { data, error } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Workspace access check error:', error);
+        return false;
+      }
+
+      return !!data;
     } catch (error) {
       console.error('Workspace access check error:', error);
       return false;

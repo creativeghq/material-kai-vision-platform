@@ -45,6 +45,8 @@ import { CriticalErrorBoundary, PageErrorBoundary } from './components/ErrorBoun
 import { MivaaDocsViewer } from './components/Admin/MivaaDocsViewer';
 import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMetricsPanel';
 import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { CRMManagement } from './components/Admin/CRMManagement';
 
 const queryClient = new QueryClient();
 
@@ -316,6 +318,18 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <PDFKnowledgeDemo />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/auth/callback" element={
+              <PageErrorBoundary name="Auth Callback">
+                <AuthCallbackPage />
+              </PageErrorBoundary>
+            } />
+            <Route path="/admin/crm" element={
+              <AuthGuard>
+                <Layout>
+                  <CRMManagement />
                 </Layout>
               </AuthGuard>
             } />

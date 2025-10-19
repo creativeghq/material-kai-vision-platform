@@ -423,6 +423,24 @@ const AdminDashboard: React.FC = () => {
         count: 'API management',
       },
     ],
+    'CRM & User Management': [
+      {
+        title: 'User Management',
+        description: 'Manage users, roles, subscriptions, and access control',
+        icon: Users,
+        path: '/admin/crm',
+        status: 'active',
+        count: 'CRM System',
+      },
+      {
+        title: 'Subscriptions & Credits',
+        description: 'Manage user subscriptions, billing, and credit system',
+        icon: BarChart3,
+        path: '/admin/subscriptions',
+        status: 'active',
+        count: 'Stripe Integration',
+      },
+    ],
     'System Monitoring': [
       {
         title: 'Analytics Dashboard',

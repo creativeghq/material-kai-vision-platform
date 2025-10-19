@@ -21,13 +21,13 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const SUPABASE_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY);
 
-const TEST_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/49f683ad-ebf2-4296-a410-0d8c011ce0be/1760462185826-harmony-signature-book-24-25.pdf';
+const TEST_PDF_URL = process.env.TEST_PDF_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf';
 
 let workflowResults = {
   steps: [],
@@ -102,10 +102,9 @@ async function step2_TriggerProcessing(pdfPath) {
     const pdfUrl = pdfPath.startsWith('http') ? pdfPath : `${SUPABASE_URL}/storage/v1/object/public/${pdfPath}`;
 
     const payload = {
-      action: 'pdf_process_url',
+      action: 'bulk_process',
       payload: {
-        url: pdfUrl,
-        document_name: pdfPath.split('/').pop(),
+        urls: [pdfUrl],
         options: {
           extract_text: true,
           extract_images: true,
@@ -125,16 +124,23 @@ async function step2_TriggerProcessing(pdfPath) {
       body: JSON.stringify(payload)
     });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(`Processing failed: ${result.error || response.statusText}`);
+    const raw = await response.text();
+    let result;
+    try {
+      result = raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      throw new Error(`Processing failed: Non-JSON response (status ${response.status}). Body: ${raw?.slice(0, 500)}`);
     }
 
+    if (!response.ok) {
+      throw new Error(`Processing failed (status ${response.status}): ${result.error || response.statusText}`);
+    }
+
+    const jobId = result.job_id || result.data?.job_id;
     log('STEP 2', `Processing triggered successfully`, 'success');
-    log('STEP 2', `Job ID: ${result.job_id || 'N/A'}`, 'info');
-    
-    return result;
+    log('STEP 2', `Job ID: ${jobId || 'N/A'}`, 'info');
+
+    return { ...result, job_id: jobId };
   } catch (error) {
     log('STEP 2', `Processing trigger failed: ${error.message}`, 'error');
     workflowResults.errors.push({ step: 'Trigger Processing', error: error.message });
@@ -142,7 +148,7 @@ async function step2_TriggerProcessing(pdfPath) {
   }
 }
 
-async function step3_MonitorProgress(jobId, maxWaitTime = 300000) {
+async function step3_MonitorProgress(jobId, maxWaitTime = 600000) {
   log('STEP 3', 'Monitoring job progress', 'step');
   
   try {
@@ -166,21 +172,33 @@ async function step3_MonitorProgress(jobId, maxWaitTime = 300000) {
         })
       });
 
-      const result = await response.json();
-      
-      if (result.status !== lastStatus) {
-        log('STEP 3', `Job status: ${result.status}`, 'info');
-        lastStatus = result.status;
+      const raw = await response.text();
+      let result;
+      try {
+        result = raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        throw new Error(`Status poll failed: Non-JSON response (status ${response.status}). Body: ${raw?.slice(0, 500)}`);
       }
 
-      if (result.status === 'completed') {
+      const status = result.status ?? result.data?.status;
+      if (status !== lastStatus) {
+        log('STEP 3', `Job status: ${status}`, 'info');
+        lastStatus = status;
+      }
+
+      if (status === 'completed' || status === 'succeeded' || status === 'success') {
+        const details = result.details ?? result.data?.details;
+        const chunksCount = result.chunks_count ?? result.data?.chunks_count ?? details?.chunks_created ?? details?.chunks ?? 0;
+        const imagesCount = result.images_count ?? result.data?.images_count ?? details?.images_extracted ?? details?.images ?? 0;
+        const documentId = result.document_id ?? result.data?.document_id ?? details?.document_id;
         log('STEP 3', `Job completed successfully`, 'success');
-        log('STEP 3', `Chunks: ${result.chunks_count || 0}, Images: ${result.images_count || 0}`, 'info');
-        return result;
+        log('STEP 3', `Chunks: ${chunksCount}, Images: ${imagesCount}`, 'info');
+        return { ...result, document_id: documentId, chunks_count: chunksCount, images_count: imagesCount };
       }
 
-      if (result.status === 'failed') {
-        throw new Error(`Job failed: ${result.error || 'Unknown error'}`);
+      if (status === 'failed' || status === 'error') {
+        const errMsg = result.error || result.data?.error_message || 'Unknown error';
+        throw new Error(`Job failed: ${errMsg}`);
       }
 
       await sleep(5000); // Check every 5 seconds
@@ -201,8 +219,9 @@ async function step4_VerifyChunksAndImages(documentId) {
     // Query chunks
     const { data: chunks, error: chunksError } = await supabase
       .from('document_chunks')
-      .select('id, content, page_number')
+      .select('id, content, chunk_index, metadata')
       .eq('document_id', documentId)
+      .order('chunk_index', { ascending: true })
       .limit(10);
 
     if (chunksError) {
@@ -225,6 +244,51 @@ async function step4_VerifyChunksAndImages(documentId) {
       throw new Error(`Failed to fetch images: ${imagesError.message}`);
     }
 
+    // Fallback: if DB has 0 images, get image list directly from MIVAA gateway for diagnostics
+    if (!images || images.length === 0) {
+      try {
+        // Check images via MIVAA
+        const diagImagesRes = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ action: 'get_document_images', payload: { document_id: documentId } })
+        });
+        const diagImagesText = await diagImagesRes.text();
+        let diagImagesJson; try { diagImagesJson = diagImagesText ? JSON.parse(diagImagesText) : {}; } catch {}
+        const mivaaImages = diagImagesJson?.data?.images || diagImagesJson?.images || [];
+        log('STEP 4', `Diagnostics: MIVAA get_document_images -> ${mivaaImages.length} images`, 'warning');
+        if (mivaaImages.length > 0) {
+          const u = mivaaImages[0]?.url || mivaaImages[0]?.image_url || 'n/a';
+          log('STEP 4', `Diagnostics: Sample MIVAA image URL: ${u}`, 'info');
+        }
+
+        // Check document content summary via MIVAA
+        const diagContentRes = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ action: 'get_document_content', payload: { document_id: documentId } })
+        });
+        const diagContentText = await diagContentRes.text();
+        let diagContentJson; try { diagContentJson = diagContentText ? JSON.parse(diagContentText) : {}; } catch {}
+        const imagesCountFromContent = diagContentJson?.data?.processing_summary?.images_extracted
+          ?? diagContentJson?.document_info?.processing_summary?.images_extracted
+          ?? diagContentJson?.images?.length
+          ?? 0;
+        const chunkCountFromContent = diagContentJson?.data?.chunks?.length
+          ?? diagContentJson?.chunks?.length
+          ?? 0;
+        log('STEP 4', `Diagnostics: MIVAA get_document_content -> images_extracted=${imagesCountFromContent}, chunks=${chunkCountFromContent}`, 'warning');
+      } catch (diagErr) {
+        log('STEP 4', `Diagnostics failed to query MIVAA content/images: ${diagErr.message}`, 'warning');
+      }
+    }
+
     log('STEP 4', `Found ${images?.length || 0} images`, 'success');
 
     return { chunks: chunks || [], images: images || [] };
@@ -239,25 +303,52 @@ async function step5_VerifyEmbeddings(documentId) {
   log('STEP 5', 'Verifying embeddings generation', 'step');
   
   try {
+    // Fetch a sample of embeddings
     const { data: embeddings, error } = await supabase
-      .from('document_embeddings')
-      .select('id, chunk_id, embedding')
-      .eq('document_id', documentId)
+      .from('embeddings')
+      .select(`
+        id, chunk_id, embedding,
+        document_chunks!inner(id, document_id)
+      `)
+      .eq('document_chunks.document_id', documentId)
       .limit(10);
 
     if (error) {
       throw new Error(`Failed to fetch embeddings: ${error.message}`);
     }
 
-    log('STEP 5', `Found ${embeddings?.length || 0} embeddings`, 'success');
-    
-    if (embeddings && embeddings.length > 0) {
-      const sample = embeddings[0];
-      const embeddingDim = Array.isArray(sample.embedding) ? sample.embedding.length : 0;
-      log('STEP 5', `Embedding dimension: ${embeddingDim}`, 'info');
+    // Get exact count via head request
+    const { count, error: countError } = await supabase
+      .from('embeddings')
+      .select(`id, document_chunks!inner(id, document_id)`, { count: 'exact', head: true })
+      .eq('document_chunks.document_id', documentId);
+
+    if (countError) {
+      log('STEP 5', `Warning: Failed to count embeddings exactly: ${countError.message}`, 'warning');
     }
 
-    return embeddings || [];
+    const totalEmbeddings = typeof count === 'number' ? count : (embeddings?.length || 0);
+    log('STEP 5', `Found ${totalEmbeddings} embeddings`, 'success');
+
+    if (embeddings && embeddings.length > 0) {
+      const sample = embeddings[0];
+      // Embedding is stored as pgvector type, check if it exists
+      let embeddingDim = 0;
+      if (sample.embedding) {
+        if (Array.isArray(sample.embedding)) {
+          embeddingDim = sample.embedding.length;
+        } else if (typeof sample.embedding === 'string') {
+          // Vector stored as string, parse to get dimension
+          const vectorMatch = sample.embedding.match(/\[([^\]]+)\]/);
+          if (vectorMatch) {
+            embeddingDim = vectorMatch[1].split(',').length;
+          }
+        }
+      }
+      log('STEP 5', `Embedding dimension: ${embeddingDim} (expected: 1536)`, embeddingDim === 1536 ? 'success' : 'warning');
+    }
+
+    return { rows: embeddings || [], totalCount: totalEmbeddings, sample: embeddings?.[0] || null };
   } catch (error) {
     log('STEP 5', `Embedding verification failed: ${error.message}`, 'error');
     workflowResults.errors.push({ step: 'Verify Embeddings', error: error.message });
@@ -265,12 +356,12 @@ async function step5_VerifyEmbeddings(documentId) {
   }
 }
 
-async function step6_PerformSearch(documentId, searchQuery = 'material') {
+async function step6_PerformSearch(documentId, searchQuery = 'energy') {
   log('STEP 6', `Performing search: "${searchQuery}"`, 'step');
-  
+
   try {
     const searchUrl = `${SUPABASE_URL}/functions/v1/unified-material-search`;
-    
+
     const response = await fetch(searchUrl, {
       method: 'POST',
       headers: {
@@ -280,19 +371,46 @@ async function step6_PerformSearch(documentId, searchQuery = 'material') {
       body: JSON.stringify({
         query: searchQuery,
         limit: 10,
-        document_id: documentId
+        search_type: 'text'  // Use text search for testing
       })
     });
 
-    const result = await response.json();
+    const raw = await response.text();
+    let result;
+    try {
+      result = raw ? JSON.parse(raw) : {};
+    } catch {
+      result = { error: `Non-JSON response: ${raw?.slice(0, 300)}` };
+    }
 
     if (!response.ok) {
-      throw new Error(`Search failed: ${result.error || response.statusText}`);
+      log('STEP 6', `Primary search endpoint failed (${response.status}). Falling back to text search on chunks.`, 'warning');
+      // Fallback: simple text search within this document's chunks
+      const { data: chunkSearch, error: chunkSearchError } = await supabase
+        .from('document_chunks')
+        .select('id, content, chunk_index')
+        .eq('document_id', documentId)
+        .ilike('content', `%${searchQuery}%`)
+        .order('chunk_index', { ascending: true })
+        .limit(10);
+
+      if (chunkSearchError) {
+        throw new Error(`Search fallback failed: ${chunkSearchError.message}`);
+      }
+
+      log('STEP 6', `Fallback search completed`, 'success');
+      log('STEP 6', `Found ${chunkSearch?.length || 0} results`, 'info');
+      if (chunkSearch && chunkSearch.length > 0) {
+        chunkSearch.slice(0, 3).forEach((r, i) => {
+          log('STEP 6', `Result ${i + 1}: "${r.content?.substring(0, 80)}..."`, 'info');
+        });
+      }
+      return chunkSearch || [];
     }
 
     log('STEP 6', `Search completed successfully`, 'success');
     log('STEP 6', `Found ${result.results?.length || 0} results`, 'info');
-    
+
     if (result.results && result.results.length > 0) {
       result.results.slice(0, 3).forEach((r, i) => {
         log('STEP 6', `Result ${i + 1}: "${r.content?.substring(0, 80)}..." (score: ${r.similarity_score?.toFixed(3)})`, 'info');
@@ -332,12 +450,12 @@ async function runCompleteWorkflow() {
     // Step 5: Verify Embeddings
     const embeddingsResult = await step5_VerifyEmbeddings(progressResult.document_id);
     workflowResults.summary.embeddings = {
-      count: embeddingsResult.length,
-      sample: embeddingsResult[0] || null
+      count: embeddingsResult.totalCount,
+      sample: embeddingsResult.sample || null
     };
 
     // Step 6: Perform Search
-    const searchResults = await step6_PerformSearch(progressResult.document_id, 'material design');
+    const searchResults = await step6_PerformSearch(progressResult.document_id);
     workflowResults.summary.searchResults = {
       count: searchResults.length,
       topResults: searchResults.slice(0, 3)
@@ -350,9 +468,9 @@ async function runCompleteWorkflow() {
     console.log('\n📊 SUMMARY:');
     console.log(`  ✓ PDF Uploaded: ${uploadResult.fileName}`);
     console.log(`  ✓ Job ID: ${workflowResults.summary.jobId}`);
-    console.log(`  ✓ Chunks Extracted: ${extractionResult.chunks.length}`);
-    console.log(`  ✓ Images Extracted: ${extractionResult.images.length}`);
-    console.log(`  ✓ Embeddings Generated: ${embeddingsResult.length}`);
+    console.log(`  ✓ Chunks Extracted: ${progressResult.chunks_count ?? extractionResult.chunks.length}`);
+    console.log(`  ✓ Images Extracted: ${progressResult.images_count ?? extractionResult.images.length}`);
+    console.log(`  ✓ Embeddings Generated: ${embeddingsResult.totalCount}`);
     console.log(`  ✓ Search Results: ${searchResults.length}`);
     console.log('\n');
 

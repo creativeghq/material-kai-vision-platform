@@ -54,17 +54,7 @@ export const DEFAULT_EMBEDDING_CONFIG: UnifiedEmbeddingConfig = {
     normalization: 'l2',
     batchSize: 100,
   },
-  fallback: [
-    {
-      name: 'sentence-transformers/all-MiniLM-L6-v2',
-      provider: 'huggingface',
-      dimensions: 384,
-      maxTokens: 512,
-      costPerToken: 0,
-      normalization: 'l2',
-      batchSize: 32,
-    },
-  ],
+  fallback: [],
   textPreprocessing: {
     maxLength: 8000, // Leave room for tokenization overhead
     truncateStrategy: 'tail',

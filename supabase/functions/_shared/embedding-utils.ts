@@ -66,19 +66,12 @@ export const MIVAA_CONFIG = {
 
 // Unified embedding configuration for consistency across platform
 export const EMBEDDING_CONFIG = {
-  model: getEnv('EMBEDDING_MODEL', 'text-embedding-ada-002'), // Changed to ada-002 for consistency
-  dimensions: parseInt(getEnv('EMBEDDING_DIMENSIONS', '1536')),
+  model: 'text-embedding-ada-002',
+  dimensions: 1536,
   maxTokens: 8191,
   maxRetries: 3,
   retryDelay: 1000,
   requestTimeout: 30000,
-
-  // Supported models and their configurations
-  supportedModels: {
-    'text-embedding-ada-002': { maxDimensions: 1536, defaultDimensions: 1536 },
-    'text-embedding-3-small': { maxDimensions: 1536, defaultDimensions: 1536 },
-    'text-embedding-3-large': { maxDimensions: 3072, defaultDimensions: 3072 },
-  },
 } as const;
 
 /**

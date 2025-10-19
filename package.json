@@ -4,12 +4,16 @@
   "description": "Material Kai Vision Platform with integrated API key authentication",
   "type": "module",
   "scripts": {
-    "test:material-kai": "node tests/material-kai-integration-test.js",
-    "validate-env": "node scripts/validate-env.js",
     "dev": "vite",
     "build": "vite build",
     "start": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "validate-env": "node scripts/validate-env.js",
+    "test:integration:material-kai": "node tests/material-kai-integration-test.js",
+    "test:qa": "node scripts/testing/qa-comprehensive-test.js",
+    "test:e2e-workflow": "node scripts/testing/end-to-end-workflow.js",
+    "test:workflow:comprehensive": "node scripts/testing/comprehensive-workflow-testing.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
@@ -55,6 +59,7 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "node-fetch": "^3.3.2",
+    "praisonai": "^1.0.19",
     "react": "^18.3.1",
     "react-day-picker": "^9.8.1",
     "react-dom": "^18.3.1",

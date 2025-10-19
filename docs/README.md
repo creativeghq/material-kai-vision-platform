@@ -39,6 +39,8 @@
 - **[API Documentation](./api-documentation.md)** - REST API endpoints and integration
 - **[Database Schema](./database-schema.md)** - Database structure and relationships
 - **[Security & Authentication](./security-authentication.md)** - Auth systems and security practices
+- **[Color & Style Analysis to Vector Recognition](./color-style-analysis-vector-recognition.md)** - Comprehensive guide to color analysis, style classification, vector embeddings, and admin panel integration
+- **[CRM & User Management](./crm-user-management.md)** - User management, role-based access control, subscriptions, and credits system
 
 ### 📦 Services Documentation
 
@@ -50,6 +52,9 @@
 - **[API Gateway](./services/backend/api-gateway.md)** - API management
 - **[Knowledge Base](./services/database/knowledge-base-system.md)** - Document management
 - **[Chat Agent](./services/ai-ml/chat-agent-service.md)** - Conversational AI
+- **[Agent System](./agents-system.md)** - PraisonAI-powered agents with role-based access control
+- **[Agent Integration Guide](./agents-integration-guide.md)** - Complete integration guide for agent system
+- **[Agent API Reference](./agents-api-reference.md)** - Full API documentation for agent endpoints
 - **[MoodBoard](./services/frontend/moodboard-service.md)** - Material organization
 - **[Multi-Modal Analysis](./services/ai-ml/multimodal-analysis.md)** - AI analysis
 - **[Testing Panel](./services/ai-ml/testing-panel.md)** - QA and testing
@@ -70,6 +75,14 @@
 - **[Dynamic Category System](./dynamic-category-system.md)** - Category management
 - **[Admin Panel Guide](./admin-panel-guide.md)** - Admin panel documentation
 - **[Retrieval API](./api/retrieval-api.md)** - Retrieval API reference
+
+### 🔗 Integration & Architecture
+
+- **[Integrations Summary](./integrations_summary.md)** - Comprehensive Q&A guide covering multimodal capabilities, LlamaIndex integration, search & RAG, OCR services, automatic categorization, and backward compatibility removal
+- **[Platform Integrations Guide](./platform-integrations-guide.md)** - Detailed guide to multimodal capabilities, LlamaIndex, search & RAG, OCR services, and automatic categorization
+- **[Automatic Categorization & Metadata](./automatic-categorization-metadata.md)** - Category extraction pipeline, metadata structure, and integration points
+- **[Backward Compatibility Removal](./backward-compatibility-removal.md)** - 10 items to remove with impact analysis and testing strategy
+- **[Cleanup Implementation Plan](./cleanup-implementation-plan.md)** - 4-phase implementation plan (62 hours, 5 weeks)
 
 ---
 

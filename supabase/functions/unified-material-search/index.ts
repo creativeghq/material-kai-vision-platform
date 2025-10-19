@@ -244,15 +244,41 @@ async function performUnifiedSearch(
   }
 }
 
-// GET /unified-material-search - Search materials
+// GET/POST /unified-material-search - Search materials
 async function handleSearch(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const params = url.searchParams;
-  
-  const query = params.get('q') || params.get('query');
-  const searchType = params.get('search_type') as 'text' | 'semantic' | 'hybrid' || 'hybrid';
-  const category = params.get('category') || undefined;
-  const limit = Math.min(parseInt(params.get('limit') || '20'), 100);
+
+  // Support both GET (query params) and POST (JSON body)
+  let query: string | null = null;
+  let searchType: 'text' | 'semantic' | 'hybrid' = 'hybrid';
+  let category: string | undefined = undefined;
+  let limit = 20;
+
+  if (request.method === 'POST') {
+    try {
+      const body = await request.json();
+      query = body.query || body.q;
+      searchType = body.search_type || body.searchType || 'hybrid';
+      category = body.category;
+      limit = Math.min(parseInt(body.limit || '20'), 100);
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid JSON body',
+        metadata: { processing_time_ms: 0 }
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+  } else {
+    // GET request - use query params
+    query = params.get('q') || params.get('query');
+    searchType = params.get('search_type') as 'text' | 'semantic' | 'hybrid' || 'hybrid';
+    category = params.get('category') || undefined;
+    limit = Math.min(parseInt(params.get('limit') || '20'), 100);
+  }
 
   const startTime = Date.now();
 
@@ -441,10 +467,17 @@ Deno.serve(async (req: Request) => {
         } else {
           return await handleSearch(req);
         }
+      case 'POST':
+        // Support POST requests for search (same as GET)
+        if (endpoint === 'suggestions') {
+          return await handleSearchSuggestions(req);
+        } else {
+          return await handleSearch(req);
+        }
       default:
         return new Response(JSON.stringify({
           success: false,
-          error: 'Method not allowed'
+          error: 'Method not allowed. Use GET or POST.'
         }), {
           status: 405,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

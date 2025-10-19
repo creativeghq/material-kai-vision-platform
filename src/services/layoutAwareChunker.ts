@@ -424,12 +424,11 @@ export class LayoutAwareChunker {
         }
         console.log(`Successfully processed ${chunks.length} chunks for MIVAA embeddings`);
       } catch (error) {
-        console.warn('MIVAA embedding service failed, falling back to HuggingFace:', error);
-        await this.generateHuggingFaceEmbeddings(chunks);
+        console.error('MIVAA embedding service failed:', error);
+        throw error;
       }
     } else {
-      // Use HuggingFace embedding service (fallback)
-      await this.generateHuggingFaceEmbeddings(chunks);
+      throw new Error('MIVAA embedding service not available');
     }
   }
 

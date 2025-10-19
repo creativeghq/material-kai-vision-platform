@@ -101,9 +101,41 @@ serve(async (req) => {
       })
       .eq('id', documentId)
 
+    // Store extraction results in database
+    let extractionId = null;
+    try {
+      const { data: authData } = await supabaseClient.auth.getUser();
+      const userId = authData?.user?.id;
+
+      const { data: storedExtraction, error: storageError } = await supabaseClient
+        .from('category_extractions')
+        .insert({
+          user_id: userId,
+          source_type: 'document',
+          source_data: documentId,
+          categories: filteredCategories,
+          confidence_scores: filteredCategories.reduce((acc: any, cat: any) => {
+            acc[cat.category_key] = cat.confidence;
+            return acc;
+          }, {}),
+          extraction_method: extractionTypes.join(','),
+        })
+        .select()
+        .single();
+
+      if (storageError) {
+        console.error('Failed to store category extraction:', storageError);
+      } else {
+        extractionId = storedExtraction?.id;
+      }
+    } catch (storageErr) {
+      console.error('Error storing extraction:', storageErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
+        extraction_id: extractionId,
         categories: filteredCategories,
         metadata: {
           extractionTypes,
@@ -113,8 +145,8 @@ serve(async (req) => {
           timestamp: new Date().toISOString()
         }
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
 

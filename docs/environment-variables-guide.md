@@ -19,6 +19,11 @@ SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
+#### Stripe (CRM - Credit System & Subscriptions)
+```
+STRIPE_PUBLISHABLE_KEY=pk_live_<your-stripe-publishable-key>
+```
+
 #### MIVAA Service
 ```
 MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
@@ -49,6 +54,13 @@ SUPABASE_ACCESS_TOKEN=<your-supabase-cli-token>
 SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 SUPABASE_ANON_KEY=<your-supabase-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+```
+
+#### Stripe (CRM - Credit System & Subscriptions)
+```
+STRIPE_SECRET_KEY=sk_live_<your-stripe-secret-key>
+STRIPE_WEBHOOK_SECRET=whsec_<your-stripe-webhook-secret>
+STRIPE_PUBLISHABLE_KEY=pk_live_<your-stripe-publishable-key>
 ```
 
 #### Vercel
@@ -89,6 +101,8 @@ SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 OPENAI_API_KEY=<openai-key>
 MIVAA_API_KEY=<mivaa-jwt-token>
+STRIPE_SECRET_KEY=sk_live_<your-stripe-secret-key>
+STRIPE_WEBHOOK_SECRET=whsec_<your-stripe-webhook-secret>
 ```
 
 ## 🔧 Local Development (Optional)
@@ -141,6 +155,47 @@ const supabase = createClient(
 );
 ```
 
+## 💳 CRM System Secrets (Stripe Integration)
+
+The CRM system requires Stripe integration for subscriptions and credit purchases. Here's what you need:
+
+### Stripe Setup
+1. Create Stripe account at https://stripe.com
+2. Create products:
+   - **Subscription Plans**: Free ($0), Pro ($99/month), Enterprise ($299/month)
+   - **Credit Packages**: Starter ($9.99), Standard ($44.99), Premium ($84.99)
+3. Get API keys from Stripe Dashboard:
+   - Publishable Key (starts with `pk_live_`)
+   - Secret Key (starts with `sk_live_`)
+   - Webhook Signing Secret (starts with `whsec_`)
+
+### Where to Add Stripe Secrets
+
+**GitHub Secrets** (for CI/CD):
+```
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+```
+
+**Supabase Edge Functions Secrets** (for backend):
+```bash
+supabase secrets set STRIPE_SECRET_KEY=sk_live_...
+supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+**Vercel Environment Variables** (for frontend):
+```
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+```
+
+### Authentication Methods (Already Configured ✅)
+- **Google OAuth**: ✅ Configured in Supabase
+- **Email/Password Signup**: ✅ Enabled in Supabase
+- No additional secrets needed for authentication
+
+---
+
 ## 🔐 Security Best Practices
 
 1. **Never commit secrets to git**
@@ -166,6 +221,9 @@ const supabase = createClient(
 | `SUPABASE_URL` | String | ✅ | Vercel, GitHub, Supabase | Database connection |
 | `SUPABASE_ANON_KEY` | String | ✅ | Vercel, GitHub | Frontend auth |
 | `SUPABASE_SERVICE_ROLE_KEY` | String | ✅ | GitHub, Supabase | Backend operations |
+| `STRIPE_SECRET_KEY` | String | ✅ | GitHub, Supabase | Stripe backend API calls |
+| `STRIPE_WEBHOOK_SECRET` | String | ✅ | GitHub, Supabase | Stripe webhook verification |
+| `STRIPE_PUBLISHABLE_KEY` | String | ✅ | Vercel, GitHub | Stripe frontend checkout |
 | `MIVAA_GATEWAY_URL` | String | ✅ | Vercel, GitHub | PDF processing service |
 | `MIVAA_API_KEY` | String | ✅ | Vercel, GitHub, Supabase | MIVAA authentication |
 | `OPENAI_API_KEY` | String | ❌ | GitHub, Supabase | LLM operations |

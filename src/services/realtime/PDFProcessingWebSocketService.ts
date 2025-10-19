@@ -81,22 +81,23 @@ class PDFProcessingWebSocketService {
         return;
       }
 
-      this.wsManager = new WebSocketManager(wsUrl, {
-        reconnectAttempts: 5,
+      this.wsManager = new WebSocketManager({
+        url: wsUrl,
+        maxReconnectAttempts: 5,
         reconnectInterval: 3000,
         heartbeatInterval: 30000,
       });
 
       this.wsManager.setHandlers({
         onMessage: this.handleWebSocketMessage.bind(this),
-        onConnect: () => {
+        onOpen: () => {
           console.log('📡 PDF Processing WebSocket connected');
         },
-        onDisconnect: () => {
+        onClose: () => {
           console.log('📡 PDF Processing WebSocket disconnected');
         },
-        onError: (error) => {
-          console.error('📡 PDF Processing WebSocket error:', error);
+        onError: (event) => {
+          console.error('📡 PDF Processing WebSocket error:', event);
         },
       });
 
@@ -181,22 +182,24 @@ class PDFProcessingWebSocketService {
     const existingProgress = this.activeJobs.get(workflowJob.id);
     if (!existingProgress) {
       // Create new progress tracking if it doesn't exist
-      this.startJob(workflowJob.id, workflowJob.fileName || 'Unknown File');
+      this.startJob(workflowJob.id, workflowJob.filename || 'Unknown File');
     }
 
     const progress = this.activeJobs.get(workflowJob.id)!;
-    
+
     // Update overall status and progress
     progress.status = this.mapWorkflowStatus(workflowJob.status);
-    progress.overallProgress = workflowJob.progress || 0;
-    progress.currentStep = workflowJob.currentStep || 'Processing';
-    
+    const totalSteps = workflowJob.steps?.length || 0;
+    const currentIndex = typeof workflowJob.currentStepIndex === 'number' ? workflowJob.currentStepIndex : 0;
+    progress.overallProgress = totalSteps > 0 ? Math.round(((currentIndex + 1) / totalSteps) * 100) : 0;
+    progress.currentStep = workflowJob.steps?.[currentIndex]?.name || 'Processing';
+
     // Update steps
-    progress.steps = workflowJob.steps.map(step => this.mapWorkflowStep(step));
-    
+    progress.steps = (workflowJob.steps || []).map(step => this.mapWorkflowStep(step));
+
     // Extract statistics from step metadata
-    this.extractStatisticsFromSteps(progress, workflowJob.steps);
-    
+    this.extractStatisticsFromSteps(progress, workflowJob.steps || []);
+
     // Update timing
     if (workflowJob.endTime) {
       progress.endTime = workflowJob.endTime;

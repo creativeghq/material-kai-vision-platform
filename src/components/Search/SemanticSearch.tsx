@@ -98,8 +98,7 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
 
     if (!mivaaResponse.success) {
       console.error('MIVAA semantic search failed:', mivaaResponse.error);
-      // Fallback to basic database search if MIVAA fails
-      return await fallbackDatabaseSearch(query);
+      throw new Error(`Semantic search failed: ${mivaaResponse.error?.message || 'Unknown error'}`);
     }
 
     // Transform MIVAA response to SearchResult format
@@ -135,123 +134,7 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
 
   } catch (error) {
     console.error('MIVAA semantic search error:', error);
-    // Fallback to basic database search if MIVAA fails
-    return await fallbackDatabaseSearch(query);
-  }
-};
-
-// Fallback database search function (basic text matching)
-const fallbackDatabaseSearch = async (query: string): Promise<SearchResult[]> => {
-  try {
-    console.log('⚠️ Using fallback database search for:', query);
-
-    // Search across multiple tables for comprehensive results
-    const searchPromises = [];
-
-    // Search processing results (documents and PDFs)
-    searchPromises.push(
-      supabase
-        .from('processing_results')
-        .select(`
-          id,
-          document_id,
-          status,
-          extraction_type,
-          page_count,
-          file_size_bytes,
-          processing_time_ms,
-          created_at,
-          updated_at,
-          metadata,
-          extracted_content
-        `)
-        .or(`document_id.ilike.%${query}%,extracted_content.ilike.%${query}%,metadata->>title.ilike.%${query}%`)
-        .eq('status', 'completed')
-        .limit(20),
-    );
-
-    // Search materials catalog
-    searchPromises.push(
-      supabase
-        .from('materials_catalog')
-        .select(`
-          id,
-          name,
-          description,
-          category,
-          properties,
-          created_at,
-          updated_at,
-          metadata
-        `)
-        .or(`name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
-        .limit(20),
-    );
-
-    const [processingResults, materialsResults] = await Promise.all(searchPromises);
-
-    const results: SearchResult[] = [];
-
-    // Process processing results
-    if (processingResults?.data) {
-      processingResults.data.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const metadata = item.metadata || {};
-        results.push({
-          id: `processing_${item.id}`,
-          title: metadata.title || `Document ${item.document_id}`,
-          content: item.extracted_content?.substring(0, 200) || `${item.extraction_type} processing result`,
-          type: 'document',
-          category: item.extraction_type || 'document',
-          relevanceScore: 0.8 + Math.random() * 0.2,
-          semanticScore: 0.75 + Math.random() * 0.25,
-          timestamp: new Date(item.created_at),
-          metadata: {
-            source: `processing/${item.document_id}`,
-            fileType: metadata.fileType || 'PDF',
-            size: item.file_size_bytes || 0,
-            tags: metadata.tags || [],
-            processingStatus: item.status as 'completed' | 'processing' | 'failed',
-            confidence: 0.8 + Math.random() * 0.2,
-            searchType: 'fallback'
-          },
-          highlights: [item.extraction_type, 'document processing', 'analysis'],
-          url: `/processing/${item.id}`,
-        });
-      });
-    }
-
-    // Process materials results
-    if (materialsResults?.data) {
-      materialsResults.data.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const metadata = item.metadata || {};
-        results.push({
-          id: `material_${item.id}`,
-          title: item.name,
-          content: item.description?.substring(0, 200) || 'Material catalog entry',
-          type: 'data',
-          category: item.category || 'material',
-          relevanceScore: 0.75 + Math.random() * 0.25,
-          semanticScore: 0.7 + Math.random() * 0.3,
-          timestamp: new Date(item.created_at),
-          metadata: {
-            source: `materials/${item.id}`,
-            fileType: 'Material Data',
-            tags: metadata.tags || [item.category],
-            processingStatus: 'completed' as const,
-            confidence: 0.85 + Math.random() * 0.15,
-            searchType: 'fallback'
-          },
-          highlights: [item.category, 'material properties', 'catalog'],
-          url: `/materials/${item.id}`,
-        });
-      });
-    }
-
-    console.log(`⚠️ Fallback search returned ${results.length} results`);
-    return results;
-  } catch (error) {
-    console.error('Fallback database search error:', error);
-    return [];
+    throw error;
   }
 };
 

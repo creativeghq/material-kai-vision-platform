@@ -5,7 +5,7 @@ import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
 import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAuthMiddleware';
 import { supabase } from '../../integrations/supabase/client';
 import { DocumentVectorStoreService, createDocumentVectorStoreService } from '../../services/documentVectorStoreService';
-import { EmbeddingGenerationService } from '../../services/embeddingGenerationService';
+import { EmbeddingGenerationService, defaultEmbeddingConfig } from '../../services/embeddingGenerationService';
 
 /**
  * Request/Response types for unified PDF API
@@ -365,7 +365,7 @@ export class ConsolidatedPDFController {
   constructor() {
     this.mivaaService = new MivaaIntegrationService(defaultMivaaConfig);
     // Initialize vector store service with embedding service
-    const embeddingService = new EmbeddingGenerationService();
+    const embeddingService = new EmbeddingGenerationService(defaultEmbeddingConfig);
     this.vectorStoreService = createDocumentVectorStoreService(embeddingService);
   }
 
@@ -1068,12 +1068,13 @@ export class ConsolidatedPDFController {
       }
 
       // Query database for additional metrics
-      const { data: jobMetrics, error: metricsError } = await supabase
+      const { data: jobMetricsRaw } = await supabase
         .from('processing_jobs')
         .select('status, created_at, completed_at')
         .eq('user_id', authContext.user.id)
         .order('created_at', { ascending: false })
         .limit(100);
+      const jobMetrics = (jobMetricsRaw as Array<{ status: string }> | null);
 
       const metrics = {
         activeJobs: this.activeJobs.size,

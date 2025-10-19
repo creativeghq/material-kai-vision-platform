@@ -13,7 +13,7 @@ interface WorkflowStepDetail {
   error?: string;
 }
 
-interface WorkflowStep {
+export interface WorkflowStep {
   id: string;
   name: string;
   description?: string;
@@ -30,7 +30,7 @@ interface WorkflowStep {
   icon?: React.ComponentType<{ className?: string }>;
 }
 
-interface WorkflowJob {
+export interface WorkflowJob {
   id: string;
   name?: string;
   filename?: string;
@@ -1276,14 +1276,19 @@ export class ConsolidatedPDFWorkflowService {
               console.log(`💾 Updated chunk ${i + 1} in database`);
 
               // Track quality in job metadata
-              if (!job.metadata.qualityMetrics) {
-                job.metadata.qualityMetrics = [];
+              const jobRef = this.jobs.get(jobId);
+              if (jobRef) {
+                if (!jobRef.metadata.qualityMetrics) {
+                  (jobRef.metadata as any).qualityMetrics = [];
+                }
+                (jobRef.metadata as any).qualityMetrics.push({
+                  chunkId,
+                  coherenceScore: qualityData.coherence_score,
+                  assessment: qualityData.quality_assessment,
+                });
+                this.jobs.set(jobId, jobRef);
+                this.notifyUpdate(jobRef);
               }
-              job.metadata.qualityMetrics.push({
-                chunkId,
-                coherenceScore: qualityData.coherence_score,
-                assessment: qualityData.quality_assessment,
-              });
             } catch (qualityError) {
               console.error(`❌ Failed to score chunk quality for ${chunkId}:`, qualityError);
               // Continue processing even if quality scoring fails
@@ -1783,7 +1788,7 @@ export class ConsolidatedPDFWorkflowService {
 
         // Update job with polling error details
         this.updateJobStep(jobId, 'mivaa-processing', {
-          progress: Math.max(30, Math.min(80, progressPercentage || (30 + (attempts / maxAttempts) * 50))),
+          progress: Math.max(30, Math.min(80, 30 + (attempts / maxAttempts) * 50)),
           details: [
             `⏳ Polling attempt ${attempts}/${maxAttempts}`,
             `⚠️ Temporary polling error: ${error instanceof Error ? error.message : 'Unknown error'}`,

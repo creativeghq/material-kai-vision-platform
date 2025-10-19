@@ -205,6 +205,32 @@ graph TD
 - **Classification**: Material category and type identification
 - **Confidence Scoring**: AI prediction confidence levels
 
+#### Color & Style Analysis System
+The platform includes advanced color and style analysis capabilities:
+
+**Color Analysis Engine**
+- **Dominant Color Extraction**: K-means clustering to identify 8 primary colors
+- **Multi-Color Space Support**: RGB, HSV, LAB, LCH color space analysis
+- **Industry Standards**: Pantone and RAL color code mapping
+- **Color Harmony Analysis**: Balance, contrast, and vibrancy metrics
+- **Psychological Profiling**: Emotion, mood, warmth, and trustworthiness analysis
+- **Palette Recommendations**: Complementary, analogous, and triadic palettes
+
+**Style Classification**
+- **Design Style Detection**: Minimalist, Traditional, Industrial, Rustic, Contemporary, Transitional
+- **Aesthetic Properties**: Warmth, saturation, brightness, edge sharpness, pattern complexity
+- **Material Finish Detection**: Metallic, glossy, matte, natural properties
+- **Room Suitability Analysis**: Compatibility with different room types
+- **Trend Scoring**: Design trend relevance and contemporary appeal
+
+**Vector Embeddings for Recognition**
+- **CLIP Embeddings**: Image-text understanding (512-1024D vectors)
+- **Custom Material Embeddings**: Material-specific feature vectors
+- **Text Embeddings**: Semantic understanding of descriptions (1536D vectors)
+- **Unified Vector Search**: Find similar materials by color, style, or semantic similarity
+
+📖 **See [Color & Style Analysis Documentation](./color-style-analysis-vector-recognition.md) for detailed technical information.**
+
 #### AI-Powered Features
 - **Visual Analysis**: Computer vision for material identification
 - **Property Prediction**: AI-predicted material properties

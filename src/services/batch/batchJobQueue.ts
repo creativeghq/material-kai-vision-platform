@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { createHash } from 'crypto';
+import { supabase } from '../../integrations/supabase/client';
 
 /**
  * Job priority levels for queue processing
@@ -190,6 +191,7 @@ export class BatchJobQueue extends EventEmitter {
 
     this.startProcessing();
     this.setupIntervals();
+    this.recoverJobs(); // Recover jobs from database on startup
   }
 
   /**
@@ -731,13 +733,131 @@ export class BatchJobQueue extends EventEmitter {
   }
 
   /**
-   * Persist queue state (placeholder for future implementation)
+   * Persist queue state to database
    */
-  private persistState(): void {
-    // TODO: Implement state persistence to file or database
-    this.emit('statePersisted', {
-      jobCount: this.jobs.size,
-      queueSizes: this.getStatus().queueSizes,
-    });
+  private async persistState(): Promise<void> {
+    try {
+      const jobs = Array.from(this.jobs.values()).map(job => ({
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        data: {
+          payload: job.payload,
+          metadata: {
+            ...job.metadata,
+            createdAt: job.metadata.createdAt.toISOString(),
+            updatedAt: job.metadata.updatedAt.toISOString(),
+            scheduledAt: job.metadata.scheduledAt?.toISOString(),
+            startedAt: job.metadata.startedAt?.toISOString(),
+            completedAt: job.metadata.completedAt?.toISOString(),
+          },
+          dependencies: job.dependencies,
+          tags: job.tags,
+        },
+        priority: this.priorityToNumber(job.priority),
+        created_at: job.metadata.createdAt.toISOString(),
+        updated_at: new Date().toISOString(),
+        completed_at: job.metadata.completedAt?.toISOString(),
+        error: job.metadata.lastError,
+      }));
+
+      if (jobs.length > 0) {
+        const { error } = await supabase
+          .from('batch_jobs')
+          .upsert(jobs, { onConflict: 'id' });
+
+        if (error) {
+          console.error('Failed to persist batch jobs:', error);
+        }
+      }
+
+      this.emit('statePersisted', {
+        jobCount: this.jobs.size,
+        queueSizes: this.getStatus().queueSizes,
+      });
+    } catch (error) {
+      console.error('Failed to persist batch job state:', error);
+    }
+  }
+
+  /**
+   * Recover jobs from database on startup
+   */
+  private async recoverJobs(): Promise<void> {
+    try {
+      const { data: jobs, error } = await supabase
+        .from('batch_jobs')
+        .select('*')
+        .in('status', ['pending', 'queued', 'processing', 'retrying'])
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Failed to recover batch jobs:', error);
+        return;
+      }
+
+      if (jobs && jobs.length > 0) {
+        console.log(`Recovering ${jobs.length} batch jobs from database...`);
+
+        for (const job of jobs) {
+          const batchJob: BatchJob = {
+            id: job.id,
+            type: job.type,
+            status: job.status === 'processing' ? 'queued' : job.status, // Reset processing jobs to queued
+            priority: this.numberToPriority(job.priority),
+            payload: job.data.payload,
+            metadata: {
+              ...job.data.metadata,
+              createdAt: new Date(job.data.metadata.createdAt),
+              updatedAt: new Date(job.data.metadata.updatedAt),
+              scheduledAt: job.data.metadata.scheduledAt ? new Date(job.data.metadata.scheduledAt) : undefined,
+              startedAt: job.data.metadata.startedAt ? new Date(job.data.metadata.startedAt) : undefined,
+              completedAt: job.data.metadata.completedAt ? new Date(job.data.metadata.completedAt) : undefined,
+            },
+            dependencies: job.data.dependencies,
+            tags: job.data.tags,
+          };
+
+          this.jobs.set(job.id, batchJob);
+
+          // Add to appropriate priority queue
+          const queue = this.priorityQueues.get(batchJob.priority);
+          if (queue && !queue.includes(job.id)) {
+            queue.push(job.id);
+          }
+        }
+
+        console.log(`Successfully recovered ${jobs.length} batch jobs`);
+        this.updateMetrics();
+      }
+    } catch (error) {
+      console.error('Failed to recover batch jobs:', error);
+    }
+  }
+
+  /**
+   * Convert priority to number for database storage
+   */
+  private priorityToNumber(priority: JobPriority): number {
+    const map: Record<JobPriority, number> = {
+      low: 0,
+      normal: 1,
+      high: 2,
+      critical: 3,
+    };
+    return map[priority];
+  }
+
+  /**
+   * Convert number to priority from database
+   */
+  private numberToPriority(num: number): JobPriority {
+    const map: Record<number, JobPriority> = {
+      0: 'low',
+      1: 'normal',
+      2: 'high',
+      3: 'critical',
+    };
+    return map[num] || 'normal';
   }
 }

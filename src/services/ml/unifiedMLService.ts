@@ -99,13 +99,12 @@ export interface UnifiedMLServiceConfig extends ServiceConfig {
  */
 export interface UnifiedMLOptions {
   preferServerSide?: boolean;
-  fallbackToClient?: boolean;
   confidenceThreshold?: number;
   useAIVision?: boolean;
   maxFileSize?: number;
   maxFiles?: number;
   enableHuggingFace?: boolean;
-  processingMethod?: 'auto' | 'client' | 'server' | 'huggingface';
+  processingMethod?: 'auto' | 'server' | 'huggingface';
 
   // Additional options for compatibility
   analysisType?: string;
@@ -120,12 +119,11 @@ export interface UnifiedMLOptions {
  * Unified ML result interface
  */
 export interface UnifiedMLResult extends MLResult {
-  processingMethod: 'client' | 'server' | 'huggingface' | 'hybrid';
+  processingMethod: 'server' | 'huggingface';
   serverJobId?: string;
   provider?: string;
   modelVersion?: string;
   deviceInfo?: any;
-  fallbackUsed?: boolean;
 }
 
 /**
@@ -428,54 +426,26 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
   }
 
   /**
-   * Hybrid processing with intelligent fallback
+   * Server-side processing with HuggingFace fallback
    */
-  private async processHybrid(
+  private async processServerWithFallback(
     file: File | string,
     description?: string,
     options: UnifiedMLOptions = {}
   ): Promise<UnifiedMLResult> {
-    let result: UnifiedMLResult;
-    let fallbackUsed = false;
-
     try {
-      // Try primary method
-      const primaryMethod = options.preferServerSide ? 'server' : 'client';
-      result = await (primaryMethod === 'server' 
-        ? this.processServerSide(file, description, options)
-        : this.processClientSide(file, description, options));
-
-      // Check if confidence is acceptable
-      if ((result.confidence || 0) < (options.confidenceThreshold || 0.7)) {
-        throw new Error('Low confidence result, trying fallback');
-      }
+      return await this.processServerSide(file, description, options);
     } catch (error) {
-      console.warn('Primary processing failed, using fallback:', error);
-      fallbackUsed = true;
+      console.warn('Server processing failed, trying HuggingFace:', error);
 
-      // Try fallback method
-      const fallbackMethod = options.preferServerSide ? 'client' : 'server';
-      try {
-        result = await (fallbackMethod === 'server'
-          ? this.processServerSide(file, description, options)
-          : this.processClientSide(file, description, options));
-      } catch (fallbackError) {
-        // Final fallback to HuggingFace if available
-        if (this.huggingFaceService) {
-          console.warn('Server/client fallback failed, trying HuggingFace');
-          result = await this.processHuggingFace(file, description, options);
-          result.processingMethod = 'huggingface';
-        } else {
-          throw fallbackError;
-        }
+      if (this.huggingFaceService) {
+        const result = await this.processHuggingFace(file, description, options);
+        result.processingMethod = 'huggingface';
+        return result;
       }
-    }
 
-    return {
-      ...result,
-      processingMethod: 'hybrid',
-      fallbackUsed,
-    };
+      throw error;
+    }
   }
 
   /**

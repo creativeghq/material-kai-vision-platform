@@ -83,7 +83,7 @@ export const developmentConfig: AppConfig = {
       timeout: 30000,
       retryAttempts: 3,
       circuitBreaker: {
-        enabled: false, // Disabled for development
+        enabled: true,
         failureThreshold: 5,
         resetTimeout: 60000,
       },

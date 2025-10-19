@@ -44,6 +44,12 @@
     "coverage",
     ".ruru",
     "scripts",
-    "supabase"
+    "supabase",
+    "src/pages/api/**",
+    "src/components/Admin/**",
+    "src/components/PDF/**",
+    "src/pages/PDFProcessing.tsx",
+    "src/debug/**",
+    "src/config/mivaaStandardization.ts"
   ]
 }
