@@ -13,10 +13,6 @@ import {
   ChevronRight,
   Brain,
   ArrowLeft,
-  X,
-  Clock,
-  CheckCircle,
-  AlertCircle,
   Package,
 } from 'lucide-react';
 
@@ -251,6 +247,17 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
   const getEmbeddingByChunk = (chunkId: string) => {
     return embeddings.find(embedding => embedding.chunk_id === chunkId);
+  };
+
+  // IMPROVED: Find related chunks based on document proximity
+  const getRelatedChunks = (chunk: DocumentChunk, limit: number = 3) => {
+    return chunks
+      .filter(c =>
+        c.document_id === chunk.document_id &&
+        c.id !== chunk.id &&
+        Math.abs(c.chunk_index - chunk.chunk_index) <= 2
+      )
+      .slice(0, limit);
   };
 
   const getDocumentDisplayName = (chunk: DocumentChunk) => {
@@ -637,6 +644,33 @@ export const MaterialKnowledgeBase: React.FC = () => {
                               </div>
                             </div>
 
+                            {/* IMPROVED: Related Chunks - Show relationships */}
+                            {getRelatedChunks(chunk).length > 0 && (
+                              <div>
+                                <h4 className="font-medium mb-2 flex items-center gap-2">
+                                  <Layers className="h-4 w-4" />
+                                  Related Chunks ({getRelatedChunks(chunk).length})
+                                </h4>
+                                <div className="space-y-2">
+                                  {getRelatedChunks(chunk).map((relChunk) => (
+                                    <div key={relChunk.id} className="border rounded-lg p-2 bg-muted/30">
+                                      <div className="flex items-start justify-between mb-1">
+                                        <Badge variant="outline" className="text-xs">
+                                          Chunk {relChunk.chunk_index}
+                                        </Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                          Distance: {Math.abs(relChunk.chunk_index - chunk.chunk_index)} positions
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground line-clamp-2">
+                                        {relChunk.content.substring(0, 150)}...
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {/* Related Images */}
                             {relatedImages.length > 0 && (
                               <div>
@@ -848,12 +882,33 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                     </div>
                                   )}
 
+                                  {/* IMPROVED: Show related chunks */}
+                                  {image.chunk_id && (
+                                    <div>
+                                      <h4 className="font-medium mb-2">Related Chunk</h4>
+                                      <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                                        {chunks.find(c => c.id === image.chunk_id)?.content.substring(0, 300) || 'Chunk not found'}...
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {image.visual_features && (
                                     <div>
                                       <h4 className="font-medium mb-2">Visual Features</h4>
                                       <div className="bg-muted/50 rounded-lg p-3 text-sm">
                                         <pre className="whitespace-pre-wrap">
                                           {JSON.stringify(image.visual_features, null, 2)}
+                                        </pre>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {image.image_analysis_results && (
+                                    <div>
+                                      <h4 className="font-medium mb-2">Analysis Results</h4>
+                                      <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                                        <pre className="whitespace-pre-wrap">
+                                          {JSON.stringify(image.image_analysis_results, null, 2)}
                                         </pre>
                                       </div>
                                     </div>
