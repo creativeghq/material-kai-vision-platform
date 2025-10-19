@@ -428,7 +428,30 @@ export class LayoutAwareChunker {
         throw error;
       }
     } else {
-      throw new Error('MIVAA embedding service not available');
+      // Use HuggingFace embedding service (fallback)
+      await this.generateHuggingFaceEmbeddings(chunks);
+    }
+  }
+
+  /**
+   * Generate embeddings using HuggingFace service (fallback method)
+   */
+  private async generateHuggingFaceEmbeddings(chunks: DocumentChunk[]): Promise<void> {
+    try {
+      await this.textEmbedder.initialize();
+
+      for (const chunk of chunks) {
+        try {
+          const result = await this.textEmbedder.generateEmbedding(chunk.text);
+          if (result.success && 'embedding' in result) {
+            chunk.embedding = (result as Record<string, unknown>).embedding as number[];
+          }
+        } catch (error) {
+          console.warn(`Failed to generate HuggingFace embedding for chunk ${chunk.id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.warn('HuggingFace text embedder initialization failed, skipping embeddings:', error);
     }
   }
 
