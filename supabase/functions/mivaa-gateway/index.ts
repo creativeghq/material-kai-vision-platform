@@ -155,18 +155,26 @@ serve(async (req) => {
 
     let responseData
     let contentType = 'application/json'
+    const responseText = await response.text()
 
     if (isDocsEndpoint) {
-      responseData = await response.text()
+      responseData = responseText
       contentType = 'text/html'
       console.log(`📥 MIVAA Response: ${response.status} [HTML Content]`)
     } else if (isJsonEndpoint) {
-      responseData = await response.text() // Keep as text for OpenAPI JSON
+      responseData = responseText // Keep as text for OpenAPI JSON
       contentType = 'application/json'
       console.log(`📥 MIVAA Response: ${response.status} [OpenAPI JSON]`)
     } else {
-      responseData = await response.json()
-      console.log(`📥 MIVAA Response: ${response.status}`, responseData)
+      // Try to parse as JSON, but handle HTML error responses
+      try {
+        responseData = JSON.parse(responseText)
+        console.log(`📥 MIVAA Response: ${response.status}`, responseData)
+      } catch (parseError) {
+        // If JSON parsing fails, it's likely an HTML error page
+        console.error(`❌ Failed to parse MIVAA response as JSON. Response text: ${responseText.substring(0, 500)}`)
+        throw new Error(`MIVAA API returned non-JSON response: ${response.status} ${response.statusText}. Response: ${responseText.substring(0, 200)}`)
+      }
     }
 
     if (!response.ok) {
