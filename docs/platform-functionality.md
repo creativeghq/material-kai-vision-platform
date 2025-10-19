@@ -617,12 +617,39 @@ The admin panel provides comprehensive system management through multiple tabs:
 
 ### 11. 🛍️ Products & E-Commerce System
 
+#### Product Creation & Management
+- **Product Extraction**: Extract products from PDF chunks in knowledge base
+- **Product Properties**: Store material type, color, finish, durability, and custom properties
+- **Product Metadata**: Supplier, origin, price range, availability, certifications
+- **Product Status**: Draft, published, archived states
+- **Product Embeddings**: Vector embeddings for semantic search
+- **Source Tracking**: Link products to source PDF chunks and documents
+- **Product Images**: Store and manage product images with metadata
+
+#### Product Creation Workflow
+```
+1. User uploads PDF to Knowledge Base
+   ↓
+2. PDF is processed by MIVAA service
+   ↓
+3. Chunks are extracted and stored in document_chunks table
+   ↓
+4. Products are created FROM chunks (not mocked)
+   ↓
+5. Products linked to source chunks and documents
+   ↓
+6. Products appear in Products tab with real data
+   ↓
+7. Products available for shopping cart and moodboards
+```
+
 #### Shopping Cart Management
 - **Cart Creation**: Users can create shopping carts for product collections
 - **Item Management**: Add, remove, and update items in cart
 - **Cart Status Tracking**: Active, submitted, quoted, ordered states
 - **Automatic Totals**: Real-time calculation of cart totals and item counts
 - **Cart Persistence**: Carts saved to database with user association
+- **Product Linking**: Cart items linked to actual products with real data
 
 #### Quote Request System
 - **Quote Submission**: Users submit carts as quote requests
@@ -630,6 +657,7 @@ The admin panel provides comprehensive system management through multiple tabs:
 - **Status Tracking**: Pending → Updated → Approved/Rejected workflow
 - **Item Tracking**: Automatic count and total estimation
 - **Notes & Comments**: Support for special requests and notes
+- **Product Details**: Quote requests include full product information
 
 #### Proposal Management
 - **Proposal Creation**: Admins create proposals from quote requests
@@ -637,12 +665,14 @@ The admin panel provides comprehensive system management through multiple tabs:
 - **Automatic Calculations**: Total calculated automatically
 - **Proposal Status**: Draft → Sent → Accepted/Rejected workflow
 - **User Acceptance**: Users can accept proposals to proceed to order
+- **Product Pricing**: Final pricing for each product in proposal
 
 #### Moodboard Integration
 - **Product Collections**: Add products to moodboards
 - **Position Tracking**: Store product positions within moodboard
 - **Quote from Moodboard**: Users can request quotes for entire moodboards
 - **Product Management**: Add/remove products from moodboards
+- **Moodboard Creator**: Track who created each moodboard
 
 #### Commission System
 - **Moodboard Creator Commissions**: Track commissions for moodboard creators
@@ -650,6 +680,7 @@ The admin panel provides comprehensive system management through multiple tabs:
 - **Commission Tracking**: Pending → Approved → Paid workflow
 - **Commission Dashboard**: View and manage all commissions
 - **Commission Calculations**: Automatic calculation based on proposal totals
+- **Creator Earnings**: Track total earnings per moodboard creator
 
 #### Edge Functions
 - **shopping-cart-api**: Cart CRUD operations
@@ -675,16 +706,24 @@ The admin panel provides comprehensive system management through multiple tabs:
 - **MoodboardProductSelector**: Add/remove products from moodboards
 
 #### Database Tables
+- **products**: Product records with properties, metadata, embeddings
+- **product_images**: Product images with metadata and relationships
 - **shopping_carts**: User shopping carts
-- **cart_items**: Items in shopping carts
+- **cart_items**: Items in shopping carts with product references
 - **quote_requests**: Quote requests from users
 - **proposals**: Proposals created by admins
 - **moodboard_products**: Products linked to moodboards
 - **moodboard_quote_requests**: Commission tracking for moodboard quotes
 
-#### Testing
+#### Testing & Validation
 - **test-products-complete-flow.js**: Product creation and search tests
 - **test-products-system-complete.js**: End-to-end cart → quote → proposal → commission tests
+- **test-products-from-knowledge-base.js**: Extract products from real PDF chunks
+  - Fetches actual chunks from document_chunks table
+  - Extracts product information from chunk content
+  - Creates products with real data (not mocked)
+  - Uses `created_from_type: 'pdf_processing'` for real source tracking
+  - Displays all product details with source information
 
 ## 🔗 Related Documentation
 

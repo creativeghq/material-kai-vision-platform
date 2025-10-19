@@ -3078,9 +3078,273 @@ Authorization: Bearer {token}
 }
 ```
 
+## 📦 Products API
+
+### Product Creation from Knowledge Base
+
+#### Extract and Create Products from PDF Chunks
+```http
+POST /functions/v1/products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "action": "create_from_chunks",
+  "chunk_ids": ["chunk-123", "chunk-124"],
+  "document_id": "doc-456"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "prod-789",
+    "name": "Product from Chunk",
+    "description": "Extracted from PDF chunk",
+    "long_description": "Full content from chunk",
+    "properties": {
+      "source_chunk_id": "chunk-123",
+      "document_id": "doc-456",
+      "page_number": 1,
+      "chunk_index": 0
+    },
+    "metadata": {
+      "extracted_from": "knowledge_base_chunk",
+      "chunk_metadata": {}
+    },
+    "status": "draft",
+    "created_from_type": "pdf_processing",
+    "created_at": "2025-10-19T10:00:00Z"
+  }
+}
+```
+
+**Purpose**: Creates products from actual PDF chunks in knowledge base (not mocked data)
+
+### Product Search & Retrieval
+
+#### Search Products by Description
+```http
+GET /functions/v1/products-api?action=search&query=marble&limit=20&offset=0
+Authorization: Bearer {token}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "prod-001",
+      "name": "Premium Italian Marble",
+      "description": "White marble with elegant veining",
+      "properties": {
+        "material_type": "natural_stone",
+        "color": "white",
+        "finish": "polished"
+      },
+      "metadata": {
+        "supplier": "Italian Quarries Inc",
+        "origin": "Italy",
+        "price_range": "$100-200 per sq ft"
+      },
+      "status": "published",
+      "created_from_type": "pdf_processing"
+    }
+  ],
+  "count": 1,
+  "total": 1
+}
+```
+
+#### Get Product by ID
+```http
+GET /functions/v1/products-api?action=get&product_id=prod-001
+Authorization: Bearer {token}
+```
+
+#### List All Products
+```http
+GET /functions/v1/products-api?action=list&limit=50&offset=0&status=published
+Authorization: Bearer {token}
+```
+
+### Product Management
+
+#### Update Product
+```http
+PUT /functions/v1/products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "product_id": "prod-001",
+  "name": "Updated Product Name",
+  "description": "Updated description",
+  "properties": {
+    "material_type": "natural_stone",
+    "color": "white"
+  },
+  "metadata": {
+    "supplier": "Updated Supplier",
+    "price_range": "$150-250 per sq ft"
+  },
+  "status": "published"
+}
+```
+
+#### Delete Product
+```http
+DELETE /functions/v1/products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "product_id": "prod-001"
+}
+```
+
+### Product Images
+
+#### Add Product Image
+```http
+POST /functions/v1/products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "action": "add_image",
+  "product_id": "prod-001",
+  "image_url": "https://storage.example.com/image.jpg",
+  "image_type": "primary",
+  "display_order": 1
+}
+```
+
+#### Get Product Images
+```http
+GET /functions/v1/products-api?action=get_images&product_id=prod-001
+Authorization: Bearer {token}
+```
+
+### Product Embeddings
+
+#### Generate Product Embedding
+```http
+POST /functions/v1/products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "action": "generate_embedding",
+  "product_id": "prod-001",
+  "embedding_model": "text-embedding-3-small"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "data": {
+    "product_id": "prod-001",
+    "embedding_model": "text-embedding-3-small",
+    "embedding_dimensions": 1536,
+    "generated_at": "2025-10-19T10:00:00Z"
+  }
+}
+```
+
+#### Search Products by Embedding Similarity
+```http
+POST /functions/v1/products-api
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "action": "search_by_embedding",
+  "query": "white marble flooring",
+  "limit": 10,
+  "similarity_threshold": 0.7
+}
+```
+
+### Product Data Structure
+
+#### Product Schema
+```json
+{
+  "id": "UUID",
+  "name": "string",
+  "description": "string (short)",
+  "long_description": "string (full content)",
+  "category_id": "UUID (optional)",
+  "source_document_id": "UUID (optional)",
+  "source_chunks": "JSONB array of chunk IDs",
+  "properties": "JSONB object (material_type, color, finish, durability, etc.)",
+  "specifications": "JSONB object (technical specs)",
+  "metadata": "JSONB object (supplier, origin, price_range, availability, certifications)",
+  "embedding": "VECTOR(1536) (text embedding)",
+  "embedding_model": "string (default: text-embedding-3-small)",
+  "status": "enum (draft, published, archived)",
+  "created_from_type": "enum (pdf_processing, xml_import, manual, scraping, sample_data)",
+  "created_by": "UUID (user ID)",
+  "created_at": "TIMESTAMPTZ",
+  "updated_at": "TIMESTAMPTZ"
+}
+```
+
+#### Product Image Schema
+```json
+{
+  "id": "UUID",
+  "product_id": "UUID",
+  "image_id": "UUID (optional, reference to document_images)",
+  "image_url": "string",
+  "image_type": "enum (primary, texture, sample, installation, etc.)",
+  "display_order": "integer",
+  "metadata": "JSONB object",
+  "created_at": "TIMESTAMPTZ"
+}
+```
+
+### Testing Products API
+
+#### Test Script: Extract from Knowledge Base
+```bash
+# Set your Supabase service role key
+export SUPABASE_SERVICE_ROLE_KEY=your_key_here
+
+# Run the test
+node scripts/test-products-from-knowledge-base.js
+```
+
+**What it does**:
+1. Fetches real chunks from `document_chunks` table
+2. Displays chunk information (ID, content preview, page number)
+3. Extracts products from those chunks
+4. Creates product records with real data
+5. Shows all created products with full details
+
+**Expected Output**:
+- Chunks found count
+- Products extracted count
+- Products created count
+- Full product details with properties and metadata
+- Success rate and error count
+
+#### Test Script: Complete E2E Workflow
+```bash
+# Test cart → quote → proposal → commission workflow
+node scripts/test-products-system-complete.js
+```
+
 ## 🔗 Related Documentation
 
 - [Security & Authentication](./security-authentication.md) - API security
 - [Setup & Configuration](./setup-configuration.md) - API configuration
 - [AI & ML Services](./ai-ml-services.md) - AI API integrations
 - [Admin Panel Guide](./admin-panel-guide.md) - Admin interface documentation
+- [Products Mock vs Real Data](./PRODUCTS-MOCK-VS-REAL-DATA-CLARIFICATION.md) - Product creation workflow

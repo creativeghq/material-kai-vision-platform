@@ -41,6 +41,8 @@
 - **[Security & Authentication](./security-authentication.md)** - Auth systems and security practices
 - **[Color & Style Analysis to Vector Recognition](./color-style-analysis-vector-recognition.md)** - Comprehensive guide to color analysis, style classification, vector embeddings, and admin panel integration
 - **[CRM & User Management](./crm-user-management.md)** - User management, role-based access control, subscriptions, and credits system
+- **[Products & E-Commerce System](./platform-functionality.md#11--products--ecommerce-system)** - Product creation from PDFs, shopping cart, quotes, proposals, and commission tracking
+- **[Products Mock vs Real Data](./PRODUCTS-MOCK-VS-REAL-DATA-CLARIFICATION.md)** - Understanding product creation workflow: extracting from real PDFs vs mock data
 
 ### 📦 Services Documentation
 
