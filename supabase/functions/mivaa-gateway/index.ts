@@ -266,16 +266,16 @@ serve(async (req) => {
     const isJsonEndpoint = action === 'openapi_json'
 
     let responseData
-    let contentType = 'application/json'
+    let responseContentType = 'application/json'
     const responseText = await response.text()
 
     if (isDocsEndpoint) {
       responseData = responseText
-      contentType = 'text/html'
+      responseContentType = 'text/html'
       console.log(`📥 MIVAA Response: ${response.status} [HTML Content]`)
     } else if (isJsonEndpoint) {
       responseData = responseText // Keep as text for OpenAPI JSON
-      contentType = 'application/json'
+      responseContentType = 'application/json'
       console.log(`📥 MIVAA Response: ${response.status} [OpenAPI JSON]`)
     } else {
       // Try to parse as JSON, but handle HTML error responses
@@ -300,7 +300,7 @@ serve(async (req) => {
       isDocsEndpoint || isJsonEndpoint ? responseData : JSON.stringify(responseData),
       {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': contentType }
+        headers: { ...corsHeaders, 'Content-Type': responseContentType }
       }
     )
 
