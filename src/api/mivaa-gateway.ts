@@ -51,7 +51,7 @@ export class MivaaGatewayController {
 
       if (typeof res?.status === 'function' && typeof res?.json === 'function') {
         res.status(501).json(response);
-      },
+      }
     } catch (error) {
       if (typeof res?.status === 'function' && typeof res?.json === 'function') {
         res.status(500).json({
@@ -62,8 +62,8 @@ export class MivaaGatewayController {
           },
           metadata: { timestamp: new Date().toISOString(), processingTime: 0, version: '1.0.0' },
         } satisfies GatewayResponse);
-      },
-    },
+      }
+    }
   };
 
   // Simple health check
@@ -76,12 +76,12 @@ export class MivaaGatewayController {
         timestamp: new Date().toISOString(),
         processingTime: 0,
         version: '1.0.0',
-      },
+      }
     };
 
     if (typeof res?.status === 'function' && typeof res?.json === 'function') {
       res.status(200).json(response);
-    },
+    }
   };
 }
 

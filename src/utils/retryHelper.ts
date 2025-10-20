@@ -61,7 +61,7 @@ export class RetryHelper {
 
         // Increase delay for next attempt (exponential backoff)
         currentDelay = Math.min(currentDelay * backoffMultiplier, maxDelay);
-      },
+      }
     }
 
     throw lastError;
@@ -100,5 +100,5 @@ export class RetryHelper {
    */
   private static sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
-  },
+  }
 }

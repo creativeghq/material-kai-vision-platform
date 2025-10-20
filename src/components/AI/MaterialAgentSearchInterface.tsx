@@ -307,13 +307,13 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         reader.readAsDataURL(file);
       } else {
         setAttachedFiles(prev => [...prev, newFile]);
-      },
+      }
     });
 
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
-    },
+    }
   };
 
   const removeAttachedFile = (fileId: string) => {
@@ -427,12 +427,12 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             // eslint-disable-next-line no-console
             console.log('✅ RAG search completed:', ragResults);
             enhancedContext.ragResults = ragResults;
-          },
+          }
         } catch (ragError) {
           // eslint-disable-next-line no-console
           console.warn('⚠️ RAG search failed, continuing without:', ragError);
           // Continue without RAG results
-        },
+        }
       }
 
       // If Visual Search is enabled and images are attached, perform visual search
@@ -493,17 +493,17 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                   enhancedContext.visualSearchResults = visualSearchResults || null;
                   setVisualSearchResults(visualSearchResults);
                   break; // Use first image for now
-                },
-              },
+                }
+              }
             } catch (imageError) {
               // eslint-disable-next-line no-console
               console.warn(`⚠️ Visual search failed for ${imageFile.name}:`, imageError);
-            },
-          },
+            }
+          }
         } catch (visualError) {
           // eslint-disable-next-line no-console
           console.warn('⚠️ Visual search failed, continuing without:', visualError);
-        },
+        }
       }
 
       // If Similarity Search mode is enabled, perform vector similarity search
@@ -545,11 +545,11 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             console.log('✅ Vector similarity search completed:', similaritySearchResults);
             enhancedContext.similaritySearchResults = similaritySearchResults;
             setSimilaritySearchResults(similaritySearchResults);
-          },
+          }
         } catch (similarityError) {
           // eslint-disable-next-line no-console
           console.warn('⚠️ Vector similarity search failed, continuing without:', similarityError);
-        },
+        }
       }
 
       // Determine which AI service to use based on hybrid configuration
@@ -590,7 +590,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             error = null;
           } else {
             throw new Error('Hybrid AI failed: No successful response');
-          },
+          }
         } catch (hybridError) {
           // eslint-disable-next-line no-console
           console.warn('⚠️ Hybrid AI failed, falling back to standard Material Agent:', hybridError);
@@ -609,7 +609,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           });
           data = response.data as APIResponse;
           error = response.error?.message || null;
-        },
+        }
       } else {
         // eslint-disable-next-line no-console
         console.log('🤖 Using standard Material Agent...');
@@ -691,13 +691,13 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               };
               // eslint-disable-next-line no-console
               console.log('✅ 3D generation completed:', enhanced3DContent);
-            },
-          },
+            }
+          }
         } catch (generationError) {
           // eslint-disable-next-line no-console
           console.warn('⚠️ 3D generation failed:', generationError);
           // Continue without 3D content
-        },
+        }
       }
 
       const assistantMessage: Message = {
@@ -753,7 +753,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       });
     } finally {
       setIsLoading(false);
-    },
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -763,14 +763,14 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
   const handleMaterialClick = (material: MaterialResult) => {
     if (onMaterialSelect && material.id) {
       onMaterialSelect(material.id);
-    },
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
-    },
+    }
   };
 
   return (
@@ -855,7 +855,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                             variant={
                               message.responseQuality.overall_quality_score >= 0.85 ? 'default' :
                               message.responseQuality.overall_quality_score >= 0.7 ? 'secondary' :
-                              'destructive',
+                              'destructive'
                             }
                             className="text-xs"
                           >

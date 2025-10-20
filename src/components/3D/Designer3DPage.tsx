@@ -42,7 +42,7 @@ export const Designer3DPage: React.FC = () => {
           _role: 'admin',
         });
         setIsAdmin(data === true);
-      },
+      }
     };
 
     checkAdminRole();
@@ -112,7 +112,7 @@ export const Designer3DPage: React.FC = () => {
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
-    },
+    }
   };
 
   const removeImage = () => {
@@ -282,10 +282,10 @@ export const Designer3DPage: React.FC = () => {
             description: 'Your 3D interior is being generated. This may take a few minutes...',
           });
           await pollForResults(responseData.generationId);
-        },
+        }
       } else {
         throw new Error(result.error?.message || 'Failed to start generation');
-      },
+      }
     } catch (error: unknown) {
       // eslint-disable-next-line no-console
       console.error('Generation error:', error);
@@ -296,7 +296,7 @@ export const Designer3DPage: React.FC = () => {
       });
       setIsGenerating(false);
       setIsUploading(false);
-    },
+    }
   };
 
   const pollForResults = async (_generationId: string) => { // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -358,7 +358,7 @@ export const Designer3DPage: React.FC = () => {
                 detectedModel = model;
                 modelName = model.name;
                 break;
-              },
+              }
             }
 
             // Strategy 2: If no model detected from URL, use sequential mapping with validation
@@ -369,7 +369,7 @@ export const Designer3DPage: React.FC = () => {
               if (candidateModel) {
                 detectedModel = candidateModel;
                 modelName = candidateModel.name;
-              },
+              }
             }
 
             // Strategy 3: Fallback - try to map based on successful results count
@@ -380,7 +380,7 @@ export const Designer3DPage: React.FC = () => {
               if (fallbackModel) {
                 detectedModel = fallbackModel;
                 modelName = `${fallbackModel.name} (Result ${index + 1})`;
-              },
+              }
             }
 
             const result = {
@@ -432,7 +432,7 @@ export const Designer3DPage: React.FC = () => {
           setTimeout(poll, 5000); // Poll every 5 seconds
         } else {
           throw new Error('Generation timed out');
-        },
+        }
       } catch (error: unknown) {
         // eslint-disable-next-line no-console
         console.error('Polling error:', error);
@@ -443,7 +443,7 @@ export const Designer3DPage: React.FC = () => {
           description: (error as Error).message || 'Generation failed during processing',
           variant: 'destructive',
         });
-      },
+      }
     };
 
     poll();
@@ -460,7 +460,7 @@ export const Designer3DPage: React.FC = () => {
       setCurrentImageIndex(currentImageIndex - 1);
     } else if (direction === 'next' && currentImageIndex < generatedImages.length - 1) {
       setCurrentImageIndex(currentImageIndex + 1);
-    },
+    }
   };
 
   const modalImages = generatedImages;
@@ -778,7 +778,7 @@ export const Designer3DPage: React.FC = () => {
                   // eslint-disable-next-line no-console
                   console.log(`✅ Strategy 1 success: URL ${url} mapped to model ${modelName}`);
                   return { url, modelName, modelId, resultIndex };
-                },
+                }
               }
 
               // Strategy 2: Sequential mapping with validation
@@ -790,7 +790,7 @@ export const Designer3DPage: React.FC = () => {
                   // eslint-disable-next-line no-console
                   console.log(`✅ Strategy 2 success: Index ${index} mapped to model ${modelName}`);
                   return { url, modelName, modelId, resultIndex };
-                },
+                }
               }
 
               // Strategy 3: Fallback mapping for remaining cases

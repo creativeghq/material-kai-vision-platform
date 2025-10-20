@@ -211,7 +211,7 @@ export function safeParseJSON(value: string): any | null {
     return JSON.parse(value);
   } catch {
     return null;
-  },
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,7 +220,7 @@ export function safeStringify(value: any): string {
     return JSON.stringify(value);
   } catch {
     return String(value);
-  },
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -338,26 +338,26 @@ export function getArrayProperty<T>(
 export function assertIsString(value: any, message = 'Expected string'): asserts value is string {
   if (!isString(value)) {
     throw new TypeError(`${message}, got ${typeof value}`);
-  },
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function assertIsNumber(value: any, message = 'Expected number'): asserts value is number {
   if (!isNumber(value)) {
     throw new TypeError(`${message}, got ${typeof value}`);
-  },
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function assertIsObject(value: any, message = 'Expected object'): asserts value is Record<string, any> {
   if (!isObject(value)) {
     throw new TypeError(`${message}, got ${typeof value}`);
-  },
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function assertIsArray(value: any, message = 'Expected array'): asserts value is any[] {
   if (!isArray(value)) {
     throw new TypeError(`${message}, got ${typeof value}`);
-  },
+  }
 }

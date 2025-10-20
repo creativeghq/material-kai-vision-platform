@@ -161,7 +161,7 @@ export const AIStudioPage: React.FC = () => {
     } finally {
       setIsProcessing(false);
       setProgress(0);
-    },
+    }
   };
 
   const removeFile = (index: number) => {
@@ -190,14 +190,14 @@ export const AIStudioPage: React.FC = () => {
             <Card key={stage.name} className={`transition-all ${
               stage.status === 'completed' ? 'border-green-500 bg-green-50 dark:bg-green-950' :
               stage.status === 'processing' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' :
-              'border-muted',
+              'border-muted'
             }`}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <stage.icon className={`w-6 h-6 ${
                     stage.status === 'completed' ? 'text-green-600' :
                     stage.status === 'processing' ? 'text-blue-600' :
-                    'text-muted-foreground',
+                    'text-muted-foreground'
                   }`} />
                   <div className="flex-1">
                     <p className="font-medium">{stage.name}</p>

@@ -230,7 +230,7 @@ export class AuthenticationHelper {
     } catch (_error) {
       // Authentication error - return unauthenticated state
       return { isAuthenticated: false };
-    },
+    }
   }
 
   /**
@@ -250,8 +250,8 @@ export class AuthenticationHelper {
     } catch (_error) {
       // Endpoint access check error - deny access
       return false;
-    },
-  },
+    }
+  }
 }
 
 /**
@@ -307,7 +307,7 @@ export class RateLimitHelper {
         remaining: 60,
         resetTime: new Date(Date.now() + 60000),
       };
-    },
+    }
   }
 
   /**
@@ -337,8 +337,8 @@ export class RateLimitHelper {
         });
     } catch (_error) {
       // Failed to log API usage - continue without logging
-    },
-  },
+    }
+  }
 }
 
 
@@ -415,7 +415,7 @@ export class ConsolidatedPDFController {
         },
         timestamp: new Date().toISOString(),
       };
-    },
+    }
   }
 
   /**
@@ -462,7 +462,7 @@ export class ConsolidatedPDFController {
             code: 'FORBIDDEN',
             timestamp: new Date().toISOString(),
           };
-        },
+        }
       }
 
       // Create extraction request
@@ -474,7 +474,7 @@ export class ConsolidatedPDFController {
             pageRange: {
               ...(validationResult.data.options.pageRange.start !== undefined && { start: validationResult.data.options.pageRange.start }),
               ...(validationResult.data.options.pageRange.end !== undefined && { end: validationResult.data.options.pageRange.end }),
-            },
+            }
           }),
           ...(validationResult.data.options.outputFormat && { outputFormat: validationResult.data.options.outputFormat }),
           ...(validationResult.data.options.workspaceAware !== undefined && { workspaceAware: validationResult.data.options.workspaceAware }),
@@ -509,7 +509,7 @@ export class ConsolidatedPDFController {
           workspace: {
             userId: authContext.user.id,
             ...extractionRequest.metadata?.workspace,
-          },
+          }
         };
       }
 
@@ -544,7 +544,7 @@ export class ConsolidatedPDFController {
           });
 
           result = { ...result, jobId };
-        },
+        }
       } else if (request.options.enableFunctionalMetadata) {
         // Process for functional metadata extraction with enhanced error handling
         const functionalMetadataRequest = {
@@ -552,7 +552,7 @@ export class ConsolidatedPDFController {
           options: {
             ...extractionRequest.options,
             include_functional_metadata: true,
-          },
+          }
         };
 
         let jobId: string | undefined;
@@ -659,13 +659,13 @@ export class ConsolidatedPDFController {
                 job.updatedAt = new Date().toISOString();
                 this.activeJobs.set(jobId, job);
                 result = { ...result, jobId };
-              },
+              }
             } catch (fallbackError) {
               // Both functional metadata and standard extraction failed
               throw new Error(`Both functional metadata and standard extraction failed. Functional metadata error: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}. Standard extraction error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
-            },
-          },
-        },
+            }
+          }
+        }
       } else {
         // Standard extraction
         result = await this.mivaaService.extractFromPdf(extractionRequest);
@@ -706,7 +706,7 @@ export class ConsolidatedPDFController {
         data: { message: error instanceof Error ? error.message : 'Unknown error' },
         timestamp: new Date().toISOString(),
       };
-    },
+    }
   }
 
   /**
@@ -750,7 +750,7 @@ export class ConsolidatedPDFController {
             code: 'FORBIDDEN',
             timestamp: new Date().toISOString(),
           };
-        },
+        }
       }
 
       // Calculate progress
@@ -833,7 +833,7 @@ export class ConsolidatedPDFController {
         code: 'STATUS_RETRIEVAL_ERROR',
         timestamp: new Date().toISOString(),
       };
-    },
+    }
   }
 
   /**
@@ -899,7 +899,7 @@ export class ConsolidatedPDFController {
             pageNumber: (result.metadata?.pageNumber as number) || 0,
             chunkIndex: (result.metadata?.chunkIndex as number) || 0,
             tags: (result.metadata?.tags as string[]) || [],
-          },
+          }
         })),
         totalResults: searchResults.totalMatches,
         searchTime: searchResults.processingTime,
@@ -939,7 +939,7 @@ export class ConsolidatedPDFController {
         code: 'SEARCH_ERROR',
         timestamp: new Date().toISOString(),
       };
-    },
+    }
   }
 
   /**
@@ -989,7 +989,7 @@ export class ConsolidatedPDFController {
         // If failFast is enabled and any request failed, stop processing
         if (options.batchOptions?.failFast && batchResults.some(r => !r.result.success)) {
           break;
-        },
+        }
       }
 
       // Log usage
@@ -1030,7 +1030,7 @@ export class ConsolidatedPDFController {
         code: 'BATCH_PROCESSING_ERROR',
         timestamp: new Date().toISOString(),
       };
-    },
+    }
   }
 
   /**
@@ -1082,7 +1082,7 @@ export class ConsolidatedPDFController {
         databaseMetrics: {
           totalJobs: jobMetrics?.length || 0,
           successRate: jobMetrics ? ((jobMetrics.filter(j => j.status === 'completed').length / jobMetrics.length) * 100).toFixed(2) : 'N/A',
-        },
+        }
       };
 
       return {
@@ -1098,7 +1098,7 @@ export class ConsolidatedPDFController {
         code: 'METRICS_ERROR',
         timestamp: new Date().toISOString(),
       };
-    },
+    }
   }
 
   /**
@@ -1123,7 +1123,7 @@ export class ConsolidatedPDFController {
     } catch (_error) {
       // Failed to check workspace access
       return false;
-    },
+    }
   }
 
   /**
@@ -1157,7 +1157,7 @@ export class ConsolidatedPDFController {
         });
     } catch (_error) {
       // Failed to create processing job
-    },
+    }
   }
 
   /**
@@ -1179,7 +1179,7 @@ export class ConsolidatedPDFController {
         .eq('job_id', jobId);
     } catch (_error) {
       // Failed to update processing job
-    },
+    }
   }
 
 
@@ -1191,7 +1191,7 @@ export class ConsolidatedPDFController {
   private async fileToBuffer(file: File): Promise<Buffer> {
     const arrayBuffer = await file.arrayBuffer();
     return Buffer.from(arrayBuffer);
-  },
+  }
 }
 
 /**

@@ -215,7 +215,7 @@ export function validateMaterialMetadata(
         message: `Invalid finish "${metadata.finish}" for category "${category}". Valid options: ${categoryDef.finish.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   } else {
     warnings.push({
       field: 'metadata.finish',
@@ -232,7 +232,7 @@ export function validateMaterialMetadata(
         message: `Invalid size "${metadata.size}" for category "${category}". Valid options: ${categoryDef.size.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   } else {
     warnings.push({
       field: 'metadata.size',
@@ -249,7 +249,7 @@ export function validateMaterialMetadata(
         message: `Invalid installation method "${metadata.installationMethod}" for category "${category}". Valid options: ${categoryDef.installationMethod.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   } else {
     warnings.push({
       field: 'metadata.installationMethod',
@@ -266,7 +266,7 @@ export function validateMaterialMetadata(
         message: `Invalid application "${metadata.application}" for category "${category}". Valid options: ${categoryDef.application.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   } else {
     warnings.push({
       field: 'metadata.application',
@@ -303,7 +303,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
         message: 'Density seems unusually high (>30 g/cm³) - please verify',
         severity: 'warning',
       });
-    },
+    }
   }
 
   if (properties.yieldStrength !== undefined) {
@@ -319,7 +319,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
         message: 'Yield strength seems unusually high (>10,000 MPa) - please verify',
         severity: 'warning',
       });
-    },
+    }
   }
 
   if (properties.tensileStrength !== undefined) {
@@ -335,7 +335,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
         message: 'Tensile strength seems unusually high (>15,000 MPa) - please verify',
         severity: 'warning',
       });
-    },
+    }
   }
 
   if (properties.thermalConductivity !== undefined) {
@@ -351,7 +351,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
         message: 'Thermal conductivity seems unusually high (>1000 W/m·K) - please verify',
         severity: 'warning',
       });
-    },
+    }
   }
 
   if (properties.meltingPoint !== undefined) {
@@ -373,7 +373,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
         message: 'Melting point seems unusually high (>5000°C) - please verify',
         severity: 'warning',
       });
-    },
+    }
   }
 
   if (properties.glassTransition !== undefined) {
@@ -389,7 +389,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
         message: 'Glass transition temperature cannot be below absolute zero (-273.15°C)',
         severity: 'error',
       });
-    },
+    }
   }
 
   // Validate relationships between properties
@@ -400,7 +400,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
         message: 'Yield strength typically should not exceed tensile strength',
         severity: 'warning',
       });
-    },
+    }
   }
 
   return {
@@ -444,7 +444,7 @@ export function validateExtractedAIData(
           message: 'Low confidence score (<0.5) - manual review recommended',
           severity: 'warning',
         });
-      },
+      }
     }
 
     // Check for extracted meta fields
@@ -458,7 +458,7 @@ export function validateExtractedAIData(
         message: 'No meta fields extracted - catalog information may be incomplete',
         severity: 'warning',
       });
-    },
+    }
   }
 
   // Validate material identification
@@ -494,7 +494,7 @@ export function validateExtractedAIData(
         message: `Detected category "${materialId.category}" differs from expected "${expectedCategory}"`,
         severity: 'warning',
       });
-    },
+    }
   }
 
   return {
@@ -533,7 +533,7 @@ export function validateExtractedMetaFields(
         message: `Invalid finish "${extractedMeta.finish}" for category "${category}". Valid options: ${categoryDef.finish.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   }
 
   // Validate size
@@ -544,7 +544,7 @@ export function validateExtractedMetaFields(
         message: `Invalid size "${extractedMeta.size}" for category "${category}". Valid options: ${categoryDef.size.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   }
 
   // Validate installation method
@@ -555,7 +555,7 @@ export function validateExtractedMetaFields(
         message: `Invalid installation method "${extractedMeta.installation_method}" for category "${category}". Valid options: ${categoryDef.installationMethod.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   }
 
   // Validate application
@@ -566,7 +566,7 @@ export function validateExtractedMetaFields(
         message: `Invalid application "${extractedMeta.application}" for category "${category}". Valid options: ${categoryDef.application.join(', ')}`,
         severity: 'error',
       });
-    },
+    }
   }
 
   // Validate R11 rating format if present
@@ -583,7 +583,7 @@ export function validateExtractedMetaFields(
         message: 'R11 rating format may be invalid - expected format like "R11-2.5" or "2.5"',
         severity: 'warning',
       });
-    },
+    }
   }
 
   // Validate metal types if present
@@ -602,9 +602,9 @@ export function validateExtractedMetaFields(
             message: 'Each metal type must be a string',
             severity: 'error',
           });
-        },
+        }
       });
-    },
+    }
   }
 
   return {
@@ -641,7 +641,7 @@ export function validateAndSuggestCorrections(
           suggestions.push(`For ${material.category}, try these sizes: ${(categoryDef?.size as unknown as string[])?.slice(0, 3).join(', ')}`);
         }
         break;
-    },
+    }
   });
 
   // Add suggestions for missing recommended fields
@@ -693,7 +693,7 @@ export function validateMaterialBatch(materials: Partial<Material>[]): {
       isValid: allErrors.length === 0,
       errors: allErrors,
       warnings: allWarnings,
-    },
+    }
     individual: individualResults,
     summary,
   };
@@ -770,7 +770,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       if (normalized !== meta.finish) {
         meta.finish = normalized;
         changes.push(`Normalized finish: "${(rawData.processing_metadata as any)?.extracted_meta?.finish}" → "${normalized}"`);
-      },
+      }
     }
 
     // Normalize size
@@ -779,7 +779,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       if (normalized !== meta.size) {
         meta.size = normalized;
         changes.push(`Normalized size: "${(rawData.processing_metadata as any)?.extracted_meta?.size}" → "${normalized}"`);
-      },
+      }
     }
 
     // Normalize installation method
@@ -788,7 +788,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       if (normalized !== meta.installation_method) {
         meta.installation_method = normalized;
         changes.push(`Normalized installation method: "${(rawData.processing_metadata as any)?.extracted_meta?.installation_method}" → "${normalized}"`);
-      },
+      }
     }
 
     // Normalize application
@@ -797,7 +797,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       if (normalized !== meta.application) {
         meta.application = normalized;
         changes.push(`Normalized application: "${(rawData.processing_metadata as any)?.extracted_meta?.application}" → "${normalized}"`);
-      },
+      }
     }
 
     // Normalize R11 rating
@@ -806,7 +806,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       if (normalized !== meta.r11) {
         meta.r11 = normalized;
         changes.push(`Normalized R11 rating: "${(rawData.processing_metadata as any)?.extracted_meta?.r11}" → "${normalized}"`);
-      },
+      }
     }
 
     // Normalize metal types
@@ -819,8 +819,8 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       if (JSON.stringify(normalized) !== JSON.stringify(meta.metal_types)) {
         meta.metal_types = normalized;
         changes.push(`Normalized metal types: ${JSON.stringify((rawData.processing_metadata as any)?.extracted_meta?.metal_types)} → ${JSON.stringify(normalized)}`);
-      },
-    },
+      }
+    }
   }
 
   return {
@@ -855,7 +855,7 @@ export function createMaterialFromExtractedData(
     name: string;
     createdBy?: string;
     imageUrl?: string;
-  },
+  }
 ): Partial<Material> {
   const { sanitized } = sanitizeExtractedData(extractedData);
   const now = new Date().toISOString();
@@ -876,8 +876,8 @@ export function createMaterialFromExtractedData(
         extractionMethod: (sanitized.processing_metadata as any)?.method,
         extractionConfidence: (sanitized.processing_metadata as any)?.confidence,
         modelVersion: (sanitized.processing_metadata as any)?.model_version,
-      },
-    },
+      }
+    }
   };
 
   // Add optional properties separately to handle undefined properly

@@ -341,7 +341,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setMultiModalTesting(false);
-    },
+    }
   };
 
   // Similarity search testing function
@@ -425,7 +425,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setSimilarityTesting(false);
-    },
+    }
   };
 
   const testMaterialAnalysis = async () => {
@@ -507,7 +507,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setTesting(false);
-    },
+    }
   };
 
   const test3DGeneration = async () => {
@@ -544,7 +544,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setTesting(false);
-    },
+    }
   };
 
   const getSampleImageUrls = () => [
