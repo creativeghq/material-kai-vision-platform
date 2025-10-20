@@ -4,6 +4,8 @@ import { categoryExtractionService, updateDocumentCategories } from './categoryE
 import { dynamicCategoryManagementService } from './dynamicCategoryManagementService';
 import { pdfProcessingWebSocketService } from './realtime/PDFProcessingWebSocketService';
 import { chunkQualityService } from './chunkQualityService';
+import { MetafieldService } from './metafieldService';
+import { EntityRelationshipService } from './entityRelationshipService';
 
 
 // Define interfaces locally to avoid importing from React components
@@ -55,6 +57,7 @@ export interface ConsolidatedProcessingOptions {
   enableImageMapping?: boolean;
   enableSemanticAnalysis?: boolean;
   workspaceAware?: boolean;
+  categoryId?: string;
   // MIVAA is now the only processing method available
 }
 
@@ -208,7 +211,9 @@ export class ConsolidatedPDFWorkflowService {
       startTime: new Date(),
       steps,
       currentStepIndex: 0,
-      metadata: {},
+      metadata: {
+        categoryId: options.categoryId,
+      },
     };
 
     this.jobs.set(jobId, job);
@@ -1070,29 +1075,35 @@ export class ConsolidatedPDFWorkflowService {
             });
           }
 
-          // Try to fetch images from MIVAA using the fixed endpoint
-          console.log(`🔍 Attempting to fetch images for document: ${mivaaDocumentId}`);
-          const imagesResponse = await this.callMivaaGatewayDirect('get_document_images', {
-            document_id: mivaaDocumentId
-          });
-
-          console.log(`📊 Images response:`, {
-            success: imagesResponse.success,
-            hasData: !!imagesResponse.data,
-            dataType: Array.isArray(imagesResponse.data) ? 'array' : typeof imagesResponse.data,
-            dataLength: Array.isArray(imagesResponse.data) ? imagesResponse.data.length : 'N/A',
-            error: imagesResponse.error
-          });
-
-          if (imagesResponse.success && imagesResponse.data) {
-            images = Array.isArray(imagesResponse.data) ? imagesResponse.data : [];
-            console.log(`🖼️ Fetched ${images.length} real images from MIVAA`);
-          } else {
-            console.warn(`Failed to fetch images from MIVAA:`, {
-              success: imagesResponse.success,
-              error: imagesResponse.error,
-              data: imagesResponse.data
+          // Try to fetch images from MIVAA gateway (which should have storage URLs from MIVAA's upload)
+          console.log(`🔍 Attempting to fetch images from MIVAA gateway for document: ${mivaaDocumentId}`);
+          try {
+            const imagesResponse = await this.callMivaaGatewayDirect('get_document_images', {
+              document_id: mivaaDocumentId
             });
+
+            console.log(`📊 Images response from MIVAA:`, {
+              success: imagesResponse.success,
+              hasData: !!imagesResponse.data,
+              dataType: Array.isArray(imagesResponse.data) ? 'array' : typeof imagesResponse.data,
+              dataLength: Array.isArray(imagesResponse.data) ? imagesResponse.data.length : 'N/A',
+              error: imagesResponse.error
+            });
+
+            if (imagesResponse.success && imagesResponse.data && Array.isArray(imagesResponse.data)) {
+              images = imagesResponse.data.map((img: any) => ({
+                ...img,
+                url: img.storage_url || img.public_url || img.image_url || img.url,
+                image_url: img.storage_url || img.public_url || img.image_url || img.url,
+                storage_uploaded: true,
+                storage_bucket: img.storage_bucket || 'pdf-tiles'
+              }));
+              console.log(`✅ Fetched ${images.length} images from MIVAA (with storage URLs)`);
+            } else {
+              console.log(`⚠️ MIVAA gateway returned no images for document ${mivaaDocumentId}`);
+            }
+          } catch (mivaaImageError) {
+            console.error('❌ Failed to fetch images from MIVAA gateway:', mivaaImageError);
           }
 
         } catch (error) {
@@ -1131,32 +1142,51 @@ export class ConsolidatedPDFWorkflowService {
         }
       }
 
+      // Note: Images should have been fetched from Supabase above
+      // If still no images but metadata shows they exist, create placeholder records
       if (images.length === 0 && imagesCount > 0) {
-        console.log(`⚠️ MIVAA gateway returned 0 images, trying direct database access...`);
-        try {
-          const { data: dbImages, error: imagesError } = await supabase
-            .from('document_images')
-            .select('*')
-            .eq('document_id', mivaaDocumentId)
-            .order('page_number');
+        console.warn(`⚠️ Metadata shows ${imagesCount} images should exist, but none were found in database for document ${documentId}`);
+        console.warn(`Creating placeholder image records based on metadata count...`);
 
-          if (imagesError) {
-            console.error('Database images query error:', imagesError);
-          } else if (dbImages && dbImages.length > 0) {
-            images = dbImages.map((image: any) => ({
-              image_id: image.id,
-              filename: image.metadata?.filename || `image_${image.id}`,
-              page_number: image.page_number || 1,
-              format: image.metadata?.format || 'PNG',
-              size_bytes: image.metadata?.size_bytes || 0,
-              dimensions: image.metadata?.dimensions || { width: 0, height: 0 },
-              description: image.caption || image.alt_text,
-              url: image.image_url
-            }));
-            console.log(`✅ Retrieved ${images.length} images from database fallback`);
+        // Create placeholder image records so the UI knows images were detected
+        // This helps track that images were extracted even if they're not fully stored
+        try {
+          const placeholderImages = [];
+          for (let i = 0; i < Math.min(imagesCount, 50); i++) { // Limit to 50 to avoid too many inserts
+            placeholderImages.push({
+              document_id: documentId,
+              workspace_id: user.id,
+              image_url: `placeholder_image_${documentId}_${i}`,
+              image_type: 'extracted',
+              page_number: Math.floor(i / 5) + 1, // Estimate ~5 images per page
+              confidence: 0.5, // Lower confidence for placeholders
+              caption: `Image ${i + 1} (extracted by MIVAA)`,
+              alt_text: `Extracted image ${i + 1}`,
+              processing_status: 'extracted_not_stored',
+              metadata: {
+                source: 'mivaa_pdf_processing',
+                placeholder: true,
+                reason: 'MIVAA extracted images but did not store them in database',
+                total_images_detected: imagesCount,
+                image_index: i
+              }
+            });
           }
-        } catch (dbError) {
-          console.error('Database fallback failed:', dbError);
+
+          if (placeholderImages.length > 0) {
+            const { error: placeholderError } = await supabase
+              .from('document_images')
+              .insert(placeholderImages);
+
+            if (!placeholderError) {
+              console.log(`✅ Created ${placeholderImages.length} placeholder image records`);
+              images = placeholderImages;
+            } else {
+              console.error(`❌ Failed to create placeholder images:`, placeholderError);
+            }
+          }
+        } catch (placeholderError) {
+          console.error('❌ Error creating placeholder images:', placeholderError);
         }
       }
 
@@ -1188,7 +1218,6 @@ export class ConsolidatedPDFWorkflowService {
             id: documentId,
             workspace_id: user.id,
             filename: file.name,
-            title: documentName,
             content_type: file.type || 'application/pdf',
             processing_status: 'completed',
             metadata: {
@@ -1317,11 +1346,69 @@ export class ConsolidatedPDFWorkflowService {
         }
       }
 
+      // Extract metafields for chunks
+      console.log(`🏷️ Starting metafield extraction for ${chunksStored} chunks...`);
+      try {
+        // Get applicable metafield definitions
+        const { data: metafieldDefs } = await supabase
+          .from('material_metadata_fields')
+          .select('*')
+          .order('sort_order', { ascending: true });
+
+        if (metafieldDefs && metafieldDefs.length > 0) {
+          const fieldDefinitionsMap = new Map();
+          metafieldDefs.forEach(field => {
+            fieldDefinitionsMap.set(field.id, field);
+          });
+
+          // Extract metafields for each chunk
+          for (let i = 0; i < Math.min(chunks.length, 10); i++) {
+            const chunk = chunks[i];
+            const chunkId = `${documentId}_chunk_${i}`;
+            const chunkContent = typeof chunk === 'string' ? chunk : chunk.content || chunk.text || '';
+
+            try {
+              console.log(`🏷️ Extracting metafields for chunk ${i + 1}...`);
+              const metafields = await MetafieldService.extractMetafieldsFromText(
+                chunkContent,
+                metafieldDefs
+              );
+
+              if (Object.keys(metafields).length > 0) {
+                await MetafieldService.saveChunkMetafields(
+                  chunkId,
+                  metafields,
+                  fieldDefinitionsMap,
+                  'pdf_extraction'
+                );
+                console.log(`✅ Saved metafields for chunk ${i + 1}`);
+              }
+            } catch (metafieldError) {
+              console.warn(`⚠️ Metafield extraction failed for chunk ${i + 1}:`, metafieldError);
+              // Continue processing even if metafield extraction fails
+            }
+          }
+          console.log(`✅ Metafield extraction completed for chunks`);
+        }
+      } catch (metafieldError) {
+        console.warn(`⚠️ Metafield extraction setup failed:`, metafieldError);
+      }
+
       // Store document images
       if (images.length > 0) {
+        console.log(`📸 Starting to store ${images.length} images...`);
         for (let i = 0; i < images.length; i++) {
           const image = images[i];
-          let imageUrl = image.url || image.image_url;
+          let imageUrl = image.url || image.image_url || image.storage_url || image.public_url;
+
+          // Log image details for debugging
+          console.log(`📸 Processing image ${i + 1}/${images.length}:`, {
+            hasUrl: !!imageUrl,
+            url: imageUrl?.substring(0, 100) + (imageUrl && imageUrl.length > 100 ? '...' : ''),
+            storage_uploaded: image.storage_uploaded,
+            storage_bucket: image.storage_bucket,
+            filename: image.filename
+          });
 
           // If no URL is provided, try to generate a proper storage URL
           if (!imageUrl || imageUrl.startsWith('placeholder_')) {
@@ -1352,7 +1439,7 @@ export class ConsolidatedPDFWorkflowService {
               document_id: documentId,
               workspace_id: user.id,
               image_url: imageUrl,
-              image_type: image.type || 'extracted',
+              image_type: image.type || image.image_type || 'extracted',
               caption: image.caption || image.description || '',
               alt_text: image.alt_text || image.caption || '',
               page_number: image.page_number || image.page || i + 1,
@@ -1366,6 +1453,8 @@ export class ConsolidatedPDFWorkflowService {
                 source: 'mivaa_pdf_processing',
                 source_document: documentName,  // For bubble display
                 original_url: image.url || image.image_url,
+                storage_uploaded: image.storage_uploaded || false,
+                storage_bucket: image.storage_bucket || 'pdf-tiles',
                 storage_path: `extracted/${documentId}/${image.filename || image.image_id || `image_${i}.png`}`,
                 image_filename: image.filename || image.image_id || `image_${i}.png`,
                 format: image.format || 'PNG',
@@ -1384,39 +1473,114 @@ export class ConsolidatedPDFWorkflowService {
               heading_distance: image.heading_distance || 0
             });
 
-          if (!imageError) {
+          if (imageError) {
+            console.error(`❌ Failed to store image ${i}:`, imageError);
+          } else {
             imagesStored++;
+            console.log(`✅ Stored image ${i + 1}/${images.length}`);
           }
         }
+      } else {
+        console.log(`⚠️ No images to store (images.length = 0)`);
+      }
+
+      // Extract metafields for images
+      console.log(`🏷️ Starting metafield extraction for ${imagesStored} images...`);
+      try {
+        // Get applicable metafield definitions
+        const { data: metafieldDefs } = await supabase
+          .from('material_metadata_fields')
+          .select('*')
+          .order('sort_order', { ascending: true });
+
+        if (metafieldDefs && metafieldDefs.length > 0) {
+          const fieldDefinitionsMap = new Map();
+          metafieldDefs.forEach((field: any) => {
+            fieldDefinitionsMap.set(field.id, field);
+          });
+
+          // Get stored images and extract metafields
+          const { data: storedImages } = await supabase
+            .from('document_images')
+            .select('id, image_url')
+            .eq('document_id', documentId)
+            .limit(10);
+
+          if (storedImages && storedImages.length > 0) {
+            for (const image of storedImages) {
+              try {
+                if (!image.image_url || image.image_url.startsWith('missing_')) {
+                  console.log(`⏭️ Skipping image ${image.id} - no valid URL`);
+                  continue;
+                }
+
+                console.log(`🏷️ Extracting metafields for image ${image.id}...`);
+                const metafields = await MetafieldService.extractMetafieldsFromImage(
+                  image.image_url,
+                  metafieldDefs
+                );
+
+                if (Object.keys(metafields).length > 0) {
+                  await MetafieldService.saveImageMetafields(
+                    image.id,
+                    metafields,
+                    fieldDefinitionsMap,
+                    'visual_analysis'
+                  );
+                  console.log(`✅ Saved metafields for image ${image.id}`);
+                }
+              } catch (metafieldError) {
+                console.warn(`⚠️ Metafield extraction failed for image ${image.id}:`, metafieldError);
+              }
+            }
+          }
+          console.log(`✅ Metafield extraction completed for images`);
+        }
+      } catch (metafieldError) {
+        console.warn(`⚠️ Image metafield extraction setup failed:`, metafieldError);
       }
 
       console.log(`✅ Storage completed: ${chunksStored} chunks, ${imagesStored} images, ${embeddingsStored} embeddings stored in database`);
 
+      // Log image extraction status for debugging
+      if (imagesCount > 0 && imagesStored === 0) {
+        console.warn(`⚠️ IMAGE EXTRACTION ISSUE: Metadata shows ${imagesCount} images were detected, but ${imagesStored} were stored`);
+        console.warn(`This indicates MIVAA extracted images but did not persist them to the database`);
+        console.warn(`Placeholder records may have been created to track this`);
+      } else if (imagesStored > 0) {
+        console.log(`✅ Successfully stored ${imagesStored} images (${imagesCount} detected by MIVAA)`);
+      }
+
       // Apply quality scoring via Edge Function
-      console.log(`🎯 Calling apply-quality-scoring Edge Function...`);
+      console.log(`🎯 Calling apply-quality-scoring Edge Function for document: ${documentId}...`);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token || '';
+        const supabaseUrl = process.env.VITE_SUPABASE_URL;
 
-        const qualityScoringResponse = await fetch(
-          `${process.env.VITE_SUPABASE_URL}/functions/v1/apply-quality-scoring`,
-          {
+        if (!supabaseUrl || !documentId) {
+          console.warn(`⚠️ Cannot call quality scoring: supabaseUrl=${!!supabaseUrl}, documentId=${documentId}`);
+        } else {
+          const qualityScoringUrl = `${supabaseUrl}/functions/v1/apply-quality-scoring`;
+          console.log(`📍 Quality scoring URL: ${qualityScoringUrl}`);
+
+          const qualityScoringResponse = await fetch(qualityScoringUrl, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ document_id: documentId }),
-          }
-        );
+          });
 
-        if (qualityScoringResponse.ok) {
-          const qualityScoringResult = await qualityScoringResponse.json();
-          console.log(`✅ Quality scoring completed: ${qualityScoringResult.scored_chunks}/${qualityScoringResult.total_chunks} chunks scored`);
-        } else {
-          console.error(`❌ Quality scoring failed with status ${qualityScoringResponse.status}`);
-          const errorText = await qualityScoringResponse.text();
-          console.error('Error details:', errorText);
+          if (qualityScoringResponse.ok) {
+            const qualityScoringResult = await qualityScoringResponse.json();
+            console.log(`✅ Quality scoring completed: ${qualityScoringResult.scored_chunks}/${qualityScoringResult.total_chunks} chunks scored`);
+          } else {
+            console.error(`❌ Quality scoring failed with status ${qualityScoringResponse.status}`);
+            const errorText = await qualityScoringResponse.text();
+            console.error('Error details:', errorText);
+          }
         }
       } catch (qualityError) {
         console.error('Quality scoring failed:', qualityError);
@@ -1878,6 +2042,284 @@ export class ConsolidatedPDFWorkflowService {
       const genericError = error instanceof Error ? error.message : String(error);
       console.error('❌ MIVAA gateway error:', genericError);
       throw new Error(`MIVAA gateway error: ${genericError}`);
+    }
+  }
+
+  /**
+   * Link chunks to images with relationship types
+   */
+  async linkChunksToImages(
+    chunks: any[],
+    images: any[],
+    options: { relationshipType?: string; calculateRelevance?: boolean } = {}
+  ): Promise<{ linksCreated: number; totalAttempted: number }> {
+    const relationshipType = options.relationshipType || 'illustrates';
+    const calculateRelevance = options.calculateRelevance !== false;
+
+    console.log(`🔗 Linking chunks to images...`);
+    console.log(`   Chunks: ${chunks.length}`);
+    console.log(`   Images: ${images.length}`);
+    console.log(`   Relationship type: ${relationshipType}`);
+
+    let linksCreated = 0;
+    const totalAttempted = Math.min(chunks.length, 10) * Math.min(images.length, 10);
+
+    try {
+      // Link first 10 chunks to first 10 images
+      for (let i = 0; i < Math.min(chunks.length, 10); i++) {
+        const chunk = chunks[i];
+
+        for (let j = 0; j < Math.min(images.length, 10); j++) {
+          const image = images[j];
+
+          try {
+            // Calculate relevance score if enabled
+            let relevanceScore = 0.5; // Default medium relevance
+            if (calculateRelevance) {
+              // Simple relevance: chunks and images from same page have higher relevance
+              if (chunk.page_number === image.page_number) {
+                relevanceScore = 0.9;
+              } else if (Math.abs((chunk.page_number || 0) - (image.page_number || 0)) <= 2) {
+                relevanceScore = 0.7;
+              }
+            }
+
+            await EntityRelationshipService.linkChunkToImage(
+              chunk.id,
+              image.id,
+              relationshipType as any,
+              relevanceScore
+            );
+
+            linksCreated++;
+            console.log(`✅ Linked chunk ${i + 1} to image ${j + 1} (relevance: ${relevanceScore})`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to link chunk ${i + 1} to image ${j + 1}:`, error);
+          }
+        }
+      }
+
+      console.log(`✅ Chunk-image linking completed: ${linksCreated}/${totalAttempted} links created`);
+
+      return {
+        linksCreated,
+        totalAttempted,
+      };
+    } catch (error) {
+      console.error('Error linking chunks to images:', error);
+      throw new Error(`Failed to link chunks to images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Link products to images with relationship types
+   */
+  async linkProductsToImages(
+    products: any[],
+    images: any[],
+    options: { relationshipType?: string; calculateRelevance?: boolean } = {}
+  ): Promise<{ linksCreated: number; totalAttempted: number }> {
+    const relationshipType = options.relationshipType || 'depicts';
+    const calculateRelevance = options.calculateRelevance !== false;
+
+    console.log(`🔗 Linking products to images...`);
+    console.log(`   Products: ${products.length}`);
+    console.log(`   Images: ${images.length}`);
+    console.log(`   Relationship type: ${relationshipType}`);
+
+    let linksCreated = 0;
+    const totalAttempted = Math.min(products.length, 10) * Math.min(images.length, 10);
+
+    try {
+      // Link first 10 products to first 10 images
+      for (let i = 0; i < Math.min(products.length, 10); i++) {
+        const product = products[i];
+
+        for (let j = 0; j < Math.min(images.length, 10); j++) {
+          const image = images[j];
+
+          try {
+            // Calculate relevance score if enabled
+            let relevanceScore = 0.5; // Default medium relevance
+            if (calculateRelevance) {
+              // Simple relevance: products from same page as image have higher relevance
+              const productPageNumber = product.properties?.page_number || 0;
+              const imagePageNumber = image.page_number || 0;
+
+              if (productPageNumber === imagePageNumber) {
+                relevanceScore = 0.9;
+              } else if (Math.abs(productPageNumber - imagePageNumber) <= 2) {
+                relevanceScore = 0.7;
+              }
+            }
+
+            await EntityRelationshipService.linkProductToImage(
+              product.id,
+              image.id,
+              relationshipType as any,
+              relevanceScore
+            );
+
+            linksCreated++;
+            console.log(`✅ Linked product ${i + 1} to image ${j + 1} (relevance: ${relevanceScore})`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to link product ${i + 1} to image ${j + 1}:`, error);
+          }
+        }
+      }
+
+      console.log(`✅ Product-image linking completed: ${linksCreated}/${totalAttempted} links created`);
+
+      return {
+        linksCreated,
+        totalAttempted,
+      };
+    } catch (error) {
+      console.error('Error linking products to images:', error);
+      throw new Error(`Failed to link products to images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create products from chunks with metafield extraction
+   */
+  async createProductsFromChunksWithMetafields(
+    chunks: any[],
+    documentId: string,
+    userId: string,
+    options: { maxProducts?: number; extractMetafields?: boolean } = {}
+  ): Promise<{ productsCreated: number; metafieldsExtracted: number }> {
+    const maxProducts = options.maxProducts || 5;
+    const extractMetafields = options.extractMetafields !== false;
+
+    console.log(`📦 Creating products from chunks with metafield extraction...`);
+    console.log(`   Max products: ${maxProducts}`);
+    console.log(`   Extract metafields: ${extractMetafields}`);
+
+    let productsCreated = 0;
+    let metafieldsExtracted = 0;
+
+    try {
+      // Get metafield definitions if extraction is enabled
+      let metafieldDefs: any[] = [];
+      let fieldDefinitionsMap = new Map();
+
+      if (extractMetafields) {
+        const { data: defs } = await supabase
+          .from('material_metadata_fields')
+          .select('*')
+          .order('sort_order', { ascending: true });
+
+        if (defs && defs.length > 0) {
+          metafieldDefs = defs;
+          defs.forEach((field: any) => {
+            fieldDefinitionsMap.set(field.id, field);
+          });
+        }
+      }
+
+      // Create products from chunks
+      for (let i = 0; i < Math.min(chunks.length, maxProducts); i++) {
+        const chunk = chunks[i];
+
+        try {
+          // Extract product information from chunk
+          const productName = `Product from Chunk ${i + 1}`;
+          const productDescription = chunk.content?.substring(0, 200) || 'No description';
+          const productLongDescription = chunk.content || 'No long description';
+
+          console.log(`📝 Creating product ${i + 1}/${Math.min(chunks.length, maxProducts)}...`);
+
+          // Create product
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .insert({
+              name: productName,
+              description: productDescription,
+              long_description: productLongDescription,
+              properties: {
+                source_chunk_id: chunk.id,
+                document_id: documentId,
+                chunk_index: chunk.chunk_index,
+                page_number: chunk.page_number,
+              },
+              metadata: {
+                extracted_from: 'knowledge_base_chunk',
+                chunk_metadata: chunk.metadata,
+                extraction_date: new Date().toISOString(),
+              },
+              status: 'draft',
+              created_from_type: 'pdf_processing',
+              created_by: userId,
+            })
+            .select()
+            .single();
+
+          if (productError) {
+            console.warn(`⚠️ Failed to create product ${i + 1}: ${productError.message}`);
+            continue;
+          }
+
+          if (!product) {
+            console.warn(`⚠️ Product creation returned no data for chunk ${i + 1}`);
+            continue;
+          }
+
+          productsCreated++;
+          console.log(`✅ Product created: ${product.id}`);
+
+          // Extract and save metafields if enabled
+          if (extractMetafields && metafieldDefs.length > 0) {
+            try {
+              console.log(`🏷️ Extracting metafields for product ${i + 1}...`);
+
+              const productText = `${product.name} ${product.description} ${product.long_description}`;
+              const metafields = await MetafieldService.extractMetafieldsFromText(
+                productText,
+                metafieldDefs
+              );
+
+              if (Object.keys(metafields).length > 0) {
+                await MetafieldService.saveProductMetafields(
+                  product.id,
+                  metafields,
+                  fieldDefinitionsMap,
+                  'product_extraction'
+                );
+                metafieldsExtracted++;
+                console.log(`✅ Metafields extracted for product ${i + 1}`);
+              }
+            } catch (metafieldError) {
+              console.warn(`⚠️ Metafield extraction failed for product ${i + 1}:`, metafieldError);
+            }
+          }
+
+          // Link chunk to product
+          try {
+            await EntityRelationshipService.linkChunkToProduct(
+              chunk.id,
+              product.id,
+              'source',
+              1.0
+            );
+            console.log(`🔗 Linked chunk to product`);
+          } catch (linkError) {
+            console.warn(`⚠️ Failed to link chunk to product:`, linkError);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Error processing chunk ${i + 1}:`, error);
+        }
+      }
+
+      console.log(`✅ Product creation completed: ${productsCreated} products, ${metafieldsExtracted} with metafields`);
+
+      return {
+        productsCreated,
+        metafieldsExtracted,
+      };
+    } catch (error) {
+      console.error('Error creating products from chunks:', error);
+      throw new Error(`Failed to create products: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

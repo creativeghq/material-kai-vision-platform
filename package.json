@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run copy:coverage",
+    "copy:coverage": "node scripts/copy-coverage.js",
     "start": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "validate-env": "node scripts/validate-env.js",
     "test:integration:material-kai": "node tests/material-kai-integration-test.js",

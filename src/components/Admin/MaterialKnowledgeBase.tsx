@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -78,29 +77,11 @@ interface Embedding {
   metadata?: any;
 }
 
-interface MaterialMetadataField {
-  id: string;
-  field_name: string;
-  display_name: string;
-  field_type: string;
-  is_required?: boolean;
-  description?: string;
-  extraction_hints?: string;
-  dropdown_options?: string[];
-  applies_to_categories?: string[];
-  is_global?: boolean;
-  sort_order?: number;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
-}
-
 interface KnowledgeBaseStats {
   totalChunks: number;
   totalImages: number;
   totalEmbeddings: number;
   totalDocuments: number;
-  totalMetadataFields: number;
   avgChunkSize: number;
   avgConfidence: number;
 }
@@ -109,7 +90,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
   const [images, setImages] = useState<DocumentImage[]>([]);
   const [embeddings, setEmbeddings] = useState<Embedding[]>([]);
-  const [metadataFields, setMetadataFields] = useState<MaterialMetadataField[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [stats, setStats] = useState<KnowledgeBaseStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,15 +149,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
       if (embeddingsError) throw embeddingsError;
       setEmbeddings(embeddingsData || []);
 
-      // Load metadata fields
-      const { data: metadataData, error: metadataError } = await supabase
-        .from('material_metadata_fields')
-        .select('*')
-        .order('sort_order', { ascending: true });
-
-      if (metadataError) throw metadataError;
-      setMetadataFields(metadataData || []);
-
       // Load products created from PDF chunks
       const { data: productsData, error: productsError } = await supabase
         .from('products')
@@ -185,7 +156,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
         .eq('created_from_type', 'pdf_processing')
         .order('created_at', { ascending: false });
 
-      if (productsError) throw productsError;
+      if (productsError) {
+        console.error('❌ Error loading products:', productsError);
+        throw productsError;
+      }
+      console.log(`✅ Loaded ${productsData?.length || 0} products from database`);
       setProducts(productsData || []);
 
       // Calculate stats
@@ -200,13 +175,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
         totalImages: imagesData?.length || 0,
         totalEmbeddings: embeddingsData?.length || 0,
         totalDocuments: uniqueDocuments,
-        totalMetadataFields: metadataData?.length || 0,
         avgChunkSize: Math.round(avgChunkSize),
         avgConfidence: Math.round(avgConfidence * 100) / 100,
       });
 
     } catch (error) {
-      console.error('Error loading knowledge base data:', error);
+      console.error('❌ Error loading knowledge base data:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
       toast({
         title: 'Error',
         description: 'Failed to load knowledge base data',
@@ -385,18 +363,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Layers className="h-4 w-4 text-red-500" />
-                <div>
-                  <p className="text-2xl font-bold">{stats.totalMetadataFields}</p>
-                  <p className="text-xs text-muted-foreground">Meta Fields</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
                 <Hash className="h-4 w-4 text-cyan-500" />
                 <div>
                   <p className="text-2xl font-bold">{stats.avgChunkSize}</p>
@@ -445,7 +411,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
           <TabsTrigger value="images">Images ({stats?.totalImages || 0})</TabsTrigger>
           <TabsTrigger value="embeddings">Embeddings ({stats?.totalEmbeddings || 0})</TabsTrigger>
           <TabsTrigger value="products">📦 Products</TabsTrigger>
-          <TabsTrigger value="metadata">Metadata ({stats?.totalMetadataFields || 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -539,10 +504,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span>Embeddings Generated</span>
                     <Badge variant="secondary">{stats?.totalEmbeddings || 0} generated</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Metadata Fields</span>
-                    <Badge variant="secondary">{stats?.totalMetadataFields || 0} configured</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -1135,166 +1096,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="metadata" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Metadata Fields Configuration</CardTitle>
-              <CardDescription>
-                Configured metadata fields for material categorization and properties extraction
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {metadataFields.length === 0 ? (
-                <div className="text-center py-8">
-                  <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    No metadata fields configured. Set up fields to enhance material categorization.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Field Name</TableHead>
-                        <TableHead>Display Name</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Required</TableHead>
-                        <TableHead>Categories</TableHead>
-                        <TableHead>Global</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {metadataFields.map((field) => (
-                        <TableRow key={field.id}>
-                          <TableCell className="font-medium">{field.field_name}</TableCell>
-                          <TableCell>{field.display_name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{field.field_type}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {field.is_required ? (
-                              <Badge variant="destructive">Required</Badge>
-                            ) : (
-                              <Badge variant="secondary">Optional</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {field.applies_to_categories?.length ? (
-                              <div className="flex flex-wrap gap-1">
-                                {field.applies_to_categories.slice(0, 2).map((cat) => (
-                                  <Badge key={cat} variant="outline" className="text-xs">
-                                    {cat}
-                                  </Badge>
-                                ))}
-                                {field.applies_to_categories.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{field.applies_to_categories.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">All</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {field.is_global ? (
-                              <Badge variant="default">Global</Badge>
-                            ) : (
-                              <Badge variant="outline">Local</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {/* IMPROVED: Implement eye icon functionality with metadata detail modal */}
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-2xl">
-                                <DialogHeader>
-                                  <DialogTitle>{field.display_name}</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <h4 className="font-medium mb-2">Field Information</h4>
-                                      <div className="space-y-2 text-sm">
-                                        <p><strong>Field Name:</strong> {field.field_name}</p>
-                                        <p><strong>Display Name:</strong> {field.display_name}</p>
-                                        <p><strong>Type:</strong> {field.field_type}</p>
-                                        <p><strong>Required:</strong> {field.is_required ? 'Yes' : 'No'}</p>
-                                        <p><strong>Global:</strong> {field.is_global ? 'Yes' : 'No'}</p>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <h4 className="font-medium mb-2">Configuration</h4>
-                                      <div className="space-y-2 text-sm">
-                                        <p><strong>Sort Order:</strong> {field.sort_order || 'N/A'}</p>
-                                        <p><strong>Created:</strong> {new Date(field.created_at).toLocaleDateString()}</p>
-                                        <p><strong>Updated:</strong> {new Date(field.updated_at).toLocaleDateString()}</p>
-                                        {field.created_by && (
-                                          <p><strong>Created By:</strong> {field.created_by}</p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
 
-                                  {/* IMPROVED: Show relationships */}
-                                  {field.applies_to_categories && field.applies_to_categories.length > 0 && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Applied Categories</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {field.applies_to_categories?.map((cat) => (
-                                          <Badge key={cat} variant="outline">
-                                            {cat}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {field.description && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Description</h4>
-                                      <p className="text-sm text-muted-foreground">{field.description}</p>
-                                    </div>
-                                  )}
-
-                                  {field.extraction_hints && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Extraction Hints</h4>
-                                      <p className="text-sm text-muted-foreground">{field.extraction_hints}</p>
-                                    </div>
-                                  )}
-
-                                  {field.dropdown_options && field.dropdown_options.length > 0 && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Dropdown Options</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {field.dropdown_options?.map((opt) => (
-                                          <Badge key={opt} variant="secondary">
-                                            {opt}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </DialogContent>
-                            </Dialog>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );

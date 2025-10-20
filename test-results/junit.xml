@@ -1,3 +1,449 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="0" failures="0" errors="0" time="1.607">
+<testsuites name="jest tests" tests="212" failures="0" errors="0" time="2.81">
+  <testsuite name="ChunkSearchEnhancementService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:23" time="0.755" tests="22">
+    <testcase classname="ChunkSearchEnhancementService initialization should initialize with correct configuration" name="ChunkSearchEnhancementService initialization should initialize with correct configuration" time="0.012">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService searchChunks should handle search request with basic query" name="ChunkSearchEnhancementService searchChunks should handle search request with basic query" time="0.004">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService searchChunks should apply content type filters" name="ChunkSearchEnhancementService searchChunks should apply content type filters" time="0.013">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService searchChunks should apply validation status filters" name="ChunkSearchEnhancementService searchChunks should apply validation status filters" time="0.006">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService searchChunks should apply confidence threshold" name="ChunkSearchEnhancementService searchChunks should apply confidence threshold" time="0.005">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService searchChunks should apply validation score threshold" name="ChunkSearchEnhancementService searchChunks should apply validation score threshold" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService searchChunks should handle pagination" name="ChunkSearchEnhancementService searchChunks should handle pagination" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService getChunksByContentType should retrieve chunks by content type" name="ChunkSearchEnhancementService getChunksByContentType should retrieve chunks by content type" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService getChunksByContentType should respect limit parameter" name="ChunkSearchEnhancementService getChunksByContentType should respect limit parameter" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService getProductBoundaries should retrieve product boundaries" name="ChunkSearchEnhancementService getProductBoundaries should retrieve product boundaries" time="0.005">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService getProductBoundaries should filter by is_product_boundary flag" name="ChunkSearchEnhancementService getProductBoundaries should filter by is_product_boundary flag" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService getChunksNeedingReview should retrieve chunks with needs_review status" name="ChunkSearchEnhancementService getChunksNeedingReview should retrieve chunks with needs_review status" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService getChunksNeedingReview should filter by validation_status" name="ChunkSearchEnhancementService getChunksNeedingReview should filter by validation_status" time="0.008">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService enhanceChunkResult should calculate overall quality score correctly" name="ChunkSearchEnhancementService enhanceChunkResult should calculate overall quality score correctly" time="0.004">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService enhanceChunkResult should handle missing analysis data" name="ChunkSearchEnhancementService enhanceChunkResult should handle missing analysis data" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService enhanceChunkResult should set contentTypeMatch correctly" name="ChunkSearchEnhancementService enhanceChunkResult should set contentTypeMatch correctly" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService error handling should handle search errors gracefully" name="ChunkSearchEnhancementService error handling should handle search errors gracefully" time="0.002">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService error handling should handle missing workspace ID" name="ChunkSearchEnhancementService error handling should handle missing workspace ID" time="0.002">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService response structure should return properly structured search response" name="ChunkSearchEnhancementService response structure should return properly structured search response" time="0.005">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService response structure should include all required fields in enhanced result" name="ChunkSearchEnhancementService response structure should include all required fields in enhanced result" time="0.004">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService filtering combinations should handle multiple filters together" name="ChunkSearchEnhancementService filtering combinations should handle multiple filters together" time="0.003">
+    </testcase>
+    <testcase classname="ChunkSearchEnhancementService filtering combinations should handle empty filters" name="ChunkSearchEnhancementService filtering combinations should handle empty filters" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="ProductRecommendationService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:24" time="0.194" tests="18">
+    <testcase classname="ProductRecommendationService Service Initialization should initialize successfully" name="ProductRecommendationService Service Initialization should initialize successfully" time="0.005">
+    </testcase>
+    <testcase classname="ProductRecommendationService Service Initialization should have correct service name" name="ProductRecommendationService Service Initialization should have correct service name" time="0.005">
+    </testcase>
+    <testcase classname="ProductRecommendationService Service Initialization should have correct version" name="ProductRecommendationService Service Initialization should have correct version" time="0.004">
+    </testcase>
+    <testcase classname="ProductRecommendationService getRecommendations should retrieve product recommendations" name="ProductRecommendationService getRecommendations should retrieve product recommendations" time="0.007">
+    </testcase>
+    <testcase classname="ProductRecommendationService getRecommendations should calculate confidence scores correctly" name="ProductRecommendationService getRecommendations should calculate confidence scores correctly" time="0.004">
+    </testcase>
+    <testcase classname="ProductRecommendationService getRecommendations should include quality metrics in recommendations" name="ProductRecommendationService getRecommendations should include quality metrics in recommendations" time="0.003">
+    </testcase>
+    <testcase classname="ProductRecommendationService getRecommendations should respect limit parameter" name="ProductRecommendationService getRecommendations should respect limit parameter" time="0.004">
+    </testcase>
+    <testcase classname="ProductRecommendationService getRecommendations should filter by minimum confidence" name="ProductRecommendationService getRecommendations should filter by minimum confidence" time="0.01">
+    </testcase>
+    <testcase classname="ProductRecommendationService getPersonalizedRecommendations should retrieve personalized recommendations" name="ProductRecommendationService getPersonalizedRecommendations should retrieve personalized recommendations" time="0.004">
+    </testcase>
+    <testcase classname="ProductRecommendationService getPersonalizedRecommendations should include reason for each recommendation" name="ProductRecommendationService getPersonalizedRecommendations should include reason for each recommendation" time="0.004">
+    </testcase>
+    <testcase classname="ProductRecommendationService getPersonalizedRecommendations should respect limit parameter" name="ProductRecommendationService getPersonalizedRecommendations should respect limit parameter" time="0.003">
+    </testcase>
+    <testcase classname="ProductRecommendationService getTrendingProducts should retrieve trending products" name="ProductRecommendationService getTrendingProducts should retrieve trending products" time="0.005">
+    </testcase>
+    <testcase classname="ProductRecommendationService getTrendingProducts should include metadata in trending products" name="ProductRecommendationService getTrendingProducts should include metadata in trending products" time="0.004">
+    </testcase>
+    <testcase classname="ProductRecommendationService getTrendingProducts should respect limit parameter" name="ProductRecommendationService getTrendingProducts should respect limit parameter" time="0.004">
+    </testcase>
+    <testcase classname="ProductRecommendationService Error Handling should handle missing workspace gracefully" name="ProductRecommendationService Error Handling should handle missing workspace gracefully" time="0.005">
+    </testcase>
+    <testcase classname="ProductRecommendationService Error Handling should handle empty results" name="ProductRecommendationService Error Handling should handle empty results" time="0.003">
+    </testcase>
+    <testcase classname="ProductRecommendationService Service Health should report healthy status" name="ProductRecommendationService Service Health should report healthy status" time="0.003">
+    </testcase>
+    <testcase classname="ProductRecommendationService Service Health should track metrics" name="ProductRecommendationService Service Health should track metrics" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="AnalyticsService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:24" time="0.232" tests="26">
+    <testcase classname="AnalyticsService Service Initialization should initialize successfully" name="AnalyticsService Service Initialization should initialize successfully" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService Service Initialization should have correct service name" name="AnalyticsService Service Initialization should have correct service name" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService Service Initialization should have correct version" name="AnalyticsService Service Initialization should have correct version" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService trackEvent should track analytics event" name="AnalyticsService trackEvent should track analytics event" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService trackEvent should track event with metadata" name="AnalyticsService trackEvent should track event with metadata" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService trackEvent should track event without user_id" name="AnalyticsService trackEvent should track event without user_id" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService getMetrics should retrieve analytics metrics" name="AnalyticsService getMetrics should retrieve analytics metrics" time="0.006">
+    </testcase>
+    <testcase classname="AnalyticsService getMetrics should calculate events by type" name="AnalyticsService getMetrics should calculate events by type" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService getMetrics should calculate error rate" name="AnalyticsService getMetrics should calculate error rate" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService getMetrics should count unique users" name="AnalyticsService getMetrics should count unique users" time="0.005">
+    </testcase>
+    <testcase classname="AnalyticsService getMetrics should count sessions" name="AnalyticsService getMetrics should count sessions" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService getMetrics should calculate average response time" name="AnalyticsService getMetrics should calculate average response time" time="0.006">
+    </testcase>
+    <testcase classname="AnalyticsService getReport should generate analytics report" name="AnalyticsService getReport should generate analytics report" time="0.038">
+    </testcase>
+    <testcase classname="AnalyticsService getReport should include metrics in report" name="AnalyticsService getReport should include metrics in report" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService getReport should include trends in report" name="AnalyticsService getReport should include trends in report" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService getReport should include top events in report" name="AnalyticsService getReport should include top events in report" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService getReport should sort top events by count" name="AnalyticsService getReport should sort top events by count" time="0.004">
+    </testcase>
+    <testcase classname="AnalyticsService getUserEngagement should retrieve user engagement metrics" name="AnalyticsService getUserEngagement should retrieve user engagement metrics" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService getUserEngagement should count active users" name="AnalyticsService getUserEngagement should count active users" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService getUserEngagement should count total sessions" name="AnalyticsService getUserEngagement should count total sessions" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService getUserEngagement should calculate average session duration" name="AnalyticsService getUserEngagement should calculate average session duration" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService getUserEngagement should estimate returning users" name="AnalyticsService getUserEngagement should estimate returning users" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService Error Handling should handle missing workspace gracefully" name="AnalyticsService Error Handling should handle missing workspace gracefully" time="0.002">
+    </testcase>
+    <testcase classname="AnalyticsService Error Handling should handle zero events" name="AnalyticsService Error Handling should handle zero events" time="0.003">
+    </testcase>
+    <testcase classname="AnalyticsService Service Health should report healthy status" name="AnalyticsService Service Health should report healthy status" time="0.007">
+    </testcase>
+    <testcase classname="AnalyticsService Service Health should track metrics" name="AnalyticsService Service Health should track metrics" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="QualityDashboardService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:25" time="0.183" tests="15">
+    <testcase classname="QualityDashboardService Service Initialization should initialize successfully" name="QualityDashboardService Service Initialization should initialize successfully" time="0.005">
+    </testcase>
+    <testcase classname="QualityDashboardService Service Initialization should have correct configuration" name="QualityDashboardService Service Initialization should have correct configuration" time="0.003">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Metrics should retrieve quality metrics for workspace" name="QualityDashboardService Quality Metrics should retrieve quality metrics for workspace" time="0.002">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Metrics should calculate overall quality score correctly" name="QualityDashboardService Quality Metrics should calculate overall quality score correctly" time="0.003">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Metrics should include all required metric fields" name="QualityDashboardService Quality Metrics should include all required metric fields" time="0.004">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Metrics should determine quality trend" name="QualityDashboardService Quality Metrics should determine quality trend" time="0.008">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Trends should retrieve quality trends" name="QualityDashboardService Quality Trends should retrieve quality trends" time="0.003">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Trends should include trend data points" name="QualityDashboardService Quality Trends should include trend data points" time="0.004">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Issues should identify quality issues" name="QualityDashboardService Quality Issues should identify quality issues" time="0.004">
+    </testcase>
+    <testcase classname="QualityDashboardService Quality Issues should include issue details" name="QualityDashboardService Quality Issues should include issue details" time="0.005">
+    </testcase>
+    <testcase classname="QualityDashboardService Dashboard Data should retrieve complete dashboard data" name="QualityDashboardService Dashboard Data should retrieve complete dashboard data" time="0.005">
+    </testcase>
+    <testcase classname="QualityDashboardService Dashboard Data should include recommendations" name="QualityDashboardService Dashboard Data should include recommendations" time="0.006">
+    </testcase>
+    <testcase classname="QualityDashboardService Dashboard Data should aggregate data from all services" name="QualityDashboardService Dashboard Data should aggregate data from all services" time="0.005">
+    </testcase>
+    <testcase classname="QualityDashboardService Service Health should report service health" name="QualityDashboardService Service Health should report service health" time="0.005">
+    </testcase>
+    <testcase classname="QualityDashboardService Service Health should track metrics" name="QualityDashboardService Service Health should track metrics" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="PerformanceOptimizationService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:25" time="0.173" tests="27">
+    <testcase classname="PerformanceOptimizationService Service Initialization should initialize successfully" name="PerformanceOptimizationService Service Initialization should initialize successfully" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Service Initialization should have correct service name" name="PerformanceOptimizationService Service Initialization should have correct service name" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Service Initialization should have correct version" name="PerformanceOptimizationService Service Initialization should have correct version" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceMetrics should retrieve performance metrics" name="PerformanceOptimizationService getPerformanceMetrics should retrieve performance metrics" time="0.004">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceMetrics should have valid response time" name="PerformanceOptimizationService getPerformanceMetrics should have valid response time" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceMetrics should have valid throughput" name="PerformanceOptimizationService getPerformanceMetrics should have valid throughput" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceMetrics should have valid error rate" name="PerformanceOptimizationService getPerformanceMetrics should have valid error rate" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceMetrics should have valid cache hit rate" name="PerformanceOptimizationService getPerformanceMetrics should have valid cache hit rate" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceMetrics should cache metrics for 60 seconds" name="PerformanceOptimizationService getPerformanceMetrics should cache metrics for 60 seconds" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getOptimizationRecommendations should retrieve optimization recommendations" name="PerformanceOptimizationService getOptimizationRecommendations should retrieve optimization recommendations" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getOptimizationRecommendations should include recommendation details" name="PerformanceOptimizationService getOptimizationRecommendations should include recommendation details" time="0.008">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getOptimizationRecommendations should prioritize critical issues" name="PerformanceOptimizationService getOptimizationRecommendations should prioritize critical issues" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getOptimizationRecommendations should provide actionable recommendations" name="PerformanceOptimizationService getOptimizationRecommendations should provide actionable recommendations" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceReport should generate performance report" name="PerformanceOptimizationService getPerformanceReport should generate performance report" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceReport should include metrics in report" name="PerformanceOptimizationService getPerformanceReport should include metrics in report" time="0.005">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceReport should include recommendations in report" name="PerformanceOptimizationService getPerformanceReport should include recommendations in report" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceReport should calculate optimization score" name="PerformanceOptimizationService getPerformanceReport should calculate optimization score" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService getPerformanceReport should include last updated timestamp" name="PerformanceOptimizationService getPerformanceReport should include last updated timestamp" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Optimization Score Calculation should calculate score based on metrics" name="PerformanceOptimizationService Optimization Score Calculation should calculate score based on metrics" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Optimization Score Calculation should penalize critical recommendations" name="PerformanceOptimizationService Optimization Score Calculation should penalize critical recommendations" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Recommendation Categories should include caching recommendations" name="PerformanceOptimizationService Recommendation Categories should include caching recommendations" time="0.001">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Recommendation Categories should include query recommendations" name="PerformanceOptimizationService Recommendation Categories should include query recommendations" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Recommendation Categories should include resource recommendations" name="PerformanceOptimizationService Recommendation Categories should include resource recommendations" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Error Handling should handle missing workspace gracefully" name="PerformanceOptimizationService Error Handling should handle missing workspace gracefully" time="0.008">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Error Handling should handle empty recommendations" name="PerformanceOptimizationService Error Handling should handle empty recommendations" time="0.002">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Service Health should report healthy status" name="PerformanceOptimizationService Service Health should report healthy status" time="0.003">
+    </testcase>
+    <testcase classname="PerformanceOptimizationService Service Health should track metrics" name="PerformanceOptimizationService Service Health should track metrics" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="ChunkAnalysisService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:25" time="0.211" tests="15">
+    <testcase classname="ChunkAnalysisService initialization should initialize with correct configuration" name="ChunkAnalysisService initialization should initialize with correct configuration" time="0.004">
+    </testcase>
+    <testcase classname="ChunkAnalysisService classification operations should prepare classification insert data" name="ChunkAnalysisService classification operations should prepare classification insert data" time="0.002">
+    </testcase>
+    <testcase classname="ChunkAnalysisService classification operations should validate confidence bounds" name="ChunkAnalysisService classification operations should validate confidence bounds" time="0.008">
+    </testcase>
+    <testcase classname="ChunkAnalysisService classification operations should support all content types" name="ChunkAnalysisService classification operations should support all content types" time="0.004">
+    </testcase>
+    <testcase classname="ChunkAnalysisService boundary operations should prepare boundary insert data" name="ChunkAnalysisService boundary operations should prepare boundary insert data" time="0.003">
+    </testcase>
+    <testcase classname="ChunkAnalysisService boundary operations should validate boundary score bounds" name="ChunkAnalysisService boundary operations should validate boundary score bounds" time="0.003">
+    </testcase>
+    <testcase classname="ChunkAnalysisService boundary operations should support all boundary types" name="ChunkAnalysisService boundary operations should support all boundary types" time="0.003">
+    </testcase>
+    <testcase classname="ChunkAnalysisService validation operations should prepare validation score insert data" name="ChunkAnalysisService validation operations should prepare validation score insert data" time="0.002">
+    </testcase>
+    <testcase classname="ChunkAnalysisService validation operations should validate all quality scores" name="ChunkAnalysisService validation operations should validate all quality scores" time="0.004">
+    </testcase>
+    <testcase classname="ChunkAnalysisService validation operations should support all validation statuses" name="ChunkAnalysisService validation operations should support all validation statuses" time="0.005">
+    </testcase>
+    <testcase classname="ChunkAnalysisService validation operations should handle validation issues and recommendations" name="ChunkAnalysisService validation operations should handle validation issues and recommendations" time="0.004">
+    </testcase>
+    <testcase classname="ChunkAnalysisService data structure validation should handle optional fields" name="ChunkAnalysisService data structure validation should handle optional fields" time="0.003">
+    </testcase>
+    <testcase classname="ChunkAnalysisService data structure validation should handle sub-categories array" name="ChunkAnalysisService data structure validation should handle sub-categories array" time="0.009">
+    </testcase>
+    <testcase classname="ChunkAnalysisService data structure validation should handle metadata in validation" name="ChunkAnalysisService data structure validation should handle metadata in validation" time="0.003">
+    </testcase>
+    <testcase classname="ChunkAnalysisService timestamp handling should accept ISO timestamp strings" name="ChunkAnalysisService timestamp handling should accept ISO timestamp strings" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="BoundaryDetectionService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:25" time="0.186" tests="31">
+    <testcase classname="BoundaryDetectionService initialization should initialize with correct configuration" name="BoundaryDetectionService initialization should initialize with correct configuration" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateBoundaryScore should score sentence boundaries high" name="BoundaryDetectionService calculateBoundaryScore should score sentence boundaries high" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateBoundaryScore should score paragraph boundaries high" name="BoundaryDetectionService calculateBoundaryScore should score paragraph boundaries high" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateBoundaryScore should score section headers high" name="BoundaryDetectionService calculateBoundaryScore should score section headers high" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateBoundaryScore should score mid-word breaks low" name="BoundaryDetectionService calculateBoundaryScore should score mid-word breaks low" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateBoundaryScore should score empty text as zero" name="BoundaryDetectionService calculateBoundaryScore should score empty text as zero" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateBoundaryScore should keep score between 0 and 1" name="BoundaryDetectionService calculateBoundaryScore should keep score between 0 and 1" time="0.006">
+    </testcase>
+    <testcase classname="BoundaryDetectionService determineBoundaryType should identify sentence boundaries" name="BoundaryDetectionService determineBoundaryType should identify sentence boundaries" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService determineBoundaryType should identify paragraph boundaries" name="BoundaryDetectionService determineBoundaryType should identify paragraph boundaries" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService determineBoundaryType should identify section boundaries" name="BoundaryDetectionService determineBoundaryType should identify section boundaries" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService determineBoundaryType should identify semantic boundaries" name="BoundaryDetectionService determineBoundaryType should identify semantic boundaries" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService determineBoundaryType should identify weak boundaries" name="BoundaryDetectionService determineBoundaryType should identify weak boundaries" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService isProductBoundary should identify product boundaries" name="BoundaryDetectionService isProductBoundary should identify product boundaries" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService isProductBoundary should not identify non-product boundaries" name="BoundaryDetectionService isProductBoundary should not identify non-product boundaries" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService isProductBoundary should require both high boundary score and low similarity" name="BoundaryDetectionService isProductBoundary should require both high boundary score and low similarity" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService cosineSimilarity should calculate similarity between identical vectors" name="BoundaryDetectionService cosineSimilarity should calculate similarity between identical vectors" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService cosineSimilarity should calculate similarity between orthogonal vectors" name="BoundaryDetectionService cosineSimilarity should calculate similarity between orthogonal vectors" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService cosineSimilarity should calculate similarity between opposite vectors" name="BoundaryDetectionService cosineSimilarity should calculate similarity between opposite vectors" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService cosineSimilarity should handle different length vectors" name="BoundaryDetectionService cosineSimilarity should handle different length vectors" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService cosineSimilarity should handle zero vectors" name="BoundaryDetectionService cosineSimilarity should handle zero vectors" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService euclideanDistance should calculate distance between identical points" name="BoundaryDetectionService euclideanDistance should calculate distance between identical points" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService euclideanDistance should calculate distance between different points" name="BoundaryDetectionService euclideanDistance should calculate distance between different points" time="0.007">
+    </testcase>
+    <testcase classname="BoundaryDetectionService euclideanDistance should calculate distance in 3D space" name="BoundaryDetectionService euclideanDistance should calculate distance in 3D space" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateClusterCoherence should return high coherence for tight clusters" name="BoundaryDetectionService calculateClusterCoherence should return high coherence for tight clusters" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateClusterCoherence should return low coherence for loose clusters" name="BoundaryDetectionService calculateClusterCoherence should return low coherence for loose clusters" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService calculateClusterCoherence should return 0 for empty embeddings" name="BoundaryDetectionService calculateClusterCoherence should return 0 for empty embeddings" time="0.002">
+    </testcase>
+    <testcase classname="BoundaryDetectionService generateReasoning should generate reasoning for strong boundaries" name="BoundaryDetectionService generateReasoning should generate reasoning for strong boundaries" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService generateReasoning should generate reasoning for weak boundaries" name="BoundaryDetectionService generateReasoning should generate reasoning for weak boundaries" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService generateReasoning should generate reasoning for moderate boundaries" name="BoundaryDetectionService generateReasoning should generate reasoning for moderate boundaries" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService detectBoundaries should handle empty chunk list" name="BoundaryDetectionService detectBoundaries should handle empty chunk list" time="0.003">
+    </testcase>
+    <testcase classname="BoundaryDetectionService detectBoundaries should process single chunk" name="BoundaryDetectionService detectBoundaries should process single chunk" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="SearchOptimizationService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:26" time="0.158" tests="22">
+    <testcase classname="SearchOptimizationService Service Initialization should initialize successfully" name="SearchOptimizationService Service Initialization should initialize successfully" time="0.007">
+    </testcase>
+    <testcase classname="SearchOptimizationService Service Initialization should have correct service name" name="SearchOptimizationService Service Initialization should have correct service name" time="0.002">
+    </testcase>
+    <testcase classname="SearchOptimizationService Service Initialization should have correct version" name="SearchOptimizationService Service Initialization should have correct version" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService search should perform optimized search" name="SearchOptimizationService search should perform optimized search" time="0.004">
+    </testcase>
+    <testcase classname="SearchOptimizationService search should calculate relevance scores" name="SearchOptimizationService search should calculate relevance scores" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService search should calculate quality scores" name="SearchOptimizationService search should calculate quality scores" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService search should calculate combined scores" name="SearchOptimizationService search should calculate combined scores" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService search should sort results by combined score" name="SearchOptimizationService search should sort results by combined score" time="0.002">
+    </testcase>
+    <testcase classname="SearchOptimizationService search should respect limit parameter" name="SearchOptimizationService search should respect limit parameter" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService search should calculate optimization metrics" name="SearchOptimizationService search should calculate optimization metrics" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService getSuggestions should get search suggestions" name="SearchOptimizationService getSuggestions should get search suggestions" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService getSuggestions should return unique suggestions" name="SearchOptimizationService getSuggestions should return unique suggestions" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService getSuggestions should respect limit parameter" name="SearchOptimizationService getSuggestions should respect limit parameter" time="0.002">
+    </testcase>
+    <testcase classname="SearchOptimizationService getRelatedResults should get related search results" name="SearchOptimizationService getRelatedResults should get related search results" time="0.007">
+    </testcase>
+    <testcase classname="SearchOptimizationService getRelatedResults should get related results for chunk" name="SearchOptimizationService getRelatedResults should get related results for chunk" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService getRelatedResults should include quality metrics in related results" name="SearchOptimizationService getRelatedResults should include quality metrics in related results" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService getRelatedResults should respect limit parameter" name="SearchOptimizationService getRelatedResults should respect limit parameter" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService Search Result Structure should include all required fields in search results" name="SearchOptimizationService Search Result Structure should include all required fields in search results" time="0.004">
+    </testcase>
+    <testcase classname="SearchOptimizationService Error Handling should handle empty query gracefully" name="SearchOptimizationService Error Handling should handle empty query gracefully" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService Error Handling should handle non-existent workspace" name="SearchOptimizationService Error Handling should handle non-existent workspace" time="0.002">
+    </testcase>
+    <testcase classname="SearchOptimizationService Service Health should report healthy status" name="SearchOptimizationService Service Health should report healthy status" time="0.003">
+    </testcase>
+    <testcase classname="SearchOptimizationService Service Health should track metrics" name="SearchOptimizationService Service Health should track metrics" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="ValidationRulesService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:26" time="0.164" tests="11">
+    <testcase classname="ValidationRulesService Service Initialization should initialize successfully" name="ValidationRulesService Service Initialization should initialize successfully" time="0.007">
+    </testcase>
+    <testcase classname="ValidationRulesService Service Initialization should have correct configuration" name="ValidationRulesService Service Initialization should have correct configuration" time="0.002">
+    </testcase>
+    <testcase classname="ValidationRulesService Rule Creation should create a validation rule" name="ValidationRulesService Rule Creation should create a validation rule" time="0.003">
+    </testcase>
+    <testcase classname="ValidationRulesService Rule Creation should validate rule parameters" name="ValidationRulesService Rule Creation should validate rule parameters" time="0.003">
+    </testcase>
+    <testcase classname="ValidationRulesService Rule Retrieval should retrieve active rules for workspace" name="ValidationRulesService Rule Retrieval should retrieve active rules for workspace" time="0.003">
+    </testcase>
+    <testcase classname="ValidationRulesService Chunk Validation should validate a single chunk" name="ValidationRulesService Chunk Validation should validate a single chunk" time="0.04">
+    </testcase>
+    <testcase classname="ValidationRulesService Chunk Validation should identify validation failures" name="ValidationRulesService Chunk Validation should identify validation failures" time="0.004">
+    </testcase>
+    <testcase classname="ValidationRulesService Batch Validation should validate multiple chunks" name="ValidationRulesService Batch Validation should validate multiple chunks" time="0.005">
+    </testcase>
+    <testcase classname="ValidationRulesService Validation Statistics should retrieve validation statistics" name="ValidationRulesService Validation Statistics should retrieve validation statistics" time="0.004">
+    </testcase>
+    <testcase classname="ValidationRulesService Service Health should report service health" name="ValidationRulesService Service Health should report service health" time="0.002">
+    </testcase>
+    <testcase classname="ValidationRulesService Service Health should track metrics" name="ValidationRulesService Service Health should track metrics" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="ImageValidationService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:26" time="0.135" tests="13">
+    <testcase classname="ImageValidationService Service Initialization should initialize successfully" name="ImageValidationService Service Initialization should initialize successfully" time="0.004">
+    </testcase>
+    <testcase classname="ImageValidationService Service Initialization should have correct configuration" name="ImageValidationService Service Initialization should have correct configuration" time="0.002">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should validate a valid image with default rules" name="ImageValidationService Image Validation Logic should validate a valid image with default rules" time="0.004">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should calculate quality score between 0 and 1" name="ImageValidationService Image Validation Logic should calculate quality score between 0 and 1" time="0.002">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should detect invalid dimensions when width is too small" name="ImageValidationService Image Validation Logic should detect invalid dimensions when width is too small" time="0.003">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should detect invalid format when format is not allowed" name="ImageValidationService Image Validation Logic should detect invalid format when format is not allowed" time="0.004">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should detect file size issues when file is too large" name="ImageValidationService Image Validation Logic should detect file size issues when file is too large" time="0.003">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should generate recommendations for issues" name="ImageValidationService Image Validation Logic should generate recommendations for issues" time="0.002">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should mark image as valid when all checks pass" name="ImageValidationService Image Validation Logic should mark image as valid when all checks pass" time="0.003">
+    </testcase>
+    <testcase classname="ImageValidationService Image Validation Logic should mark image as invalid when critical issues exist" name="ImageValidationService Image Validation Logic should mark image as invalid when critical issues exist" time="0.007">
+    </testcase>
+    <testcase classname="ImageValidationService Service Health should report service health" name="ImageValidationService Service Health should report service health" time="0.002">
+    </testcase>
+    <testcase classname="ImageValidationService Service Health should track metrics" name="ImageValidationService Service Health should track metrics" time="0.003">
+    </testcase>
+    <testcase classname="ImageValidationService Batch Validation should validate multiple images" name="ImageValidationService Batch Validation should validate multiple images" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="ProductEnrichmentService" errors="0" failures="0" skipped="0" timestamp="2025-10-20T08:31:26" time="0.124" tests="12">
+    <testcase classname="ProductEnrichmentService Service Initialization should initialize successfully" name="ProductEnrichmentService Service Initialization should initialize successfully" time="0.004">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Service Initialization should have correct configuration" name="ProductEnrichmentService Service Initialization should have correct configuration" time="0.002">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Chunk Enrichment should enrich a chunk with product data" name="ProductEnrichmentService Chunk Enrichment should enrich a chunk with product data" time="0.01">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Chunk Enrichment should calculate enrichment score between 0 and 1" name="ProductEnrichmentService Chunk Enrichment should calculate enrichment score between 0 and 1" time="0.003">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Chunk Enrichment should extract product name" name="ProductEnrichmentService Chunk Enrichment should extract product name" time="0.002">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Chunk Enrichment should extract product category" name="ProductEnrichmentService Chunk Enrichment should extract product category" time="0.003">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Chunk Enrichment should mark enriched chunks correctly" name="ProductEnrichmentService Chunk Enrichment should mark enriched chunks correctly" time="0.003">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Batch Enrichment should enrich multiple chunks" name="ProductEnrichmentService Batch Enrichment should enrich multiple chunks" time="0.004">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Statistics should retrieve enrichment statistics" name="ProductEnrichmentService Statistics should retrieve enrichment statistics" time="0.003">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Statistics should retrieve enrichments needing review" name="ProductEnrichmentService Statistics should retrieve enrichments needing review" time="0.003">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Service Health should report service health" name="ProductEnrichmentService Service Health should report service health" time="0.003">
+    </testcase>
+    <testcase classname="ProductEnrichmentService Service Health should track metrics" name="ProductEnrichmentService Service Health should track metrics" time="0.003">
+    </testcase>
+  </testsuite>
 </testsuites>

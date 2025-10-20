@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface ModelLog {
   id: string;
@@ -238,16 +239,17 @@ const ModelDebuggingPanel: React.FC = () => {
   const untestedModels = models.filter(m => m.status === 'untested').length;
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">3D Model Debugging</h1>
-            <p className="text-muted-foreground">
-              Monitor and debug AI model performance for 3D generation
-            </p>
-          </div>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="3D Model Debugging"
+        description="Monitor and debug AI model performance for 3D generation"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: '3D Model Debugging' },
+        ]}
+      />
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex gap-2">
             <Button
               onClick={testAllModels}

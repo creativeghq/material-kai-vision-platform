@@ -22,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 
 import { SessionDetailView } from './SessionDetailView';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 type ViewMode = 'sessions' | 'detail' | 'create';
 type ScrapingMode = 'single-page' | 'sitemap' | 'crawl' | 'search' | 'map';
@@ -273,13 +274,23 @@ Return a list of materials found on the page.`);
   };
 
   const renderCreateForm = () => (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground" onClick={() => setViewMode('sessions')}>
-          ← Back to Sessions
-        </Button>
-        <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
-      </div>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="Material Scraper"
+        description="Scrape material data from websites and external sources"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'Material Scraper' },
+        ]}
+      />
+      <div className="p-6">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="flex items-center gap-4 mb-6">
+            <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground" onClick={() => setViewMode('sessions')}>
+              ← Back to Sessions
+            </Button>
+            <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
+          </div>
 
       {/* Scraping Mode Selection */}
       <Card>
@@ -868,6 +879,8 @@ Return a list of materials found on the page.`);
           </>
         )}
       </Button>
+        </div>
+      </div>
     </div>
   );
 
@@ -878,21 +891,45 @@ Return a list of materials found on the page.`);
 
     case 'detail':
       return (
-        <SessionDetailView
-          sessionId={selectedSessionId}
-          onBack={() => setViewMode('sessions')}
-        />
+        <div className="min-h-screen bg-background">
+          <GlobalAdminHeader
+            title="Material Scraper"
+            description="Scrape material data from websites and external sources"
+            breadcrumbs={[
+              { label: 'Admin', path: '/admin' },
+              { label: 'Material Scraper' },
+            ]}
+          />
+          <div className="p-6">
+            <SessionDetailView
+              sessionId={selectedSessionId}
+              onBack={() => setViewMode('sessions')}
+            />
+          </div>
+        </div>
       );
 
     default:
       return (
-        <ScrapingSessionsList
-          onSelectSession={(sessionId) => {
-            setSelectedSessionId(sessionId);
-            setViewMode('detail');
-          }}
-          onCreateNew={() => setViewMode('create')}
-        />
+        <div className="min-h-screen bg-background">
+          <GlobalAdminHeader
+            title="Material Scraper"
+            description="Scrape material data from websites and external sources"
+            breadcrumbs={[
+              { label: 'Admin', path: '/admin' },
+              { label: 'Material Scraper' },
+            ]}
+          />
+          <div className="p-6">
+            <ScrapingSessionsList
+              onSelectSession={(sessionId) => {
+                setSelectedSessionId(sessionId);
+                setViewMode('detail');
+              }}
+              onCreateNew={() => setViewMode('create')}
+            />
+          </div>
+        </div>
       );
   }
 };

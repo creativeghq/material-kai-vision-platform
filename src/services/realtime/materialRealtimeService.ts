@@ -153,7 +153,6 @@ export class MaterialRealtimeService {
   public async subscribeToAllMaterialChanges(): Promise<void> {
     await this.subscribeToMaterialCatalogChanges();
     await this.subscribeToMaterialImagesChanges();
-    await this.subscribeToMaterialMetafieldChanges();
     await this.subscribeToMaterialRelationshipChanges();
   }
 
@@ -247,59 +246,6 @@ export class MaterialRealtimeService {
   }
 
   // Subscribe to material metafield values changes
-  public async subscribeToMaterialMetafieldChanges(materialId?: string, fieldId?: string): Promise<void> {
-    const channelName = materialId && fieldId 
-      ? `material_metafields_${materialId}_${fieldId}`
-      : materialId 
-        ? `material_metafields_${materialId}`
-        : 'material_metafields_all';
-    
-    if (this.channels.has(channelName)) {
-      console.log(`Material Realtime: Already subscribed to ${channelName}`);
-      return;
-    }
-
-    const channel = this.supabase.channel(channelName);
-
-    let filter = '';
-    if (materialId && fieldId) {
-      filter = `material_id=eq.${materialId} AND field_id=eq.${fieldId}`;
-    } else if (materialId) {
-      filter = `material_id=eq.${materialId}`;
-    }
-
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'material_metafield_values',
-        ...(filter && { filter })
-      },
-      (payload: any) => {
-        console.log('Material Realtime: Material metafield change:', payload);
-
-        const changePayload: MaterialChangePayload = {
-          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
-          table: 'material_metafield_values',
-          old: payload.old,
-          new: payload.new,
-          materialId: payload.new?.material_id || payload.old?.material_id,
-          timestamp: new Date().toISOString()
-        };
-
-        this.callbacks.onMetafieldChange?.(changePayload);
-      }
-    ).subscribe((status: string) => {
-      console.log(`Material Realtime: Material metafields subscription status: ${status}`);
-      if (status === 'SUBSCRIBED') {
-        this.channels.set(channelName, channel);
-      } else if (status === 'CHANNEL_ERROR') {
-        this.callbacks.onError?.(new Error(`Failed to subscribe to material metafields: ${channelName}`));
-      }
-    });
-  }
-
   // Subscribe to material relationships changes
   public async subscribeToMaterialRelationshipChanges(materialId?: string): Promise<void> {
     const channelName = materialId ? `material_relationships_${materialId}` : 'material_relationships_all';
@@ -350,11 +296,10 @@ export class MaterialRealtimeService {
   // Subscribe to specific material and all its related data
   public async subscribeToMaterial(materialId: string): Promise<void> {
     console.log(`Material Realtime: Setting up comprehensive subscription for material: ${materialId}`);
-    
+
     await Promise.all([
       this.subscribeToMaterialCatalogChanges(materialId),
       this.subscribeToMaterialImagesChanges(materialId),
-      this.subscribeToMaterialMetafieldChanges(materialId),
       this.subscribeToMaterialRelationshipChanges(materialId)
     ]);
 
@@ -414,9 +359,7 @@ export class MaterialRealtimeService {
       if (config.images) {
         await this.subscribeToMaterialImagesChanges(config.materialId);
       }
-      if (config.metafields) {
-        await this.subscribeToMaterialMetafieldChanges(config.materialId);
-      }
+      // metafields option ignored - table doesn't exist
       if (config.relationships) {
         await this.subscribeToMaterialRelationshipChanges(config.materialId);
       }
@@ -428,9 +371,7 @@ export class MaterialRealtimeService {
       if (config.images) {
         await this.subscribeToMaterialImagesChanges();
       }
-      if (config.metafields) {
-        await this.subscribeToMaterialMetafieldChanges();
-      }
+      // metafields option ignored - table doesn't exist
       if (config.relationships) {
         await this.subscribeToMaterialRelationshipChanges();
       }

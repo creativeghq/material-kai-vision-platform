@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface MaterialSuggestion {
   name: string;
@@ -223,7 +224,16 @@ export const MaterialSuggestionsPanel: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="3D Material Suggestions"
+        description="AI-powered material suggestions for 3D design and visualization"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: '3D Suggestions' },
+        ]}
+      />
+      <div className="p-6 space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -404,6 +414,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };

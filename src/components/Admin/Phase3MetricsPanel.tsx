@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw, Link2, Search, MessageSquare } from 'lucide-react';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface RelationshipStats {
   total_relationships: number;
@@ -162,18 +163,22 @@ const Phase3MetricsPanel: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Phase 3: Validation Metrics</h1>
-          <p className="text-gray-600 mt-2">Monitor chunk relationships, retrieval quality, and response quality</p>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="Phase 3: Validation Metrics"
+        description="Monitor chunk relationships, retrieval quality, and response quality"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'Phase 3 Metrics' },
+        ]}
+      />
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-end">
+          <Button onClick={() => fetchMetrics()} disabled={refreshing} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
-        <Button onClick={() => fetchMetrics()} disabled={refreshing} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
 
       {/* Overall Health */}
       <Card>
@@ -333,6 +338,7 @@ const Phase3MetricsPanel: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };

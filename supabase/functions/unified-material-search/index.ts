@@ -90,15 +90,7 @@ async function performUnifiedSearch(
         .from('materials_catalog')
         .select(`
           *,
-          material_images(id, image_url, image_type, is_featured, display_order),
-          material_metafield_values(
-            field_id,
-            value_text,
-            value_number,
-            value_boolean,
-            confidence_score,
-            field:material_metadata_fields(field_name, display_name, field_type)
-          )
+          material_images(id, image_url, image_type, is_featured, display_order)
         `);
 
       if (category) {
@@ -122,15 +114,6 @@ async function performUnifiedSearch(
               type: img.image_type,
               is_featured: img.is_featured
             })),
-          metafield_values: (material.material_metafield_values || []).map((value: any) => ({
-            field_name: value.field?.field_name,
-            display_name: value.field?.display_name,
-            field_type: value.field?.field_type,
-            value_text: value.value_text,
-            value_number: value.value_number,
-            value_boolean: value.value_boolean,
-            confidence_score: value.confidence_score
-          })),
           search_score: 0.8,
           match_type: 'text'
         })));
@@ -155,15 +138,7 @@ async function performUnifiedSearch(
               .from('materials_catalog')
               .select(`
                 *,
-                material_images(id, image_url, image_type, is_featured, display_order),
-                material_metafield_values(
-                  field_id,
-                  value_text,
-                  value_number,
-                  value_boolean,
-                  confidence_score,
-                  field:material_metadata_fields(field_name, display_name, field_type)
-                )
+                material_images(id, image_url, image_type, is_featured, display_order)
               `)
               .in('id', materialIds);
 
@@ -185,15 +160,6 @@ async function performUnifiedSearch(
                     type: img.image_type,
                     is_featured: img.is_featured
                   })),
-                metafield_values: (material.material_metafield_values || []).map((value: any) => ({
-                  field_name: value.field?.field_name,
-                  display_name: value.field?.display_name,
-                  field_type: value.field?.field_type,
-                  value_text: value.value_text,
-                  value_number: value.value_number,
-                  value_boolean: value.value_boolean,
-                  confidence_score: value.confidence_score
-                })),
                 search_score: scoresMap.get(material.id) || 0.7,
                 match_type: 'semantic'
               })));

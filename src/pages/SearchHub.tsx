@@ -1,17 +1,21 @@
 import React from 'react';
 
 import { MaterialAgentSearchInterface } from '@/components/AI/MaterialAgentSearchInterface';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 const SearchHubPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">AI Search Hub</h1>
-          <p className="text-muted-foreground">
-            Intelligent material research powered by Material Agent Orchestrator
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="AI Search Hub"
+        description="Intelligent material research powered by Material Agent Orchestrator"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'Search Hub' },
+        ]}
+      />
+      <div className="p-6">
+        <div className="max-w-6xl mx-auto space-y-6">
 
         <MaterialAgentSearchInterface
           onMaterialSelect={(materialId) => {
@@ -25,6 +29,7 @@ const SearchHubPage: React.FC = () => {
             window.location.href = '/3d';
           }}
         />
+        </div>
       </div>
     </div>
   );

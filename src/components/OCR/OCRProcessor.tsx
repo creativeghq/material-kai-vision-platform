@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { HybridOCRService, HybridOCROptions, HybridOCRResult } from '@/services/ml';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 export const OCRProcessor: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -106,8 +107,18 @@ export const OCRProcessor: React.FC = () => {
   }, [getRecommendation]);
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="OCR Document Processing"
+        description="Extract text and structured data from images and documents using hybrid OCR"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'OCR Processor' },
+        ]}
+      />
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -316,6 +327,8 @@ export const OCRProcessor: React.FC = () => {
           </CardContent>
         </Card>
       )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -5,7 +5,6 @@ import {
   Clock,
   Loader2,
   FileText,
-  X,
   RefreshCw,
   AlertTriangle,
   HelpCircle,
@@ -202,13 +201,6 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             </div>
             <div className="flex items-center gap-2">
               {getStatusBadge(job.status)}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-              >
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
@@ -319,8 +311,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
         {/* Completion Summary - Full Details */}
         {isCompleted && (
-          <div className="p-6 pt-4 flex-shrink-0 bg-green-50 border-t border-green-200 space-y-4">
-            <h3 className="text-lg font-semibold text-green-900 flex items-center gap-2">
+          <div className="p-6 pt-4 flex-shrink-0 border-t space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
               Processing Complete - Full Summary
             </h3>
@@ -344,12 +336,12 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 if (mivaaStep?.details) {
                   mivaaStep.details.forEach((detail: unknown) => {
                     const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
-                    const chunkMatch = detailStr.match(/Generated (\d+) text chunks/);
-                    const imageMatch = detailStr.match(/Extracted (\d+) images/);
-                    const pageMatch = detailStr.match(/Processed (\d+) pages?/);
-                    if (chunkMatch) chunksCreated = parseInt(chunkMatch[1]);
-                    if (imageMatch) imagesExtracted = parseInt(imageMatch[1]);
-                    if (pageMatch) pagesProcessed = parseInt(pageMatch[1]);
+                    const chunkMatch = detailStr.match(/Generated (\d+) text chunks|Chunks Generated: (\d+)/);
+                    const imageMatch = detailStr.match(/Extracted (\d+) images|Images Extracted: (\d+)/);
+                    const pageMatch = detailStr.match(/Pages: (\d+)\/(\d+)|Processed (\d+) pages?/);
+                    if (chunkMatch) chunksCreated = parseInt(chunkMatch[1] || chunkMatch[2]);
+                    if (imageMatch) imagesExtracted = parseInt(imageMatch[1] || imageMatch[2]);
+                    if (pageMatch) pagesProcessed = parseInt(pageMatch[1] || pageMatch[3]);
                   });
                 }
 
@@ -373,29 +365,29 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
                 return (
                   <>
-                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
-                      <div className="text-2xl font-bold text-green-700">{pagesProcessed}</div>
-                      <div className="text-sm text-green-600">Pages Processed</div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">{pagesProcessed}</div>
+                      <div className="text-sm text-muted-foreground">Pages Processed</div>
                     </div>
-                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
-                      <div className="text-2xl font-bold text-green-700">{chunksCreated}</div>
-                      <div className="text-sm text-green-600">Chunks Created</div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">{chunksCreated}</div>
+                      <div className="text-sm text-muted-foreground">Chunks Created</div>
                     </div>
-                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
-                      <div className="text-2xl font-bold text-green-700">{imagesExtracted}</div>
-                      <div className="text-sm text-green-600">Images Extracted</div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">{imagesExtracted}</div>
+                      <div className="text-sm text-muted-foreground">Images Extracted</div>
                     </div>
-                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
-                      <div className="text-2xl font-bold text-green-700">{embeddingsGenerated || chunksCreated}</div>
-                      <div className="text-sm text-green-600">Embeddings Generated</div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">{embeddingsGenerated || chunksCreated}</div>
+                      <div className="text-sm text-muted-foreground">Embeddings Generated</div>
                     </div>
-                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
-                      <div className="text-2xl font-bold text-green-700">{kbEntriesStored || chunksCreated}</div>
-                      <div className="text-sm text-green-600">KB Entries Stored</div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">{kbEntriesStored || chunksCreated}</div>
+                      <div className="text-sm text-muted-foreground">KB Entries Stored</div>
                     </div>
-                    <div className="text-center p-3 bg-white rounded-lg border border-green-200">
-                      <div className="text-2xl font-bold text-green-700">{categoriesAdded}</div>
-                      <div className="text-sm text-green-600">Categories Added</div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">{categoriesAdded}</div>
+                      <div className="text-sm text-muted-foreground">Categories Added</div>
                     </div>
                   </>
                 );
@@ -404,10 +396,10 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
             {/* Detailed Step Information */}
             <div className="space-y-3 mt-4">
-              <h4 className="font-semibold text-green-900 text-sm">Processing Details:</h4>
+              <h4 className="font-semibold text-sm">Processing Details:</h4>
               <div className="space-y-2 text-sm">
                 {job.steps.map(step => (
-                  <div key={step.id} className="flex items-start gap-2 p-2 bg-white rounded border border-green-200">
+                  <div key={step.id} className="flex items-start gap-2 p-2 bg-card rounded border">
                     <div className="flex-shrink-0 mt-0.5">
                       {step.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-600" />}
                       {step.status === 'failed' && <XCircle className="h-4 w-4 text-red-600" />}
@@ -415,16 +407,16 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                       {step.status === 'pending' && <Clock className="h-4 w-4 text-gray-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-green-900">{step.name}</div>
+                      <div className="font-medium">{step.name}</div>
                       {step.details && step.details.length > 0 && (
-                        <div className="text-xs text-green-700 mt-1 space-y-1">
+                        <div className="text-xs text-muted-foreground mt-1 space-y-1">
                           {step.details.slice(0, 2).map((detail, idx) => (
                             <div key={idx} className="truncate">
                               • {typeof detail === 'string' ? detail : detail.message}
                             </div>
                           ))}
                           {step.details.length > 2 && (
-                            <div className="text-xs text-green-600">
+                            <div className="text-xs text-muted-foreground">
                               +{step.details.length - 2} more details
                             </div>
                           )}
@@ -436,8 +428,72 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               </div>
             </div>
 
+            {/* Metafields Information */}
+            <div className="space-y-3 mt-4">
+              <h4 className="font-semibold text-sm">Metadata & Fields:</h4>
+              <div className="text-xs space-y-2 p-2 bg-card rounded border">
+                {(() => {
+                  const knowledgeStep = job.steps.find(s => s.id === 'knowledge-storage');
+                  const metafields: { name: string; status: string }[] = [];
+
+                  // Extract metafields from knowledge storage step
+                  if (knowledgeStep?.details) {
+                    knowledgeStep.details.forEach((detail: unknown) => {
+                      const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
+
+                      // Check for various metadata fields
+                      if (detailStr.includes('Document stored')) metafields.push({ name: 'Document Storage', status: '✓ Added' });
+                      if (detailStr.includes('MIVAA processing results')) metafields.push({ name: 'MIVAA Metadata', status: '✓ Integrated' });
+                      if (detailStr.includes('text chunks')) metafields.push({ name: 'Chunk Metadata', status: '✓ Added' });
+                      if (detailStr.includes('images')) metafields.push({ name: 'Image Metadata', status: '✓ Added' });
+                      if (detailStr.includes('embeddings')) metafields.push({ name: 'Embedding Metadata', status: '✓ Added' });
+                      if (detailStr.includes('categories')) metafields.push({ name: 'Category Metadata', status: '✓ Added' });
+                      if (detailStr.includes('Metadata and relationships')) metafields.push({ name: 'Relationships', status: '✓ Preserved' });
+                      if (detailStr.includes('Search indexing')) metafields.push({ name: 'Search Index', status: '✓ Completed' });
+                    });
+                  }
+
+                  // Also check upload and validation steps for additional metadata
+                  const uploadStep = job.steps.find(s => s.id === 'upload');
+                  if (uploadStep?.details) {
+                    uploadStep.details.forEach((detail: unknown) => {
+                      const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
+                      if (detailStr.includes('File uploaded')) metafields.push({ name: 'File Upload', status: '✓ Completed' });
+                    });
+                  }
+
+                  const validationStep = job.steps.find(s => s.id === 'validation');
+                  if (validationStep?.details) {
+                    validationStep.details.forEach((detail: unknown) => {
+                      const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
+                      if (detailStr.includes('PDF structure')) metafields.push({ name: 'PDF Structure', status: '✓ Validated' });
+                      if (detailStr.includes('Content accessibility')) metafields.push({ name: 'Content Access', status: '✓ Confirmed' });
+                    });
+                  }
+
+                  // Remove duplicates
+                  const uniqueMetafields = Array.from(new Map(metafields.map(m => [m.name, m])).values());
+
+                  if (uniqueMetafields.length === 0) {
+                    return <div className="text-muted-foreground">No metadata fields tracked</div>;
+                  }
+
+                  return (
+                    <div className="space-y-1">
+                      {uniqueMetafields.map((field, idx) => (
+                        <div key={idx} className="flex justify-between items-center">
+                          <span className="text-muted-foreground">{field.name}:</span>
+                          <span className="text-green-600 font-medium">{field.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
             {/* Job Metadata */}
-            <div className="text-xs text-green-700 p-2 bg-white rounded border border-green-200 space-y-1">
+            <div className="text-xs p-2 bg-card rounded border space-y-1">
               <div><strong>Job ID:</strong> {job.id}</div>
               <div><strong>Document ID:</strong> {(job.metadata?.documentId as string) || 'N/A'}</div>
               <div><strong>Processing Time:</strong> {job.endTime ? formatDuration(job.startTime, job.endTime) : 'In progress'}</div>

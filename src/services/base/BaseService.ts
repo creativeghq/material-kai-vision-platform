@@ -68,6 +68,12 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
   protected latencySum: number = 0;
   protected lastActivity?: Date;
   protected rateLimitTracker: Map<string, number[]> = new Map();
+  protected logger = {
+    error: (message: string, error?: unknown) => console.error(message, error),
+    warn: (message: string) => console.warn(message),
+    info: (message: string) => console.info(message),
+    debug: (message: string) => console.debug(message),
+  };
 
   constructor(config: TConfig) {
     super();

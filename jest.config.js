@@ -24,7 +24,7 @@ export default {
   },
   
   // Module name mapping for path aliases
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@tests/(.*)$': '<rootDir>/tests/$1'
   },

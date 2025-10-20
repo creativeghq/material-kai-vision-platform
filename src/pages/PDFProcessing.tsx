@@ -4,13 +4,16 @@ import { Upload, Activity, Link } from 'lucide-react';
 
 import { PDFWorkflowViewer, WorkflowJob } from '@/components/PDF/PDFWorkflowViewer';
 import { PDFUploadProgressModal } from '@/components/PDF/PDFUploadProgressModal';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { consolidatedPDFWorkflowService } from '@/services/consolidatedPDFWorkflowService';
+import { dynamicCategoryManagementService, CategoryHierarchy } from '@/services/dynamicCategoryManagementService';
 import { useToast } from '@/hooks/use-toast';
 
 const PDFProcessing = () => {
@@ -19,9 +22,29 @@ const PDFProcessing = () => {
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [categories, setCategories] = useState<CategoryHierarchy[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Load categories
+    const loadCategories = async () => {
+      try {
+        const cats = await dynamicCategoryManagementService.getCategoriesHierarchy();
+        setCategories(cats);
+        if (cats.length > 0) {
+          setSelectedCategory(cats[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+
     // Subscribe to workflow updates
     const unsubscribe = consolidatedPDFWorkflowService.subscribe((job: any) => {
       setWorkflowJobs((prev: WorkflowJob[]) => {
@@ -56,7 +79,9 @@ const PDFProcessing = () => {
   const onDrop = async (acceptedFiles: File[]) => {
     for (const file of acceptedFiles) {
       try {
-        const jobId = await consolidatedPDFWorkflowService.startPDFProcessing(file);
+        const jobId = await consolidatedPDFWorkflowService.startPDFProcessing(file, {
+          categoryId: selectedCategory,
+        });
 
         // Get the job and show progress modal
         const job = consolidatedPDFWorkflowService.getJob(jobId) as WorkflowJob | undefined;
@@ -149,13 +174,17 @@ const PDFProcessing = () => {
   const failedJobs = workflowJobs.filter(job => job.status === 'failed').length;
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">PDF Processing</h1>
-        <p className="text-muted-foreground mt-2">
-          Upload and process PDF documents with advanced workflow monitoring and step-by-step tracking.
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="PDF Processing"
+        description="Upload and process PDF documents with advanced workflow monitoring and step-by-step tracking"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'PDF Processing' },
+        ]}
+      />
+      <div className="p-6">
+        <div className="container mx-auto">
 
       <div className="space-y-6">
         {/* Header with status */}
@@ -218,6 +247,26 @@ const PDFProcessing = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Category Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Material Category</label>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={isLoadingCategories}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingCategories ? 'Loading categories...' : 'Select a category'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.displayName || category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select the material category for this PDF to help organize and categorize the content
+                </p>
+              </div>
+
               {/* File Upload Area */}
               <div
                 {...getRootProps()}
@@ -304,6 +353,8 @@ const PDFProcessing = () => {
           }
         }}
       />
+        </div>
+      </div>
     </div>
   );
 };

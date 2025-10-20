@@ -225,6 +225,176 @@ export interface MaterialMetafieldValue {
 }
 
 /**
+ * Generic metafield value for any entity (chunk, product, image)
+ */
+export interface EntityMetafieldValue {
+  /** Unique identifier */
+  id: string;
+  /** Entity ID (chunk_id, product_id, or image_id) */
+  entityId: string;
+  /** Metafield definition ID */
+  fieldId: string;
+  /** Text value */
+  valueText?: string;
+  /** Numeric value */
+  valueNumber?: number;
+  /** Boolean value */
+  valueBoolean?: boolean;
+  /** Date value */
+  valueDate?: string;
+  /** JSON value */
+  valueJson?: Record<string, unknown>;
+  /** Confidence score for AI-extracted values */
+  confidenceScore: number;
+  /** Method used to extract/populate this value */
+  extractionMethod?: string;
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Chunk with metafield support
+ */
+export interface DocumentChunk {
+  /** Unique identifier */
+  id: string;
+  /** Document ID this chunk belongs to */
+  documentId: string;
+  /** Chunk content/text */
+  content: string;
+  /** Chunk index/sequence number */
+  chunkIndex: number;
+  /** Metadata about the chunk */
+  metadata?: Record<string, unknown>;
+  /** Metafield values for this chunk */
+  metafieldValues?: EntityMetafieldValue[];
+  /** Related product IDs */
+  relatedProductIds?: string[];
+  /** Related image IDs */
+  relatedImageIds?: string[];
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Product with metafield support
+ */
+export interface Product {
+  /** Unique identifier */
+  id: string;
+  /** Product name */
+  name: string;
+  /** Product description */
+  description?: string;
+  /** Product category */
+  category?: string;
+  /** Product properties */
+  properties?: Record<string, unknown>;
+  /** Product specifications */
+  specifications?: Record<string, unknown>;
+  /** Generic metadata */
+  metadata?: Record<string, unknown>;
+  /** Metafield values for this product */
+  metafieldValues?: EntityMetafieldValue[];
+  /** Source chunk IDs */
+  sourceChunkIds?: string[];
+  /** Related image IDs */
+  relatedImageIds?: string[];
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Image with metafield support
+ */
+export interface DocumentImage {
+  /** Unique identifier */
+  id: string;
+  /** Document ID this image belongs to */
+  documentId: string;
+  /** Image URL */
+  url: string;
+  /** Image caption */
+  caption?: string;
+  /** Alternative text */
+  altText?: string;
+  /** Image metadata */
+  metadata?: Record<string, unknown>;
+  /** Visual analysis results */
+  visualAnalysis?: Record<string, unknown>;
+  /** Metafield values for this image */
+  metafieldValues?: EntityMetafieldValue[];
+  /** Related chunk IDs */
+  relatedChunkIds?: string[];
+  /** Related product IDs */
+  relatedProductIds?: string[];
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+}
+
+/**
+ * Relationship between chunks and products
+ */
+export interface ChunkProductRelationship {
+  /** Unique identifier */
+  id: string;
+  /** Chunk ID */
+  chunkId: string;
+  /** Product ID */
+  productId: string;
+  /** Type of relationship */
+  relationshipType: 'source' | 'related' | 'component' | 'alternative';
+  /** Relevance score (0-1) */
+  relevanceScore: number;
+  /** Creation timestamp */
+  createdAt: string;
+}
+
+/**
+ * Relationship between chunks and images
+ */
+export interface ChunkImageRelationship {
+  /** Unique identifier */
+  id: string;
+  /** Chunk ID */
+  chunkId: string;
+  /** Image ID */
+  imageId: string;
+  /** Type of relationship */
+  relationshipType: 'illustrates' | 'depicts' | 'related' | 'example';
+  /** Relevance score (0-1) */
+  relevanceScore: number;
+  /** Creation timestamp */
+  createdAt: string;
+}
+
+/**
+ * Relationship between products and images
+ */
+export interface ProductImageRelationship {
+  /** Unique identifier */
+  id: string;
+  /** Product ID */
+  productId: string;
+  /** Image ID */
+  imageId: string;
+  /** Type of relationship */
+  relationshipType: 'depicts' | 'illustrates' | 'variant' | 'related';
+  /** Relevance score (0-1) */
+  relevanceScore: number;
+  /** Creation timestamp */
+  createdAt: string;
+}
+
+/**
  * Request to create a metafield definition
  */
 export interface CreateMetafieldDefinitionRequest {

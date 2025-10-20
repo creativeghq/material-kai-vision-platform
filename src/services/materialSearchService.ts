@@ -233,57 +233,6 @@ export class MaterialSearchService {
       };
     }
   }
-
-  /**
-   * Create or update metafield value
-   */
-  async updateMetafieldValue(
-    materialId: string,
-    fieldId: string,
-    value: unknown,
-    options: {
-      confidenceScore?: number;
-      extractionMethod?: string;
-      sourceUrl?: string;
-    } = {}
-  ): Promise<{
-    success: boolean;
-    data?: unknown;
-    error?: string;
-  }> {
-    try {
-      const { data, error } = await supabase.functions.invoke('material-metafield-values', {
-        body: {
-          material_id: materialId,
-          field_id: fieldId,
-          value: value,
-          confidence_score: options.confidenceScore || 1.0,
-          extraction_method: options.extractionMethod || 'manual',
-          source_url: options.sourceUrl
-        }
-      });
-
-      if (error) {
-        return {
-          success: false,
-          error: error.message || 'Failed to update metafield'
-        };
-      }
-
-      return {
-        success: data.success,
-        data: data.data,
-        error: data.error
-      };
-
-    } catch (error) {
-      console.error('Metafield update error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
 }
 
 // Export singleton instance

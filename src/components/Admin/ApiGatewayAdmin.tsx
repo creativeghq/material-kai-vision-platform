@@ -33,6 +33,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey, type RateLimitRule } from '@/services/apiGateway/apiGatewayService';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 
 export const ApiGatewayAdmin: React.FC = () => {
@@ -214,40 +215,14 @@ export const ApiGatewayAdmin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header with Navigation */}
-      <div className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                className="border border-gray-300 text-sm px-3 py-1 flex items-center gap-2"
-                onClick={() => navigate('/')}
-              >
-                <Home className="h-4 w-4" />
-                Back to Main
-              </Button>
-              <Button
-                className="border border-gray-300 text-sm px-3 py-1 flex items-center gap-2"
-                onClick={() => navigate('/admin')}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Admin
-              </Button>
-            </div>
-            <div className="h-6 w-px bg-border" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">API Gateway Management</h1>
-              <p className="text-sm text-muted-foreground">
-                Configure endpoints, access control, rate limiting, and monitoring
-              </p>
-            </div>
-          </div>
-          <Badge className="border border-gray-300 text-sm">
-            <Shield className="h-3 w-3 mr-1" />
-            Admin Access
-          </Badge>
-        </div>
-      </div>
+      <GlobalAdminHeader
+        title="API Gateway Management"
+        description="Configure endpoints, access control, rate limiting, and monitoring"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'API Gateway' },
+        ]}
+      />
 
       {/* Main Content */}
       <div className="p-6 space-y-6">

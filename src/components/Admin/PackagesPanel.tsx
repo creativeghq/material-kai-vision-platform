@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 /**
  * Call MIVAA Gateway directly using fetch to avoid CORS issues
@@ -279,19 +280,23 @@ const PackagesPanel: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Package Management</h1>
-          <p className="text-muted-foreground">
-            Monitor and manage system dependencies across NodeJS and MIVAA services
-          </p>
-        </div>
-        <Button onClick={checkPackageStatus} disabled={isChecking}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
-          {isChecking ? 'Checking...' : 'Refresh Status'}
-        </Button>
-      </div>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="Package Management"
+        description="Monitor and manage system dependencies across NodeJS and MIVAA services"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'Packages' },
+        ]}
+      />
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="flex items-center justify-end">
+            <Button onClick={checkPackageStatus} disabled={isChecking}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
+              {isChecking ? 'Checking...' : 'Refresh Status'}
+            </Button>
+          </div>
 
       {/* Filters */}
       <Card>
@@ -353,6 +358,8 @@ const PackagesPanel: React.FC = () => {
           <PackageTable packages={mivaaPackages} title="MIVAA Python Packages" />
         </TabsContent>
       </Tabs>
+        </div>
+      </div>
     </div>
   );
 };

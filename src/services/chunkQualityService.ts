@@ -301,18 +301,43 @@ export class ChunkQualityService {
     const highCoherence = coherenceScores.filter(s => s >= 0.8).length;
     const lowCoherence = coherenceScores.filter(s => s < 0.6).length;
 
-    // Store document quality metrics
-    const { error: updateError } = await supabase
+    // First, try to check if a record exists
+    const { data: existingRecord } = await supabase
       .from('document_quality_metrics')
-      .upsert({
-        document_id: documentId,
-        average_coherence_score: averageCoherence,
-        chunks_with_high_coherence: highCoherence,
-        chunks_with_low_coherence: lowCoherence,
-        overall_quality_score: averageCoherence,
-        quality_assessment: this.getQualityAssessment(averageCoherence),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'document_id' });
+      .select('id')
+      .eq('document_id', documentId)
+      .single();
+
+    let updateError;
+    if (existingRecord) {
+      // Update existing record
+      const result = await supabase
+        .from('document_quality_metrics')
+        .update({
+          average_coherence_score: averageCoherence,
+          chunks_with_high_coherence: highCoherence,
+          chunks_with_low_coherence: lowCoherence,
+          overall_quality_score: averageCoherence,
+          quality_assessment: this.getQualityAssessment(averageCoherence),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('document_id', documentId);
+      updateError = result.error;
+    } else {
+      // Insert new record
+      const result = await supabase
+        .from('document_quality_metrics')
+        .insert({
+          document_id: documentId,
+          average_coherence_score: averageCoherence,
+          chunks_with_high_coherence: highCoherence,
+          chunks_with_low_coherence: lowCoherence,
+          overall_quality_score: averageCoherence,
+          quality_assessment: this.getQualityAssessment(averageCoherence),
+          updated_at: new Date().toISOString(),
+        });
+      updateError = result.error;
+    }
 
     if (updateError) {
       console.error('Failed to update document quality metrics:', updateError);

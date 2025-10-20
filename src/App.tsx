@@ -48,6 +48,17 @@ import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
 
+// Coverage page component
+const CoveragePage = () => (
+  <div style={{ width: '100%', height: '100vh' }}>
+    <iframe
+      src="/coverage/lcov-report/index.html"
+      style={{ width: '100%', height: '100%', border: 'none' }}
+      title="Test Coverage Report"
+    />
+  </div>
+);
+
 const queryClient = new QueryClient();
 
 // Initialize monitoring service with basic config
@@ -335,6 +346,8 @@ const App = () => (
             } />
             <Route path="/health" element={<HealthPage />} />
             <Route path="/ready" element={<HealthPage />} />
+            <Route path="/coverage" element={<CoveragePage />} />
+            <Route path="/coverage/*" element={<CoveragePage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
