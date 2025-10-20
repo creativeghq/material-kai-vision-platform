@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+
 import { FunctionalMetadata } from '@/types/materials';
-import { 
+import {
   FunctionalMetadataApiService,
   FunctionalMetadataExtractionRequest,
   FunctionalMetadataExtractionResult,
@@ -49,7 +50,7 @@ export interface UseFunctionalMetadataOptions {
 
 /**
  * Custom hook for managing functional metadata extraction and state
- * 
+ *
  * Provides comprehensive state management for MIVAA functional metadata extraction
  * with proper loading states, error handling, and cleanup.
  */
@@ -57,7 +58,7 @@ export function useFunctionalMetadata(
   documentId: string | null,
   file: File | Buffer | null,
   mivaaService: MivaaIntegrationService,
-  options: UseFunctionalMetadataOptions = {}
+  options: UseFunctionalMetadataOptions = {},
 ) {
   const {
     autoExtract = false,
@@ -112,16 +113,16 @@ export function useFunctionalMetadata(
       try {
         const result = await apiServiceRef.current!.checkFunctionalMetadataAvailability(documentId);
         if (!isCancelled) {
-          setState(prev => ({ 
-            ...prev, 
+          setState(prev => ({
+            ...prev,
             available: result.available,
             error: result.available ? null : result.reason || 'Service unavailable',
           }));
         }
       } catch (error) {
         if (!isCancelled) {
-          setState(prev => ({ 
-            ...prev, 
+          setState(prev => ({
+            ...prev,
             available: false,
             error: error instanceof Error ? error.message : 'Availability check failed',
           }));
@@ -161,9 +162,9 @@ export function useFunctionalMetadata(
     abortControllerRef.current = new AbortController();
     const currentController = abortControllerRef.current;
 
-    setState(prev => ({ 
-      ...prev, 
-      loading: true, 
+    setState(prev => ({
+      ...prev,
+      loading: true,
       error: null,
       processingTime: 0,
     }));
@@ -183,7 +184,7 @@ export function useFunctionalMetadata(
       };
 
       const result = await apiServiceRef.current.extractWithFunctionalMetadata(request);
-      
+
       // Check if request was cancelled
       if (currentController.signal.aborted) {
         return null;
@@ -327,13 +328,13 @@ export function useFunctionalMetadata(
   return {
     // State
     ...state,
-    
+
     // Actions
     extractFunctionalMetadata,
     extractFunctionalMetadataOnly,
     clearFunctionalMetadata,
     retryExtraction,
-    
+
     // Utilities
     isExtracting: state.loading,
     hasError: !!state.error,
@@ -347,7 +348,7 @@ export function useFunctionalMetadata(
  */
 export function useFunctionalMetadataAvailability(
   documentId: string | null,
-  mivaaService: MivaaIntegrationService
+  mivaaService: MivaaIntegrationService,
 ) {
   const [available, setAvailable] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -367,7 +368,7 @@ export function useFunctionalMetadataAvailability(
       try {
         const service = createFunctionalMetadataApiService(mivaaService);
         const result = await service.checkFunctionalMetadataAvailability(documentId);
-        
+
         if (!isCancelled) {
           setAvailable(result.available);
           setError(result.available ? null : result.reason || 'Service unavailable');
@@ -402,7 +403,7 @@ export function useFunctionalMetadataAvailability(
  */
 export function useBatchFunctionalMetadata(
   mivaaService: MivaaIntegrationService,
-  options: UseFunctionalMetadataOptions = {}
+  options: UseFunctionalMetadataOptions = {},
 ) {
   const [batchState, setBatchState] = useState<{
     processing: Map<string, FunctionalMetadataState>;
@@ -420,10 +421,10 @@ export function useBatchFunctionalMetadata(
    * Process multiple documents for functional metadata extraction
    */
   const processBatch = useCallback(async (
-    documents: Array<{ id: string; file: File | Buffer }>
+    documents: Array<{ id: string; file: File | Buffer }>,
   ) => {
     const apiService = createFunctionalMetadataApiService(mivaaService);
-    
+
     // Initialize processing state for all documents
     setBatchState(prev => ({
       ...prev,
@@ -456,7 +457,7 @@ export function useBatchFunctionalMetadata(
           };
 
           const result = await apiService.extractWithFunctionalMetadata(request);
-          
+
           if (controller.signal.aborted) return null;
 
           if (result.status === 'success' && result.data.functionalMetadata) {
@@ -489,7 +490,7 @@ export function useBatchFunctionalMetadata(
         } finally {
           abortControllersRef.current.delete(doc.id);
         }
-      })
+      }),
     );
 
     return results;
@@ -503,7 +504,7 @@ export function useBatchFunctionalMetadata(
     if (controller) {
       controller.abort();
       abortControllersRef.current.delete(documentId);
-      
+
       setBatchState(prev => ({
         ...prev,
         processing: new Map([...prev.processing].filter(([id]) => id !== documentId)),
@@ -517,7 +518,7 @@ export function useBatchFunctionalMetadata(
   const cancelAll = useCallback(() => {
     abortControllersRef.current.forEach(controller => controller.abort());
     abortControllersRef.current.clear();
-    
+
     setBatchState(prev => ({
       ...prev,
       processing: new Map(),
@@ -548,19 +549,19 @@ export function useBatchFunctionalMetadata(
     processing: Array.from(batchState.processing.entries()),
     completed: Array.from(batchState.completed.entries()),
     failed: Array.from(batchState.failed.entries()),
-    
+
     // Computed state
     isProcessing: batchState.processing.size > 0,
     totalProcessing: batchState.processing.size,
     totalCompleted: batchState.completed.size,
     totalFailed: batchState.failed.size,
-    
+
     // Actions
     processBatch,
     cancelDocument,
     cancelAll,
     clearAll,
-    
+
     // Utilities
     getMetadata: (documentId: string) => batchState.completed.get(documentId) || null,
     getError: (documentId: string) => batchState.failed.get(documentId) || null,
@@ -587,7 +588,7 @@ export function useFunctionalMetadataCache() {
 
     const now = new Date();
     const ageMinutes = (now.getTime() - cached.extractedAt.getTime()) / (1000 * 60);
-    
+
     if (ageMinutes > ttlMinutes) {
       // Remove expired entry
       setCache(prev => {

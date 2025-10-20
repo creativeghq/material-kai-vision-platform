@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { mivaaService } from '@/services/mivaaIntegrationService';
@@ -61,21 +60,21 @@ export const MivaaPDFProcessor: React.FC = () => {
 
     try {
       console.log('🚀 Starting MIVAA PDF processing...');
-      
+
       const processingResults: PDFProcessingResult[] = [];
-      
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setProgress((i / files.length) * 90);
-        
+
         // Upload file to temporary storage and get URL
         const formData = new FormData();
         formData.append('file', file);
-        
+
         // For demo purposes, we'll use a placeholder URL
         // In production, you'd upload to Supabase storage first
         const fileUrl = `https://example.com/temp/${file.name}`;
-        
+
         // Call MIVAA service for PDF processing with polling
         const response = await mivaaService.processPDF(fileUrl, {
           extractImages: true,
@@ -90,7 +89,7 @@ export const MivaaPDFProcessor: React.FC = () => {
           // Note: In a real implementation, you'd want to show a progress modal here
           // and use the consolidatedPDFWorkflowService.startJobPolling method
         }
-        
+
         if (response.success && response.data) {
           processingResults.push({
             id: crypto.randomUUID(),
@@ -121,14 +120,14 @@ export const MivaaPDFProcessor: React.FC = () => {
           });
         }
       }
-      
+
       console.log('✅ MIVAA PDF processing completed:', processingResults);
-      
+
       setResults(processingResults);
       setProgress(100);
-      
+
       toast.success(`Successfully processed ${processingResults.length} PDF files with MIVAA!`);
-      
+
     } catch (error) {
       console.error('❌ MIVAA PDF processing failed:', error);
       toast.error(error instanceof Error ? error.message : 'MIVAA PDF processing failed');

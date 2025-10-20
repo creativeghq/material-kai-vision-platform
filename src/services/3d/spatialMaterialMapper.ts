@@ -328,7 +328,7 @@ export class SpatialMaterialMapper {
       name: string;
       properties: Json;
       metadata?: Record<string, unknown>;
-    }
+    },
   ): number {
     let confidence = 0;
     let factors = 0;

@@ -19,10 +19,10 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 import { SessionDetailView } from './SessionDetailView';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
-import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 type ViewMode = 'sessions' | 'detail' | 'create';
 type ScrapingMode = 'single-page' | 'sitemap' | 'crawl' | 'search' | 'map';

@@ -7,9 +7,10 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/Layout/AuthGuard';
+import { monitoringService } from '@/services/monitoring/monitoringService';
+
 import { AdminGuard } from './components/Layout/AdminGuard';
 
-import { monitoringService } from '@/services/monitoring/monitoringService';
 // Import CORS debug utility for troubleshooting
 import './debug/cors-debug';
 import Index from './pages/Index';
@@ -30,7 +31,6 @@ import { Designer3DPage } from './components/3D/Designer3DPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { Layout } from './components/Layout/Layout';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
-
 import { OCRProcessor } from './components/OCR/OCRProcessor';
 import { IntegratedRAGManagement } from './components/Admin/IntegratedRAGManagement';
 import PDFProcessing from './pages/PDFProcessing';
@@ -47,6 +47,7 @@ import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMet
 import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
+import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -66,7 +67,7 @@ monitoringService.initialize({
   enabled: false,
   environment: 'development',
   version: '1.0.0',
-  providers: {}
+  providers: {},
 });
 
 const App = () => (
@@ -138,6 +139,15 @@ const App = () => (
               <AuthGuard>
                 <AdminGuard>
                   <AnalyticsDashboard />
+                </AdminGuard>
+              </AuthGuard>
+            } />
+            <Route path="/admin/pdf-processing-monitor" element={
+              <AuthGuard>
+                <AdminGuard>
+                  <Layout>
+                    <PDFProcessingMonitor />
+                  </Layout>
                 </AdminGuard>
               </AuthGuard>
             } />

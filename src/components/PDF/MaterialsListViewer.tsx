@@ -175,15 +175,15 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
           properties: {
             confidence: material.confidence,
             source: 'pdf_extraction',
-            extracted_properties: material.properties || {}
+            extracted_properties: material.properties || {},
           },
           extracted_properties: material.properties || {},
           confidence_scores: {
             overall: material.confidence,
-            extraction_method: 'pdf_analysis'
+            extraction_method: 'pdf_analysis',
           },
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();

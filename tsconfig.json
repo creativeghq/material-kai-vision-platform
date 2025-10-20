@@ -45,11 +45,7 @@
     ".ruru",
     "scripts",
     "supabase",
-    "src/api/**",
-    "src/pages/api/**",
-    "src/components/Admin/**",
     "src/pages/PDFProcessing.tsx",
-    "src/debug/**",
-    "src/config/mivaaStandardization.ts"
+    "src/debug/**"
   ]
 }

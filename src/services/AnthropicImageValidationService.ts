@@ -3,9 +3,11 @@
  * Uses Claude 3.5 Sonnet Vision to validate images and match them to product groups
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import { supabase } from "@/integrations/supabase/client";
-import { BaseService, ServiceConfig } from "./base/BaseService";
+import Anthropic from '@anthropic-ai/sdk';
+
+import { supabase } from '@/integrations/supabase/client';
+
+import { BaseService, ServiceConfig } from './base/BaseService';
 
 interface ImageValidationRequest {
   image_id: string;
@@ -16,7 +18,7 @@ interface ImageValidationRequest {
 
 interface ImageValidationResult {
   image_id: string;
-  validation_status: "valid" | "invalid" | "needs_review";
+  validation_status: 'valid' | 'invalid' | 'needs_review';
   quality_score: number;
   product_associations: Array<{
     product_group: string;
@@ -34,14 +36,14 @@ interface ImageValidationResult {
  */
 export class AnthropicImageValidationService extends BaseService<ServiceConfig> {
   private anthropicClient: Anthropic;
-  private model: string = "claude-3-5-sonnet-20241022";
+  private model: string = 'claude-3-5-sonnet-20241022';
   private maxTokens: number = 2048;
 
   constructor() {
     super({
-      name: "AnthropicImageValidationService",
-      version: "1.0.0",
-      environment: "production",
+      name: 'AnthropicImageValidationService',
+      version: '1.0.0',
+      environment: 'production',
       enabled: true,
       timeout: 60000,
       retries: 2,
@@ -49,30 +51,30 @@ export class AnthropicImageValidationService extends BaseService<ServiceConfig> 
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is required");
+      throw new Error('ANTHROPIC_API_KEY environment variable is required');
     }
 
     this.anthropicClient = new Anthropic({ apiKey });
   }
 
   protected async doInitialize(): Promise<void> {
-    console.log("AnthropicImageValidationService initialized");
+    console.log('AnthropicImageValidationService initialized');
   }
 
   /**
    * Validate a single image using Claude Vision
    */
   async validateImage(
-    request: ImageValidationRequest
+    request: ImageValidationRequest,
   ): Promise<ImageValidationResult> {
     return this.executeOperation(async () => {
       const startTime = Date.now();
 
       // Get image data from database
       const { data: imageData, error: imageError } = await supabase
-        .from("document_images")
-        .select("*")
-        .eq("id", request.image_id)
+        .from('document_images')
+        .select('*')
+        .eq('id', request.image_id)
         .single();
 
       if (imageError || !imageData) {
@@ -82,8 +84,8 @@ export class AnthropicImageValidationService extends BaseService<ServiceConfig> 
       // Prepare product groups context
       const productGroupsContext =
         request.product_groups && request.product_groups.length > 0
-          ? `\n\nProduct Groups to match against:\n${request.product_groups.map((g) => `- ${g}`).join("\n")}`
-          : "";
+          ? `\n\nProduct Groups to match against:\n${request.product_groups.map((g) => `- ${g}`).join('\n')}`
+          : '';
 
       // Build Claude Vision prompt
       const prompt = `You are an expert material and product analyst. Analyze this image and provide:
@@ -117,17 +119,17 @@ Respond in JSON format:
         max_tokens: this.maxTokens,
         messages: [
           {
-            role: "user",
+            role: 'user',
             content: [
               {
-                type: "image",
+                type: 'image',
                 source: {
-                  type: "url",
+                  type: 'url',
                   url: request.image_url,
                 },
               },
               {
-                type: "text",
+                type: 'text',
                 text: prompt,
               },
             ],
@@ -137,21 +139,21 @@ Respond in JSON format:
 
       // Parse response
       const responseText =
-        response.content[0].type === "text" ? response.content[0].text : "{}";
+        response.content[0].type === 'text' ? response.content[0].text : '{}';
       const analysisResult = JSON.parse(responseText);
 
       // Determine validation status
       const qualityScore = analysisResult.quality_score || 0;
       const validationStatus =
         qualityScore >= 0.7
-          ? "valid"
+          ? 'valid'
           : qualityScore >= 0.5
-            ? "needs_review"
-            : "invalid";
+            ? 'needs_review'
+            : 'invalid';
 
       // Store validation result in database
       const { data: validation, error: insertError } = await supabase
-        .from("image_validations")
+        .from('image_validations')
         .insert([
           {
             image_id: request.image_id,
@@ -184,14 +186,14 @@ Respond in JSON format:
         recommendations: analysisResult.recommendations || [],
         processing_time_ms: Date.now() - startTime,
       };
-    }, "validateImage");
+    }, 'validateImage');
   }
 
   /**
    * Validate multiple images in batch
    */
   async validateImages(
-    requests: ImageValidationRequest[]
+    requests: ImageValidationRequest[],
   ): Promise<ImageValidationResult[]> {
     return this.executeOperation(async () => {
       const results: ImageValidationResult[] = [];
@@ -204,10 +206,10 @@ Respond in JSON format:
           console.error(`Failed to validate image ${request.image_id}:`, error);
           results.push({
             image_id: request.image_id,
-            validation_status: "invalid",
+            validation_status: 'invalid',
             quality_score: 0,
             product_associations: [],
-            issues: [`Validation failed: ${error instanceof Error ? error.message : "Unknown error"}`],
+            issues: [`Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
             recommendations: [],
             processing_time_ms: 0,
           });
@@ -215,7 +217,7 @@ Respond in JSON format:
       }
 
       return results;
-    }, "validateImages");
+    }, 'validateImages');
   }
 }
 

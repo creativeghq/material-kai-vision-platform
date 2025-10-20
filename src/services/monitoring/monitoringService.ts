@@ -1,6 +1,6 @@
 /**
  * Monitoring Service
- * 
+ *
  * Centralized monitoring and error tracking service that can integrate
  * with various monitoring providers (Sentry, LogRocket, DataDog, etc.)
  */
@@ -217,7 +217,7 @@ class MonitoringService {
    */
   public captureError(
     error: Error | string,
-    options: Partial<Omit<ErrorEvent, 'message' | 'timestamp' | 'errorId' | 'url' | 'userAgent'>> = {}
+    options: Partial<Omit<ErrorEvent, 'message' | 'timestamp' | 'errorId' | 'url' | 'userAgent'>> = {},
   ): string {
     if (!this.config.enabled) return '';
 
@@ -278,7 +278,7 @@ class MonitoringService {
    */
   public setUser(user: { id?: string; email?: string; username?: string }): void {
     this.config.userId = user.id;
-    
+
     // Update user context in providers
     console.log('User context updated:', user);
   }
@@ -290,7 +290,7 @@ class MonitoringService {
     if (!this.config.enabled) return;
 
     console.log(`[${level.toUpperCase()}] ${category}: ${message}`);
-    
+
     // In a real implementation, this would add breadcrumbs to Sentry/LogRocket
   }
 
@@ -353,7 +353,7 @@ class MonitoringService {
    */
   public startTimer(name: string): () => void {
     const startTime = performance.now();
-    
+
     return () => {
       const endTime = performance.now();
       this.capturePerformance({

@@ -10,7 +10,7 @@ import {
   MaterialAgentTaskRequest,
   AgentExecutionData,
   MaterialProperties,
-  SpatialAnalysisData
+  SpatialAnalysisData,
 } from './materials';
 
 /**
@@ -20,9 +20,9 @@ import {
  */
 export function isMaterial(value: unknown): value is Material {
   if (!value || typeof value !== 'object') return false;
-  
+
   const obj = value as Record<string, unknown>;
-  
+
   return (
     typeof obj.id === 'string' &&
     typeof obj.name === 'string' &&
@@ -52,9 +52,9 @@ export function isProcessingJobStatus(value: unknown): value is ProcessingJobSta
  */
 export function isRecognitionResult(value: unknown): value is RecognitionResult {
   if (!value || typeof value !== 'object') return false;
-  
+
   const obj = value as Record<string, unknown>;
-  
+
   return (
     typeof obj.materialId === 'string' &&
     typeof obj.confidence === 'number' &&
@@ -71,9 +71,9 @@ export function isRecognitionResult(value: unknown): value is RecognitionResult 
  */
 export function isMaterialAgentTaskRequest(value: unknown): value is MaterialAgentTaskRequest {
   if (!value || typeof value !== 'object') return false;
-  
+
   const obj = value as Record<string, unknown>;
-  
+
   return (
     ['analysis', 'recognition', 'processing'].includes(obj.taskType as string) &&
     typeof obj.inputData === 'object' &&
@@ -88,9 +88,9 @@ export function isMaterialAgentTaskRequest(value: unknown): value is MaterialAge
  */
 export function isAgentExecutionResult(value: unknown): value is AgentExecutionData {
   if (!value || typeof value !== 'object') return false;
-  
+
   const obj = value as Record<string, unknown>;
-  
+
   return (
     typeof obj.agent_id === 'string' &&
     typeof obj.output === 'object' &&
@@ -106,9 +106,9 @@ export function isAgentExecutionResult(value: unknown): value is AgentExecutionD
  */
 export function isMaterialProperties(value: unknown): value is MaterialProperties {
   if (!value || typeof value !== 'object') return false;
-  
+
   const obj = value as Record<string, unknown>;
-  
+
   // All properties are optional, but if present must be correct types
   return (
     (obj.density === undefined || typeof obj.density === 'number') &&
@@ -125,9 +125,9 @@ export function isMaterialProperties(value: unknown): value is MaterialPropertie
  */
 export function isSpatialAnalysisData(value: unknown): value is SpatialAnalysisData {
   if (!value || typeof value !== 'object') return false;
-  
+
   const obj = value as Record<string, unknown>;
-  
+
   return (
     typeof obj.room_type === 'string' &&
     typeof obj.dimensions === 'object' &&
@@ -145,7 +145,7 @@ export function isSpatialAnalysisData(value: unknown): value is SpatialAnalysisD
 export function assertType<T>(
   value: unknown,
   guard: (val: unknown) => val is T,
-  errorMessage: string
+  errorMessage: string,
 ): T {
   if (!guard(value)) {
     throw new TypeError(errorMessage);
@@ -163,7 +163,7 @@ export function assertType<T>(
 export function parseWithDefault<T>(
   value: unknown,
   guard: (val: unknown) => val is T,
-  defaultValue: T
+  defaultValue: T,
 ): T {
   return guard(value) ? value : defaultValue;
 }
@@ -187,7 +187,7 @@ export interface ValidationResult<T = any> {
 export function createValidationResult<T>(
   isValid: boolean,
   data?: T,
-  errors?: string[]
+  errors?: string[],
 ): ValidationResult<T> {
   return {
     isValid,
@@ -206,7 +206,7 @@ export function createValidationResult<T>(
 export function validateWithGuard<T>(
   value: unknown,
   guard: (val: unknown) => val is T,
-  errorMessage: string
+  errorMessage: string,
 ): ValidationResult<T> {
   if (guard(value)) {
     return createValidationResult(true, value);

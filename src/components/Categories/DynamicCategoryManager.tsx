@@ -1,10 +1,12 @@
 /**
  * Dynamic Category Manager Component
- * 
+ *
  * Displays and manages material and product categories with hierarchical structure
  */
 
 import React, { useState, useEffect } from 'react';
+import { Plus, Tag, Folder, Package } from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,15 +17,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  CategoryHierarchy, 
+import {
+  CategoryHierarchy,
   CategoryCreationRequest,
   dynamicCategoryManagementService,
   getProductCategories,
   getMaterialCategories,
-  getCategoriesHierarchy
+  getCategoriesHierarchy,
 } from '@/services/dynamicCategoryManagementService';
-import { Plus, Tag, Folder, Package } from 'lucide-react';
 
 interface DynamicCategoryManagerProps {
   onCategorySelect?: (category: CategoryHierarchy) => void;
@@ -34,7 +35,7 @@ interface DynamicCategoryManagerProps {
 export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
   onCategorySelect,
   showCreateButton = true,
-  mode = 'view'
+  mode = 'view',
 }) => {
   const { toast } = useToast();
   const [categories, setCategories] = useState<CategoryHierarchy[]>([]);
@@ -51,7 +52,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
     isPrimaryCategory: false,
     aiExtractionEnabled: true,
     aiConfidenceThreshold: 0.7,
-    processingPriority: 1
+    processingPriority: 1,
   });
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
       const [allCategories, products, materials] = await Promise.all([
         getCategoriesHierarchy(),
         getProductCategories(),
-        getMaterialCategories()
+        getMaterialCategories(),
       ]);
 
       setCategories(allCategories);
@@ -75,7 +76,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to load categories',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -87,14 +88,14 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
       toast({
         title: 'Validation Error',
         description: 'Category key, name, and display name are required',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
 
     try {
       const created = await dynamicCategoryManagementService.createCategory(newCategory as CategoryCreationRequest);
-      
+
       if (created) {
         toast({
           title: 'Success',
@@ -109,7 +110,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
           isPrimaryCategory: false,
           aiExtractionEnabled: true,
           aiConfidenceThreshold: 0.7,
-          processingPriority: 1
+          processingPriority: 1,
         });
         await loadCategories();
       } else {
@@ -120,7 +121,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to create category',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
@@ -128,7 +129,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
   const renderCategoryTree = (categories: CategoryHierarchy[], level = 0) => {
     return categories.map((category) => (
       <div key={category.id} className={`ml-${level * 4} mb-2`}>
-        <Card 
+        <Card
           className={`cursor-pointer transition-colors hover:bg-gray-50 ${
             selectedCategory?.id === category.id ? 'ring-2 ring-blue-500' : ''
           }`}
@@ -286,7 +287,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="materials">Materials</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="all" className="space-y-4">
           <Card>
             <CardHeader>

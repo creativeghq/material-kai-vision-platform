@@ -1,6 +1,6 @@
 /**
  * API Error Handler
- * 
+ *
  * Provides standardized error handling for API calls with
  * user-friendly messages and proper error categorization.
  */
@@ -133,7 +133,7 @@ export function handleApiError(error: unknown, context?: string): ApiErrorRespon
  */
 export async function callApi<T>(
   fn: () => Promise<T>,
-  context?: string
+  context?: string,
 ): Promise<ApiResponse<T>> {
   try {
     const data = await fn();

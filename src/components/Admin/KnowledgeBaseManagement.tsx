@@ -33,10 +33,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { KnowledgeBasePDFViewer } from '@/components/PDF/KnowledgeBasePDFViewer';
+
 import { FunctionalPropertySearch, type FunctionalPropertyFilters } from '../Search/FunctionalPropertySearch';
 
 import EmbeddingGenerationPanel from './EmbeddingGenerationPanel';
-import { KnowledgeBasePDFViewer } from '@/components/PDF/KnowledgeBasePDFViewer';
 
 interface KnowledgeEntry {
   id: string;
@@ -96,9 +97,9 @@ const KnowledgeBaseManagement: React.FC = () => {
           payload: {
             document_id: documentId,
             limit: 10,
-            similarity_threshold: 0.7
-          }
-        }
+            similarity_threshold: 0.7,
+          },
+        },
       });
 
       if (response.data?.related_documents) {
@@ -126,9 +127,9 @@ const KnowledgeBaseManagement: React.FC = () => {
             document_id: documentId,
             summary_type: 'comprehensive',
             max_length: 500,
-            include_key_points: true
-          }
-        }
+            include_key_points: true,
+          },
+        },
       });
 
       if (response.data?.summary) {
@@ -139,7 +140,7 @@ const KnowledgeBaseManagement: React.FC = () => {
           .from('enhanced_knowledge_base')
           .update({
             metadata: { summary: response.data.summary },
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', documentId);
 
@@ -169,9 +170,9 @@ const KnowledgeBaseManagement: React.FC = () => {
           payload: {
             document_id: documentId,
             entity_types: ['PERSON', 'ORG', 'MATERIAL', 'LOCATION', 'DATE'],
-            confidence_threshold: 0.8
-          }
-        }
+            confidence_threshold: 0.8,
+          },
+        },
       });
 
       if (response.data?.entities) {
@@ -186,7 +187,7 @@ const KnowledgeBaseManagement: React.FC = () => {
           .update({
             semantic_tags: tags,
             metadata: { extracted_entities: response.data.entities },
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', documentId);
 
@@ -219,9 +220,9 @@ const KnowledgeBaseManagement: React.FC = () => {
             document_ids: selectedDocsForComparison,
             comparison_type: 'comprehensive',
             include_similarities: true,
-            include_differences: true
-          }
-        }
+            include_differences: true,
+          },
+        },
       });
 
       if (response.data) {
@@ -308,7 +309,7 @@ const KnowledgeBaseManagement: React.FC = () => {
       filtered = filtered.filter(entry => {
         const functionalMetadata = (entry.metadata as Record<string, unknown>)?.functional_metadata;
         if (!functionalMetadata) return false;
-        
+
         // Search in functional metadata content
         const metadataString = JSON.stringify(functionalMetadata).toLowerCase();
         return metadataString.includes(query);
@@ -320,7 +321,7 @@ const KnowledgeBaseManagement: React.FC = () => {
     filtered = filtered.filter(entry => {
       const functionalMetadata = (entry.metadata as Record<string, unknown>)?.functional_metadata;
       if (!functionalMetadata) return false;
-      
+
       // Check if entry has data in any of the selected categories
       return functionalPropertyFilters.activeCategories.some(category => {
         const categoryData = (functionalMetadata as Record<string, unknown>)[category];
@@ -584,7 +585,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 onFiltersChange={setFunctionalPropertyFilters}
                 availableMaterials={entries.map(entry => ({
                   id: entry.id,
-                  functionalMetadata: (entry.metadata as any)?.functional_metadata
+                  functionalMetadata: (entry.metadata as any)?.functional_metadata,
                 }))}
                 displayMode="compact"
                 isLoading={loading}

@@ -95,13 +95,13 @@ describe('QualityDashboardService', () => {
     };
 
     (ImageValidationService.getInstance as jest.Mock).mockReturnValue(
-      mockImageValidationService
+      mockImageValidationService,
     );
     (ProductEnrichmentService.getInstance as jest.Mock).mockReturnValue(
-      mockProductEnrichmentService
+      mockProductEnrichmentService,
     );
     (ValidationRulesService.getInstance as jest.Mock).mockReturnValue(
-      mockValidationRulesService
+      mockValidationRulesService,
     );
 
     service = new QualityDashboardService();

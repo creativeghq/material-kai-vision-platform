@@ -40,21 +40,21 @@ export class MaterialRealtimeService {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
       },
       realtime: {
         params: {
           eventsPerSecond: 10,
-          heartbeatIntervalMs: 30000
-        }
-      }
+          heartbeatIntervalMs: 30000,
+        },
+      },
     });
 
     // Set auth token if provided
     if (config.authToken) {
       this.supabase.auth.setSession({
         access_token: config.authToken,
-        refresh_token: ''
+        refresh_token: '',
       });
     }
 
@@ -113,7 +113,7 @@ export class MaterialRealtimeService {
       }
 
       console.log('Material Realtime: Connecting to Supabase Realtime...');
-      
+
       // Remove existing channels
       this.channels.forEach(channel => {
         this.supabase.removeChannel(channel);
@@ -121,7 +121,7 @@ export class MaterialRealtimeService {
       this.channels.clear();
 
       await this.supabase.realtime.connect();
-      
+
     } catch (error) {
       console.error('Material Realtime: Failed to connect:', error);
       this.callbacks.onError?.(error as Error);
@@ -132,7 +132,7 @@ export class MaterialRealtimeService {
   public async disconnect(): Promise<void> {
     try {
       console.log('Material Realtime: Disconnecting...');
-      
+
       // Unsubscribe from all channels
       this.channels.forEach(channel => {
         channel.unsubscribe();
@@ -141,7 +141,7 @@ export class MaterialRealtimeService {
 
       await this.supabase.realtime.disconnect();
       this.isConnected = false;
-      
+
       console.log('Material Realtime: Disconnected successfully');
     } catch (error) {
       console.error('Material Realtime: Error during disconnect:', error);
@@ -159,7 +159,7 @@ export class MaterialRealtimeService {
   // Subscribe to materials catalog changes
   public async subscribeToMaterialCatalogChanges(materialId?: string): Promise<void> {
     const channelName = materialId ? `materials_catalog_${materialId}` : 'materials_catalog_all';
-    
+
     if (this.channels.has(channelName)) {
       console.log(`Material Realtime: Already subscribed to ${channelName}`);
       return;
@@ -174,7 +174,7 @@ export class MaterialRealtimeService {
         event: '*',
         schema: 'public',
         table: 'materials_catalog',
-        ...(materialId && { filter: `id=eq.${materialId}` })
+        ...(materialId && { filter: `id=eq.${materialId}` }),
       },
       (payload: any) => {
         console.log('Material Realtime: Material catalog change:', payload);
@@ -185,11 +185,11 @@ export class MaterialRealtimeService {
           old: payload.old,
           new: payload.new,
           materialId: payload.new?.id || payload.old?.id,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
 
         this.callbacks.onMaterialChange?.(changePayload);
-      }
+      },
     );
 
     subscription.subscribe((status: string) => {
@@ -205,7 +205,7 @@ export class MaterialRealtimeService {
   // Subscribe to material images changes
   public async subscribeToMaterialImagesChanges(materialId?: string): Promise<void> {
     const channelName = materialId ? `material_images_${materialId}` : 'material_images_all';
-    
+
     if (this.channels.has(channelName)) {
       console.log(`Material Realtime: Already subscribed to ${channelName}`);
       return;
@@ -219,7 +219,7 @@ export class MaterialRealtimeService {
         event: '*',
         schema: 'public',
         table: 'material_images',
-        ...(materialId && { filter: `material_id=eq.${materialId}` })
+        ...(materialId && { filter: `material_id=eq.${materialId}` }),
       },
       (payload: any) => {
         console.log('Material Realtime: Material images change:', payload);
@@ -230,11 +230,11 @@ export class MaterialRealtimeService {
           old: payload.old,
           new: payload.new,
           materialId: payload.new?.material_id || payload.old?.material_id,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
 
         this.callbacks.onImageChange?.(changePayload);
-      }
+      },
     ).subscribe((status: string) => {
       console.log(`Material Realtime: Material images subscription status: ${status}`);
       if (status === 'SUBSCRIBED') {
@@ -249,7 +249,7 @@ export class MaterialRealtimeService {
   // Subscribe to material relationships changes
   public async subscribeToMaterialRelationshipChanges(materialId?: string): Promise<void> {
     const channelName = materialId ? `material_relationships_${materialId}` : 'material_relationships_all';
-    
+
     if (this.channels.has(channelName)) {
       console.log(`Material Realtime: Already subscribed to ${channelName}`);
       return;
@@ -257,7 +257,7 @@ export class MaterialRealtimeService {
 
     const channel = this.supabase.channel(channelName);
 
-    const filter = materialId 
+    const filter = materialId
       ? `parent_material_id=eq.${materialId} OR related_material_id=eq.${materialId}`
       : '';
 
@@ -267,7 +267,7 @@ export class MaterialRealtimeService {
         event: '*',
         schema: 'public',
         table: 'material_relationships',
-        ...(filter && { filter })
+        ...(filter && { filter }),
       },
       (payload: any) => {
         console.log('Material Realtime: Material relationships change:', payload);
@@ -278,11 +278,11 @@ export class MaterialRealtimeService {
           old: payload.old,
           new: payload.new,
           materialId: payload.new?.parent_material_id || payload.old?.parent_material_id,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
 
         this.callbacks.onRelationshipChange?.(changePayload);
-      }
+      },
     ).subscribe((status: string) => {
       console.log(`Material Realtime: Material relationships subscription status: ${status}`);
       if (status === 'SUBSCRIBED') {
@@ -300,7 +300,7 @@ export class MaterialRealtimeService {
     await Promise.all([
       this.subscribeToMaterialCatalogChanges(materialId),
       this.subscribeToMaterialImagesChanges(materialId),
-      this.subscribeToMaterialRelationshipChanges(materialId)
+      this.subscribeToMaterialRelationshipChanges(materialId),
     ]);
 
     console.log(`Material Realtime: Comprehensive subscription active for material: ${materialId}`);
@@ -312,7 +312,7 @@ export class MaterialRealtimeService {
       `materials_catalog_${materialId}`,
       `material_images_${materialId}`,
       `material_metafields_${materialId}`,
-      `material_relationships_${materialId}`
+      `material_relationships_${materialId}`,
     ];
 
     channelsToRemove.forEach(channelName => {
@@ -334,7 +334,7 @@ export class MaterialRealtimeService {
     return {
       isConnected: this.isConnected,
       activeChannels: this.channels.size,
-      reconnectAttempts: this.reconnectAttempts
+      reconnectAttempts: this.reconnectAttempts,
     };
   }
 
@@ -387,18 +387,18 @@ export function useMaterialRealtime(
     autoConnect?: boolean;
     subscribeToAll?: boolean;
     materialId?: string;
-  } = {}
+  } = {},
 ) {
   const [service, setService] = useState<MaterialRealtimeService | null>(null);
   const [connectionStatus, setConnectionStatus] = useState({
     isConnected: false,
     activeChannels: 0,
-    reconnectAttempts: 0
+    reconnectAttempts: 0,
   });
 
   useEffect(() => {
     const realtimeService = new MaterialRealtimeService(config);
-    
+
     // Set up callbacks with connection status updates
     realtimeService.setCallbacks({
       ...callbacks,
@@ -413,7 +413,7 @@ export function useMaterialRealtime(
       onError: (error) => {
         setConnectionStatus(realtimeService.getConnectionStatus());
         callbacks.onError?.(error);
-      }
+      },
     });
 
     setService(realtimeService);
@@ -474,7 +474,7 @@ export function useMaterialRealtime(
     disconnect,
     subscribeToMaterial,
     unsubscribeFromMaterial,
-    activeSubscriptions: service?.getActiveSubscriptions() || []
+    activeSubscriptions: service?.getActiveSubscriptions() || [],
   };
 }
 

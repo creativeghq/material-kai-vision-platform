@@ -1,6 +1,6 @@
 /**
  * Health Check Page Component
- * 
+ *
  * Provides a web interface for health and readiness checks
  * Also serves as API endpoints when accessed programmatically
  */
@@ -26,7 +26,7 @@ const HealthPage: React.FC = () => {
         healthCheck(),
         readinessCheck(),
       ]);
-      
+
       setHealthStatus(health);
       setReadinessStatus(readiness);
       setLastChecked(new Date());
@@ -39,7 +39,7 @@ const HealthPage: React.FC = () => {
 
   useEffect(() => {
     runHealthCheck();
-    
+
     // Auto-refresh every 30 seconds
     const interval = setInterval(runHealthCheck, 30000);
     return () => clearInterval(interval);
@@ -75,9 +75,9 @@ const HealthPage: React.FC = () => {
       );
     }
 
-    const variant = status === 'healthy' ? 'default' : 
+    const variant = status === 'healthy' ? 'default' :
                    status === 'degraded' ? 'secondary' : 'destructive';
-    
+
     return (
       <Badge variant={variant}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -120,7 +120,7 @@ const HealthPage: React.FC = () => {
                   <span>Overall Status:</span>
                   {getStatusBadge(healthStatus.status)}
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span>Database:</span>
@@ -129,7 +129,7 @@ const HealthPage: React.FC = () => {
                       <span className="text-sm">{healthStatus.checks.database}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <span>Memory:</span>
                     <div className="flex items-center space-x-2">
@@ -137,7 +137,7 @@ const HealthPage: React.FC = () => {
                       <span className="text-sm">{healthStatus.checks.memory}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <span>Dependencies:</span>
                     <div className="flex items-center space-x-2">
@@ -193,7 +193,7 @@ const HealthPage: React.FC = () => {
                   <span>Ready for Traffic:</span>
                   {getStatusBadge(readinessStatus.ready)}
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span>Database:</span>
@@ -204,7 +204,7 @@ const HealthPage: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <span>Configuration:</span>
                     <div className="flex items-center space-x-2">
@@ -214,7 +214,7 @@ const HealthPage: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <span>Dependencies:</span>
                     <div className="flex items-center space-x-2">

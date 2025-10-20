@@ -36,7 +36,7 @@ export class CommissionService {
    */
   async getCommissions(
     limit: number = 50,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<{
     data: Commission[];
     count: number;
@@ -53,7 +53,7 @@ export class CommissionService {
       >(
         'moodboard-quote-api',
         { limit, offset },
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       return response;
@@ -68,7 +68,7 @@ export class CommissionService {
    */
   calculateCommissionAmount(
     proposalTotal: number,
-    commissionPercentage: number
+    commissionPercentage: number,
   ): number {
     return (proposalTotal * commissionPercentage) / 100;
   }

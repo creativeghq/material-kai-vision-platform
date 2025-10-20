@@ -1,6 +1,6 @@
 /**
  * Quality-Based Ranking Service
- * 
+ *
  * Ranks search results using quality metrics to improve result ordering
  * Combines relevance score with quality metrics for better ranking
  */
@@ -59,7 +59,7 @@ function calculateRecencyScore(createdAt: string): number {
  */
 function calculateRankingScore(
   result: SearchResult,
-  weights: RankingWeights = DEFAULT_WEIGHTS
+  weights: RankingWeights = DEFAULT_WEIGHTS,
 ): number {
   const relevanceScore = result.relevanceScore || 0;
   const semanticScore = result.semanticScore || 0;
@@ -90,7 +90,7 @@ function calculateRankingScore(
  */
 export function rankResultsByQuality(
   results: SearchResult[],
-  weights?: RankingWeights
+  weights?: RankingWeights,
 ): SearchResult[] {
   // Calculate ranking score for each result
   const scoredResults = results.map(result => ({
@@ -111,7 +111,7 @@ export function rankResultsByQuality(
 export function applyQualityBasedRanking(
   results: SearchResult[],
   useQualityRanking: boolean = true,
-  weights?: RankingWeights
+  weights?: RankingWeights,
 ): SearchResult[] {
   if (!useQualityRanking) {
     // Fallback to relevance-based ranking
@@ -135,7 +135,7 @@ export function applyQualityBasedRanking(
  */
 export function getRankingExplanation(
   result: SearchResult,
-  weights: RankingWeights = DEFAULT_WEIGHTS
+  weights: RankingWeights = DEFAULT_WEIGHTS,
 ): string {
   const relevanceScore = result.relevanceScore || 0;
   const semanticScore = result.semanticScore || 0;

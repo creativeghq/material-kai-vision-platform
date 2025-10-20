@@ -5,7 +5,6 @@ import {
   Plus,
   Eye,
   Key,
-  Shield,
   Activity,
   Network,
 
@@ -14,11 +13,8 @@ import {
   XCircle,
   Globe,
   Lock,
-  ArrowLeft,
-  Home,
   Edit,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,11 +29,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey, type RateLimitRule } from '@/services/apiGateway/apiGatewayService';
+
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 
 export const ApiGatewayAdmin: React.FC = () => {
-  const navigate = useNavigate();
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
   const [, setInternalNetworks] = useState<InternalNetwork[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -702,7 +698,7 @@ export const ApiGatewayAdmin: React.FC = () => {
 
         {/* Endpoint Details Modal */}
         <Sheet open={endpointDetailsOpen} onOpenChange={setEndpointDetailsOpen}>
-          <SheetContent className="w-[700px] sm:w-[800px]" side={"right" as const}>
+          <SheetContent className="w-[700px] sm:w-[800px]" side={'right' as const}>
             <SheetHeader>
               <SheetTitle>API Endpoint Details</SheetTitle>
               <SheetDescription>

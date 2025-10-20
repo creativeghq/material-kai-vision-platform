@@ -1,6 +1,6 @@
 /**
  * Comprehensive Error Type System for Material-KAI Vision Platform
- * 
+ *
  * @fileoverview Type-safe error handling system with Result/Option patterns
  * @author TypeScript Specialist
  * @version 1.0.0
@@ -12,7 +12,7 @@
 
 /**
  * Base error interface for all application errors
- * 
+ *
  * @interface BaseError
  * @description Foundation for all error types in the application
  */
@@ -34,7 +34,7 @@ export interface BaseError {
  */
 export enum ErrorDomain {
   VALIDATION = 'VALIDATION',
-  NETWORK = 'NETWORK', 
+  NETWORK = 'NETWORK',
   DATABASE = 'DATABASE',
   AUTHENTICATION = 'AUTHENTICATION',
   AUTHORIZATION = 'AUTHORIZATION',
@@ -89,11 +89,11 @@ export interface MaterialProcessingError extends BaseError {
 
 /**
  * Result type for explicit error handling without exceptions
- * 
+ *
  * @template T - Success value type
  * @template E - Error type
  * @description Functional programming approach to error handling
- * 
+ *
  * @example
  * ```typescript
  * async function fetchMaterial(id: string): Promise<Result<Material, NetworkError>> {
@@ -118,10 +118,10 @@ export type Result<T, E extends BaseError = BaseError> =
 
 /**
  * Option type for nullable value handling
- * 
+ *
  * @template T - Value type
  * @description Type-safe nullable values without null/undefined
- * 
+ *
  * @example
  * ```typescript
  * function findMaterial(query: string): Option<Material> {
@@ -130,7 +130,7 @@ export type Result<T, E extends BaseError = BaseError> =
  * }
  * ```
  */
-export type Option<T> = 
+export type Option<T> =
   | { some: true; value: T }
   | { some: false };
 
@@ -140,7 +140,7 @@ export type Option<T> =
 
 /**
  * Creates a successful Result
- * 
+ *
  * @param value - Success value
  * @returns Success Result
  */
@@ -150,7 +150,7 @@ export function ok<T>(value: T): Result<T, never> {
 
 /**
  * Creates a failed Result
- * 
+ *
  * @param error - Error information
  * @returns Error Result
  */
@@ -160,24 +160,24 @@ export function err<E extends BaseError>(error: E): Result<never, E> {
 
 /**
  * Type guard for successful Result
- * 
+ *
  * @param result - Result to check
  * @returns True if Result is successful
  */
 export function isOk<T, E extends BaseError>(
-  result: Result<T, E>
+  result: Result<T, E>,
 ): result is { ok: true; value: T } {
   return result.ok;
 }
 
 /**
  * Type guard for failed Result
- * 
+ *
  * @param result - Result to check
  * @returns True if Result is an error
  */
 export function isErr<T, E extends BaseError>(
-  result: Result<T, E>
+  result: Result<T, E>,
 ): result is { ok: false; error: E } {
   return !result.ok;
 }
@@ -188,7 +188,7 @@ export function isErr<T, E extends BaseError>(
 
 /**
  * Creates an Option with a value
- * 
+ *
  * @param value - Value to wrap
  * @returns Option with value
  */
@@ -198,7 +198,7 @@ export function some<T>(value: T): Option<T> {
 
 /**
  * Creates an empty Option
- * 
+ *
  * @returns Empty Option
  */
 export function none<T>(): Option<T> {
@@ -207,7 +207,7 @@ export function none<T>(): Option<T> {
 
 /**
  * Type guard for Option with value
- * 
+ *
  * @param option - Option to check
  * @returns True if Option has value
  */
@@ -217,7 +217,7 @@ export function isSome<T>(option: Option<T>): option is { some: true; value: T }
 
 /**
  * Type guard for empty Option
- * 
+ *
  * @param option - Option to check
  * @returns True if Option is empty
  */
@@ -231,7 +231,7 @@ export function isNone<T>(option: Option<T>): option is { some: false } {
 
 /**
  * Creates a validation error
- * 
+ *
  * @param message - Error message
  * @param field - Field that failed validation
  * @param expectedType - Expected type
@@ -242,7 +242,7 @@ export function createValidationError(
   message: string,
   field?: string,
   expectedType?: string,
-  actualValue?: unknown
+  actualValue?: unknown,
 ): ValidationError {
   return {
     domain: ErrorDomain.VALIDATION,
@@ -252,13 +252,13 @@ export function createValidationError(
     expectedType,
     actualValue,
     timestamp: new Date().toISOString(),
-    recoverable: true
+    recoverable: true,
   };
 }
 
 /**
  * Creates a network error
- * 
+ *
  * @param message - Error message
  * @param statusCode - HTTP status code
  * @param endpoint - Failed endpoint
@@ -267,7 +267,7 @@ export function createValidationError(
 export function createNetworkError(
   message: string,
   statusCode?: number,
-  endpoint?: string
+  endpoint?: string,
 ): NetworkError {
   return {
     domain: ErrorDomain.NETWORK,
@@ -277,13 +277,13 @@ export function createNetworkError(
     endpoint,
     retryable: statusCode ? statusCode >= 500 : true,
     timestamp: new Date().toISOString(),
-    recoverable: true
+    recoverable: true,
   };
 }
 
 /**
  * Creates a material processing error
- * 
+ *
  * @param message - Error message
  * @param materialId - ID of material being processed
  * @param processingStage - Stage where error occurred
@@ -292,7 +292,7 @@ export function createNetworkError(
 export function createMaterialProcessingError(
   message: string,
   materialId?: string,
-  processingStage?: string
+  processingStage?: string,
 ): MaterialProcessingError {
   return {
     domain: ErrorDomain.MATERIAL_PROCESSING,
@@ -301,7 +301,7 @@ export function createMaterialProcessingError(
     materialId,
     processingStage,
     timestamp: new Date().toISOString(),
-    recoverable: true
+    recoverable: true,
   };
 }
 
@@ -311,35 +311,35 @@ export function createMaterialProcessingError(
 
 /**
  * Maps a successful Result to a new type
- * 
+ *
  * @param result - Input Result
  * @param fn - Transformation function
  * @returns Transformed Result
  */
 export function mapResult<T, U, E extends BaseError>(
   result: Result<T, E>,
-  fn: (value: T) => U
+  fn: (value: T) => U,
 ): Result<U, E> {
   return isOk(result) ? ok(fn(result.value)) : result;
 }
 
 /**
  * Chains Result operations
- * 
+ *
  * @param result - Input Result
  * @param fn - Function that returns Result
  * @returns Chained Result
  */
 export function flatMapResult<T, U, E extends BaseError>(
   result: Result<T, E>,
-  fn: (value: T) => Result<U, E>
+  fn: (value: T) => Result<U, E>,
 ): Result<U, E> {
   return isOk(result) ? fn(result.value) : result;
 }
 
 /**
  * Unwraps Result value or throws error
- * 
+ *
  * @param result - Result to unwrap
  * @returns Unwrapped value
  * @throws Error if Result is failure
@@ -353,14 +353,14 @@ export function unwrapResult<T, E extends BaseError>(result: Result<T, E>): T {
 
 /**
  * Unwraps Result value or returns default
- * 
+ *
  * @param result - Result to unwrap
  * @param defaultValue - Default value if Result is failure
  * @returns Value or default
  */
 export function unwrapOr<T, E extends BaseError>(
   result: Result<T, E>,
-  defaultValue: T
+  defaultValue: T,
 ): T {
   return isOk(result) ? result.value : defaultValue;
 }

@@ -1,6 +1,6 @@
 /**
  * Centralized Caching Service
- * 
+ *
  * Provides a unified interface for all caching operations across the application.
  * Supports multiple cache strategies and automatic cache invalidation.
  */
@@ -117,13 +117,13 @@ export class CacheService {
   has(key: string): boolean {
     const entry = this.cache.get(key);
     if (!entry) return false;
-    
+
     if (this.isExpired(entry)) {
       this.cache.delete(key);
       this.removeFromAccessOrder(key);
       return false;
     }
-    
+
     return true;
   }
 
@@ -178,7 +178,7 @@ export class CacheService {
   async getOrSet<T>(
     key: string,
     fetcher: () => Promise<T>,
-    ttl?: number
+    ttl?: number,
   ): Promise<T> {
     const cached = this.get<T>(key);
     if (cached !== null) {
@@ -283,8 +283,8 @@ export class CacheService {
    * Update hit rate metric
    */
   private updateHitRate(): void {
-    this.metrics.hitRate = this.metrics.totalRequests > 0 
-      ? this.metrics.hits / this.metrics.totalRequests 
+    this.metrics.hitRate = this.metrics.totalRequests > 0
+      ? this.metrics.hits / this.metrics.totalRequests
       : 0;
   }
 

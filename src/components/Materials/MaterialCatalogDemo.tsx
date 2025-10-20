@@ -1,11 +1,13 @@
 import React from 'react';
+import { CheckCircle, AlertTriangle, Info } from 'lucide-react';
+
 import { Material } from '@/types/materials';
-import { MaterialCatalogListing } from './MaterialCatalogListing';
 import { MaterialValidation } from '@/utils/materialValidation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, AlertTriangle, Info } from 'lucide-react';
+
+import { MaterialCatalogListing } from './MaterialCatalogListing';
 
 /**
  * Sample materials data that demonstrates the full type system with extracted meta fields
@@ -182,7 +184,7 @@ export const MaterialCatalogDemo: React.FC = () => {
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold">Material Catalog Demo</h1>
         <p className="text-muted-foreground">
-          Demonstrating the full material catalog system with AI-extracted meta fields, 
+          Demonstrating the full material catalog system with AI-extracted meta fields,
           validation, filtering, and search capabilities.
         </p>
       </div>
@@ -262,7 +264,7 @@ export const MaterialCatalogDemo: React.FC = () => {
             <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
-                All sample materials passed validation successfully! 
+                All sample materials passed validation successfully!
                 The type system and validation utilities are working correctly.
               </AlertDescription>
             </Alert>
@@ -384,21 +386,21 @@ export const MaterialCatalogDemo: React.FC = () => {
           <div>
             <h4 className="font-semibold mb-2">2. Search Materials</h4>
             <p className="text-sm text-muted-foreground">
-              Use the search field to find materials by name, description, or standards. 
+              Use the search field to find materials by name, description, or standards.
               The search is intelligent and searches across all material properties.
             </p>
           </div>
           <div>
             <h4 className="font-semibold mb-2">3. View Details</h4>
             <p className="text-sm text-muted-foreground">
-              Click the info (i) button on any material card to expand and see detailed 
+              Click the info (i) button on any material card to expand and see detailed
               properties, meta fields, physical characteristics, and standards.
             </p>
           </div>
           <div>
             <h4 className="font-semibold mb-2">4. Switch View Modes</h4>
             <p className="text-sm text-muted-foreground">
-              Toggle between grid and list view modes using the view controls. 
+              Toggle between grid and list view modes using the view controls.
               Grid mode shows more materials at once, list mode shows more details.
             </p>
           </div>

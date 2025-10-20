@@ -66,7 +66,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
       dataWithPrompt.prompt &&
       typeof dataWithPrompt.prompt === 'string' &&
       !dataWithPrompt.prompt.includes('[NO_IMAGE]') &&
-      dataWithPrompt.prompt !== '[NO_IMAGE]'
+      dataWithPrompt.prompt !== '[NO_IMAGE]',
     );
 
     setHasReferenceImage(hasRefImage);
@@ -160,7 +160,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(
           process.env.SUPABASE_URL!,
-          process.env.SUPABASE_ANON_KEY!
+          process.env.SUPABASE_ANON_KEY!,
         );
 
         const { data, error } = await supabase
@@ -236,7 +236,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           if (mappedStatus === 'completed') {
             mappedStatus = 'success';
           }
-          
+
           const currentStep = updatedSteps[stepIndex];
           if (currentStep) {
             updatedSteps[stepIndex] = {
@@ -346,7 +346,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
       setIsPaused(false);
       setApiResponse(null);
       setPollingError(null);
-      
+
       // Initialize steps immediately to prevent flashing
       const hasRefImage = Boolean(generationData &&
         typeof generationData === 'object' &&

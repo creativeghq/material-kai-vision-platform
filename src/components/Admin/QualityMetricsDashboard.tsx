@@ -1,17 +1,18 @@
 /**
  * Quality Metrics Dashboard
- * 
+ *
  * Displays retrieval and response quality metrics collected from search and LLM operations
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AlertTriangle } from 'lucide-react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { AlertTriangle } from 'lucide-react';
 
 // Type assertions for recharts components
 const RechartResponsiveContainer = ResponsiveContainer as any;

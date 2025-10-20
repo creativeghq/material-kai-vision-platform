@@ -2,8 +2,9 @@
  * Validation Rules Service Tests
  */
 
-import { ValidationRulesService } from '../ValidationRulesService';
 import { ValidationRuleRequest } from '@/types/validation-rules';
+
+import { ValidationRulesService } from '../ValidationRulesService';
 
 // Mock Supabase
 jest.mock('@/integrations/supabase/client', () => {

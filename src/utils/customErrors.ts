@@ -14,7 +14,7 @@ export abstract class MaterialKAIError extends Error {
   constructor(
     message: string,
     code: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -38,7 +38,7 @@ export abstract class MaterialKAIError extends Error {
       code: this.code,
       timestamp: this.timestamp,
       context: this.context,
-      stack: this.stack
+      stack: this.stack,
     };
   }
 }
@@ -56,7 +56,7 @@ export class ValidationError extends MaterialKAIError {
     field?: string,
     value?: unknown,
     expectedType?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, 'VALIDATION_ERROR', context);
     this.field = field;
@@ -67,13 +67,13 @@ export class ValidationError extends MaterialKAIError {
   static forInvalidType(
     field: string,
     value: unknown,
-    expectedType: string
+    expectedType: string,
   ): ValidationError {
     return new ValidationError(
       `Invalid type for field '${field}'. Expected ${expectedType}, got ${typeof value}`,
       field,
       value,
-      expectedType
+      expectedType,
     );
   }
 
@@ -82,20 +82,20 @@ export class ValidationError extends MaterialKAIError {
       `Required field '${field}' is missing`,
       field,
       undefined,
-      'defined value'
+      'defined value',
     );
   }
 
   static forInvalidValue(
     field: string,
     value: unknown,
-    validValues: unknown[]
+    validValues: unknown[],
   ): ValidationError {
     return new ValidationError(
       `Invalid value for field '${field}'. Expected one of: ${validValues.join(', ')}`,
       field,
       value,
-      `one of: ${validValues.join(', ')}`
+      `one of: ${validValues.join(', ')}`,
     );
   }
 }
@@ -113,7 +113,7 @@ export class APIError extends MaterialKAIError {
     statusCode?: number,
     endpoint?: string,
     method?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, 'API_ERROR', context);
     this.statusCode = statusCode;
@@ -125,13 +125,13 @@ export class APIError extends MaterialKAIError {
     endpoint: string,
     method: string,
     statusCode: number,
-    message?: string
+    message?: string,
   ): APIError {
     return new APIError(
       message || `API call failed: ${method} ${endpoint}`,
       statusCode,
       endpoint,
-      method
+      method,
     );
   }
 
@@ -140,7 +140,7 @@ export class APIError extends MaterialKAIError {
       `API call timed out: ${method} ${endpoint}`,
       408,
       endpoint,
-      method
+      method,
     );
   }
 }
@@ -156,7 +156,7 @@ export class ConfigurationError extends MaterialKAIError {
     message: string,
     configKey?: string,
     configValue?: unknown,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, 'CONFIGURATION_ERROR', context);
     this.configKey = configKey;
@@ -167,19 +167,19 @@ export class ConfigurationError extends MaterialKAIError {
     return new ConfigurationError(
       `Missing required configuration: ${key}`,
       key,
-      undefined
+      undefined,
     );
   }
 
   static forInvalidConfig(
     key: string,
     value: unknown,
-    expectedFormat: string
+    expectedFormat: string,
   ): ConfigurationError {
     return new ConfigurationError(
       `Invalid configuration for '${key}'. Expected ${expectedFormat}`,
       key,
-      value
+      value,
     );
   }
 }
@@ -197,7 +197,7 @@ export class MaterialProcessingError extends MaterialKAIError {
     materialId?: string,
     processingStage?: string,
     operationType?: string,
-    context?: Record<string, unknown>
+    context?: Record<string, unknown>,
   ) {
     super(message, 'MATERIAL_PROCESSING_ERROR', context);
     this.materialId = materialId;
@@ -208,26 +208,26 @@ export class MaterialProcessingError extends MaterialKAIError {
   static forAnalysisFailure(
     materialId: string,
     analysisType: string,
-    reason: string
+    reason: string,
   ): MaterialProcessingError {
     return new MaterialProcessingError(
       `Material analysis failed: ${reason}`,
       materialId,
       'analysis',
-      analysisType
+      analysisType,
     );
   }
 
   static forRecognitionFailure(
     reason: string,
-    confidence?: number
+    confidence?: number,
   ): MaterialProcessingError {
     return new MaterialProcessingError(
       `Material recognition failed: ${reason}`,
       undefined,
       'recognition',
       'image_analysis',
-      { confidence }
+      { confidence },
     );
   }
 }
@@ -235,10 +235,10 @@ export class MaterialProcessingError extends MaterialKAIError {
 /**
  * Type discrimination helper for error handling
  */
-export type AppError = 
-  | ValidationError 
-  | APIError 
-  | ConfigurationError 
+export type AppError =
+  | ValidationError
+  | APIError
+  | ConfigurationError
   | MaterialProcessingError;
 
 /**
@@ -296,7 +296,7 @@ export interface ErrorBoundaryProps {
  */
 export function createErrorResponse<T = never>(
   error: AppError,
-  data?: T
+  data?: T,
 ): {
   success: false;
   error: string;
@@ -309,7 +309,7 @@ export function createErrorResponse<T = never>(
     error: error.message,
     code: error.code,
     timestamp: error.timestamp,
-    data
+    data,
   };
 }
 
@@ -318,7 +318,7 @@ export function createErrorResponse<T = never>(
  */
 export function createSuccessResponse<T>(
   data: T,
-  message?: string
+  message?: string,
 ): {
   success: true;
   data: T;
@@ -329,6 +329,6 @@ export function createSuccessResponse<T>(
     success: true,
     data,
     message,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 }

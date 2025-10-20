@@ -61,7 +61,7 @@ class DynamicMaterialCategoriesService {
   private supabaseUrl: string;
   private supabaseKey: string;
   private baseUrl: string;
-  
+
   // In-memory cache
   private categoriesCache: MaterialCategory[] | null = null;
   private propertiesCache: MaterialProperty[] | null = null;
@@ -84,20 +84,20 @@ class DynamicMaterialCategoriesService {
   }
 
   private isCacheValid(): boolean {
-    return this.cacheTimestamp !== null && 
+    return this.cacheTimestamp !== null &&
            (Date.now() - this.cacheTimestamp) < this.CACHE_DURATION;
   }
 
   private async makeRequest(endpoint: string = ''): Promise<DynamicCategoriesResponse> {
     const url = endpoint ? `${this.baseUrl}/${endpoint}` : this.baseUrl;
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.supabaseKey}`,
-        'apikey': this.supabaseKey
-      }
+        'apikey': this.supabaseKey,
+      },
     });
 
     if (!response.ok) {
@@ -189,7 +189,7 @@ class DynamicMaterialCategoriesService {
     if (this.isCacheValid() && this.categoriesCache && this.propertiesCache) {
       return {
         categories: this.categoriesCache,
-        properties: this.propertiesCache
+        properties: this.propertiesCache,
       };
     }
 

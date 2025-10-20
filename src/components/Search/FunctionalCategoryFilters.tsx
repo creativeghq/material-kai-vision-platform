@@ -36,7 +36,7 @@ export const FunctionalCategoryFilters = ({
   const updatePropertyFilter = useCallback((
     categoryKey: string,
     propertyKey: string,
-    value: unknown
+    value: unknown,
   ) => {
     const newFilters = {
       ...filters,
@@ -61,7 +61,7 @@ export const FunctionalCategoryFilters = ({
               <Shield className="h-4 w-4 text-red-600" />
               <Label className="font-medium">🦶 Slip/Safety Ratings</Label>
             </div>
-            
+
             {/* R-Value Selection */}
             <div className="space-y-2">
               <Label className="text-sm">R-Value (DIN 51130)</Label>
@@ -181,7 +181,7 @@ export const FunctionalCategoryFilters = ({
               <Star className="h-4 w-4 text-yellow-600" />
               <Label className="font-medium">✨ Surface Gloss/Reflectivity</Label>
             </div>
-            
+
             {/* Gloss Level Selection */}
             <div className="space-y-2">
               <Label className="text-sm">Gloss Level</Label>
@@ -234,7 +234,7 @@ export const FunctionalCategoryFilters = ({
               <Hammer className="h-4 w-4 text-blue-600" />
               <Label className="font-medium">🔧 Mechanical Properties</Label>
             </div>
-            
+
             {/* Mohs Hardness Range */}
             <div className="space-y-2">
               <Label className="text-sm">Mohs Hardness (1-10)</Label>
@@ -287,7 +287,7 @@ export const FunctionalCategoryFilters = ({
               <Thermometer className="h-4 w-4 text-orange-600" />
               <Label className="font-medium">🌡️ Thermal Properties</Label>
             </div>
-            
+
             {/* Thermal Conductivity Range */}
             <div className="space-y-2">
               <Label className="text-sm">Thermal Conductivity Range (W/mK)</Label>
@@ -345,7 +345,7 @@ export const FunctionalCategoryFilters = ({
               <Droplets className="h-4 w-4 text-cyan-600" />
               <Label className="font-medium">💧 Water/Moisture Resistance</Label>
             </div>
-            
+
             {/* Water Absorption Range */}
             <div className="space-y-2">
               <Label className="text-sm">Water Absorption Range (%)</Label>
@@ -394,7 +394,7 @@ export const FunctionalCategoryFilters = ({
               <Shield className="h-4 w-4 text-purple-600" />
               <Label className="font-medium">🧪 Chemical/Hygiene Resistance</Label>
             </div>
-            
+
             {/* Acid Resistance */}
             <div className="space-y-2">
               <Label className="text-sm">Acid Resistance Level</Label>
@@ -486,7 +486,7 @@ export const FunctionalCategoryFilters = ({
               <Waves className="h-4 w-4 text-indigo-600" />
               <Label className="font-medium">🔊 Acoustic/Electrical Properties</Label>
             </div>
-            
+
             {/* NRC Range */}
             <div className="space-y-2">
               <Label className="text-sm">Noise Reduction Coefficient (NRC)</Label>
@@ -535,7 +535,7 @@ export const FunctionalCategoryFilters = ({
               <Leaf className="h-4 w-4 text-green-600" />
               <Label className="font-medium">🌱 Environmental/Sustainability</Label>
             </div>
-            
+
             {/* Greenguard Level */}
             <div className="space-y-2">
               <Label className="text-sm">Greenguard Certification</Label>
@@ -607,7 +607,7 @@ export const FunctionalCategoryFilters = ({
               <Palette className="h-4 w-4 text-pink-600" />
               <Label className="font-medium">📏 Dimensional/Aesthetic</Label>
             </div>
-            
+
             {/* Rectified Edges */}
             <div className="flex items-center space-x-2">
               <Checkbox

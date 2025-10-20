@@ -10,7 +10,7 @@ import {
   UnifiedEmbeddingConfig,
   EmbeddingValidator,
   EmbeddingCacheKey,
-  textPreprocessor
+  textPreprocessor,
 } from '../config/embeddingConfig';
 
 /**
@@ -165,7 +165,7 @@ export class EmbeddingGenerationService extends EventEmitter {
     this.config = {
       ...config,
       // Ensure we have the unified embedding config
-      embedding: config.embedding || DEFAULT_EMBEDDING_CONFIG
+      embedding: config.embedding || DEFAULT_EMBEDDING_CONFIG,
     };
     this.logger = logger;
 
@@ -208,7 +208,7 @@ export class EmbeddingGenerationService extends EventEmitter {
       const cacheKey = EmbeddingCacheKey.generate(
         preprocessedText,
         this.config.embedding.primary.name,
-        this.config.embedding.caching.keyStrategy
+        this.config.embedding.caching.keyStrategy,
       );
 
       // Check cache first
@@ -256,7 +256,7 @@ export class EmbeddingGenerationService extends EventEmitter {
       // Validate and normalize embedding
       const embeddingValidation = EmbeddingValidator.validateEmbedding(
         result.data[0].embedding,
-        this.config.embedding.primary
+        this.config.embedding.primary,
       );
 
       if (!embeddingValidation.valid) {
@@ -275,7 +275,7 @@ export class EmbeddingGenerationService extends EventEmitter {
           dimensions: finalEmbedding.length,
           model: result.model,
           usage: result.usage,
-          normalized: embeddingValidation.normalized !== undefined
+          normalized: embeddingValidation.normalized !== undefined,
         } as any);
       }
 

@@ -5,7 +5,6 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { BaseService } from './base/BaseService';
 import {
   ChunkClassification,
   ChunkBoundary,
@@ -14,6 +13,8 @@ import {
   BoundaryType,
   ValidationStatus,
 } from '@/types/chunk-analysis';
+
+import { BaseService } from './base/BaseService';
 
 export interface EnhancedSearchResult {
   chunkId: string;
@@ -105,7 +106,7 @@ export class ChunkSearchEnhancementService extends BaseService {
             content_quality_score,
             boundary_quality_score
           )
-        `
+        `,
         )
         .eq('workspace_id', request.workspaceId)
         .textSearch('content', request.query);
@@ -166,7 +167,7 @@ export class ChunkSearchEnhancementService extends BaseService {
   async getChunksByContentType(
     workspaceId: string,
     contentType: ContentType,
-    limit = 20
+    limit = 20,
   ): Promise<EnhancedSearchResult[]> {
     try {
       const { data, error } = await supabase
@@ -188,7 +189,7 @@ export class ChunkSearchEnhancementService extends BaseService {
               validation_status
             )
           )
-        `
+        `,
         )
         .eq('workspace_id', workspaceId)
         .eq('content_type', contentType)
@@ -247,7 +248,7 @@ export class ChunkSearchEnhancementService extends BaseService {
               boundary_score
             )
           )
-        `
+        `,
         )
         .eq('workspace_id', workspaceId)
         .eq('validation_status', 'needs_review')

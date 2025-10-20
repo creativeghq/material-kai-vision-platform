@@ -200,7 +200,7 @@ export function validateMaterial(material: Partial<Material>): ValidationResult 
  */
 export function validateMaterialMetadata(
   metadata: MaterialMetadata,
-  category: MaterialCategory
+  category: MaterialCategory,
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
@@ -415,7 +415,7 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
  */
 export function validateExtractedAIData(
   extractedData: Record<string, unknown>,
-  expectedCategory?: MaterialCategory
+  expectedCategory?: MaterialCategory,
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
@@ -509,7 +509,7 @@ export function validateExtractedAIData(
  */
 export function validateExtractedMetaFields(
   extractedMeta: Record<string, unknown>,
-  category?: MaterialCategory
+  category?: MaterialCategory,
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
@@ -618,7 +618,7 @@ export function validateExtractedMetaFields(
  * Validate and suggest corrections for material data
  */
 export function validateAndSuggestCorrections(
-  material: Partial<Material>
+  material: Partial<Material>,
 ): ValidationResult & { suggestions: string[] } {
   const validation = validateMaterial(material);
   const suggestions: string[] = [];
@@ -677,7 +677,7 @@ export function validateMaterialBatch(materials: Partial<Material>[]): {
   };
 } {
   const individualResults = materials.map(material => validateMaterial(material));
-  
+
   const allErrors = individualResults.flatMap(result => result.errors);
   const allWarnings = individualResults.flatMap(result => result.warnings);
 
@@ -717,7 +717,7 @@ function validateR11Format(r11: string): boolean {
     /^R[-\s]?\d+(\.\d+)?$/i,    // R-2.5, R 2.5
     /^\d+(\.\d+)?$/,            // 2.5
   ];
-  
+
   return r11Patterns.some(pattern => pattern.test(r11.trim()));
 }
 
@@ -726,20 +726,20 @@ function validateR11Format(r11: string): boolean {
  */
 export function checkExtractionCompleteness(
   extractedData: Record<string, unknown>,
-  expectedFields: string[] = ['finish', 'size', 'installation_method', 'application']
+  expectedFields: string[] = ['finish', 'size', 'installation_method', 'application'],
 ): {
   completeness: number;
   missingFields: string[];
   presentFields: string[];
 } {
   const extractedMeta = (extractedData.processing_metadata as any)?.extracted_meta || {};
-  const presentFields = expectedFields.filter(field => 
-    extractedMeta[field] && 
-    extractedMeta[field] !== '' && 
+  const presentFields = expectedFields.filter(field =>
+    extractedMeta[field] &&
+    extractedMeta[field] !== '' &&
     extractedMeta[field] !== null &&
-    extractedMeta[field] !== undefined
+    extractedMeta[field] !== undefined,
   );
-  
+
   const missingFields = expectedFields.filter(field => !presentFields.includes(field));
   const completeness = presentFields.length / expectedFields.length;
 
@@ -763,7 +763,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
   // Normalize extracted meta fields
   if (sanitized.processing_metadata?.extracted_meta) {
     const meta = sanitized.processing_metadata.extracted_meta;
-    
+
     // Normalize finish
     if (meta.finish && typeof meta.finish === 'string') {
       const normalized = meta.finish.toLowerCase().trim();
@@ -815,7 +815,7 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
         .filter((type: unknown): type is string => typeof type === 'string')
         .map((type: string) => type.trim().toLowerCase())
         .filter((type: string) => type.length > 0);
-      
+
       if (JSON.stringify(normalized) !== JSON.stringify(meta.metal_types)) {
         meta.metal_types = normalized;
         changes.push(`Normalized metal types: ${JSON.stringify((rawData.processing_metadata as any)?.extracted_meta?.metal_types)} → ${JSON.stringify(normalized)}`);
@@ -834,14 +834,14 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
  */
 function normalizeR11Rating(r11: string): string {
   const trimmed = r11.trim();
-  
+
   // Extract numeric value
   const numericMatch = trimmed.match(/(\d+(?:\.\d+)?)/);
   if (numericMatch) {
     const value = numericMatch[1];
     return `R11-${value}`;
   }
-  
+
   return trimmed;
 }
 
@@ -855,11 +855,11 @@ export function createMaterialFromExtractedData(
     name: string;
     createdBy?: string;
     imageUrl?: string;
-  }
+  },
 ): Partial<Material> {
   const { sanitized } = sanitizeExtractedData(extractedData);
   const now = new Date().toISOString();
-  
+
   const material: Partial<Material> = {
     id: additionalInfo.id,
     name: additionalInfo.name,

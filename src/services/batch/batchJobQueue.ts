@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { performance } from 'perf_hooks';
 import { createHash } from 'crypto';
+
 import { supabase } from '../../integrations/supabase/client';
 
 /**

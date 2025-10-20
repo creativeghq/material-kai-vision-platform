@@ -1,6 +1,6 @@
 /**
  * Entity Relationship Service
- * 
+ *
  * Manages relationships between:
  * - Chunks and Products
  * - Chunks and Images
@@ -22,7 +22,7 @@ export class EntityRelationshipService {
     chunkId: string,
     productId: string,
     relationshipType: 'source' | 'related' | 'component' | 'alternative' = 'source',
-    relevanceScore: number = 1.0
+    relevanceScore: number = 1.0,
   ): Promise<ChunkProductRelationship> {
     const { data, error } = await supabase
       .from('chunk_product_relationships')
@@ -33,7 +33,7 @@ export class EntityRelationshipService {
           relationship_type: relationshipType,
           relevance_score: relevanceScore,
         },
-        { onConflict: 'chunk_id,product_id' }
+        { onConflict: 'chunk_id,product_id' },
       )
       .select()
       .single();
@@ -49,7 +49,7 @@ export class EntityRelationshipService {
     chunkId: string,
     imageId: string,
     relationshipType: 'illustrates' | 'depicts' | 'related' | 'example' = 'illustrates',
-    relevanceScore: number = 1.0
+    relevanceScore: number = 1.0,
   ): Promise<ChunkImageRelationship> {
     const { data, error } = await supabase
       .from('chunk_image_relationships')
@@ -60,7 +60,7 @@ export class EntityRelationshipService {
           relationship_type: relationshipType,
           relevance_score: relevanceScore,
         },
-        { onConflict: 'chunk_id,image_id' }
+        { onConflict: 'chunk_id,image_id' },
       )
       .select()
       .single();
@@ -76,7 +76,7 @@ export class EntityRelationshipService {
     productId: string,
     imageId: string,
     relationshipType: 'depicts' | 'illustrates' | 'variant' | 'related' = 'depicts',
-    relevanceScore: number = 1.0
+    relevanceScore: number = 1.0,
   ): Promise<ProductImageRelationship> {
     const { data, error } = await supabase
       .from('product_image_relationships')
@@ -87,7 +87,7 @@ export class EntityRelationshipService {
           relationship_type: relationshipType,
           relevance_score: relevanceScore,
         },
-        { onConflict: 'product_id,image_id' }
+        { onConflict: 'product_id,image_id' },
       )
       .select()
       .single();
@@ -271,7 +271,7 @@ export class EntityRelationshipService {
    * Batch link chunks to products
    */
   static async batchLinkChunksToProducts(
-    links: Array<{ chunkId: string; productId: string; relevanceScore?: number }>
+    links: Array<{ chunkId: string; productId: string; relevanceScore?: number }>,
   ): Promise<void> {
     const data = links.map(link => ({
       chunk_id: link.chunkId,
@@ -291,7 +291,7 @@ export class EntityRelationshipService {
    * Batch link chunks to images
    */
   static async batchLinkChunksToImages(
-    links: Array<{ chunkId: string; imageId: string; relevanceScore?: number }>
+    links: Array<{ chunkId: string; imageId: string; relevanceScore?: number }>,
   ): Promise<void> {
     const data = links.map(link => ({
       chunk_id: link.chunkId,
@@ -311,7 +311,7 @@ export class EntityRelationshipService {
    * Batch link products to images
    */
   static async batchLinkProductsToImages(
-    links: Array<{ productId: string; imageId: string; relevanceScore?: number }>
+    links: Array<{ productId: string; imageId: string; relevanceScore?: number }>,
   ): Promise<void> {
     const data = links.map(link => ({
       product_id: link.productId,

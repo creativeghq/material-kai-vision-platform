@@ -4,12 +4,12 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import type {
+  MaterialApiResponse,
+} from '@/types/unified-material-api';
 
 import { BaseService, ServiceConfig } from '../base/BaseService';
 // Import standardized API response types
-import type {
-  MaterialApiResponse
-} from '@/types/unified-material-api';
 
 export interface MaterialPropertiesServiceConfig extends ServiceConfig {
   defaultAnalysisType: 'thermal' | 'mechanical' | 'chemical' | 'optical' | 'comprehensive';

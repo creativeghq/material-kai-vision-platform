@@ -76,7 +76,7 @@ export const AdminPanel: React.FC = () => {
       const filteredData = Array.isArray(data)
         ? data.filter((item: unknown) =>
             item && typeof item === 'object' && 'created_at' in item &&
-            (item as Record<string, unknown>).created_at !== null
+            (item as Record<string, unknown>).created_at !== null,
           ) as AnalyticsEvent[]
         : [] as AnalyticsEvent[];
       setAnalyticsData(filteredData);

@@ -1,6 +1,6 @@
 /**
  * Unified Material API Type Definitions
- * 
+ *
  * This module provides comprehensive TypeScript type definitions for the unified material API,
  * building upon the excellent foundation in materials.ts to add API-specific types for
  * Edge Functions, request/response patterns, and validation schemas.
@@ -811,7 +811,7 @@ export interface ValidationSchema {
  * Type guard to check if a response is successful
  */
 export function isSuccessfulResponse<T>(
-  response: MaterialApiResponse<T>
+  response: MaterialApiResponse<T>,
 ): response is MaterialApiResponse<T> & { success: true; data: T } {
   return response.success && response.data !== undefined;
 }
@@ -820,7 +820,7 @@ export function isSuccessfulResponse<T>(
  * Type guard to check if a search result is a material
  */
 export function isMaterialSearchResult(
-  result: UnifiedSearchResult
+  result: UnifiedSearchResult,
 ): result is UnifiedSearchResult & { type: 'material'; data: Material } {
   return result.type === 'material';
 }
@@ -829,7 +829,7 @@ export function isMaterialSearchResult(
  * Type guard to check if a search result is a metafield
  */
 export function isMetafieldSearchResult(
-  result: UnifiedSearchResult
+  result: UnifiedSearchResult,
 ): result is UnifiedSearchResult & { type: 'metafield'; data: MaterialMetafieldDefinition } {
   return result.type === 'metafield';
 }
@@ -838,7 +838,7 @@ export function isMetafieldSearchResult(
  * Type guard to check if a search result is an image
  */
 export function isImageSearchResult(
-  result: UnifiedSearchResult
+  result: UnifiedSearchResult,
 ): result is UnifiedSearchResult & { type: 'image'; data: MaterialImage } {
   return result.type === 'image';
 }
@@ -847,7 +847,7 @@ export function isImageSearchResult(
  * Type guard to check if a search result is a relationship
  */
 export function isRelationshipSearchResult(
-  result: UnifiedSearchResult
+  result: UnifiedSearchResult,
 ): result is UnifiedSearchResult & { type: 'relationship'; data: MaterialRelationship } {
   return result.type === 'relationship';
 }

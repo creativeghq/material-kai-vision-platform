@@ -9,9 +9,9 @@ import { performance } from 'perf_hooks';
 import { supabase } from '@/integrations/supabase/client';
 
 import { AppError } from '../utils/errorHandler';
+import { DEFAULT_EMBEDDING_CONFIG } from '../config/embeddingConfig';
 
 import { EmbeddingGenerationService } from './embeddingGenerationService';
-import { DEFAULT_EMBEDDING_CONFIG } from '../config/embeddingConfig';
 import { unifiedTextPreprocessor } from './textPreprocessor';
 
 /**

@@ -1,17 +1,18 @@
 /**
  * Test page for PDF Image Gallery component
- * 
+ *
  * This page demonstrates the image gallery functionality
  * and can be used for testing and development
  */
 
 import React, { useState } from 'react';
+import { ImageIcon, TestTube } from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PDFImageGallery } from '@/components/PDF/PDFImageGallery';
-import { ImageIcon, TestTube } from 'lucide-react';
 
 const TestImageGallery: React.FC = () => {
   const [documentId, setDocumentId] = useState('');
@@ -20,8 +21,8 @@ const TestImageGallery: React.FC = () => {
   // Sample document IDs for testing (these would be real document IDs from your database)
   const sampleDocumentIds = [
     'sample-doc-1',
-    'sample-doc-2', 
-    'sample-doc-3'
+    'sample-doc-2',
+    'sample-doc-3',
   ];
 
   const handleTestGallery = () => {
@@ -82,8 +83,8 @@ const TestImageGallery: React.FC = () => {
             <Button onClick={handleTestGallery} disabled={!documentId.trim()}>
               Load Image Gallery
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setShowGallery(false);
                 setDocumentId('');
@@ -143,7 +144,7 @@ const TestImageGallery: React.FC = () => {
                 <li>• Hover effects and transitions</li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="font-semibold mb-2">Functionality</h3>
               <ul className="text-sm space-y-1 text-gray-600">
@@ -193,7 +194,7 @@ const TestImageGallery: React.FC = () => {
             <div>
               <h4 className="font-medium mb-2">1. Testing with Real Data</h4>
               <p className="text-gray-600">
-                To test with real data, process a PDF document through the PDF Processing page. 
+                To test with real data, process a PDF document through the PDF Processing page.
                 After processing completes, use the job ID as the document ID in this test page.
               </p>
             </div>

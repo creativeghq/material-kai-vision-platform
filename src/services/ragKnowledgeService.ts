@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { RAGSearchRequest, RAGSearchResult, RAGResponse } from '../types/rag';
 
 // RAG interfaces moved to src/types/rag.ts for unified usage across the application

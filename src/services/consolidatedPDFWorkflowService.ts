@@ -1,11 +1,13 @@
 
 import { supabase } from '../integrations/supabase/client';
+
 import { categoryExtractionService, updateDocumentCategories } from './categoryExtractionService';
 import { dynamicCategoryManagementService } from './dynamicCategoryManagementService';
 import { pdfProcessingWebSocketService } from './realtime/PDFProcessingWebSocketService';
 import { chunkQualityService } from './chunkQualityService';
 import { MetafieldService } from './metafieldService';
 import { EntityRelationshipService } from './entityRelationshipService';
+import { fallbackEmbeddingService } from './fallbackEmbeddingService';
 
 
 // Define interfaces locally to avoid importing from React components
@@ -329,7 +331,7 @@ export class ConsolidatedPDFWorkflowService {
           details: [
             this.createSuccessDetail(`Authenticated user: ${user.email}`),
             this.createSuccessDetail(`User ID: ${user.id}`),
-            this.createSuccessDetail('Authentication verified successfully')
+            this.createSuccessDetail('Authentication verified successfully'),
           ],
           metadata: { userId: user.id, email: user.email },
         };
@@ -393,7 +395,7 @@ export class ConsolidatedPDFWorkflowService {
           progress: 10,
           details: [
             this.createInfoDetail('Initializing MIVAA processing...'),
-            this.createInfoDetail('Preparing document for analysis')
+            this.createInfoDetail('Preparing document for analysis'),
           ],
         });
 
@@ -458,7 +460,7 @@ export class ConsolidatedPDFWorkflowService {
               this.createInfoDetail('Initializing MIVAA processing...'),
               this.createInfoDetail('Preparing document for analysis'),
               this.createInfoDetail('Sending document to MIVAA service...'),
-              this.createErrorDetail(`MIVAA processing failed: ${errorMessage}`, `Error Code: ${errorCode}\nMessage: ${errorMessage}`)
+              this.createErrorDetail(`MIVAA processing failed: ${errorMessage}`, `Error Code: ${errorCode}\nMessage: ${errorMessage}`),
             ],
           });
 
@@ -671,7 +673,7 @@ export class ConsolidatedPDFWorkflowService {
           mivaaData,
           uploadData,
           file,
-          jobId
+          jobId,
         );
 
         // Store document ID in job metadata for image gallery access
@@ -813,7 +815,7 @@ export class ConsolidatedPDFWorkflowService {
                 image_ids: images.map((img: any) => img.id),
                 workspace_id: user?.id || 'default',
               }),
-            }
+            },
           );
 
           if (!response.ok) {
@@ -896,7 +898,7 @@ export class ConsolidatedPDFWorkflowService {
                 chunk_ids: chunks.map((chunk: any) => chunk.id),
                 workspace_id: user?.id || 'default',
               }),
-            }
+            },
           );
 
           if (!response.ok) {
@@ -948,7 +950,7 @@ export class ConsolidatedPDFWorkflowService {
           details: [
             this.createErrorDetail(
               'Processing timeout: PDF is too large or complex',
-              'This PDF appears to be very large or complex and is taking longer than our processing timeout allows. Try reducing the processing options (disable image extraction, table extraction) or use a smaller PDF.'
+              'This PDF appears to be very large or complex and is taking longer than our processing timeout allows. Try reducing the processing options (disable image extraction, table extraction) or use a smaller PDF.',
             ),
             this.createInfoDetail('💡 Tip: Large signature books and complex documents may need simplified processing'),
             this.createInfoDetail('🔧 Try disabling "Extract Images" and "Extract Tables" for faster processing'),
@@ -984,7 +986,7 @@ export class ConsolidatedPDFWorkflowService {
       // Mark step as running with 0% progress
       this.updateJobStep(jobId, stepId, {
         status: 'running',
-        progress: 0
+        progress: 0,
       });
 
       // Execute the step
@@ -1178,7 +1180,7 @@ export class ConsolidatedPDFWorkflowService {
     mivaaData: any,
     uploadData: any,
     file: File,
-    jobId: string
+    jobId: string,
   ): Promise<{
     documentId: string;
     chunksStored: number;
@@ -1195,7 +1197,7 @@ export class ConsolidatedPDFWorkflowService {
         .insert({
           chunk_id: `job_${jobId}`,
           event: 'storeMivaaResults_start',
-          details: { jobId }
+          details: { jobId },
         });
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -1233,25 +1235,25 @@ export class ConsolidatedPDFWorkflowService {
           // Try to fetch chunks from MIVAA using the fixed endpoint
           console.log(`🔍 Attempting to fetch chunks for document: ${mivaaDocumentId}`);
           const chunksResponse = await this.callMivaaGatewayDirect('get_document_chunks', {
-            document_id: mivaaDocumentId
+            document_id: mivaaDocumentId,
           });
 
-          console.log(`📊 Chunks response:`, {
+          console.log('📊 Chunks response:', {
             success: chunksResponse.success,
             hasData: !!chunksResponse.data,
             dataType: Array.isArray(chunksResponse.data) ? 'array' : typeof chunksResponse.data,
             dataLength: Array.isArray(chunksResponse.data) ? chunksResponse.data.length : 'N/A',
-            error: chunksResponse.error
+            error: chunksResponse.error,
           });
 
           if (chunksResponse.success && chunksResponse.data) {
             chunks = Array.isArray(chunksResponse.data) ? chunksResponse.data : [];
             console.log(`📝 Fetched ${chunks.length} real chunks from MIVAA`);
           } else {
-            console.warn(`Failed to fetch chunks from MIVAA:`, {
+            console.warn('Failed to fetch chunks from MIVAA:', {
               success: chunksResponse.success,
               error: chunksResponse.error,
-              data: chunksResponse.data
+              data: chunksResponse.data,
             });
           }
 
@@ -1259,15 +1261,15 @@ export class ConsolidatedPDFWorkflowService {
           console.log(`🔍 Attempting to fetch images from MIVAA gateway for document: ${mivaaDocumentId}`);
           try {
             const imagesResponse = await this.callMivaaGatewayDirect('get_document_images', {
-              document_id: mivaaDocumentId
+              document_id: mivaaDocumentId,
             });
 
-            console.log(`📊 Images response from MIVAA:`, {
+            console.log('📊 Images response from MIVAA:', {
               success: imagesResponse.success,
               hasData: !!imagesResponse.data,
               dataType: Array.isArray(imagesResponse.data) ? 'array' : typeof imagesResponse.data,
               dataLength: Array.isArray(imagesResponse.data) ? imagesResponse.data.length : 'N/A',
-              error: imagesResponse.error
+              error: imagesResponse.error,
             });
 
             if (imagesResponse.success && imagesResponse.data && Array.isArray(imagesResponse.data)) {
@@ -1276,7 +1278,7 @@ export class ConsolidatedPDFWorkflowService {
                 url: img.storage_url || img.public_url || img.image_url || img.url,
                 image_url: img.storage_url || img.public_url || img.image_url || img.url,
                 storage_uploaded: true,
-                storage_bucket: img.storage_bucket || 'pdf-tiles'
+                storage_bucket: img.storage_bucket || 'pdf-tiles',
               }));
               console.log(`✅ Fetched ${images.length} images from MIVAA (with storage URLs)`);
             } else {
@@ -1295,7 +1297,7 @@ export class ConsolidatedPDFWorkflowService {
 
       // If MIVAA gateway failed, try direct database access as fallback
       if (chunks.length === 0 && chunksCount > 0) {
-        console.log(`⚠️ MIVAA gateway returned 0 chunks, trying direct database access...`);
+        console.log('⚠️ MIVAA gateway returned 0 chunks, trying direct database access...');
         try {
           const { data: dbChunks, error: chunksError } = await supabase
             .from('document_chunks')
@@ -1313,7 +1315,7 @@ export class ConsolidatedPDFWorkflowService {
               chunk_index: chunk.chunk_index || 0,
               start_char: chunk.metadata?.start_char || 0,
               end_char: chunk.metadata?.end_char || chunk.content?.length || 0,
-              metadata: chunk.metadata || {}
+              metadata: chunk.metadata || {},
             }));
             console.log(`✅ Retrieved ${chunks.length} chunks from database fallback`);
           }
@@ -1326,7 +1328,7 @@ export class ConsolidatedPDFWorkflowService {
       // If no images found, log warning but don't create placeholders
       if (images.length === 0 && imagesCount > 0) {
         console.warn(`⚠️ Metadata shows ${imagesCount} images should exist, but none were found in database for document ${documentId}`);
-        console.warn(`This indicates MIVAA LlamaIndex processing did not extract/store images. Check MIVAA service logs.`);
+        console.warn('This indicates MIVAA LlamaIndex processing did not extract/store images. Check MIVAA service logs.');
       }
 
       // Final validation - only throw error if we still have no data after fallback
@@ -1341,8 +1343,8 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       console.log(`📋 Final data for storage: ${chunks.length} chunks, ${images.length} images`);
-      console.log(`📝 Sample chunk:`, chunks[0] ? { content: chunks[0].content?.substring(0, 100) + '...', metadata: chunks[0].metadata } : 'No chunks');
-      console.log(`🖼️ Sample image:`, images[0] ? { url: images[0].url, metadata: images[0].metadata } : 'No images');
+      console.log('📝 Sample chunk:', chunks[0] ? { content: chunks[0].content?.substring(0, 100) + '...', metadata: chunks[0].metadata } : 'No chunks');
+      console.log('🖼️ Sample image:', images[0] ? { url: images[0].url, metadata: images[0].metadata } : 'No images');
 
       const metadata = details || {};
 
@@ -1366,8 +1368,8 @@ export class ConsolidatedPDFWorkflowService {
               upload_date: new Date().toISOString(),
               chunks_count: chunksCount,
               images_count: imagesCount,
-              ...metadata
-            }
+              ...metadata,
+            },
           });
 
         if (docError) {
@@ -1410,8 +1412,8 @@ export class ConsolidatedPDFWorkflowService {
                 chunk_strategy: 'mivaa_processing',
                 source: 'mivaa_pdf_processing',
                 source_document: documentName,  // For bubble display
-                ...metadata
-              }
+                ...metadata,
+              },
             });
 
           if (!chunkError) {
@@ -1431,7 +1433,7 @@ export class ConsolidatedPDFWorkflowService {
                   page_number: chunk.page_number || i + 1,
                   chunk_index: i,
                   source_document: documentName,
-                }
+                },
               );
 
               console.log(`✅ Scored chunk ${i + 1}: ${(qualityData.coherence_score * 100).toFixed(1)}%`);
@@ -1492,7 +1494,7 @@ export class ConsolidatedPDFWorkflowService {
               console.log(`🏷️ Extracting metafields for chunk ${i + 1}...`);
               const metafields = await MetafieldService.extractMetafieldsFromText(
                 chunkContent,
-                metafieldDefs
+                metafieldDefs,
               );
 
               if (Object.keys(metafields).length > 0) {
@@ -1500,7 +1502,7 @@ export class ConsolidatedPDFWorkflowService {
                   chunkId,
                   metafields,
                   fieldDefinitionsMap,
-                  'pdf_extraction'
+                  'pdf_extraction',
                 );
                 console.log(`✅ Saved metafields for chunk ${i + 1}`);
               }
@@ -1509,10 +1511,10 @@ export class ConsolidatedPDFWorkflowService {
               // Continue processing even if metafield extraction fails
             }
           }
-          console.log(`✅ Metafield extraction completed for chunks`);
+          console.log('✅ Metafield extraction completed for chunks');
         }
       } catch (metafieldError) {
-        console.warn(`⚠️ Metafield extraction setup failed:`, metafieldError);
+        console.warn('⚠️ Metafield extraction setup failed:', metafieldError);
       }
 
       // Store document images
@@ -1528,7 +1530,7 @@ export class ConsolidatedPDFWorkflowService {
             url: imageUrl?.substring(0, 100) + (imageUrl && imageUrl.length > 100 ? '...' : ''),
             storage_uploaded: image.storage_uploaded,
             storage_bucket: image.storage_bucket,
-            filename: image.filename
+            filename: image.filename,
           });
 
           // If no URL is provided, try to generate a proper storage URL
@@ -1581,7 +1583,7 @@ export class ConsolidatedPDFWorkflowService {
                 format: image.format || 'PNG',
                 size_bytes: image.size_bytes || 0,
                 dimensions: image.dimensions || { width: 0, height: 0 },
-                ...image
+                ...image,
               },
               ocr_extracted_text: image.ocr_text || image.text || '',
               ocr_confidence_score: image.ocr_confidence || 0.9,
@@ -1591,7 +1593,7 @@ export class ConsolidatedPDFWorkflowService {
               contextual_name: image.name || `Image ${i + 1}`,
               nearest_heading: image.heading || '',
               heading_level: image.heading_level || 0,
-              heading_distance: image.heading_distance || 0
+              heading_distance: image.heading_distance || 0,
             });
 
           if (imageError) {
@@ -1602,7 +1604,7 @@ export class ConsolidatedPDFWorkflowService {
           }
         }
       } else {
-        console.log(`⚠️ No images to store (images.length = 0)`);
+        console.log('⚠️ No images to store (images.length = 0)');
       }
 
       // Extract metafields for images
@@ -1638,7 +1640,7 @@ export class ConsolidatedPDFWorkflowService {
                 console.log(`🏷️ Extracting metafields for image ${image.id}...`);
                 const metafields = await MetafieldService.extractMetafieldsFromImage(
                   image.image_url,
-                  metafieldDefs
+                  metafieldDefs,
                 );
 
                 if (Object.keys(metafields).length > 0) {
@@ -1646,7 +1648,7 @@ export class ConsolidatedPDFWorkflowService {
                     image.id,
                     metafields,
                     fieldDefinitionsMap,
-                    'visual_analysis'
+                    'visual_analysis',
                   );
                   console.log(`✅ Saved metafields for image ${image.id}`);
                 }
@@ -1655,10 +1657,10 @@ export class ConsolidatedPDFWorkflowService {
               }
             }
           }
-          console.log(`✅ Metafield extraction completed for images`);
+          console.log('✅ Metafield extraction completed for images');
         }
       } catch (metafieldError) {
-        console.warn(`⚠️ Image metafield extraction setup failed:`, metafieldError);
+        console.warn('⚠️ Image metafield extraction setup failed:', metafieldError);
       }
 
       console.log(`✅ Storage completed: ${chunksStored} chunks, ${imagesStored} images, ${embeddingsStored} embeddings stored in database`);
@@ -1666,8 +1668,8 @@ export class ConsolidatedPDFWorkflowService {
       // Log image extraction status for debugging
       if (imagesCount > 0 && imagesStored === 0) {
         console.warn(`⚠️ IMAGE EXTRACTION ISSUE: Metadata shows ${imagesCount} images were detected, but ${imagesStored} were stored`);
-        console.warn(`This indicates MIVAA extracted images but did not persist them to the database`);
-        console.warn(`Placeholder records may have been created to track this`);
+        console.warn('This indicates MIVAA extracted images but did not persist them to the database');
+        console.warn('Placeholder records may have been created to track this');
       } else if (imagesStored > 0) {
         console.log(`✅ Successfully stored ${imagesStored} images (${imagesCount} detected by MIVAA)`);
       }
@@ -1707,9 +1709,30 @@ export class ConsolidatedPDFWorkflowService {
         console.error('Quality scoring failed:', qualityError);
       }
 
+      // ✅ FALLBACK: Generate missing embeddings if MIVAA didn't create them
+      console.log(`🔄 Checking for missing embeddings...`);
+      try {
+        const { count: embeddingCount } = await supabase
+          .from('document_vectors')
+          .select('*', { count: 'exact', head: true })
+          .eq('document_id', documentId);
+
+        if (embeddingCount === 0 && chunksStored > 0) {
+          console.warn(`⚠️ No embeddings found for ${chunksStored} chunks - running fallback embedding generation`);
+          const embeddingStats = await fallbackEmbeddingService.generateMissingEmbeddings(documentId);
+          embeddingsStored = embeddingStats.embeddingsGenerated;
+          console.log(`✅ Fallback embedding generation completed: ${embeddingStats.embeddingsGenerated}/${embeddingStats.totalChunks} embeddings generated`);
+        } else if (embeddingCount && embeddingCount > 0) {
+          embeddingsStored = embeddingCount;
+          console.log(`✅ Embeddings already exist: ${embeddingCount} embeddings found`);
+        }
+      } catch (embeddingError) {
+        console.warn('⚠️ Fallback embedding generation check failed:', embeddingError);
+      }
+
       // ✅ NOTE: Chunk relationships are now automatically built by HierarchicalNodeParser
       // in the Python backend (LlamaIndex service). No need for manual relationship building.
-      console.log(`✅ Chunk relationships automatically created by HierarchicalNodeParser`);
+      console.log('✅ Chunk relationships automatically created by HierarchicalNodeParser');
 
       // Extract categories from the document content
       let categoriesAdded = 0;
@@ -1731,8 +1754,8 @@ export class ConsolidatedPDFWorkflowService {
                 includeProductCategories: true,
                 includeMaterialCategories: true,
                 confidenceThreshold: 0.6,
-                maxCategories: 8
-              }
+                maxCategories: 8,
+              },
             );
 
             categoriesAdded = extractedCategories.categories.length;
@@ -1748,7 +1771,7 @@ export class ConsolidatedPDFWorkflowService {
         chunksStored,
         imagesStored,
         embeddingsStored,
-        categoriesAdded
+        categoriesAdded,
       };
 
     } catch (error) {
@@ -1803,7 +1826,7 @@ export class ConsolidatedPDFWorkflowService {
           chunks: statusResponse.data?.details?.chunks_created || statusResponse.data?.parameters?.chunks_created,
           images: statusResponse.data?.details?.images_extracted || statusResponse.data?.parameters?.images_extracted,
           currentPage: statusResponse.data?.details?.current_page || statusResponse.data?.parameters?.current_page,
-          totalPages: statusResponse.data?.details?.total_pages || statusResponse.data?.parameters?.total_pages
+          totalPages: statusResponse.data?.details?.total_pages || statusResponse.data?.parameters?.total_pages,
         });
 
         // Extract progress details from MIVAA response
@@ -1865,7 +1888,7 @@ export class ConsolidatedPDFWorkflowService {
                 'Preparing document for analysis',
                 'Sending document to MIVAA service...',
                 `✅ Job started with ID: ${mivaaJobId}`,
-                `✅ Processing completed successfully!`,
+                '✅ Processing completed successfully!',
                 `📝 Generated ${chunksCreated} text chunks`,
                 `🖼️ Extracted ${imagesExtracted} images`,
                 `📄 Processed ${textLength} characters of text`,
@@ -1893,8 +1916,8 @@ export class ConsolidatedPDFWorkflowService {
                       includeProductCategories: true,
                       includeMaterialCategories: true,
                       confidenceThreshold: 0.6,
-                      maxCategories: 8
-                    }
+                      maxCategories: 8,
+                    },
                   );
 
                   // Update document with extracted categories
@@ -1903,18 +1926,18 @@ export class ConsolidatedPDFWorkflowService {
                   // Auto-update global categories if high confidence
                   await dynamicCategoryManagementService.autoUpdateCategoriesFromDocument(
                     documentId,
-                    { content: docData.content }
+                    { content: docData.content },
                   );
 
                   console.log('✅ Category extraction completed:', {
                     documentId,
                     categoriesFound: extractedCategories.categories.length,
-                    categories: extractedCategories.categories.map(c => c.categoryKey)
+                    categories: extractedCategories.categories.map(c => c.categoryKey),
                   });
 
                   // Update WebSocket service with category extraction statistics
                   pdfProcessingWebSocketService.updateJobStatistics(jobId, {
-                    categoriesExtracted: extractedCategories.categories.length
+                    categoriesExtracted: extractedCategories.categories.length,
                   });
 
                   // Add category extraction to processing details
@@ -1925,7 +1948,7 @@ export class ConsolidatedPDFWorkflowService {
                       'Preparing document for analysis',
                       'Sending document to MIVAA service...',
                       `✅ Job started with ID: ${mivaaJobId}`,
-                      `✅ Processing completed successfully!`,
+                      '✅ Processing completed successfully!',
                       `📝 Generated ${chunksCreated} text chunks`,
                       `🖼️ Extracted ${imagesExtracted} images`,
                       `📄 Processed ${textLength} characters of text`,
@@ -2045,7 +2068,7 @@ export class ConsolidatedPDFWorkflowService {
           details: [
             `⏳ Polling attempt ${attempts}/${maxAttempts}`,
             `⚠️ Temporary polling error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            `🔄 Retrying in 5 seconds...`,
+            '🔄 Retrying in 5 seconds...',
           ],
         });
 
@@ -2096,11 +2119,11 @@ export class ConsolidatedPDFWorkflowService {
         controller.abort();
       }, 600000); // 10 minute timeout for PDF processing
 
-      console.log(`🔍 Making MIVAA gateway request:`, {
+      console.log('🔍 Making MIVAA gateway request:', {
         action,
         url,
         payloadSize: JSON.stringify(payload).length,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       const response = await fetch(url, {
@@ -2111,18 +2134,18 @@ export class ConsolidatedPDFWorkflowService {
         },
         body: JSON.stringify({
           action,
-          payload
+          payload,
         }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
-      console.log(`🔍 MIVAA gateway response:`, {
+      console.log('🔍 MIVAA gateway response:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       if (!response.ok) {
@@ -2188,9 +2211,9 @@ export class ConsolidatedPDFWorkflowService {
         controller.abort();
       }, 600000); // 10 minute timeout for PDF processing
 
-      console.log(`🔍 Making MIVAA RAG upload request:`, {
+      console.log('🔍 Making MIVAA RAG upload request:', {
         url,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       const response = await fetch(url, {
@@ -2199,15 +2222,15 @@ export class ConsolidatedPDFWorkflowService {
           'Authorization': `Bearer ${mivaaApiKey}`,
         },
         body: formData,
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
-      console.log(`🔍 MIVAA RAG upload response:`, {
+      console.log('🔍 MIVAA RAG upload response:', {
         status: response.status,
         statusText: response.statusText,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       if (!response.ok) {
@@ -2225,7 +2248,7 @@ export class ConsolidatedPDFWorkflowService {
       return {
         success: true,
         data: data.data || data,
-        error: null
+        error: null,
       };
     } catch (error) {
       console.error('MIVAA RAG upload failed:', error);
@@ -2262,12 +2285,12 @@ export class ConsolidatedPDFWorkflowService {
   async linkChunksToImages(
     chunks: any[],
     images: any[],
-    options: { relationshipType?: string; calculateRelevance?: boolean } = {}
+    options: { relationshipType?: string; calculateRelevance?: boolean } = {},
   ): Promise<{ linksCreated: number; totalAttempted: number }> {
     const relationshipType = options.relationshipType || 'illustrates';
     const calculateRelevance = options.calculateRelevance !== false;
 
-    console.log(`🔗 Linking chunks to images...`);
+    console.log('🔗 Linking chunks to images...');
     console.log(`   Chunks: ${chunks.length}`);
     console.log(`   Images: ${images.length}`);
     console.log(`   Relationship type: ${relationshipType}`);
@@ -2299,7 +2322,7 @@ export class ConsolidatedPDFWorkflowService {
               chunk.id,
               image.id,
               relationshipType as any,
-              relevanceScore
+              relevanceScore,
             );
 
             linksCreated++;
@@ -2328,12 +2351,12 @@ export class ConsolidatedPDFWorkflowService {
   async linkProductsToImages(
     products: any[],
     images: any[],
-    options: { relationshipType?: string; calculateRelevance?: boolean } = {}
+    options: { relationshipType?: string; calculateRelevance?: boolean } = {},
   ): Promise<{ linksCreated: number; totalAttempted: number }> {
     const relationshipType = options.relationshipType || 'depicts';
     const calculateRelevance = options.calculateRelevance !== false;
 
-    console.log(`🔗 Linking products to images...`);
+    console.log('🔗 Linking products to images...');
     console.log(`   Products: ${products.length}`);
     console.log(`   Images: ${images.length}`);
     console.log(`   Relationship type: ${relationshipType}`);
@@ -2368,7 +2391,7 @@ export class ConsolidatedPDFWorkflowService {
               product.id,
               image.id,
               relationshipType as any,
-              relevanceScore
+              relevanceScore,
             );
 
             linksCreated++;
@@ -2398,12 +2421,13 @@ export class ConsolidatedPDFWorkflowService {
     chunks: any[],
     documentId: string,
     userId: string,
-    options: { maxProducts?: number; extractMetafields?: boolean } = {}
+    options: { maxProducts?: number; extractMetafields?: boolean } = {},
   ): Promise<{ productsCreated: number; metafieldsExtracted: number }> {
-    const maxProducts = options.maxProducts || 5;
+    // ✅ FIXED: No limit - process all chunks as products (was hardcoded to 5)
+    const maxProducts = options.maxProducts || chunks.length;
     const extractMetafields = options.extractMetafields !== false;
 
-    console.log(`📦 Creating products from chunks with metafield extraction...`);
+    console.log('📦 Creating products from chunks with metafield extraction...');
     console.log(`   Max products: ${maxProducts}`);
     console.log(`   Extract metafields: ${extractMetafields}`);
 
@@ -2487,7 +2511,7 @@ export class ConsolidatedPDFWorkflowService {
               const productText = `${product.name} ${product.description} ${product.long_description}`;
               const metafields = await MetafieldService.extractMetafieldsFromText(
                 productText,
-                metafieldDefs
+                metafieldDefs,
               );
 
               if (Object.keys(metafields).length > 0) {
@@ -2495,7 +2519,7 @@ export class ConsolidatedPDFWorkflowService {
                   product.id,
                   metafields,
                   fieldDefinitionsMap,
-                  'product_extraction'
+                  'product_extraction',
                 );
                 metafieldsExtracted++;
                 console.log(`✅ Metafields extracted for product ${i + 1}`);
@@ -2511,11 +2535,11 @@ export class ConsolidatedPDFWorkflowService {
               chunk.id,
               product.id,
               'source',
-              1.0
+              1.0,
             );
-            console.log(`🔗 Linked chunk to product`);
+            console.log('🔗 Linked chunk to product');
           } catch (linkError) {
-            console.warn(`⚠️ Failed to link chunk to product:`, linkError);
+            console.warn('⚠️ Failed to link chunk to product:', linkError);
           }
         } catch (error) {
           console.warn(`⚠️ Error processing chunk ${i + 1}:`, error);

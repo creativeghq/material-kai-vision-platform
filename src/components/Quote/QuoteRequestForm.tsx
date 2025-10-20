@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+
 import { QuoteRequestService, QuoteRequest } from '../../services/quote/QuoteRequestService';
 import { ShoppingCartService, CartWithItems } from '../../services/shopping/ShoppingCartService';
 
@@ -56,7 +57,7 @@ export const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({
       const quoteRequest = await quoteService.submitRequest(
         cartId,
         workspaceId,
-        notes
+        notes,
       );
 
       setSuccess(true);

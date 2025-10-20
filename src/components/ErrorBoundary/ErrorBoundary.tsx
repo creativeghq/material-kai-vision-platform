@@ -1,6 +1,6 @@
 /**
  * Error Boundary Component
- * 
+ *
  * Catches JavaScript errors anywhere in the child component tree,
  * logs those errors, and displays a fallback UI instead of crashing the app.
  */
@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error details
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
     this.setState({
       error,
       errorInfo,
@@ -89,7 +89,7 @@ export class ErrorBoundary extends Component<Props, State> {
     monitoringService.addBreadcrumb(
       `Error boundary caught error: ${error.message}`,
       'error_boundary',
-      'error'
+      'error',
     );
   };
 
@@ -115,7 +115,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private renderErrorDetails = () => {
     const { error, errorInfo, errorId } = this.state;
-    
+
     if (!error) return null;
 
     return (
@@ -163,7 +163,7 @@ export class ErrorBoundary extends Component<Props, State> {
   private renderFallbackUI = () => {
     const { level = 'component', name } = this.props;
     const { error } = this.state;
-    
+
     const canRetry = this.retryCount < this.maxRetries;
     const isPageLevel = level === 'page';
     const isCritical = level === 'critical';
@@ -174,7 +174,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <CardTitle className="flex items-center space-x-2">
             <AlertTriangle className={`w-5 h-5 ${isCritical ? 'text-destructive' : 'text-yellow-500'}`} />
             <span>
-              {isCritical ? 'Critical Error' : 
+              {isCritical ? 'Critical Error' :
                isPageLevel ? 'Page Error' : 'Component Error'}
             </span>
             <Badge variant={isCritical ? 'destructive' : 'secondary'}>
@@ -185,7 +185,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <CardContent className="space-y-4">
           <div>
             <p className="text-muted-foreground">
-              {isCritical 
+              {isCritical
                 ? 'A critical error has occurred that prevents the application from functioning properly.'
                 : isPageLevel
                 ? 'An error occurred while loading this page.'
@@ -206,14 +206,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 Try Again ({this.maxRetries - this.retryCount} left)
               </Button>
             )}
-            
+
             {isPageLevel && (
               <Button onClick={this.handleGoHome} variant="outline">
                 <Home className="w-4 h-4 mr-2" />
                 Go Home
               </Button>
             )}
-            
+
             <Button onClick={this.handleReload} variant="outline">
               <RefreshCw className="w-4 h-4 mr-2" />
               Reload Page
@@ -244,7 +244,7 @@ export class ErrorBoundary extends Component<Props, State> {
 // Higher-order component for easy wrapping
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
-  errorBoundaryProps?: Omit<Props, 'children'>
+  errorBoundaryProps?: Omit<Props, 'children'>,
 ) {
   const WrappedComponent = (props: P) => (
     <ErrorBoundary {...errorBoundaryProps}>
@@ -253,32 +253,32 @@ export function withErrorBoundary<P extends object>(
   );
 
   WrappedComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name})`;
-  
+
   return WrappedComponent;
 }
 
 // Specialized error boundaries for different use cases
-export const PageErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({ 
-  children, 
-  name 
+export const PageErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({
+  children,
+  name,
 }) => (
   <ErrorBoundary level="page" name={name}>
     {children}
   </ErrorBoundary>
 );
 
-export const ComponentErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({ 
-  children, 
-  name 
+export const ComponentErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({
+  children,
+  name,
 }) => (
   <ErrorBoundary level="component" name={name}>
     {children}
   </ErrorBoundary>
 );
 
-export const CriticalErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({ 
-  children, 
-  name 
+export const CriticalErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({
+  children,
+  name,
 }) => (
   <ErrorBoundary level="critical" name={name}>
     {children}

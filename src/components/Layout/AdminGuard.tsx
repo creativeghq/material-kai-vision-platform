@@ -1,18 +1,19 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Shield, ArrowLeft } from 'lucide-react';
+
 import { useUserRole } from '@/hooks/useUserRole';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, ArrowLeft } from 'lucide-react';
 
 interface AdminGuardProps {
   children: React.ReactNode;
   fallbackPath?: string;
 }
 
-export const AdminGuard: React.FC<AdminGuardProps> = ({ 
-  children, 
-  fallbackPath = '/' 
+export const AdminGuard: React.FC<AdminGuardProps> = ({
+  children,
+  fallbackPath = '/',
 }) => {
   const { isAdmin, role } = useUserRole();
   const navigate = useNavigate();

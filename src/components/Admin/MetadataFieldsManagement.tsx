@@ -19,7 +19,7 @@ import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIn
 
 // Import proper TypeScript types
 import type {
-  MaterialMetafieldDefinition
+  MaterialMetafieldDefinition,
 } from '@/types/unified-material-api';
 import type { MaterialCategory } from '@/types/materials';
 import { getMaterialCategories } from '@/services/dynamicMaterialCategoriesService';
@@ -136,7 +136,7 @@ export const MetadataFieldsManagement: React.FC = () => {
       const documents = (data || []).map((doc: Record<string, unknown>) => ({
         id: doc.id,
         name: doc.name || `Document ${String(doc.id).slice(0, 8)}`,
-        has_metadata: Boolean(doc.metadata && Object.keys(doc.metadata as Record<string, unknown>).length > 0)
+        has_metadata: Boolean(doc.metadata && Object.keys(doc.metadata as Record<string, unknown>).length > 0),
       }));
 
       setAvailableDocuments(documents);
@@ -171,12 +171,12 @@ export const MetadataFieldsManagement: React.FC = () => {
             field_name: field.name,
             field_type: field.dataType,
             extraction_hints: (field as any).metadata?.extractionHints || '',
-            applies_to_categories: field.applicableCategories || []
+            applies_to_categories: field.applicableCategories || [],
           })),
           confidence_threshold: 0.6,
           include_entity_extraction: true,
-          update_existing: true
-        }
+          update_existing: true,
+        },
       });
 
       if (!result.success) {
@@ -194,7 +194,7 @@ export const MetadataFieldsManagement: React.FC = () => {
         total_fields_populated: data.total_fields_populated || 0,
         processing_time_ms: data.processing_time_ms || 0,
         success_rate: data.success_rate || 0,
-        field_mapping_stats: data.field_mapping_stats || []
+        field_mapping_stats: data.field_mapping_stats || [],
       };
 
       setAutoPopulationResults(results);
@@ -221,13 +221,13 @@ export const MetadataFieldsManagement: React.FC = () => {
 
   // Get available material categories dynamically
   const [materialCategories, setMaterialCategories] = useState<MaterialCategory[]>([]);
-  
+
   useEffect(() => {
     const loadCategories = async () => {
       const categories = await getMaterialCategories();
       setMaterialCategories(categories as unknown as MaterialCategory[]);
     };
-    
+
     loadCategories();
   }, []);
 
@@ -357,7 +357,7 @@ export const MetadataFieldsManagement: React.FC = () => {
             description: fieldData.description as string || '',
             input_data: fieldData as Json,
             status: 'pending',
-            priority: 'medium'
+            priority: 'medium',
           }]);
 
         if (error) throw error;

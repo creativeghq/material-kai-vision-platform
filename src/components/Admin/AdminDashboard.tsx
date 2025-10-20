@@ -421,6 +421,14 @@ const AdminDashboard: React.FC = () => {
     ],
     'System Monitoring': [
       {
+        title: 'PDF Processing Monitor',
+        description: 'Monitor PDF processing pipeline - embeddings, images, products, and metrics',
+        icon: Activity,
+        path: '/admin/pdf-processing-monitor',
+        status: 'active',
+        count: 'Real-time',
+      },
+      {
         title: 'Analytics Dashboard',
         description: 'System performance metrics and usage analytics',
         icon: BarChart3,
@@ -468,7 +476,7 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'Phase 3',
       },
-    ]
+    ],
   };
 
   const getStatusColor = (status: string) => {

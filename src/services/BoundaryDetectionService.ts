@@ -1,5 +1,5 @@
-import { BaseService } from "./base/BaseService";
-import { EmbeddingGenerationService, EmbeddingInput } from "./embeddingGenerationService";
+import { BaseService } from './base/BaseService';
+import { EmbeddingGenerationService, EmbeddingInput } from './embeddingGenerationService';
 
 /**
  * Boundary Detection Result
@@ -8,7 +8,7 @@ export interface BoundaryDetectionResult {
   chunk_id: string;
   chunk_text: string;
   boundary_score: number; // 0-1 confidence that this is a good boundary
-  boundary_type: "sentence" | "paragraph" | "section" | "semantic" | "weak";
+  boundary_type: 'sentence' | 'paragraph' | 'section' | 'semantic' | 'weak';
   semantic_similarity: number; // Similarity to next chunk
   is_product_boundary: boolean; // Whether this marks a product boundary
   reasoning: string;
@@ -49,28 +49,28 @@ export interface DetectBoundariesRequest {
 export class BoundaryDetectionService extends BaseService {
   private embeddingService: EmbeddingGenerationService;
   private embeddings: Map<string, number[]> = new Map();
-  private clusteringMethod: "kmeans" | "hierarchical" | "dbscan" = "kmeans";
+  private clusteringMethod: 'kmeans' | 'hierarchical' | 'dbscan' = 'kmeans';
 
   constructor() {
     super({
-      name: "BoundaryDetectionService",
-      version: "1.0.0",
-      environment: "production",
+      name: 'BoundaryDetectionService',
+      version: '1.0.0',
+      environment: 'production',
       enabled: true,
     });
 
     this.embeddingService = new EmbeddingGenerationService({
       embedding: {
-        provider: "openai",
-        model: "text-embedding-3-small",
+        provider: 'openai',
+        model: 'text-embedding-3-small',
         dimensions: 1536,
         batchSize: 100,
         timeout: 30000,
         retryAttempts: 3,
       },
       mivaa: {
-        gatewayUrl: process.env.MIVAA_GATEWAY_URL || "",
-        apiKey: process.env.MIVAA_API_KEY || "",
+        gatewayUrl: process.env.MIVAA_GATEWAY_URL || '',
+        apiKey: process.env.MIVAA_API_KEY || '',
       },
       batch: {
         maxSize: 100,
@@ -98,7 +98,7 @@ export class BoundaryDetectionService extends BaseService {
    * Detect boundaries in chunks
    */
   async detectBoundaries(
-    request: DetectBoundariesRequest
+    request: DetectBoundariesRequest,
   ): Promise<BoundaryDetectionResult[]> {
     const startTime = Date.now();
 
@@ -111,7 +111,7 @@ export class BoundaryDetectionService extends BaseService {
       }));
 
       const embeddingResults = await this.embeddingService.generateBatch(
-        embeddingInputs
+        embeddingInputs,
       );
 
       // Store embeddings
@@ -146,14 +146,14 @@ export class BoundaryDetectionService extends BaseService {
         const boundaryType = this.determineBoundaryType(
           chunk.text,
           boundaryScore,
-          semanticSimilarity
+          semanticSimilarity,
         );
 
         // Determine if this is a product boundary
         const isProductBoundary = this.isProductBoundary(
           chunk.text,
           boundaryScore,
-          semanticSimilarity
+          semanticSimilarity,
         );
 
         results.push({
@@ -166,7 +166,7 @@ export class BoundaryDetectionService extends BaseService {
           reasoning: this.generateReasoning(
             boundaryScore,
             boundaryType,
-            semanticSimilarity
+            semanticSimilarity,
           ),
         });
       }
@@ -175,17 +175,17 @@ export class BoundaryDetectionService extends BaseService {
       if (request.clustering_enabled) {
         const clusters = await this.performClustering(
           request.chunks,
-          request.num_clusters
+          request.num_clusters,
         );
         this.logger.info(`Detected ${clusters.length} clusters`);
       }
 
       this.logger.info(
-        `Boundary detection completed in ${Date.now() - startTime}ms`
+        `Boundary detection completed in ${Date.now() - startTime}ms`,
       );
       return results;
     } catch (error) {
-      this.logger.error("Boundary detection error:", error);
+      this.logger.error('Boundary detection error:', error);
       throw error;
     }
   }
@@ -212,7 +212,7 @@ export class BoundaryDetectionService extends BaseService {
     }
 
     // Section/heading boundary
-    const lastLine = trimmed.split("\n").pop() || "";
+    const lastLine = trimmed.split('\n').pop() || '';
     if (/^#+\s+/.test(lastLine) || /^[A-Z][A-Z\s]+$/.test(lastLine)) {
       score += 0.15;
     }
@@ -231,14 +231,14 @@ export class BoundaryDetectionService extends BaseService {
   private determineBoundaryType(
     text: string,
     boundaryScore: number,
-    semanticSimilarity: number
-  ): "sentence" | "paragraph" | "section" | "semantic" | "weak" {
-    if (boundaryScore < 0.3) return "weak";
-    if (/^#+\s+/.test(text.trim())) return "section";
-    if (/\n\s*$/.test(text)) return "paragraph";
-    if (/[.!?]\s*$/.test(text.trim())) return "sentence";
-    if (semanticSimilarity < 0.5) return "semantic";
-    return "weak";
+    semanticSimilarity: number,
+  ): 'sentence' | 'paragraph' | 'section' | 'semantic' | 'weak' {
+    if (boundaryScore < 0.3) return 'weak';
+    if (/^#+\s+/.test(text.trim())) return 'section';
+    if (/\n\s*$/.test(text)) return 'paragraph';
+    if (/[.!?]\s*$/.test(text.trim())) return 'sentence';
+    if (semanticSimilarity < 0.5) return 'semantic';
+    return 'weak';
   }
 
   /**
@@ -247,7 +247,7 @@ export class BoundaryDetectionService extends BaseService {
   private isProductBoundary(
     text: string,
     boundaryScore: number,
-    semanticSimilarity: number
+    semanticSimilarity: number,
   ): boolean {
     // High boundary score + low semantic similarity = likely product boundary
     return boundaryScore > 0.6 && semanticSimilarity < 0.6;
@@ -259,25 +259,25 @@ export class BoundaryDetectionService extends BaseService {
   private generateReasoning(
     boundaryScore: number,
     boundaryType: string,
-    semanticSimilarity: number
+    semanticSimilarity: number,
   ): string {
     const parts: string[] = [];
 
     if (boundaryScore > 0.7) {
-      parts.push("Strong boundary marker");
+      parts.push('Strong boundary marker');
     } else if (boundaryScore > 0.4) {
-      parts.push("Moderate boundary marker");
+      parts.push('Moderate boundary marker');
     } else {
-      parts.push("Weak boundary marker");
+      parts.push('Weak boundary marker');
     }
 
     if (semanticSimilarity < 0.5) {
-      parts.push("Low semantic similarity to next chunk");
+      parts.push('Low semantic similarity to next chunk');
     } else if (semanticSimilarity > 0.8) {
-      parts.push("High semantic similarity to next chunk");
+      parts.push('High semantic similarity to next chunk');
     }
 
-    return parts.join("; ");
+    return parts.join('; ');
   }
 
   /**
@@ -305,7 +305,7 @@ export class BoundaryDetectionService extends BaseService {
    */
   private async performClustering(
     chunks: Array<{ id: string; text: string }>,
-    numClusters?: number
+    numClusters?: number,
   ): Promise<ClusterResult[]> {
     const k = numClusters || Math.min(5, Math.ceil(Math.sqrt(chunks.length)));
     const embeddings = Array.from(this.embeddings.values());
@@ -324,7 +324,7 @@ export class BoundaryDetectionService extends BaseService {
   private performKMeansClustering(
     embeddings: number[][],
     k: number,
-    chunks: Array<{ id: string; text: string }>
+    chunks: Array<{ id: string; text: string }>,
   ): ClusterResult[] {
     // Initialize centroids randomly
     const centroids: number[][] = [];
@@ -365,7 +365,7 @@ export class BoundaryDetectionService extends BaseService {
       centroid: centroids[id],
       coherence: this.calculateClusterCoherence(
         indices.map((i) => embeddings[i]),
-        centroids[id]
+        centroids[id],
       ),
       size: indices.length,
       is_product_cluster: indices.length > 2,
@@ -388,12 +388,12 @@ export class BoundaryDetectionService extends BaseService {
    */
   private calculateClusterCoherence(
     embeddings: number[][],
-    centroid: number[]
+    centroid: number[],
   ): number {
     if (embeddings.length === 0) return 0;
 
     const distances = embeddings.map((e) =>
-      this.euclideanDistance(e, centroid)
+      this.euclideanDistance(e, centroid),
     );
     const avgDistance =
       distances.reduce((a, b) => a + b, 0) / distances.length;
@@ -415,7 +415,7 @@ export class BoundaryDetectionService extends BaseService {
   protected async doHealthCheck(): Promise<void> {
     // Verify embedding service is healthy
     if (!this.embeddingService) {
-      throw new Error("Embedding service not initialized");
+      throw new Error('Embedding service not initialized');
     }
   }
 }

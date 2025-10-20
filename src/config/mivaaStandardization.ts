@@ -1,6 +1,6 @@
 /**
  * MIVAA Service Standardization Configuration
- * 
+ *
  * This file defines standardized interfaces, payload structures, and error handling
  * for all MIVAA service integrations across the platform.
  */
@@ -18,34 +18,34 @@ export interface StandardMivaaPayload {
   // Core identification
   action: string;
   requestId?: string;
-  
+
   // Resource identification (unified field names)
   resourceUrl?: string;      // Replaces: documentId, fileUrl, url, image_data
   resourceName?: string;     // Replaces: filename, document_name, name
   resourceType?: 'pdf' | 'image' | 'text' | 'url';
-  
+
   // Processing options
   options?: {
     // PDF processing
     extractionType?: 'markdown' | 'tables' | 'images' | 'all';
     outputFormat?: 'json' | 'text' | 'html';
-    
+
     // Image processing
     analysisTypes?: string[];
     includeProperties?: boolean;
     includeComposition?: boolean;
     confidenceThreshold?: number;
-    
+
     // General options
     priority?: 'low' | 'normal' | 'high';
     timeout?: number;
     language?: string;
     quality?: 'standard' | 'high';
-    
+
     // Custom options
     [key: string]: any;
   };
-  
+
   // Metadata
   metadata?: Record<string, any>;
   tags?: string[];
@@ -111,27 +111,27 @@ export const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> 
   'pdf_extract_markdown': { path: '/api/v1/extract/markdown', method: 'POST' },
   'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
   'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
-  
+
   // Material Recognition
   'material_recognition': { path: '/api/vision/analyze', method: 'POST' },
   'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
-  
+
   // Embeddings
   'generate_embedding': { path: '/api/embeddings/generate', method: 'POST' },
   'generate_batch_embeddings': { path: '/api/embeddings/batch', method: 'POST' },
   'clip_embedding_generation': { path: '/api/embeddings/clip-generate', method: 'POST' },
-  
+
   // Search
   'semantic_search': { path: '/api/search/semantic', method: 'POST' },
   'vector_search': { path: '/api/search/vector', method: 'POST' },
   'hybrid_search': { path: '/api/search/hybrid', method: 'POST' },
-  
+
   // Chat & AI
   'chat_completion': { path: '/api/chat/completions', method: 'POST' },
   'contextual_response': { path: '/api/chat/contextual', method: 'POST' },
   'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
   'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
-  
+
   // Health & Status
   'health_check': { path: '/health', method: 'GET' },
   'service_status': { path: '/api/status', method: 'GET' },
@@ -180,7 +180,7 @@ export class MivaaPayloadTransformer {
 
     // Transform options
     standardPayload.options = this.transformOptions(legacyPayload, action);
-    
+
     // Preserve metadata and tags
     standardPayload.metadata = legacyPayload.metadata || {};
     standardPayload.tags = legacyPayload.tags || [];
@@ -193,7 +193,7 @@ export class MivaaPayloadTransformer {
    */
   static transformToMivaaFormat(standardPayload: StandardMivaaPayload): any {
     const { action, resourceUrl, resourceName, options = {} } = standardPayload;
-    
+
     // Get endpoint configuration
     const endpoint = MIVAA_ACTION_MAP[action];
     if (!endpoint) {
@@ -214,11 +214,11 @@ export class MivaaPayloadTransformer {
           timeout_seconds: options.timeout ? Math.floor(options.timeout / 1000) : 300,
           quality: options.quality || 'standard',
           language: options.language || 'auto',
-          ...options
+          ...options,
         },
         document_name: resourceName || 'Uploaded Document',
         tags: standardPayload.tags || [],
-        metadata: standardPayload.metadata || {}
+        metadata: standardPayload.metadata || {},
       };
     }
 
@@ -230,8 +230,8 @@ export class MivaaPayloadTransformer {
           include_properties: options.includeProperties ?? true,
           include_composition: options.includeComposition ?? true,
           confidence_threshold: options.confidenceThreshold ?? 0.8,
-          ...options
-        }
+          ...options,
+        },
       };
     }
 
@@ -240,7 +240,7 @@ export class MivaaPayloadTransformer {
       ...standardPayload,
       url: resourceUrl,
       name: resourceName,
-      ...options
+      ...options,
     };
   }
 

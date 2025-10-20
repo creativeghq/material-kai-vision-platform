@@ -1,6 +1,6 @@
 /**
  * Dynamic Category Management Service
- * 
+ *
  * Manages dynamic material and product categories with automatic updates
  * from document processing and AI extraction
  */
@@ -96,7 +96,7 @@ class DynamicCategoryManagementService {
       const hierarchicalData = this.buildHierarchy(data || []);
       this.categoriesCache = hierarchicalData;
       this.cacheTimestamp = Date.now();
-      
+
       return hierarchicalData;
     } catch (error) {
       console.error('Failed to fetch categories hierarchy:', error);
@@ -148,7 +148,7 @@ class DynamicCategoryManagementService {
           ai_confidence_threshold: request.aiConfidenceThreshold ?? 0.7,
           processing_priority: request.processingPriority ?? 1,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -157,7 +157,7 @@ class DynamicCategoryManagementService {
 
       // Clear cache to force refresh
       this.clearCache();
-      
+
       return this.mapToHierarchy(data);
     } catch (error) {
       console.error('Failed to create category:', error);
@@ -174,7 +174,7 @@ class DynamicCategoryManagementService {
         .from('material_categories')
         .update({
           ...updates,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('category_key', categoryKey);
 
@@ -182,7 +182,7 @@ class DynamicCategoryManagementService {
 
       // Clear cache to force refresh
       this.clearCache();
-      
+
       return true;
     } catch (error) {
       console.error('Failed to update category:', error);
@@ -194,8 +194,8 @@ class DynamicCategoryManagementService {
    * Extract categories from document content using AI
    */
   public async extractCategoriesFromContent(
-    content: string, 
-    documentId: string
+    content: string,
+    documentId: string,
   ): Promise<CategoryExtractionResult[]> {
     try {
       // Call MIVAA service for category extraction
@@ -207,8 +207,8 @@ class DynamicCategoryManagementService {
         body: JSON.stringify({
           content,
           documentId,
-          extractionTypes: ['material_category', 'product_category']
-        })
+          extractionTypes: ['material_category', 'product_category'],
+        }),
       });
 
       if (!response.ok) {
@@ -228,12 +228,12 @@ class DynamicCategoryManagementService {
    */
   public async autoUpdateCategoriesFromDocument(
     documentId: string,
-    extractedData: any
+    extractedData: any,
   ): Promise<void> {
     try {
       const extractedCategories = await this.extractCategoriesFromContent(
         extractedData.content || '',
-        documentId
+        documentId,
       );
 
       // Process high-confidence category extractions
@@ -255,7 +255,7 @@ class DynamicCategoryManagementService {
    */
   private async ensureCategoryExists(extraction: CategoryExtractionResult): Promise<void> {
     const existingCategory = await this.getCategoryByKey(extraction.categoryKey);
-    
+
     if (!existingCategory) {
       // Auto-create category based on extraction
       await this.createCategory({
@@ -268,7 +268,7 @@ class DynamicCategoryManagementService {
         displayGroup: this.determineCategoryGroup(extraction.categoryKey),
         aiExtractionEnabled: true,
         aiConfidenceThreshold: 0.7,
-        processingPriority: 5
+        processingPriority: 5,
       });
     }
   }
@@ -283,7 +283,7 @@ class DynamicCategoryManagementService {
 
   // Private helper methods
   private isCacheValid(): boolean {
-    return this.cacheTimestamp !== null && 
+    return this.cacheTimestamp !== null &&
            (Date.now() - this.cacheTimestamp) < this.CACHE_DURATION;
   }
 
@@ -305,7 +305,7 @@ class DynamicCategoryManagementService {
     // Second pass: build parent-child relationships
     categories.forEach(cat => {
       const hierarchy = categoryMap.get(cat.id)!;
-      
+
       if (cat.parent_category_id) {
         const parent = categoryMap.get(cat.parent_category_id);
         if (parent) {
@@ -336,7 +336,7 @@ class DynamicCategoryManagementService {
       aiExtractionEnabled: data.ai_extraction_enabled,
       aiConfidenceThreshold: data.ai_confidence_threshold,
       processingPriority: data.processing_priority,
-      children: []
+      children: [],
     };
   }
 
@@ -354,8 +354,8 @@ class DynamicCategoryManagementService {
   }
 
   private formatCategoryName(categoryKey: string): string {
-    return categoryKey.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
+    return categoryKey.split('_').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1),
     ).join(' ');
   }
 
@@ -366,15 +366,15 @@ class DynamicCategoryManagementService {
   private determineCategoryGroup(categoryKey: string): string {
     const productKeywords = ['tile', 'decor', 'lighting', 'furniture', 'fixture'];
     const materialKeywords = ['wood', 'metal', 'ceramic', 'glass', 'plastic'];
-    
+
     const key = categoryKey.toLowerCase();
-    
+
     if (productKeywords.some(keyword => key.includes(keyword))) {
       return 'products';
     } else if (materialKeywords.some(keyword => key.includes(keyword))) {
       return 'core_materials';
     }
-    
+
     return 'other';
   }
 
@@ -384,7 +384,7 @@ class DynamicCategoryManagementService {
         category_key: cat.categoryKey,
         confidence: cat.confidence,
         extracted_from: cat.extractedFrom,
-        context: cat.context
+        context: cat.context,
       }));
 
       await supabase
@@ -392,8 +392,8 @@ class DynamicCategoryManagementService {
         .update({
           metadata: {
             extracted_categories: categoryData,
-            last_category_update: new Date().toISOString()
-          }
+            last_category_update: new Date().toISOString(),
+          },
         })
         .eq('id', documentId);
     } catch (error) {

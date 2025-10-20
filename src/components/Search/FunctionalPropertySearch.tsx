@@ -23,12 +23,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
-import { 
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-
 import { type FunctionalMetadata } from '@/types/materials';
 
 /** Filter criteria for functional properties search - Complete metadata coverage */
@@ -245,7 +244,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
     const newActiveCategories = checked
       ? [...filters.activeCategories, category]
       : filters.activeCategories.filter(c => c !== category);
-    
+
     onFiltersChange({
       ...filters,
       activeCategories: newActiveCategories,
@@ -265,7 +264,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
   /** Render category-specific filter controls */
   const renderCategorySpecificFilters = useCallback((categoryKey: string) => {
     const categoryFilters = filters.propertyFilters[categoryKey as keyof typeof filters.propertyFilters];
-    
+
     const updateCategoryFilter = (key: string, value: unknown) => {
       const newFilters = {
         ...filters,
@@ -292,7 +291,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['R9', 'R10', 'R11', 'R12', 'R13'].map(rValue => (
                   <Button
                     key={rValue}
-                    variant={slipFilters?.rValue?.includes(rValue) ? "default" : "outline"}
+                    variant={slipFilters?.rValue?.includes(rValue) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -333,7 +332,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['A', 'B', 'C'].map(grade => (
                   <Button
                     key={grade}
-                    variant={slipFilters?.barefootRampTest?.includes(grade) ? "default" : "outline"}
+                    variant={slipFilters?.barefootRampTest?.includes(grade) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -364,7 +363,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['super-polished', 'polished', 'satin', 'semi-polished', 'matte', 'velvet', 'anti-glare'].map(level => (
                   <Button
                     key={level}
-                    variant={glossFilters?.glossLevel?.includes(level) ? "default" : "outline"}
+                    variant={glossFilters?.glossLevel?.includes(level) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -455,7 +454,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {[0, 1, 2, 3, 4, 5].map(rating => (
                   <Button
                     key={rating}
-                    variant={mechanicalFilters?.peiRating?.includes(rating) ? "default" : "outline"}
+                    variant={mechanicalFilters?.peiRating?.includes(rating) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -479,7 +478,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['low', 'medium', 'high'].map(level => (
                   <Button
                     key={level}
-                    variant={mechanicalFilters?.impactResistanceClass?.includes(level) ? "default" : "outline"}
+                    variant={mechanicalFilters?.impactResistanceClass?.includes(level) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -577,7 +576,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['non-porous', 'semi-porous', 'porous'].map(classification => (
                   <Button
                     key={classification}
-                    variant={waterFilters?.waterAbsorptionClass?.includes(classification) ? "default" : "outline"}
+                    variant={waterFilters?.waterAbsorptionClass?.includes(classification) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -633,7 +632,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['excellent', 'good', 'fair', 'poor'].map(level => (
                   <Button
                     key={level}
-                    variant={chemicalFilters?.acidResistance?.includes(level) ? "default" : "outline"}
+                    variant={chemicalFilters?.acidResistance?.includes(level) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -657,7 +656,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {[1, 2, 3, 4, 5].map(rating => (
                   <Button
                     key={rating}
-                    variant={chemicalFilters?.stainResistanceClass?.includes(rating) ? "default" : "outline"}
+                    variant={chemicalFilters?.stainResistanceClass?.includes(rating) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -748,7 +747,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['A+', 'A', 'B', 'C'].map(rating => (
                   <Button
                     key={rating}
-                    variant={envFilters?.vocEmissionRange?.includes(rating) ? "default" : "outline"}
+                    variant={envFilters?.vocEmissionRange?.includes(rating) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -861,7 +860,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['V1', 'V2', 'V3', 'V4'].map(variation => (
                   <Button
                     key={variation}
-                    variant={dimensionalFilters?.shadeVariation?.includes(variation) ? "default" : "outline"}
+                    variant={dimensionalFilters?.shadeVariation?.includes(variation) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -885,7 +884,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {['smooth', 'textured', 'structured', 'natural', 'grip'].map(texture => (
                   <Button
                     key={texture}
-                    variant={dimensionalFilters?.textureType?.includes(texture) ? "default" : "outline"}
+                    variant={dimensionalFilters?.textureType?.includes(texture) ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs px-2 py-1 h-auto"
                     onClick={() => {
@@ -1025,8 +1024,8 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 return (
                   <Badge key={categoryKey} variant="secondary" className="text-xs">
                     {category.displayName}
-                    <X 
-                      className="h-3 w-3 ml-1 cursor-pointer" 
+                    <X
+                      className="h-3 w-3 ml-1 cursor-pointer"
                       onClick={() => handleCategoryToggle(categoryKey, false)}
                     />
                   </Badge>
@@ -1109,7 +1108,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {Object.keys(FUNCTIONAL_CATEGORIES).map(categoryKey =>
-              renderCategoryFilter(categoryKey)
+              renderCategoryFilter(categoryKey),
             )}
           </div>
         </CardContent>
@@ -1134,7 +1133,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {filters.activeCategories.map(categoryKey => {
                   const category = FUNCTIONAL_CATEGORIES[categoryKey as keyof typeof FUNCTIONAL_CATEGORIES];
                   if (!category) return null;
-                  
+
                   const Icon = category.icon;
                   return (
                     <div key={categoryKey} className="border rounded-lg p-4">
@@ -1151,7 +1150,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                     </div>
                   );
                 })}
-                
+
                 {/* Filter Actions */}
                 <div className="flex items-center justify-between pt-4 border-t">
                   <div className="text-xs text-muted-foreground">

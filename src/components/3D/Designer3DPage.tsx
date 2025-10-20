@@ -142,17 +142,9 @@ export const Designer3DPage: React.FC = () => {
 
   const handleGenerate = async () => {
     // CRITICAL DEBUG: Capture prompt state at function entry
-    console.log('🔍 DEBUG: handleGenerate called');
-    console.log('🔍 DEBUG: prompt state at entry:', {
-      prompt,
-      promptType: typeof prompt,
-      promptLength: prompt?.length,
-      promptTrimmed: prompt?.trim(),
-      promptTrimmedLength: prompt?.trim()?.length,
-    });
 
     if (!prompt.trim()) {
-      console.error('❌ DEBUG: Prompt validation failed at entry check');
+      // Prompt validation failed at entry check
       toast({
         title: 'Prompt Required',
         description: 'Please enter a design prompt to generate your 3D interior.',

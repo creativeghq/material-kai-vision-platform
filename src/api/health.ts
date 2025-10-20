@@ -1,6 +1,6 @@
 /**
  * Health Check API Endpoints
- * 
+ *
  * Provides health and readiness endpoints for load balancer monitoring
  * and service health checks.
  */
@@ -76,7 +76,7 @@ export async function healthCheck(): Promise<HealthStatus> {
   if (typeof process !== 'undefined' && process.memoryUsage) {
     const memUsage = process.memoryUsage();
     const memoryPercentage = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-    
+
     details.memory = {
       used: memUsage.heapUsed,
       total: memUsage.heapTotal,
@@ -115,7 +115,7 @@ export async function healthCheck(): Promise<HealthStatus> {
  */
 export async function readinessCheck(): Promise<ReadinessStatus> {
   const timestamp = new Date().toISOString();
-  
+
   const checks = {
     database: false,
     configuration: false,
@@ -172,9 +172,9 @@ export function createHealthEndpoint() {
   return async (_req: any, res: any) => {
     try {
       const health = await healthCheck();
-      const statusCode = health.status === 'healthy' ? 200 : 
+      const statusCode = health.status === 'healthy' ? 200 :
                         health.status === 'degraded' ? 200 : 503;
-      
+
       res.status(statusCode).json(health);
     } catch (error) {
       res.status(503).json({
@@ -194,7 +194,7 @@ export function createReadinessEndpoint() {
     try {
       const readiness = await readinessCheck();
       const statusCode = readiness.ready ? 200 : 503;
-      
+
       res.status(statusCode).json(readiness);
     } catch (error) {
       res.status(503).json({
@@ -212,9 +212,9 @@ export function createReadinessEndpoint() {
 export async function handleHealthRequest(): Promise<Response> {
   try {
     const health = await healthCheck();
-    const statusCode = health.status === 'healthy' ? 200 : 
+    const statusCode = health.status === 'healthy' ? 200 :
                       health.status === 'degraded' ? 200 : 503;
-    
+
     return new Response(JSON.stringify(health), {
       status: statusCode,
       headers: {
@@ -244,7 +244,7 @@ export async function handleReadinessRequest(): Promise<Response> {
   try {
     const readiness = await readinessCheck();
     const statusCode = readiness.ready ? 200 : 503;
-    
+
     return new Response(JSON.stringify(readiness), {
       status: statusCode,
       headers: {

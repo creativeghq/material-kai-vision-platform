@@ -29,7 +29,7 @@ export class MoodboardProductsService {
     productId: string,
     positionX?: number,
     positionY?: number,
-    notes?: string
+    notes?: string,
   ): Promise<MoodboardProduct> {
     try {
       const response = await this.apiService.call<
@@ -50,7 +50,7 @@ export class MoodboardProductsService {
           position_y: positionY,
           notes,
         },
-        { method: 'POST' }
+        { method: 'POST' },
       );
 
       return response as unknown as MoodboardProduct;
@@ -66,7 +66,7 @@ export class MoodboardProductsService {
   async getProducts(
     moodboardId: string,
     limit: number = 50,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<{ data: MoodboardProduct[]; count: number }> {
     try {
       const response = await this.apiService.call<
@@ -75,7 +75,7 @@ export class MoodboardProductsService {
       >(
         'moodboard-products-api',
         { moodboard_id: moodboardId, limit, offset },
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       return response;
@@ -96,7 +96,7 @@ export class MoodboardProductsService {
       >(
         'moodboard-products-api',
         { moodboard_id: moodboardId, product_id: productId },
-        { method: 'DELETE' }
+        { method: 'DELETE' },
       );
 
       if (!response.success) {
@@ -115,7 +115,7 @@ export class MoodboardProductsService {
     moodboardId: string,
     productId: string,
     positionX: number,
-    positionY: number
+    positionY: number,
   ): Promise<MoodboardProduct> {
     try {
       // Note: This would require an additional PATCH endpoint

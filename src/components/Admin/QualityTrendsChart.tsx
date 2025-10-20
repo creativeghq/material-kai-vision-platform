@@ -1,11 +1,10 @@
 /**
  * Quality Trends Chart Component
- * 
+ *
  * Displays quality metrics trends over time using a line chart.
  */
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   LineChart,
   Line,
@@ -16,6 +15,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { QualityTrend } from '@/services/QualityDashboardService';
 
 interface QualityTrendsChartProps {

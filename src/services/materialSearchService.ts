@@ -56,14 +56,14 @@ export class MaterialSearchService {
         ...(params.minConfidence && { min_confidence: params.minConfidence.toString() }),
         include_images: (params.includeImages !== false).toString(),
         include_metafields: (params.includeMetafields !== false).toString(),
-        include_relationships: (params.includeRelationships !== false).toString()
+        include_relationships: (params.includeRelationships !== false).toString(),
       });
 
       const { data, error } = await supabase.functions.invoke('unified-material-search', {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       if (error) {
@@ -72,7 +72,7 @@ export class MaterialSearchService {
           success: false,
           data: [],
           metadata: {},
-          error: error.message || 'Search failed'
+          error: error.message || 'Search failed',
         };
       }
 
@@ -80,7 +80,7 @@ export class MaterialSearchService {
         success: data.success,
         data: data.data || [],
         metadata: data.metadata || {},
-        error: data.error
+        error: data.error,
       };
 
     } catch (error) {
@@ -89,7 +89,7 @@ export class MaterialSearchService {
         success: false,
         data: [],
         metadata: {},
-        error: error instanceof Error ? error.message : 'Unknown search error'
+        error: error instanceof Error ? error.message : 'Unknown search error',
       };
     }
   }
@@ -109,21 +109,21 @@ export class MaterialSearchService {
     try {
       const { data, error } = await supabase.functions.invoke('unified-material-search', {
         method: 'GET',
-        body: null // GET request for suggestions endpoint
+        body: null, // GET request for suggestions endpoint
       });
 
       if (error) {
         return {
           success: false,
           data: [],
-          error: error.message || 'Failed to get suggestions'
+          error: error.message || 'Failed to get suggestions',
         };
       }
 
       return {
         success: data.success,
         data: data.data || [],
-        error: data.error
+        error: data.error,
       };
 
     } catch (error) {
@@ -131,7 +131,7 @@ export class MaterialSearchService {
       return {
         success: false,
         data: [],
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -147,27 +147,27 @@ export class MaterialSearchService {
     try {
       const { data, error } = await supabase.functions.invoke('unified-materials-api', {
         method: 'GET',
-        body: null // GET request with materialId in path
+        body: null, // GET request with materialId in path
       });
 
       if (error) {
         return {
           success: false,
-          error: error.message || 'Failed to get material'
+          error: error.message || 'Failed to get material',
         };
       }
 
       return {
         success: data.success,
         data: data.data,
-        error: data.error
+        error: data.error,
       };
 
     } catch (error) {
       console.error('Get material error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -183,7 +183,7 @@ export class MaterialSearchService {
       isFeatured?: boolean;
       displayOrder?: number;
       metadata?: Record<string, unknown>;
-    } = {}
+    } = {},
   ): Promise<{
     success: boolean;
     data?: unknown;
@@ -208,28 +208,28 @@ export class MaterialSearchService {
           is_featured: options.isFeatured || false,
           display_order: options.displayOrder || 0,
           file_name: imageFile.name,
-          metadata: options.metadata || {}
-        }
+          metadata: options.metadata || {},
+        },
       });
 
       if (error) {
         return {
           success: false,
-          error: error.message || 'Failed to upload image'
+          error: error.message || 'Failed to upload image',
         };
       }
 
       return {
         success: data.success,
         data: data.data,
-        error: data.error
+        error: data.error,
       };
 
     } catch (error) {
       console.error('Image upload error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }

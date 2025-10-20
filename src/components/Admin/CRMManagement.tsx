@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Building2, Plus, Edit, Trash2, Search } from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,12 +141,12 @@ export const CRMManagement: React.FC = () => {
   };
 
   const filteredUsers = users.filter(user =>
-    user.user_id.toLowerCase().includes(searchTerm.toLowerCase())
+    user.user_id.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    contact.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (

@@ -226,7 +226,7 @@ export class ToolAccessControlManager {
    */
   getAccessibleTools(userRole: UserRole): ToolDefinition[] {
     return Array.from(this.tools.values()).filter(tool =>
-      tool.allowedRoles.includes(userRole)
+      tool.allowedRoles.includes(userRole),
     );
   }
 
@@ -236,7 +236,7 @@ export class ToolAccessControlManager {
   getExecutionLogs(toolId?: string, userId?: string): ToolExecutionLog[] {
     return this.executionLogs.filter(log =>
       (!toolId || log.toolId === toolId) &&
-      (!userId || log.userId === userId)
+      (!userId || log.userId === userId),
     );
   }
 

@@ -1,39 +1,40 @@
 /**
  * Quality Dashboard Service
- * 
+ *
  * Aggregates quality metrics from Image Validation, Product Enrichment,
  * and Validation Rules services to provide comprehensive quality insights.
  */
+
+import { supabase } from '@/integrations/supabase/client';
 
 import { BaseService } from './base/BaseService';
 import { ImageValidationService } from './ImageValidationService';
 import { ProductEnrichmentService } from './ProductEnrichmentService';
 import { ValidationRulesService } from './ValidationRulesService';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface QualityMetrics {
   timestamp: string;
   workspace_id: string;
-  
+
   // Image Validation Metrics
   total_images_validated: number;
   valid_images: number;
   invalid_images: number;
   images_needing_review: number;
   average_image_quality_score: number;
-  
+
   // Product Enrichment Metrics
   total_chunks_enriched: number;
   enriched_chunks: number;
   unenriched_chunks: number;
   average_enrichment_score: number;
-  
+
   // Validation Rules Metrics
   total_validations: number;
   passed_validations: number;
   failed_validations: number;
   validation_pass_rate: number;
-  
+
   // Overall Quality Score
   overall_quality_score: number;
   quality_trend: 'improving' | 'stable' | 'declining';
@@ -101,10 +102,10 @@ class QualityDashboardServiceImpl extends BaseService {
     return this.executeOperation(async () => {
       // Get image validation stats
       const imageStats = await this.imageValidationService.getValidationStats(workspaceId);
-      
+
       // Get product enrichment stats
       const enrichmentStats = await this.productEnrichmentService.getEnrichmentStats(workspaceId);
-      
+
       // Get validation rules stats
       const validationStats = await this.validationRulesService.getValidationStats(workspaceId);
 
@@ -113,15 +114,15 @@ class QualityDashboardServiceImpl extends BaseService {
       const enrichmentQualityWeight = 0.35;
       const validationQualityWeight = 0.35;
 
-      const imageQualityScore = imageStats.total_images > 0 
-        ? imageStats.valid_images / imageStats.total_images 
+      const imageQualityScore = imageStats.total_images > 0
+        ? imageStats.valid_images / imageStats.total_images
         : 0;
-      
+
       const enrichmentQualityScore = enrichmentStats.total_chunks > 0
         ? enrichmentStats.enriched_chunks / enrichmentStats.total_chunks
         : 0;
 
-      const overallQualityScore = 
+      const overallQualityScore =
         (imageQualityScore * imageQualityWeight) +
         (enrichmentQualityScore * enrichmentQualityWeight) +
         (validationStats.pass_rate * validationQualityWeight);

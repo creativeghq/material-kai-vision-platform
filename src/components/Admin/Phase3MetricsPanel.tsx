@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, Link2, Search, MessageSquare } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Link2, Search, MessageSquare } from 'lucide-react';
+
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface RelationshipStats {

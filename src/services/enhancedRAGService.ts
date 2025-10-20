@@ -154,7 +154,7 @@ export class EnhancedRAGService {
       const ragError = ErrorHandler.handleError(error, {
         query: request.query,
         searchType: request.searchType,
-        operation: 'Enhanced RAG search failed'
+        operation: 'Enhanced RAG search failed',
       });
       throw ragError;
     }
@@ -193,7 +193,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
         materialId,
-        operation: 'Material knowledge fetch failed'
+        operation: 'Material knowledge fetch failed',
       });
       throw ragError;
     }
@@ -266,7 +266,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
         entryTitle: entry.title,
-        operation: 'Knowledge entry addition failed'
+        operation: 'Knowledge entry addition failed',
       });
       throw ragError;
     }
@@ -306,7 +306,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
         entryId,
-        operation: 'Knowledge relationships fetch failed'
+        operation: 'Knowledge relationships fetch failed',
       });
       throw ragError;
     }
@@ -351,7 +351,7 @@ export class EnhancedRAGService {
       }));
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
-        operation: 'Query history fetch failed'
+        operation: 'Query history fetch failed',
       });
       throw ragError;
     }
@@ -401,7 +401,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
         satisfaction: feedback.satisfaction,
-        operation: 'Feedback submission failed'
+        operation: 'Feedback submission failed',
       });
       throw ragError;
     }
@@ -459,7 +459,7 @@ export class EnhancedRAGService {
       };
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
-        operation: 'Search analytics fetch failed'
+        operation: 'Search analytics fetch failed',
       });
       throw ragError;
     }
@@ -507,7 +507,7 @@ export class EnhancedRAGService {
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
         materialId,
-        operation: 'Material knowledge extraction failed'
+        operation: 'Material knowledge extraction failed',
       });
       throw ragError;
     }
@@ -539,7 +539,7 @@ export class EnhancedRAGService {
       return { success: true };
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
-        operation: 'Knowledge validation failed'
+        operation: 'Knowledge validation failed',
       });
       throw ragError;
     }

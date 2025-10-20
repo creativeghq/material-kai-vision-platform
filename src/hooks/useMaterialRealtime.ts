@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+
 import { MaterialRealtimeService, MaterialChangePayload, MaterialSubscriptionCallbacks } from '../services/realtime/materialRealtimeService';
 // import { supabase } from '../lib/supabase'; // Fixed: Using window.supabase instead
 
@@ -23,7 +24,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
   const [state, setState] = useState<MaterialRealtimeState>({
     isConnected: false,
     activeChannels: 0,
-    reconnectAttempts: 0
+    reconnectAttempts: 0,
   });
 
   const serviceRef = useRef<MaterialRealtimeService | null>(null);
@@ -37,7 +38,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
     const service = new MaterialRealtimeService({
       supabaseUrl: (window as any).supabase?.supabaseUrl || '',
       supabaseAnonKey: (window as any).supabase?.supabaseKey || '',
-      authToken: (window as any).supabase?.auth?.session()?.access_token
+      authToken: (window as any).supabase?.auth?.session()?.access_token,
     });
 
     const callbacks: MaterialSubscriptionCallbacks = {
@@ -47,72 +48,72 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
         if (payload.new) {
           setMaterialData((prev: Record<string, unknown> | null) => ({
             ...(prev || {}),
-            ...(payload.new as Record<string, unknown>)
+            ...(payload.new as Record<string, unknown>),
           }));
         }
-        
+
         setState(prev => ({
           ...prev,
-          lastUpdate: payload.timestamp
+          lastUpdate: payload.timestamp,
         }));
       },
-      
+
       onImageChange: (payload) => {
         console.log('Image change received:', payload);
-        
+
         setImageUpdates(prev => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
-        
+
         setState(prev => ({
           ...prev,
-          lastUpdate: payload.timestamp
+          lastUpdate: payload.timestamp,
         }));
       },
-      
+
       onMetafieldChange: (payload) => {
         console.log('Metafield change received:', payload);
-        
+
         setMetafieldUpdates(prev => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
-        
+
         setState(prev => ({
           ...prev,
-          lastUpdate: payload.timestamp
+          lastUpdate: payload.timestamp,
         }));
       },
-      
+
       onRelationshipChange: (payload) => {
         console.log('Relationship change received:', payload);
-        
+
         setRelationshipUpdates(prev => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
-        
+
         setState(prev => ({
           ...prev,
-          lastUpdate: payload.timestamp
+          lastUpdate: payload.timestamp,
         }));
       },
-      
+
       onConnected: () => {
         setState(prev => ({
           ...prev,
           isConnected: true,
-          error: undefined
+          error: undefined,
         }));
       },
-      
+
       onDisconnected: () => {
         setState(prev => ({
           ...prev,
-          isConnected: false
+          isConnected: false,
         }));
       },
-      
+
       onError: (error) => {
         console.error('Material realtime error:', error);
         setState(prev => ({
           ...prev,
-          error: error.message
+          error: error.message,
         }));
         options.onError?.(error);
-      }
+      },
     };
 
     service.setCallbacks(callbacks);
@@ -127,7 +128,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
           images: options.subscribeToImages !== false,
           metafields: options.subscribeToMetafields !== false,
           relationships: options.subscribeToRelationships !== false,
-          materialId: options.materialId
+          materialId: options.materialId,
         };
 
         service.configureSubscriptions(subscriptionConfig);
@@ -135,7 +136,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
         console.error('Failed to auto-connect:', error);
         setState(prev => ({
           ...prev,
-          error: error.message
+          error: error.message,
         }));
       });
     }
@@ -155,7 +156,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
           ...prev,
           isConnected: status.isConnected,
           activeChannels: status.activeChannels,
-          reconnectAttempts: status.reconnectAttempts
+          reconnectAttempts: status.reconnectAttempts,
         }));
       }
     }, 5000);
@@ -196,22 +197,22 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
   return {
     // Connection state
     ...state,
-    
+
     // Data state
     materialData,
     imageUpdates,
     metafieldUpdates,
     relationshipUpdates,
-    
+
     // Actions
     connect,
     disconnect,
     subscribeToMaterial,
     unsubscribeFromMaterial,
     clearUpdates,
-    
+
     // Service reference for advanced usage
-    service: serviceRef.current
+    service: serviceRef.current,
   };
 }
 
@@ -222,7 +223,7 @@ export function useMaterialMonitor(materialId: string) {
     autoConnect: true,
     subscribeToImages: true,
     subscribeToMetafields: true,
-    subscribeToRelationships: true
+    subscribeToRelationships: true,
   });
 }
 
@@ -232,7 +233,7 @@ export function useMaterialsOverview() {
     autoConnect: true,
     subscribeToImages: true,
     subscribeToMetafields: true,
-    subscribeToRelationships: true
+    subscribeToRelationships: true,
   });
 }
 
@@ -243,7 +244,7 @@ export function useMaterialImageUpdates(materialId?: string) {
     autoConnect: true,
     subscribeToImages: true,
     subscribeToMetafields: false,
-    subscribeToRelationships: false
+    subscribeToRelationships: false,
   });
 }
 
@@ -253,7 +254,7 @@ export function useMaterialMetafieldUpdates(materialId?: string) {
     autoConnect: true,
     subscribeToImages: false,
     subscribeToMetafields: true,
-    subscribeToRelationships: false
+    subscribeToRelationships: false,
   });
 }
 
@@ -263,6 +264,6 @@ export function useMaterialRelationshipUpdates(materialId?: string) {
     autoConnect: true,
     subscribeToImages: false,
     subscribeToMetafields: false,
-    subscribeToRelationships: true
+    subscribeToRelationships: true,
   });
 }

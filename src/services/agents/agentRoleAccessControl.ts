@@ -149,7 +149,7 @@ export class AgentAccessControlManager {
    */
   getAccessibleAgents(userRole: UserRole): AgentAccessPolicy[] {
     return Array.from(this.agentPolicies.values()).filter(policy =>
-      policy.allowedRoles.includes(userRole)
+      policy.allowedRoles.includes(userRole),
     );
   }
 
@@ -158,7 +158,7 @@ export class AgentAccessControlManager {
    */
   getAccessibleTools(userRole: UserRole): ToolAccessPolicy[] {
     return Array.from(this.toolPolicies.values()).filter(policy =>
-      policy.allowedRoles.includes(userRole)
+      policy.allowedRoles.includes(userRole),
     );
   }
 

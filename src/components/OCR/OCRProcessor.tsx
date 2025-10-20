@@ -65,7 +65,7 @@ export const OCRProcessor: React.FC = () => {
       const mockResult: HybridOCRResult = {
         text: 'Sample extracted text from document',
         confidence: 0.95,
-        processingMethod: recommendation.method
+        processingMethod: recommendation.method,
       };
 
       setOcrResult(mockResult);

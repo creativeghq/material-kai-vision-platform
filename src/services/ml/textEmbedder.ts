@@ -1,10 +1,10 @@
 import { pipeline } from '@huggingface/transformers';
 
 import { BaseService, ServiceConfig } from '../base/BaseService';
+import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
 
 import { MLResult, TextEmbeddingResult, FeatureExtractionOptions } from './types';
 import { DeviceDetector } from './deviceDetector';
-import { DEFAULT_EMBEDDING_CONFIG } from '../../config/embeddingConfig';
 
 /**
  * Configuration interface for TextEmbedderService

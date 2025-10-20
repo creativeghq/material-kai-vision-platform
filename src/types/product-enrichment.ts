@@ -9,21 +9,21 @@
 /**
  * Product Enrichment Status Types
  */
-export type ProductEnrichmentStatus = "pending" | "enriched" | "failed" | "needs_review";
+export type ProductEnrichmentStatus = 'pending' | 'enriched' | 'failed' | 'needs_review';
 
 /**
  * Product Category
  */
 export type ProductCategory =
-  | "electronics"
-  | "furniture"
-  | "clothing"
-  | "food"
-  | "books"
-  | "tools"
-  | "home"
-  | "sports"
-  | "other";
+  | 'electronics'
+  | 'furniture'
+  | 'clothing'
+  | 'food'
+  | 'books'
+  | 'tools'
+  | 'home'
+  | 'sports'
+  | 'other';
 
 /**
  * Product Metadata
@@ -85,13 +85,13 @@ export interface ProductEnrichment {
   enrichment_score?: number; // 0-1
   issues?: Array<{
     type: string;
-    severity: "low" | "medium" | "high";
+    severity: 'low' | 'medium' | 'high';
     description: string;
   }>;
   recommendations?: Array<{
     type: string;
     description: string;
-    priority: "low" | "medium" | "high";
+    priority: 'low' | 'medium' | 'high';
   }>;
   enriched_at?: string;
   created_at: string;
@@ -118,13 +118,13 @@ export interface ProductEnrichmentInsert {
   enrichment_score?: number;
   issues?: Array<{
     type: string;
-    severity: "low" | "medium" | "high";
+    severity: 'low' | 'medium' | 'high';
     description: string;
   }>;
   recommendations?: Array<{
     type: string;
     description: string;
-    priority: "low" | "medium" | "high";
+    priority: 'low' | 'medium' | 'high';
   }>;
   enriched_at?: string;
 }
@@ -147,13 +147,13 @@ export interface ProductEnrichmentUpdate {
   enrichment_score?: number;
   issues?: Array<{
     type: string;
-    severity: "low" | "medium" | "high";
+    severity: 'low' | 'medium' | 'high';
     description: string;
   }>;
   recommendations?: Array<{
     type: string;
     description: string;
-    priority: "low" | "medium" | "high";
+    priority: 'low' | 'medium' | 'high';
   }>;
   enriched_at?: string;
 }

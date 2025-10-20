@@ -55,7 +55,7 @@ export class BrowserApiIntegrationService {
    */
   public async generateImageWithReplicate(
     model: string,
-    params: TextToImageParams
+    params: TextToImageParams,
   ): Promise<StandardizedApiResponse> {
     const client = browserApiClientFactory.getClient('replicate');
     if (!client) {
@@ -85,7 +85,7 @@ export class BrowserApiIntegrationService {
    */
   public async generateImageWithHuggingFace(
     model: string,
-    prompt: string
+    prompt: string,
   ): Promise<StandardizedApiResponse> {
     const client = browserApiClientFactory.getClient('huggingface');
     if (!client) {
@@ -115,7 +115,7 @@ export class BrowserApiIntegrationService {
    */
   public async callSupabaseFunction(
     functionName: string,
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
   ): Promise<StandardizedApiResponse> {
     const client = browserApiClientFactory.getClient('supabase');
     if (!client) {
@@ -152,8 +152,8 @@ export class BrowserApiIntegrationService {
   }): Promise<StandardizedApiResponse> {
     // Try Replicate first (usually better quality)
     const replicateModels = browserApiClientFactory.getAvailableModels('replicate');
-    const interiorModel = replicateModels.find(model => 
-      model.includes('interior') || model.includes('design')
+    const interiorModel = replicateModels.find(model =>
+      model.includes('interior') || model.includes('design'),
     );
 
     if (interiorModel) {

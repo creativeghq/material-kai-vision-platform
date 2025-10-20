@@ -71,8 +71,8 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
       },
       body: JSON.stringify({
         action,
-        payload
-      })
+        payload,
+      }),
     });
 
     if (!response.ok) {
@@ -253,7 +253,7 @@ export class MivaaSearchIntegration {
       });
 
       return {
-        status: response.ok ? 'healthy' : 'unhealthy'
+        status: response.ok ? 'healthy' : 'unhealthy',
       };
     } catch (error) {
       console.error('MIVAA search service health check failed:', error);

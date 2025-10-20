@@ -1,6 +1,6 @@
 /**
  * Cache Manager
- * 
+ *
  * Centralized management for all cache instances across the application.
  * Provides cache coordination, cleanup, and monitoring capabilities.
  */
@@ -91,7 +91,7 @@ export class CacheManager {
    */
   clearAll(): void {
     console.log('🧹 Clearing all caches...');
-    
+
     Object.values(globalCaches).forEach(cache => {
       cache.clear();
     });
@@ -136,27 +136,27 @@ export class CacheManager {
 
     // Calculate totals
     const cacheMetrics = [metrics.api, metrics.embeddings, metrics.ui, metrics.ml];
-    
+
     metrics.total.totalEntries = Object.values(globalCaches).reduce(
-      (sum, cache) => sum + cache.size(), 
-      0
+      (sum, cache) => sum + cache.size(),
+      0,
     );
 
     metrics.total.totalMemoryUsage = cacheMetrics.reduce(
-      (sum, metric) => sum + metric.memoryUsage, 
-      0
+      (sum, metric) => sum + metric.memoryUsage,
+      0,
     );
 
     metrics.total.totalRequests = cacheMetrics.reduce(
-      (sum, metric) => sum + metric.totalRequests, 
-      0
+      (sum, metric) => sum + metric.totalRequests,
+      0,
     );
 
     // Calculate average hit rate weighted by requests
     if (metrics.total.totalRequests > 0) {
       const weightedHitRate = cacheMetrics.reduce(
-        (sum, metric) => sum + (metric.hitRate * metric.totalRequests), 
-        0
+        (sum, metric) => sum + (metric.hitRate * metric.totalRequests),
+        0,
       );
       metrics.total.averageHitRate = weightedHitRate / metrics.total.totalRequests;
     }
@@ -205,7 +205,7 @@ export class CacheManager {
     // Check individual cache health
     Object.entries(globalCaches).forEach(([name, cache]) => {
       const cacheMetrics = cache.getMetrics();
-      
+
       if (cacheMetrics.evictions > cacheMetrics.hits * 0.1) {
         issues.push(`High eviction rate in ${name} cache`);
       }
@@ -227,11 +227,11 @@ export class CacheManager {
     // Log optimization suggestions
     Object.entries(globalCaches).forEach(([name, cache]) => {
       const cacheMetrics = cache.getMetrics();
-      
+
       if (cacheMetrics.hitRate < 0.3) {
         console.log(`💡 Consider increasing TTL for ${name} cache (low hit rate: ${(cacheMetrics.hitRate * 100).toFixed(1)}%)`);
       }
-      
+
       if (cacheMetrics.evictions > cacheMetrics.hits * 0.2) {
         console.log(`💡 Consider increasing size for ${name} cache (high eviction rate)`);
       }
@@ -257,7 +257,7 @@ export class CacheManager {
   private startMetricsCollection(): void {
     this.metricsTimer = setInterval(() => {
       const metrics = this.getGlobalMetrics();
-      
+
       // Log metrics if there's significant activity
       if (metrics.total.totalRequests > 0) {
         console.log('📊 Cache Metrics:', {
@@ -294,7 +294,7 @@ export const cacheManager = new CacheManager(defaultCacheManagerConfig);
 if (typeof window !== 'undefined') {
   // Browser environment
   cacheManager.initialize();
-  
+
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     cacheManager.shutdown();
@@ -302,12 +302,12 @@ if (typeof window !== 'undefined') {
 } else {
   // Server environment
   cacheManager.initialize();
-  
+
   // Cleanup on process exit
   process.on('exit', () => {
     cacheManager.shutdown();
   });
-  
+
   process.on('SIGINT', () => {
     cacheManager.shutdown();
     process.exit(0);

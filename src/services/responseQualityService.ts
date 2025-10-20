@@ -1,6 +1,6 @@
 /**
  * Response Quality Service
- * 
+ *
  * Validates response quality and detects hallucinations:
  * - Response coherence scoring
  * - Hallucination detection
@@ -32,7 +32,7 @@ export class ResponseQualityService {
     responseId: string,
     query: string,
     responseText: string,
-    sourceChunks: string[]
+    sourceChunks: string[],
   ): Promise<ResponseQualityMetrics> {
     try {
       console.log(`🔍 Evaluating response quality for ${responseId}...`);

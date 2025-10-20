@@ -5,8 +5,6 @@ import { Upload, Activity, Link } from 'lucide-react';
 import { PDFWorkflowViewer, WorkflowJob } from '@/components/PDF/PDFWorkflowViewer';
 import { PDFUploadProgressModal } from '@/components/PDF/PDFUploadProgressModal';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
-
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -137,7 +135,7 @@ const PDFProcessing = () => {
 
       toast({
         title: 'Processing Started',
-        description: `Started processing PDF from URL. You can monitor the progress in the modal.`,
+        description: 'Started processing PDF from URL. You can monitor the progress in the modal.',
       });
 
       setPdfUrl(''); // Clear the URL input

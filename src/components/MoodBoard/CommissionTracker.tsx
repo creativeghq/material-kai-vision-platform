@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { CommissionService, Commission, CommissionSummary } from '../../services/moodboard/CommissionService';
 
 interface CommissionTrackerProps {

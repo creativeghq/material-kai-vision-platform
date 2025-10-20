@@ -71,10 +71,10 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
         confidence: rawResponse.data.confidence || rawResponse.data.confidence_score || 0,
         processingTime: rawResponse.data.processingTime || rawResponse.data.processing_time_ms || 0,
         testType: rawResponse.data.testType || 'unknown',
-        model: rawResponse.data.model || 'unknown'
+        model: rawResponse.data.model || 'unknown',
       },
       error: rawResponse.error,
-      metadata: rawResponse.metadata
+      metadata: rawResponse.metadata,
     };
   }
 
@@ -91,13 +91,13 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
         confidence: rawResponse.overall_confidence || 0,
         processingTime: rawResponse.total_processing_time_ms || 0,
         testType: 'crewai',
-        model: 'multi-agent'
+        model: 'multi-agent',
       },
       metadata: {
         timestamp: new Date().toISOString(),
         requestId: rawResponse.task_id || crypto.randomUUID(),
-        apiType: 'crewai'
-      }
+        apiType: 'crewai',
+      },
     };
   }
 
@@ -114,13 +114,13 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
         confidence: 0.8,
         processingTime: rawResponse.processing_time_ms || 0,
         testType: 'simple',
-        model: 'unknown'
+        model: 'unknown',
       },
       metadata: {
         timestamp: new Date().toISOString(),
         requestId: crypto.randomUUID(),
-        apiType: 'simple'
-      }
+        apiType: 'simple',
+      },
     };
   }
 
@@ -130,13 +130,13 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
     error: {
       message: rawResponse.error_message || rawResponse.error || 'Unknown error',
       code: 'RESPONSE_PARSE_ERROR',
-      details: rawResponse
+      details: rawResponse,
     },
     metadata: {
       timestamp: new Date().toISOString(),
       requestId: crypto.randomUUID(),
-      apiType: 'error'
-    }
+      apiType: 'error',
+    },
   };
 };
 
@@ -251,7 +251,7 @@ export const AITestingPanel: React.FC = () => {
         test_type: testType,
         include_entities: true,
         include_materials: true,
-        confidence_threshold: 0.6
+        confidence_threshold: 0.6,
       };
 
       if (testType === 'text_analysis' || testType === 'combined_analysis') {
@@ -265,7 +265,7 @@ export const AITestingPanel: React.FC = () => {
       // Call multi-modal analysis endpoint
       const result = await apiService.callSupabaseFunction('mivaa-gateway', {
         action: 'multimodal_analysis',
-        payload: payload
+        payload: payload,
       });
 
       // ✅ Use standardized response handler
@@ -284,20 +284,20 @@ export const AITestingPanel: React.FC = () => {
         input_data: {
           text: testType !== 'image_analysis' ? multiModalTestText : undefined,
           image_url: testType !== 'text_analysis' ? multiModalTestImage : undefined,
-          combined: testType === 'combined_analysis'
+          combined: testType === 'combined_analysis',
         },
         results: {
           entities: (data.entities || []).map((entity: any) => ({
             type: entity.type || 'unknown',
             text: entity.text || entity.value || 'unknown',
-            confidence: entity.confidence || 0.8
+            confidence: entity.confidence || 0.8,
           })),
           materials: data.materials || [],
           analysis_summary: data.response || data.analysis || 'Analysis completed successfully',
-          confidence_score: data.confidence || 0.8
+          confidence_score: data.confidence || 0.8,
         },
         processing_time_ms: data.processingTime || 0,
-        success: true
+        success: true,
       };
 
       setMultiModalResults(prev => [...prev, testResult]);
@@ -317,14 +317,14 @@ export const AITestingPanel: React.FC = () => {
         input_data: {
           text: testType !== 'image_analysis' ? multiModalTestText : undefined,
           image_url: testType !== 'text_analysis' ? multiModalTestImage : undefined,
-          combined: testType === 'combined_analysis'
+          combined: testType === 'combined_analysis',
         },
         results: {
-          confidence_score: 0
+          confidence_score: 0,
         },
         processing_time_ms: 0,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
 
       setMultiModalResults(prev => [...prev, errorResult]);
@@ -362,8 +362,8 @@ export const AITestingPanel: React.FC = () => {
           similarity_threshold: similarityThreshold,
           limit: 10,
           include_metadata: true,
-          search_type: 'semantic'
-        }
+          search_type: 'semantic',
+        },
       });
 
       if (!result.success) {
@@ -380,11 +380,11 @@ export const AITestingPanel: React.FC = () => {
           id: item.id || crypto.randomUUID(),
           title: item.title || item.name || 'Untitled',
           similarity_score: item.similarity_score || 0,
-          content_preview: (item.content || item.description || '').substring(0, 100) + '...'
+          content_preview: (item.content || item.description || '').substring(0, 100) + '...',
         })),
         total_results: data.total_results || 0,
         processing_time_ms: data.processing_time_ms || 0,
-        success: true
+        success: true,
       };
 
       setSimilarityResults(testResult);
@@ -406,7 +406,7 @@ export const AITestingPanel: React.FC = () => {
         total_results: 0,
         processing_time_ms: 0,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
 
       setSimilarityResults(errorResult);

@@ -9,7 +9,7 @@
 /**
  * Image Validation Status Types
  */
-export type ImageValidationStatus = "pending" | "valid" | "invalid" | "needs_review";
+export type ImageValidationStatus = 'pending' | 'valid' | 'invalid' | 'needs_review';
 
 /**
  * Image Quality Metrics
@@ -27,7 +27,7 @@ export interface ImageQualityMetrics {
  */
 export interface ImageValidationIssue {
   type: string;
-  severity: "low" | "medium" | "high";
+  severity: 'low' | 'medium' | 'high';
   description: string;
   suggestion?: string;
 }
@@ -38,7 +38,7 @@ export interface ImageValidationIssue {
 export interface ImageValidationRecommendation {
   type: string;
   description: string;
-  priority: "low" | "medium" | "high";
+  priority: 'low' | 'medium' | 'high';
   action?: string;
 }
 

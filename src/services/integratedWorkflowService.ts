@@ -185,7 +185,7 @@ export class IntegratedWorkflowService {
       const validationResult = validateAndLog(
         mlResult,
         validators.materialRecognition,
-        `Material Recognition for ${file.name}`
+        `Material Recognition for ${file.name}`,
       );
 
       if (!validationResult.isValid) {

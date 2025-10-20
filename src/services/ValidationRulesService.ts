@@ -4,7 +4,6 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { BaseService, ServiceConfig } from './base/BaseService';
 import {
   ValidationRule,
   ValidationRuleInsert,
@@ -21,6 +20,8 @@ import {
   ValidationOperator,
   ValidationSeverity,
 } from '@/types/validation-rules';
+
+import { BaseService, ServiceConfig } from './base/BaseService';
 
 /**
  * Validation Rules Service Configuration
@@ -163,7 +164,7 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
           request.chunk_id,
           rule,
           request.workspace_id,
-          request.chunk_data || chunkData
+          request.chunk_data || chunkData,
         );
 
         results.push(result);
@@ -280,7 +281,7 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
     chunkId: string,
     rule: ValidationRule,
     workspaceId: string,
-    chunkData: any
+    chunkData: any,
   ): Promise<ValidationResult> {
     const passed = this.evaluateRule(rule, chunkData);
 
@@ -361,7 +362,7 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
 
   private getRuleEffectiveness(
     rules: ValidationRule[],
-    results: ValidationResult[]
+    results: ValidationResult[],
   ): Array<{
     rule_id: string;
     rule_name: string;

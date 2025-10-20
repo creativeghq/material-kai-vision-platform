@@ -1,16 +1,18 @@
 /**
  * Quality Dashboard Component
- * 
+ *
  * Main dashboard for monitoring and managing quality metrics across
  * Image Validation, Product Enrichment, and Validation Rules services.
  */
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { QualityDashboardService, QualityDashboardData } from '@/services/QualityDashboardService';
+
 import { QualityMetricsCard } from './QualityMetricsCard';
 import { QualityTrendsChart } from './QualityTrendsChart';
 import { QualityIssuesPanel } from './QualityIssuesPanel';

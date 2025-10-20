@@ -1,6 +1,6 @@
 /**
  * PDF Image Service
- * 
+ *
  * Handles fetching, managing, and processing of images extracted from PDFs
  */
 
@@ -123,7 +123,7 @@ class PDFImageService {
           .from('document_chunks')
           .select('id, content, page_number')
           .in('id', imageData.metadata.associated_chunks);
-        
+
         if (chunksData) {
           relatedChunks.push(...chunksData);
         }
@@ -200,14 +200,14 @@ class PDFImageService {
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = url;
       link.download = image.metadata?.filename || `image_${image.id}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading image:', error);
@@ -224,8 +224,8 @@ class PDFImageService {
       const { data, error } = await supabase.functions.invoke('mivaa-gateway', {
         body: {
           action: 'download_images',
-          payload: { document_id: documentId }
-        }
+          payload: { document_id: documentId },
+        },
       });
 
       if (error) {
@@ -253,8 +253,8 @@ class PDFImageService {
    * Update image metadata
    */
   async updateImageMetadata(
-    imageId: string, 
-    updates: Partial<Pick<PDFImage, 'caption' | 'alt_text' | 'image_type'>>
+    imageId: string,
+    updates: Partial<Pick<PDFImage, 'caption' | 'alt_text' | 'image_type'>>,
   ): Promise<PDFImage> {
     try {
       const { data, error } = await supabase

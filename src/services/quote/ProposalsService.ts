@@ -46,7 +46,7 @@ export class ProposalsService {
     subtotal: number,
     tax: number = 0,
     discount: number = 0,
-    notes?: string
+    notes?: string,
   ): Promise<Proposal> {
     try {
       const response = await this.apiService.call<
@@ -69,7 +69,7 @@ export class ProposalsService {
           discount,
           notes,
         },
-        { method: 'POST' }
+        { method: 'POST' },
       );
 
       return response as unknown as Proposal;
@@ -84,7 +84,7 @@ export class ProposalsService {
    */
   async getProposals(
     limit: number = 50,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<{ data: Proposal[]; count: number }> {
     try {
       const response = await this.apiService.call<
@@ -93,7 +93,7 @@ export class ProposalsService {
       >(
         'proposals-api',
         { limit, offset },
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       return response as { data: Proposal[]; count: number };
@@ -114,7 +114,7 @@ export class ProposalsService {
       >(
         'proposals-api',
         { proposal_id: proposalId },
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       return response as Proposal;
@@ -132,7 +132,7 @@ export class ProposalsService {
     subtotal?: number,
     tax?: number,
     discount?: number,
-    notes?: string
+    notes?: string,
   ): Promise<Proposal> {
     try {
       const response = await this.apiService.call<
@@ -153,7 +153,7 @@ export class ProposalsService {
           discount,
           notes,
         },
-        { method: 'PUT' }
+        { method: 'PUT' },
       );
 
       return response as Proposal;
@@ -174,7 +174,7 @@ export class ProposalsService {
       >(
         'proposals-api',
         { proposal_id: proposalId },
-        { method: 'PUT' }
+        { method: 'PUT' },
       );
 
       return response as Proposal;
@@ -195,7 +195,7 @@ export class ProposalsService {
       >(
         'proposals-api',
         { proposal_id: proposalId },
-        { method: 'PUT' }
+        { method: 'PUT' },
       );
 
       return response as Proposal;

@@ -1,12 +1,13 @@
 /**
  * Search Optimization Service
- * 
+ *
  * Optimizes search results using quality metrics and relevance scoring.
  */
 
+import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService } from './base/BaseService';
 import { QualityDashboardService } from './QualityDashboardService';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface SearchResult {
   id: string;
@@ -190,7 +191,7 @@ class SearchOptimizationServiceImpl extends BaseService {
       }
 
       return (relatedChunks || []).map(chunk =>
-        this.scoreSearchResult(chunk, originalChunk.content, metrics)
+        this.scoreSearchResult(chunk, originalChunk.content, metrics),
       );
     }, 'getRelatedResults');
   }

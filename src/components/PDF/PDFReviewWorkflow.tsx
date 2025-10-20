@@ -289,7 +289,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         });
 
         if (!result.success) throw new Error(result.error?.message || 'Image generation failed');
-        
+
         const imageUrl = result.data?.image_url;
         if (typeof imageUrl === 'string') {
           images.push({ tile_id: tile.id, image_url: imageUrl });
@@ -302,7 +302,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
     return {
       success: true,
       generated: images.length,
-      images
+      images,
     };
   };
 

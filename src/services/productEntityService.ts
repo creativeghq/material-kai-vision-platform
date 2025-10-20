@@ -39,7 +39,7 @@ export class ProductEntityService {
     productId: string,
     chunkIds: string[],
     relationshipType: 'source' | 'reference' | 'related' = 'source',
-    relevanceScores?: Record<string, number>
+    relevanceScores?: Record<string, number>,
   ): Promise<{ linksCreated: number; totalAttempted: number }> {
     console.log(`🔗 Linking product to ${chunkIds.length} chunks...`);
 
@@ -60,7 +60,7 @@ export class ProductEntityService {
                 relationship_type: relationshipType,
                 relevance_score: relevanceScore,
               },
-              { onConflict: 'product_id,chunk_id' }
+              { onConflict: 'product_id,chunk_id' },
             );
 
           if (!error) {
@@ -70,7 +70,7 @@ export class ProductEntityService {
             console.warn(`  ⚠️ Failed to link chunk: ${error.message}`);
           }
         } catch (error) {
-          console.warn(`  ⚠️ Error linking chunk:`, error);
+          console.warn('  ⚠️ Error linking chunk:', error);
         }
       }
 
@@ -89,7 +89,7 @@ export class ProductEntityService {
     productId: string,
     imageIds: string[],
     relationshipType: 'primary' | 'texture' | 'sample' | 'installation' | 'related' = 'primary',
-    relevanceScores?: Record<string, number>
+    relevanceScores?: Record<string, number>,
   ): Promise<{ linksCreated: number; totalAttempted: number }> {
     console.log(`🖼️ Linking product to ${imageIds.length} images...`);
 
@@ -112,7 +112,7 @@ export class ProductEntityService {
                 image_type: relationshipType,
                 display_order: i,
               },
-              { onConflict: 'product_id,image_id' }
+              { onConflict: 'product_id,image_id' },
             );
 
           if (!error) {
@@ -122,7 +122,7 @@ export class ProductEntityService {
             console.warn(`  ⚠️ Failed to link image: ${error.message}`);
           }
         } catch (error) {
-          console.warn(`  ⚠️ Error linking image:`, error);
+          console.warn('  ⚠️ Error linking image:', error);
         }
       }
 
@@ -139,7 +139,7 @@ export class ProductEntityService {
    */
   static async linkProductToEmbeddings(
     productId: string,
-    embeddings: Array<{ embedding: number[]; embeddingType: string; sourceContent: string; modelName: string }>
+    embeddings: Array<{ embedding: number[]; embeddingType: string; sourceContent: string; modelName: string }>,
   ): Promise<{ embeddingsCreated: number; totalAttempted: number }> {
     console.log(`📊 Linking product to ${embeddings.length} embeddings...`);
 
@@ -167,7 +167,7 @@ export class ProductEntityService {
             console.warn(`  ⚠️ Failed to create embedding: ${error.message}`);
           }
         } catch (error) {
-          console.warn(`  ⚠️ Error creating embedding:`, error);
+          console.warn('  ⚠️ Error creating embedding:', error);
         }
       }
 
@@ -233,7 +233,7 @@ export class ProductEntityService {
         .select('*')
         .eq('entity_id', productId);
 
-      console.log(`✅ Product entity graph fetched:`);
+      console.log('✅ Product entity graph fetched:');
       console.log(`   - Chunks: ${sourceChunks?.length || 0}`);
       console.log(`   - Images: ${images?.length || 0}`);
       console.log(`   - Embeddings: ${embeddings?.length || 0}`);
@@ -256,7 +256,7 @@ export class ProductEntityService {
    * Get all products with their entity graphs (NO LIMIT - fetches all products)
    */
   static async getAllProductsWithGraphs(): Promise<ProductEntityGraph[]> {
-    console.log(`📊 Fetching ALL products with entity graphs (no limit)...`);
+    console.log('📊 Fetching ALL products with entity graphs (no limit)...');
 
     try {
       // Fetch ALL products without limit
@@ -293,7 +293,7 @@ export class ProductEntityService {
    * Get ALL chunks (infinite - no limit)
    */
   static async getAllChunks(): Promise<DocumentChunk[]> {
-    console.log(`📝 Fetching ALL chunks (no limit)...`);
+    console.log('📝 Fetching ALL chunks (no limit)...');
 
     try {
       const { data: chunks, error } = await supabase
@@ -314,7 +314,7 @@ export class ProductEntityService {
    * Get ALL images (infinite - no limit)
    */
   static async getAllImages(): Promise<DocumentImage[]> {
-    console.log(`🖼️ Fetching ALL images (no limit)...`);
+    console.log('🖼️ Fetching ALL images (no limit)...');
 
     try {
       const { data: images, error } = await supabase
@@ -335,7 +335,7 @@ export class ProductEntityService {
    * Get ALL embeddings (infinite - no limit)
    */
   static async getAllEmbeddings(): Promise<any[]> {
-    console.log(`📊 Fetching ALL embeddings (no limit)...`);
+    console.log('📊 Fetching ALL embeddings (no limit)...');
 
     try {
       const { data: embeddings, error } = await supabase
@@ -356,7 +356,7 @@ export class ProductEntityService {
    * Get ALL product embeddings (infinite - no limit)
    */
   static async getAllProductEmbeddings(): Promise<any[]> {
-    console.log(`📊 Fetching ALL product embeddings (no limit)...`);
+    console.log('📊 Fetching ALL product embeddings (no limit)...');
 
     try {
       const { data: embeddings, error } = await supabase
@@ -377,7 +377,7 @@ export class ProductEntityService {
    * Get ALL metafields (infinite - no limit)
    */
   static async getAllMetafields(): Promise<EntityMetafieldValue[]> {
-    console.log(`🏷️ Fetching ALL metafields (no limit)...`);
+    console.log('🏷️ Fetching ALL metafields (no limit)...');
 
     try {
       const { data: metafields, error } = await supabase
@@ -398,7 +398,7 @@ export class ProductEntityService {
    * Get ALL chunk metafields (infinite - no limit)
    */
   static async getAllChunkMetafields(): Promise<EntityMetafieldValue[]> {
-    console.log(`🏷️ Fetching ALL chunk metafields (no limit)...`);
+    console.log('🏷️ Fetching ALL chunk metafields (no limit)...');
 
     try {
       const { data: metafields, error } = await supabase
@@ -419,7 +419,7 @@ export class ProductEntityService {
    * Get ALL image metafields (infinite - no limit)
    */
   static async getAllImageMetafields(): Promise<EntityMetafieldValue[]> {
-    console.log(`🏷️ Fetching ALL image metafields (no limit)...`);
+    console.log('🏷️ Fetching ALL image metafields (no limit)...');
 
     try {
       const { data: metafields, error } = await supabase
@@ -440,7 +440,7 @@ export class ProductEntityService {
    * Get ALL material metafields (infinite - no limit)
    */
   static async getAllMaterialMetafields(): Promise<EntityMetafieldValue[]> {
-    console.log(`🏷️ Fetching ALL material metafields (no limit)...`);
+    console.log('🏷️ Fetching ALL material metafields (no limit)...');
 
     try {
       const { data: metafields, error } = await supabase
@@ -461,7 +461,7 @@ export class ProductEntityService {
    * Get ALL materials (infinite - no limit)
    */
   static async getAllMaterials(): Promise<any[]> {
-    console.log(`📦 Fetching ALL materials (no limit)...`);
+    console.log('📦 Fetching ALL materials (no limit)...');
 
     try {
       const { data: materials, error } = await supabase
@@ -495,7 +495,7 @@ export class ProductEntityService {
       materials: EntityMetafieldValue[];
     };
   }> {
-    console.log(`📚 Fetching COMPLETE knowledge base (ALL entities, no limits)...`);
+    console.log('📚 Fetching COMPLETE knowledge base (ALL entities, no limits)...');
 
     try {
       const [
@@ -522,7 +522,7 @@ export class ProductEntityService {
         this.getAllMaterialMetafields(),
       ]);
 
-      console.log(`✅ Complete knowledge base fetched:`);
+      console.log('✅ Complete knowledge base fetched:');
       console.log(`   📦 Products: ${products.length}`);
       console.log(`   📝 Chunks: ${chunks.length}`);
       console.log(`   🖼️ Images: ${images.length}`);
@@ -559,7 +559,7 @@ export class ProductEntityService {
    */
   static async getPaginatedProducts(
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
   ): Promise<PaginatedResult<ProductEntityGraph>> {
     console.log(`📦 Fetching paginated products (page ${page}, size ${pageSize})...`);
 
@@ -603,7 +603,7 @@ export class ProductEntityService {
    */
   static async getPaginatedChunks(
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
   ): Promise<PaginatedResult<DocumentChunk>> {
     console.log(`📝 Fetching paginated chunks (page ${page}, size ${pageSize})...`);
 
@@ -642,7 +642,7 @@ export class ProductEntityService {
    */
   static async getPaginatedImages(
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
   ): Promise<PaginatedResult<DocumentImage>> {
     console.log(`🖼️ Fetching paginated images (page ${page}, size ${pageSize})...`);
 
@@ -681,7 +681,7 @@ export class ProductEntityService {
    */
   static async getPaginatedMaterials(
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
   ): Promise<PaginatedResult<any>> {
     console.log(`📦 Fetching paginated materials (page ${page}, size ${pageSize})...`);
 
@@ -720,7 +720,7 @@ export class ProductEntityService {
    */
   static async getPaginatedEmbeddings(
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
   ): Promise<PaginatedResult<any>> {
     console.log(`📊 Fetching paginated embeddings (page ${page}, size ${pageSize})...`);
 
@@ -759,7 +759,7 @@ export class ProductEntityService {
    */
   static async getPaginatedMetafields(
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
   ): Promise<PaginatedResult<EntityMetafieldValue>> {
     console.log(`🏷️ Fetching paginated metafields (page ${page}, size ${pageSize})...`);
 

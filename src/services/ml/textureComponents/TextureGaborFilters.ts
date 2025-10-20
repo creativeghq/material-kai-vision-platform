@@ -42,7 +42,7 @@ export class TextureGaborFilters {
     orientations: new Float32Array(0),
     frequencies: new Float32Array(0),
     responses: [],
-    energyMaps: []
+    energyMaps: [],
   };
 
   constructor(config: GaborFilterConfig) {

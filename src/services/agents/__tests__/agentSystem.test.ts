@@ -196,7 +196,7 @@ describe('Agent Role-Based Access Control', () => {
           timestamp: new Date().toISOString(),
           parameters: { test: true },
         },
-        'success'
+        'success',
       );
 
       const updatedLogs = toolAccessControl.getExecutionLogs();
@@ -212,7 +212,7 @@ describe('Agent Role-Based Access Control', () => {
           timestamp: new Date().toISOString(),
           parameters: {},
         },
-        'success'
+        'success',
       );
 
       toolAccessControl.logExecution(
@@ -223,7 +223,7 @@ describe('Agent Role-Based Access Control', () => {
           timestamp: new Date().toISOString(),
           parameters: {},
         },
-        'success'
+        'success',
       );
 
       const toolALogs = toolAccessControl.getExecutionLogs('tool-a');

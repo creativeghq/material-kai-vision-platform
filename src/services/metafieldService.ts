@@ -1,6 +1,6 @@
 /**
  * Metafield Service
- * 
+ *
  * Handles extraction, storage, and retrieval of metafield values for:
  * - Materials
  * - Chunks
@@ -23,7 +23,7 @@ export class MetafieldService {
    */
   static async extractMetafieldsFromText(
     text: string,
-    applicableFields: MaterialMetafieldDefinition[]
+    applicableFields: MaterialMetafieldDefinition[],
   ): Promise<Record<string, unknown>> {
     try {
       // Call MIVAA gateway for AI extraction
@@ -60,7 +60,7 @@ export class MetafieldService {
    */
   static async extractMetafieldsFromImage(
     imageUrl: string,
-    applicableFields: MaterialMetafieldDefinition[]
+    applicableFields: MaterialMetafieldDefinition[],
   ): Promise<Record<string, unknown>> {
     try {
       const response = await fetch('/api/supabase-function', {
@@ -97,7 +97,7 @@ export class MetafieldService {
     chunkId: string,
     metafields: Record<string, unknown>,
     fieldDefinitions: Map<string, MaterialMetafieldDefinition>,
-    extractionMethod: string = 'ai_extraction'
+    extractionMethod: string = 'ai_extraction',
   ): Promise<void> {
     const values: Partial<EntityMetafieldValue>[] = [];
 
@@ -131,7 +131,7 @@ export class MetafieldService {
     productId: string,
     metafields: Record<string, unknown>,
     fieldDefinitions: Map<string, MaterialMetafieldDefinition>,
-    extractionMethod: string = 'ai_extraction'
+    extractionMethod: string = 'ai_extraction',
   ): Promise<void> {
     const values: Partial<EntityMetafieldValue>[] = [];
 
@@ -165,7 +165,7 @@ export class MetafieldService {
     imageId: string,
     metafields: Record<string, unknown>,
     fieldDefinitions: Map<string, MaterialMetafieldDefinition>,
-    extractionMethod: string = 'visual_analysis'
+    extractionMethod: string = 'visual_analysis',
   ): Promise<void> {
     const values: Partial<EntityMetafieldValue>[] = [];
 
@@ -236,7 +236,7 @@ export class MetafieldService {
    */
   private static normalizeMetafieldValue(
     value: unknown,
-    dataType: string
+    dataType: string,
   ): Partial<EntityMetafieldValue> {
     switch (dataType) {
       case 'number':
@@ -256,7 +256,7 @@ export class MetafieldService {
    * Search chunks by metafield values
    */
   static async searchChunksByMetafields(
-    filters: Record<string, unknown>
+    filters: Record<string, unknown>,
   ): Promise<DocumentChunk[]> {
     let query = supabase
       .from('document_chunks')
@@ -279,7 +279,7 @@ export class MetafieldService {
    * Search products by metafield values
    */
   static async searchProductsByMetafields(
-    filters: Record<string, unknown>
+    filters: Record<string, unknown>,
   ): Promise<Product[]> {
     let query = supabase
       .from('products')
@@ -301,7 +301,7 @@ export class MetafieldService {
    * Search images by metafield values
    */
   static async searchImagesByMetafields(
-    filters: Record<string, unknown>
+    filters: Record<string, unknown>,
   ): Promise<DocumentImage[]> {
     let query = supabase
       .from('document_images')

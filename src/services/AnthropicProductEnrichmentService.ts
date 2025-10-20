@@ -3,9 +3,11 @@
  * Uses Claude 3.5 Sonnet to enrich product metadata and descriptions
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import { supabase } from "@/integrations/supabase/client";
-import { BaseService, ServiceConfig } from "./base/BaseService";
+import Anthropic from '@anthropic-ai/sdk';
+
+import { supabase } from '@/integrations/supabase/client';
+
+import { BaseService, ServiceConfig } from './base/BaseService';
 
 interface ProductEnrichmentRequest {
   chunk_id: string;
@@ -16,7 +18,7 @@ interface ProductEnrichmentRequest {
 
 interface ProductEnrichmentResult {
   chunk_id: string;
-  enrichment_status: "enriched" | "partial" | "failed";
+  enrichment_status: 'enriched' | 'partial' | 'failed';
   product_name: string;
   product_category: string;
   product_description: string;
@@ -33,14 +35,14 @@ interface ProductEnrichmentResult {
  */
 export class AnthropicProductEnrichmentService extends BaseService<ServiceConfig> {
   private anthropicClient: Anthropic;
-  private model: string = "claude-3-5-sonnet-20241022";
+  private model: string = 'claude-3-5-sonnet-20241022';
   private maxTokens: number = 2048;
 
   constructor() {
     super({
-      name: "AnthropicProductEnrichmentService",
-      version: "1.0.0",
-      environment: "production",
+      name: 'AnthropicProductEnrichmentService',
+      version: '1.0.0',
+      environment: 'production',
       enabled: true,
       timeout: 60000,
       retries: 2,
@@ -48,21 +50,21 @@ export class AnthropicProductEnrichmentService extends BaseService<ServiceConfig
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is required");
+      throw new Error('ANTHROPIC_API_KEY environment variable is required');
     }
 
     this.anthropicClient = new Anthropic({ apiKey });
   }
 
   protected async doInitialize(): Promise<void> {
-    console.log("AnthropicProductEnrichmentService initialized");
+    console.log('AnthropicProductEnrichmentService initialized');
   }
 
   /**
    * Enrich a single chunk with product data using Claude
    */
   async enrichChunk(
-    request: ProductEnrichmentRequest
+    request: ProductEnrichmentRequest,
   ): Promise<ProductEnrichmentResult> {
     return this.executeOperation(async () => {
       const startTime = Date.now();
@@ -105,7 +107,7 @@ Focus on:
         max_tokens: this.maxTokens,
         messages: [
           {
-            role: "user",
+            role: 'user',
             content: prompt,
           },
         ],
@@ -113,29 +115,29 @@ Focus on:
 
       // Parse response
       const responseText =
-        response.content[0].type === "text" ? response.content[0].text : "{}";
+        response.content[0].type === 'text' ? response.content[0].text : '{}';
       const enrichmentData = JSON.parse(responseText);
 
       // Determine enrichment status
       const confidenceScore = enrichmentData.confidence_score || 0;
       const enrichmentStatus =
         confidenceScore >= 0.7
-          ? "enriched"
+          ? 'enriched'
           : confidenceScore >= 0.4
-            ? "partial"
-            : "failed";
+            ? 'partial'
+            : 'failed';
 
       // Store enrichment result in database
       const { data: enrichment, error: insertError } = await supabase
-        .from("product_enrichments")
+        .from('product_enrichments')
         .insert([
           {
             chunk_id: request.chunk_id,
             workspace_id: request.workspace_id,
             enrichment_status: enrichmentStatus,
-            product_name: enrichmentData.product_name || "",
-            product_category: enrichmentData.product_category || "",
-            product_description: enrichmentData.product_description || "",
+            product_name: enrichmentData.product_name || '',
+            product_category: enrichmentData.product_category || '',
+            product_description: enrichmentData.product_description || '',
             metadata: {
               long_description: enrichmentData.long_description,
               key_features: enrichmentData.key_features,
@@ -162,23 +164,23 @@ Focus on:
       return {
         chunk_id: request.chunk_id,
         enrichment_status: enrichmentStatus,
-        product_name: enrichmentData.product_name || "",
-        product_category: enrichmentData.product_category || "",
-        product_description: enrichmentData.product_description || "",
-        long_description: enrichmentData.long_description || "",
+        product_name: enrichmentData.product_name || '',
+        product_category: enrichmentData.product_category || '',
+        product_description: enrichmentData.product_description || '',
+        long_description: enrichmentData.long_description || '',
         specifications: enrichmentData.specifications || {},
         related_products: enrichmentData.related_products || [],
         confidence_score: confidenceScore,
         processing_time_ms: Date.now() - startTime,
       };
-    }, "enrichChunk");
+    }, 'enrichChunk');
   }
 
   /**
    * Enrich multiple chunks in batch
    */
   async enrichChunks(
-    requests: ProductEnrichmentRequest[]
+    requests: ProductEnrichmentRequest[],
   ): Promise<ProductEnrichmentResult[]> {
     return this.executeOperation(async () => {
       const results: ProductEnrichmentResult[] = [];
@@ -191,11 +193,11 @@ Focus on:
           console.error(`Failed to enrich chunk ${request.chunk_id}:`, error);
           results.push({
             chunk_id: request.chunk_id,
-            enrichment_status: "failed",
-            product_name: "",
-            product_category: "",
-            product_description: "",
-            long_description: "",
+            enrichment_status: 'failed',
+            product_name: '',
+            product_category: '',
+            product_description: '',
+            long_description: '',
             specifications: {},
             related_products: [],
             confidence_score: 0,
@@ -205,7 +207,7 @@ Focus on:
       }
 
       return results;
-    }, "enrichChunks");
+    }, 'enrichChunks');
   }
 }
 

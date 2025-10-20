@@ -1,12 +1,13 @@
 /**
  * Performance Optimization Service
- * 
+ *
  * Monitors and optimizes system performance based on quality metrics and usage patterns.
  */
 
+import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService } from './base/BaseService';
 import { QualityDashboardService } from './QualityDashboardService';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface PerformanceMetrics {
   response_time_ms: number;
@@ -230,7 +231,7 @@ class PerformanceOptimizationServiceImpl extends BaseService {
 
   private calculateOptimizationScore(
     metrics: PerformanceMetrics,
-    recommendations: OptimizationRecommendation[]
+    recommendations: OptimizationRecommendation[],
   ): number {
     let score = 100;
 

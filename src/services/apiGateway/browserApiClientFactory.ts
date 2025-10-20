@@ -1,6 +1,6 @@
 /**
  * Browser-Compatible API Client Factory
- * 
+ *
  * This factory provides API clients that work in the browser environment
  * without requiring Node.js modules.
  */
@@ -9,7 +9,7 @@ import {
   getBrowserApiConfig,
   type ReplicateConfig,
   type HuggingFaceConfig,
-  type SupabaseConfig
+  type SupabaseConfig,
 } from '../../config/browserApiConfig';
 
 import { StandardizedApiResponse } from './standardizedApiClient';

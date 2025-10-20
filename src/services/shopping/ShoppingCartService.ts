@@ -77,7 +77,7 @@ export class ShoppingCartService {
     productId: string,
     quantity: number = 1,
     unitPrice?: number,
-    notes?: string
+    notes?: string,
   ): Promise<CartItem> {
     try {
       const response = await this.apiService.call<
@@ -98,7 +98,7 @@ export class ShoppingCartService {
           unit_price: unitPrice,
           notes,
         },
-        { method: 'POST' }
+        { method: 'POST' },
       );
 
       return response as unknown as CartItem;
@@ -119,7 +119,7 @@ export class ShoppingCartService {
       >(
         'shopping-cart-api',
         { cart_id: cartId, item_id: itemId },
-        { method: 'DELETE' }
+        { method: 'DELETE' },
       );
     } catch (error) {
       console.error('Error removing item from cart:', error);
@@ -138,7 +138,7 @@ export class ShoppingCartService {
       >(
         'shopping-cart-api',
         { cart_id: cartId, status },
-        { method: 'PUT' }
+        { method: 'PUT' },
       );
 
       return response as unknown as Cart;

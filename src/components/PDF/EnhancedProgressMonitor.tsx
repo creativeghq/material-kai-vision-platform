@@ -1,33 +1,33 @@
 /**
  * Enhanced Progress Monitor for PDF Processing
- * 
+ *
  * Provides real-time progress monitoring with detailed statistics,
  * step-by-step tracking, and live updates via WebSocket
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Loader2,
+  FileText,
+  Image,
+  Database,
+  Tag,
+  Activity,
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-
 import { Separator } from '@/components/ui/separator';
-import { 
-  CheckCircle, 
-  Clock, 
-  AlertCircle, 
-  Loader2, 
-  FileText, 
-  Image, 
-  Database, 
-  Tag,
-  Activity
-} from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { 
-  pdfProcessingWebSocketService, 
+import {
+  pdfProcessingWebSocketService,
   PDFProcessingProgress,
-  PDFProcessingStep 
+  PDFProcessingStep,
 } from '@/services/realtime/PDFProcessingWebSocketService';
 
 interface EnhancedProgressMonitorProps {
@@ -47,7 +47,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
   showStatistics = true,
   showStepDetails = true,
   compact = false,
-  className
+  className,
 }) => {
   const [progress, setProgress] = useState<PDFProcessingProgress | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -60,18 +60,18 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
       jobId,
       (newProgress) => {
         setProgress(newProgress);
-        
+
         // Handle completion
         if (newProgress.status === 'completed' && onComplete) {
           onComplete(newProgress);
         }
-        
+
         // Handle errors
         if (newProgress.status === 'failed' && onError) {
           const lastError = newProgress.errors[newProgress.errors.length - 1];
           onError(lastError?.message || 'Processing failed');
         }
-      }
+      },
     );
 
     setIsSubscribed(true);
@@ -130,7 +130,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
 
   if (!progress) {
     return (
-      <Card className={cn("w-full", className)}>
+      <Card className={cn('w-full', className)}>
         <CardContent className="p-6">
           <div className="flex items-center justify-center space-x-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -143,7 +143,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
 
   if (compact) {
     return (
-      <Card className={cn("w-full", className)}>
+      <Card className={cn('w-full', className)}>
         <CardContent className="p-4">
           <div className="flex items-center space-x-3">
             {getStatusIcon(progress.status)}
@@ -161,7 +161,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
   }
 
   return (
-    <Card className={cn("w-full", className)}>
+    <Card className={cn('w-full', className)}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -271,7 +271,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
                     )}
                   </div>
                 </div>
-                
+
                 {(step.status === 'running' || step.status === 'completed') && (
                   <Progress
                     value={step.status === 'completed' ? 100 : (step.progress || 0)}
@@ -288,7 +288,7 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
                         <span className={cn(
                           substep.status === 'completed' ? 'text-green-600' :
                           substep.status === 'running' ? 'text-blue-600' :
-                          'text-gray-500'
+                          'text-gray-500',
                         )}>
                           {substep.name}
                         </span>

@@ -1,5 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
-import { BaseService } from "./base/BaseService";
+import { supabase } from '@/integrations/supabase/client';
 import {
   ChunkClassification,
   ChunkClassificationInsert,
@@ -10,7 +9,9 @@ import {
   ClassificationStats,
   BoundaryStats,
   ValidationStats,
-} from "@/types/chunk-analysis";
+} from '@/types/chunk-analysis';
+
+import { BaseService } from './base/BaseService';
 
 /**
  * ChunkAnalysisService
@@ -22,9 +23,9 @@ import {
 export class ChunkAnalysisService extends BaseService {
   constructor() {
     super({
-      name: "ChunkAnalysisService",
-      version: "1.0.0",
-      environment: "production",
+      name: 'ChunkAnalysisService',
+      version: '1.0.0',
+      environment: 'production',
       enabled: true,
     });
   }
@@ -33,11 +34,11 @@ export class ChunkAnalysisService extends BaseService {
    * Insert chunk classification
    */
   async insertClassification(
-    data: ChunkClassificationInsert
+    data: ChunkClassificationInsert,
   ): Promise<ChunkClassification> {
     try {
       const { data: result, error } = await supabase
-        .from("chunk_classifications")
+        .from('chunk_classifications')
         .insert([data])
         .select()
         .single();
@@ -45,7 +46,7 @@ export class ChunkAnalysisService extends BaseService {
       if (error) throw error;
       return result as ChunkClassification;
     } catch (error) {
-      this.logger.error("Failed to insert classification:", error);
+      this.logger.error('Failed to insert classification:', error);
       throw error;
     }
   }
@@ -54,18 +55,18 @@ export class ChunkAnalysisService extends BaseService {
    * Batch insert classifications
    */
   async insertClassifications(
-    data: ChunkClassificationInsert[]
+    data: ChunkClassificationInsert[],
   ): Promise<ChunkClassification[]> {
     try {
       const { data: results, error } = await supabase
-        .from("chunk_classifications")
+        .from('chunk_classifications')
         .insert(data)
         .select();
 
       if (error) throw error;
       return results as ChunkClassification[];
     } catch (error) {
-      this.logger.error("Failed to batch insert classifications:", error);
+      this.logger.error('Failed to batch insert classifications:', error);
       throw error;
     }
   }
@@ -76,15 +77,15 @@ export class ChunkAnalysisService extends BaseService {
   async getClassifications(chunkId: string): Promise<ChunkClassification[]> {
     try {
       const { data, error } = await supabase
-        .from("chunk_classifications")
-        .select("*")
-        .eq("chunk_id", chunkId)
-        .order("created_at", { ascending: false });
+        .from('chunk_classifications')
+        .select('*')
+        .eq('chunk_id', chunkId)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as ChunkClassification[];
     } catch (error) {
-      this.logger.error("Failed to get classifications:", error);
+      this.logger.error('Failed to get classifications:', error);
       throw error;
     }
   }
@@ -93,18 +94,18 @@ export class ChunkAnalysisService extends BaseService {
    * Get classification statistics
    */
   async getClassificationStats(
-    workspaceId: string
+    workspaceId: string,
   ): Promise<ClassificationStats[]> {
     try {
       const { data, error } = await supabase.rpc(
-        "get_classification_stats",
-        { workspace_id: workspaceId }
+        'get_classification_stats',
+        { workspace_id: workspaceId },
       );
 
       if (error) throw error;
       return data as ClassificationStats[];
     } catch (error) {
-      this.logger.error("Failed to get classification stats:", error);
+      this.logger.error('Failed to get classification stats:', error);
       throw error;
     }
   }
@@ -115,7 +116,7 @@ export class ChunkAnalysisService extends BaseService {
   async insertBoundary(data: ChunkBoundaryInsert): Promise<ChunkBoundary> {
     try {
       const { data: result, error } = await supabase
-        .from("chunk_boundaries")
+        .from('chunk_boundaries')
         .insert([data])
         .select()
         .single();
@@ -123,7 +124,7 @@ export class ChunkAnalysisService extends BaseService {
       if (error) throw error;
       return result as ChunkBoundary;
     } catch (error) {
-      this.logger.error("Failed to insert boundary:", error);
+      this.logger.error('Failed to insert boundary:', error);
       throw error;
     }
   }
@@ -132,18 +133,18 @@ export class ChunkAnalysisService extends BaseService {
    * Batch insert boundaries
    */
   async insertBoundaries(
-    data: ChunkBoundaryInsert[]
+    data: ChunkBoundaryInsert[],
   ): Promise<ChunkBoundary[]> {
     try {
       const { data: results, error } = await supabase
-        .from("chunk_boundaries")
+        .from('chunk_boundaries')
         .insert(data)
         .select();
 
       if (error) throw error;
       return results as ChunkBoundary[];
     } catch (error) {
-      this.logger.error("Failed to batch insert boundaries:", error);
+      this.logger.error('Failed to batch insert boundaries:', error);
       throw error;
     }
   }
@@ -154,15 +155,15 @@ export class ChunkAnalysisService extends BaseService {
   async getBoundaries(chunkId: string): Promise<ChunkBoundary[]> {
     try {
       const { data, error } = await supabase
-        .from("chunk_boundaries")
-        .select("*")
-        .eq("chunk_id", chunkId)
-        .order("created_at", { ascending: false });
+        .from('chunk_boundaries')
+        .select('*')
+        .eq('chunk_id', chunkId)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as ChunkBoundary[];
     } catch (error) {
-      this.logger.error("Failed to get boundaries:", error);
+      this.logger.error('Failed to get boundaries:', error);
       throw error;
     }
   }
@@ -173,16 +174,16 @@ export class ChunkAnalysisService extends BaseService {
   async getProductBoundaries(workspaceId: string): Promise<ChunkBoundary[]> {
     try {
       const { data, error } = await supabase
-        .from("chunk_boundaries")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .eq("is_product_boundary", true)
-        .order("boundary_score", { ascending: false });
+        .from('chunk_boundaries')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .eq('is_product_boundary', true)
+        .order('boundary_score', { ascending: false });
 
       if (error) throw error;
       return data as ChunkBoundary[];
     } catch (error) {
-      this.logger.error("Failed to get product boundaries:", error);
+      this.logger.error('Failed to get product boundaries:', error);
       throw error;
     }
   }
@@ -192,14 +193,14 @@ export class ChunkAnalysisService extends BaseService {
    */
   async getBoundaryStats(workspaceId: string): Promise<BoundaryStats[]> {
     try {
-      const { data, error } = await supabase.rpc("get_boundary_stats", {
+      const { data, error } = await supabase.rpc('get_boundary_stats', {
         workspace_id: workspaceId,
       });
 
       if (error) throw error;
       return data as BoundaryStats[];
     } catch (error) {
-      this.logger.error("Failed to get boundary stats:", error);
+      this.logger.error('Failed to get boundary stats:', error);
       throw error;
     }
   }
@@ -208,11 +209,11 @@ export class ChunkAnalysisService extends BaseService {
    * Insert validation score
    */
   async insertValidationScore(
-    data: ChunkValidationScoreInsert
+    data: ChunkValidationScoreInsert,
   ): Promise<ChunkValidationScore> {
     try {
       const { data: result, error } = await supabase
-        .from("chunk_validation_scores")
+        .from('chunk_validation_scores')
         .insert([data])
         .select()
         .single();
@@ -220,7 +221,7 @@ export class ChunkAnalysisService extends BaseService {
       if (error) throw error;
       return result as ChunkValidationScore;
     } catch (error) {
-      this.logger.error("Failed to insert validation score:", error);
+      this.logger.error('Failed to insert validation score:', error);
       throw error;
     }
   }
@@ -229,18 +230,18 @@ export class ChunkAnalysisService extends BaseService {
    * Batch insert validation scores
    */
   async insertValidationScores(
-    data: ChunkValidationScoreInsert[]
+    data: ChunkValidationScoreInsert[],
   ): Promise<ChunkValidationScore[]> {
     try {
       const { data: results, error } = await supabase
-        .from("chunk_validation_scores")
+        .from('chunk_validation_scores')
         .insert(data)
         .select();
 
       if (error) throw error;
       return results as ChunkValidationScore[];
     } catch (error) {
-      this.logger.error("Failed to batch insert validation scores:", error);
+      this.logger.error('Failed to batch insert validation scores:', error);
       throw error;
     }
   }
@@ -251,15 +252,15 @@ export class ChunkAnalysisService extends BaseService {
   async getValidationScores(chunkId: string): Promise<ChunkValidationScore[]> {
     try {
       const { data, error } = await supabase
-        .from("chunk_validation_scores")
-        .select("*")
-        .eq("chunk_id", chunkId)
-        .order("created_at", { ascending: false });
+        .from('chunk_validation_scores')
+        .select('*')
+        .eq('chunk_id', chunkId)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as ChunkValidationScore[];
     } catch (error) {
-      this.logger.error("Failed to get validation scores:", error);
+      this.logger.error('Failed to get validation scores:', error);
       throw error;
     }
   }
@@ -270,16 +271,16 @@ export class ChunkAnalysisService extends BaseService {
   async getChunksNeedingReview(workspaceId: string): Promise<ChunkValidationScore[]> {
     try {
       const { data, error } = await supabase
-        .from("chunk_validation_scores")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .eq("validation_status", "needs_review")
-        .order("overall_validation_score", { ascending: true });
+        .from('chunk_validation_scores')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .eq('validation_status', 'needs_review')
+        .order('overall_validation_score', { ascending: true });
 
       if (error) throw error;
       return data as ChunkValidationScore[];
     } catch (error) {
-      this.logger.error("Failed to get chunks needing review:", error);
+      this.logger.error('Failed to get chunks needing review:', error);
       throw error;
     }
   }
@@ -289,14 +290,14 @@ export class ChunkAnalysisService extends BaseService {
    */
   async getValidationStats(workspaceId: string): Promise<ValidationStats[]> {
     try {
-      const { data, error } = await supabase.rpc("get_validation_stats", {
+      const { data, error } = await supabase.rpc('get_validation_stats', {
         workspace_id: workspaceId,
       });
 
       if (error) throw error;
       return data as ValidationStats[];
     } catch (error) {
-      this.logger.error("Failed to get validation stats:", error);
+      this.logger.error('Failed to get validation stats:', error);
       throw error;
     }
   }
@@ -319,7 +320,7 @@ export class ChunkAnalysisService extends BaseService {
         validation_scores: validationScores,
       };
     } catch (error) {
-      this.logger.error("Failed to get chunk analysis:", error);
+      this.logger.error('Failed to get chunk analysis:', error);
       throw error;
     }
   }
@@ -337,8 +338,8 @@ export class ChunkAnalysisService extends BaseService {
   protected async doHealthCheck(): Promise<void> {
     // Verify database connectivity by checking if we can query
     const { error } = await supabase
-      .from("chunk_classifications")
-      .select("id")
+      .from('chunk_classifications')
+      .select('id')
       .limit(1);
 
     if (error) {

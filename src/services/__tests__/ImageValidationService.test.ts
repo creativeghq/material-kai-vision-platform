@@ -3,8 +3,9 @@
  * Tests focus on business logic validation
  */
 
-import { ImageValidationService } from '../ImageValidationService';
 import { ImageValidationRequest } from '@/types/image-validation';
+
+import { ImageValidationService } from '../ImageValidationService';
 
 // Mock Supabase - minimal mocking
 jest.mock('@/integrations/supabase/client', () => {

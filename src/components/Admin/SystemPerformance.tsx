@@ -148,8 +148,8 @@ export const SystemPerformance: React.FC = () => {
         payload: {
           job_id: jobId,
           include_stages: true,
-          include_progress: true
-        }
+          include_progress: true,
+        },
       });
 
       if (!result.success) {
@@ -167,7 +167,7 @@ export const SystemPerformance: React.FC = () => {
         estimated_completion_time: data.estimated_completion_time,
         total_processing_time_ms: data.total_processing_time_ms || 0,
         document_info: data.document_info,
-        error_details: data.error_details
+        error_details: data.error_details,
       };
 
     } catch (error) {
@@ -188,8 +188,8 @@ export const SystemPerformance: React.FC = () => {
         payload: {
           time_range: '24h',
           include_trends: true,
-          include_stage_breakdown: true
-        }
+          include_stage_breakdown: true,
+        },
       });
 
       if (!result.success) {
@@ -208,8 +208,8 @@ export const SystemPerformance: React.FC = () => {
         performance_trends: data.performance_trends || {
           processing_time_trend: 0,
           success_rate_trend: 0,
-          volume_trend: 0
-        }
+          volume_trend: 0,
+        },
       };
 
     } catch (error) {

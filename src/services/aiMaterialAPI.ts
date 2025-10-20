@@ -303,7 +303,7 @@ export class AIMaterialAPI {
         .from('processing_results')
         .update({
           result_data: { confidence_score: newConfidence },
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', resultId);
 

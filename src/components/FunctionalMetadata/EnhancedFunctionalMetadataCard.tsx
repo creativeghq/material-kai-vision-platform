@@ -25,7 +25,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-
 import { type FunctionalMetadata } from '@/types/materials';
 
 interface EnhancedFunctionalMetadataCardProps {
@@ -63,7 +62,7 @@ const CATEGORY_CONFIG = {
   },
   surfaceGlossReflectivity: {
     icon: Star,
-    displayName: '✨ Surface Gloss/Reflectivity', 
+    displayName: '✨ Surface Gloss/Reflectivity',
     color: 'text-yellow-600',
     bgColor: 'bg-yellow-50',
   },
@@ -142,7 +141,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
 
   const renderPropertyValue = (_key: string, value: unknown): React.ReactNode => {
     if (value === null || value === undefined) return null;
-    
+
     if (typeof value === 'boolean') {
       return (
         <Badge variant={value ? 'default' : 'secondary'}>
@@ -150,15 +149,15 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
         </Badge>
       );
     }
-    
+
     if (typeof value === 'number') {
       return <span className="font-mono text-sm">{value}</span>;
     }
-    
+
     if (typeof value === 'string') {
       return <span className="text-sm">{value}</span>;
     }
-    
+
     if (typeof value === 'object' && value !== null) {
       return (
         <div className="text-xs text-muted-foreground">
@@ -166,13 +165,13 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
         </div>
       );
     }
-    
+
     return <span className="text-sm">{String(value)}</span>;
   };
 
   const renderConfidenceIndicator = (confidence?: 'low' | 'medium' | 'high') => {
     if (!confidence || !showConfidence) return null;
-    
+
     const getConfidenceIcon = () => {
       switch (confidence) {
         case 'high': return <CheckCircle className="h-3 w-3" />;
@@ -183,8 +182,8 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
     };
 
     return (
-      <Badge 
-        variant="outline" 
+      <Badge
+        variant="outline"
         className={`text-xs ${getConfidenceColor(confidence)}`}
       >
         {getConfidenceIcon()}
@@ -239,7 +238,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
               </Button>
             </CollapsibleTrigger>
           </CardHeader>
-          
+
           {hasData && (
             <CollapsibleContent>
               <CardContent className="pt-0">
@@ -263,7 +262,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
                 {/* Structured properties */}
                 <div className="space-y-3">
                   {Object.entries(categoryData).map(([propKey, propValue]) => (
-                    <div 
+                    <div
                       key={propKey}
                       className="flex justify-between items-start p-2 rounded-md hover:bg-white/50 cursor-pointer transition-colors border border-transparent hover:border-gray-200"
                       onClick={() => onPropertyClick?.(categoryKey, propKey, propValue)}
@@ -276,7 +275,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
                           {renderPropertyValue(propKey, propValue)}
                         </div>
                       </div>
-                      
+
                       <div className="ml-2 flex items-center gap-1">
                         <Target className="h-3 w-3 text-muted-foreground opacity-50" />
                       </div>
@@ -340,8 +339,8 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
             {availableCategories.length} categories
           </Badge>
           {extractionSummary?.overall_confidence && showConfidence && (
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className={`text-xs ${getConfidenceColor(extractionSummary.overall_confidence)}`}
             >
               <CheckCircle className="h-3 w-3 mr-1" />
@@ -355,7 +354,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
           )}
         </div>
       </div>
-      
+
       {/* Application Suggestions Section */}
       {extractionSummary?.suggested_applications && extractionSummary.suggested_applications.length > 0 && (
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
@@ -366,9 +365,9 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {extractionSummary.suggested_applications.map((app, idx) => (
-                <Badge 
-                  key={idx} 
-                  variant="secondary" 
+                <Badge
+                  key={idx}
+                  variant="secondary"
                   className="justify-center p-2 text-xs bg-white/80 text-blue-800 border-blue-200 hover:bg-white cursor-pointer transition-colors"
                   onClick={() => onPropertyClick?.('applications', 'suggested_application', app)}
                 >
@@ -391,7 +390,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
       {displayMode === 'compact' ? (
         <div className="grid gap-2">
           {availableCategories.slice(0, 3).map(([categoryKey, categoryData]) =>
-            renderCategoryContent(categoryKey, categoryData)
+            renderCategoryContent(categoryKey, categoryData),
           )}
           {availableCategories.length > 3 && (
             <div className="text-center">
@@ -404,11 +403,11 @@ export const EnhancedFunctionalMetadataCard: React.FC<EnhancedFunctionalMetadata
       ) : (
         <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1">
           {availableCategories.map(([categoryKey, categoryData]) =>
-            renderCategoryContent(categoryKey, categoryData)
+            renderCategoryContent(categoryKey, categoryData),
           )}
         </div>
       )}
-      
+
       {functionalMetadata.functionalMetadataUpdatedAt && (
         <div className="text-xs text-muted-foreground text-right mt-2">
           Last updated: {new Date(functionalMetadata.functionalMetadataUpdatedAt).toLocaleString()}

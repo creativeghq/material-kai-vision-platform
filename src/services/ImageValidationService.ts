@@ -4,7 +4,6 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { BaseService, ServiceConfig } from './base/BaseService';
 import {
   ImageValidation,
   ImageValidationInsert,
@@ -19,6 +18,8 @@ import {
   ImageValidationIssue,
   ImageValidationRecommendation,
 } from '@/types/image-validation';
+
+import { BaseService, ServiceConfig } from './base/BaseService';
 
 /**
  * Image Validation Service Configuration
@@ -109,7 +110,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
       const validationStatus = this.determineValidationStatus(
         issues,
         qualityScore,
-        rules.min_quality_score
+        rules.min_quality_score,
       );
 
       // Create validation record
@@ -244,7 +245,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   private validateDimensions(
     imageData: any,
     rules: ImageValidationConfig,
-    issues: ImageValidationIssue[]
+    issues: ImageValidationIssue[],
   ): boolean {
     const width = imageData.width || 0;
     const height = imageData.height || 0;
@@ -273,7 +274,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   private validateFormat(
     imageData: any,
     rules: ImageValidationConfig,
-    issues: ImageValidationIssue[]
+    issues: ImageValidationIssue[],
   ): boolean {
     const format = imageData.mime_type || '';
 
@@ -292,7 +293,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   private validateFileSize(
     imageData: any,
     rules: ImageValidationConfig,
-    issues: ImageValidationIssue[]
+    issues: ImageValidationIssue[],
   ): boolean {
     const fileSize = imageData.file_size || 0;
 
@@ -327,7 +328,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
 
   private generateRecommendations(
     issues: ImageValidationIssue[],
-    recommendations: ImageValidationRecommendation[]
+    recommendations: ImageValidationRecommendation[],
   ): void {
     issues.forEach(issue => {
       if (issue.type === 'invalid_width' || issue.type === 'invalid_height') {
@@ -358,7 +359,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   private determineValidationStatus(
     issues: ImageValidationIssue[],
     qualityScore: number,
-    minQualityScore: number
+    minQualityScore: number,
   ): ImageValidationStatus {
     const criticalIssues = issues.filter(i => i.severity === 'high');
 

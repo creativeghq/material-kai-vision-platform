@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
+
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface MaterialSuggestion {

@@ -1,6 +1,6 @@
 /**
  * WebSocket API endpoint for PDF processing progress
- * 
+ *
  * This is a fallback implementation for development.
  * In production, you would use a dedicated WebSocket server.
  */
@@ -21,13 +21,13 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           'step_update - Individual step progress',
           'error - Processing errors',
           'completed - Processing completion',
-          'cancelled - Processing cancellation'
+          'cancelled - Processing cancellation',
         ],
         subscription: {
           type: 'subscribe_progress',
-          payload: { progressId: 'job-id' }
-        }
-      }
+          payload: { progressId: 'job-id' },
+        },
+      },
     });
   } else {
     res.setHeader('Allow', ['GET']);

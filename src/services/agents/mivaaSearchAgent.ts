@@ -4,6 +4,7 @@
  */
 
 import { Agent, Task } from 'praisonai';
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface MivaaSearchAgentConfig {

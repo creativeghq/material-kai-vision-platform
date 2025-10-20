@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { ProposalsService, Proposal, ProposalItem } from '../../services/quote/ProposalsService';
 import { QuoteRequestService, QuoteRequest } from '../../services/quote/QuoteRequestService';
 
@@ -74,7 +75,7 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
         subtotal,
         tax,
         discount,
-        notes
+        notes,
       );
 
       setSuccess(true);

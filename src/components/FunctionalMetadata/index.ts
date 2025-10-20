@@ -1,6 +1,6 @@
 /**
  * Functional Metadata Components
- * 
+ *
  * Components for displaying and interacting with material functional metadata
  * extracted from PDF documents via the MIVAA system.
  */

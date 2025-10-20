@@ -173,7 +173,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                 status,
                 progress,
                 ...(error !== undefined && { error }),
-                ...(result !== undefined && { result })
+                ...(result !== undefined && { result }),
               }
             : file,
         ));
@@ -185,7 +185,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
             status,
             progress,
             ...(error !== undefined && { error }),
-            ...(result !== undefined && { result })
+            ...(result !== undefined && { result }),
           });
         }
       }

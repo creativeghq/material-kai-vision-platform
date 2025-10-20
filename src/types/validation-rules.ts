@@ -11,24 +11,24 @@
  * Validation Rule Type
  */
 export type ValidationRuleType =
-  | "content_quality"
-  | "boundary_quality"
-  | "semantic_coherence"
-  | "completeness"
-  | "metadata_presence"
-  | "specification_count"
-  | "image_count"
-  | "custom";
+  | 'content_quality'
+  | 'boundary_quality'
+  | 'semantic_coherence'
+  | 'completeness'
+  | 'metadata_presence'
+  | 'specification_count'
+  | 'image_count'
+  | 'custom';
 
 /**
  * Validation Operator
  */
-export type ValidationOperator = "equals" | "not_equals" | "greater_than" | "less_than" | "contains" | "not_contains" | "matches_regex" | "in_range";
+export type ValidationOperator = 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'not_contains' | 'matches_regex' | 'in_range';
 
 /**
  * Validation Severity
  */
-export type ValidationSeverity = "info" | "warning" | "error" | "critical";
+export type ValidationSeverity = 'info' | 'warning' | 'error' | 'critical';
 
 /**
  * Validation Rule Definition

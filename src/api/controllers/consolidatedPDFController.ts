@@ -227,7 +227,7 @@ export class AuthenticationHelper {
       }
 
       return authResult.authContext;
-    } catch (error) {
+    } catch (_error) {
       // Authentication error - return unauthenticated state
       return { isAuthenticated: false };
     }
@@ -247,7 +247,7 @@ export class AuthenticationHelper {
 
       // JWT tokens have full access by default
       return true;
-    } catch (error) {
+    } catch (_error) {
       // Endpoint access check error - deny access
       return false;
     }
@@ -299,9 +299,8 @@ export class RateLimitHelper {
         remaining,
         resetTime: new Date(Date.now() + 60000),
       };
-    } catch (error) {
-      console.error('Rate limiting error:', error);
-      // Allow on error to avoid blocking legitimate requests
+    } catch (_error) {
+      // Rate limiting error - allow on error to avoid blocking legitimate requests
       return {
         allowed: true,
         limit: 60,
@@ -336,7 +335,7 @@ export class RateLimitHelper {
           is_internal_request: await apiGatewayService.isInternalIP(clientIP),
           rate_limit_exceeded: rateLimitExceeded ?? false,
         });
-    } catch (error) {
+    } catch (_error) {
       // Failed to log API usage - continue without logging
     }
   }
@@ -534,14 +533,14 @@ export class ConsolidatedPDFController {
             filename: file.name,
             fileSize: file.size,
             options: request.options,
-            metadata: request.metadata
+            metadata: request.metadata,
           });
 
           // Update job as completed
           await this.updateProcessingJob(jobId, {
             status: 'completed',
             results: result,
-            completed_at: new Date().toISOString()
+            completed_at: new Date().toISOString(),
           });
 
           result = { ...result, jobId };
@@ -555,10 +554,10 @@ export class ConsolidatedPDFController {
             include_functional_metadata: true,
           },
         };
-        
+
         let jobId: string | undefined;
         let job: ProcessingJob | undefined;
-        
+
         try {
           // Create job tracking early for functional metadata processing
           if (request.workspaceId) {
@@ -593,14 +592,14 @@ export class ConsolidatedPDFController {
             Object.keys((result.data as any).functional_properties).length > 0;
 
           if (!hasValidFunctionalMetadata) {
-            console.warn('Functional metadata extraction returned no results for document:', request.documentId);
+            // Functional metadata extraction returned no results for document
             result = {
               ...result,
               status: 'partial',
               warnings: [
                 ...(result.warnings || []),
-                'No functional metadata could be extracted from this document'
-              ]
+                'No functional metadata could be extracted from this document',
+              ],
             };
           }
 
@@ -615,15 +614,15 @@ export class ConsolidatedPDFController {
           }
 
         } catch (functionalMetadataError) {
-          console.error('Functional metadata extraction failed:', functionalMetadataError);
-          
+          // Functional metadata extraction failed
+
           // Update job status on error
           if (jobId && job) {
             job.status = 'failed';
             job.error = {
               stage: 'functional_metadata_extraction',
               message: functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown functional metadata error',
-              code: 'FUNCTIONAL_METADATA_ERROR'
+              code: 'FUNCTIONAL_METADATA_ERROR',
             };
             job.updatedAt = new Date();
             this.activeJobs.set(jobId, job);
@@ -639,9 +638,8 @@ export class ConsolidatedPDFController {
             // Critical error - return failure
             throw new Error(`Functional metadata extraction failed: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}`);
           } else {
-            // Non-critical error - fall back to standard extraction with warning
-            console.warn('Falling back to standard extraction due to functional metadata error:', functionalMetadataError);
-            
+            // Non-critical error - fall back to standard extraction
+
             try {
               result = await this.mivaaService.extractFromPdf(extractionRequest);
               result = {
@@ -649,8 +647,8 @@ export class ConsolidatedPDFController {
                 status: 'partial',
                 warnings: [
                   ...(result.warnings || []),
-                  `Functional metadata extraction failed: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}. Standard extraction completed successfully.`
-                ]
+                  `Functional metadata extraction failed: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}. Standard extraction completed successfully.`,
+                ],
               };
 
               // Update job with partial success
@@ -688,8 +686,8 @@ export class ConsolidatedPDFController {
         data: result,
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
-      console.error('PDF processing error:', error);
+    } catch (_error) {
+      // PDF processing error
 
       // Log usage with error
       await RateLimitHelper.logUsage(
@@ -816,8 +814,8 @@ export class ConsolidatedPDFController {
         data: statusResponse,
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
-      console.error('Get workflow status error:', error);
+    } catch (_error) {
+      // Get workflow status error
 
       // Log usage with error
       await RateLimitHelper.logUsage(
@@ -922,8 +920,8 @@ export class ConsolidatedPDFController {
         data: transformedResults,
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
-      console.error('Document search error:', error);
+    } catch (_error) {
+      // Document search error
 
       // Log usage with error
       await RateLimitHelper.logUsage(
@@ -1013,8 +1011,8 @@ export class ConsolidatedPDFController {
         },
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
-      console.error('Batch processing error:', error);
+    } catch (_error) {
+      // Batch processing error
 
       // Log usage with error
       await RateLimitHelper.logUsage(
@@ -1092,8 +1090,8 @@ export class ConsolidatedPDFController {
         data: metrics,
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
-      console.error('Failed to get metrics:', error);
+    } catch (_error) {
+      // Failed to get metrics
       return {
         success: false,
         error: 'Failed to get metrics',
@@ -1117,13 +1115,13 @@ export class ConsolidatedPDFController {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error checking workspace access:', error);
+        // Error checking workspace access
         return false;
       }
 
       return !!data;
-    } catch (error) {
-      console.error('Failed to check workspace access:', error);
+    } catch (_error) {
+      // Failed to check workspace access
       return false;
     }
   }
@@ -1155,10 +1153,10 @@ export class ConsolidatedPDFController {
           filename: jobData.filename,
           file_size: jobData.fileSize,
           options: jobData.options,
-          metadata: jobData.metadata
+          metadata: jobData.metadata,
         });
-    } catch (error) {
-      console.error('Failed to create processing job:', error);
+    } catch (_error) {
+      // Failed to create processing job
     }
   }
 
@@ -1179,8 +1177,8 @@ export class ConsolidatedPDFController {
         .from('processing_jobs')
         .update(updateData)
         .eq('job_id', jobId);
-    } catch (error) {
-      console.error('Failed to update processing job:', error);
+    } catch (_error) {
+      // Failed to update processing job
     }
   }
 

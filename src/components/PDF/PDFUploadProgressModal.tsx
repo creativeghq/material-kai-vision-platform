@@ -9,17 +9,18 @@ import {
   AlertTriangle,
   HelpCircle,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 
+import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getErrorFeedback } from '@/utils/errorMessages';
+
 import { EnhancedProgressMonitor } from './EnhancedProgressMonitor';
 import { PDFImageGallery } from './PDFImageGallery';
-import { getErrorFeedback } from '@/utils/errorMessages';
 
 // Import types from the workflow service
 interface WorkflowStepDetail {
@@ -87,7 +88,7 @@ const formatDuration = (startTime?: Date, endTime?: Date) => {
   if (!startTime) return '';
   const end = endTime || new Date();
   const duration = Math.round((end.getTime() - startTime.getTime()) / 1000);
-  
+
   if (duration < 60) return `${duration}s`;
   if (duration < 3600) return `${Math.floor(duration / 60)}m ${duration % 60}s`;
   return `${Math.floor(duration / 3600)}h ${Math.floor((duration % 3600) / 60)}m`;
@@ -127,8 +128,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             const response = await supabase.functions.invoke('mivaa-gateway', {
               body: {
                 action: 'get_job_status',
-                payload: { job_id: job.id }
-              }
+                payload: { job_id: job.id },
+              },
             });
 
             if (response.data?.success && response.data.data) {
@@ -208,8 +209,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
           {job.steps.some(step =>
             step.id === 'mivaa-processing' &&
             step.details?.some(detail =>
-              typeof detail === 'string' && detail.includes('async')
-            )
+              typeof detail === 'string' && detail.includes('async'),
+            ),
           ) && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
               <div className="flex items-center gap-2">

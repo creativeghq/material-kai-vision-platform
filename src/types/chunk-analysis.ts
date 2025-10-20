@@ -12,13 +12,13 @@
  * Content Classification Types
  */
 export type ContentType =
-  | "product"
-  | "specification"
-  | "introduction"
-  | "legal_disclaimer"
-  | "technical_detail"
-  | "marketing"
-  | "other";
+  | 'product'
+  | 'specification'
+  | 'introduction'
+  | 'legal_disclaimer'
+  | 'technical_detail'
+  | 'marketing'
+  | 'other';
 
 export interface ChunkClassification {
   id: string;
@@ -63,7 +63,7 @@ export interface ChunkClassificationUpdate {
 /**
  * Boundary Detection Types
  */
-export type BoundaryType = "sentence" | "paragraph" | "section" | "semantic" | "weak";
+export type BoundaryType = 'sentence' | 'paragraph' | 'section' | 'semantic' | 'weak';
 
 export interface ChunkBoundary {
   id: string;
@@ -116,18 +116,18 @@ export interface ChunkBoundaryUpdate {
 /**
  * Validation Score Types
  */
-export type ValidationStatus = "pending" | "validated" | "needs_review" | "rejected";
+export type ValidationStatus = 'pending' | 'validated' | 'needs_review' | 'rejected';
 
 export interface ValidationIssue {
   type: string;
-  severity: "low" | "medium" | "high";
+  severity: 'low' | 'medium' | 'high';
   description: string;
 }
 
 export interface ValidationRecommendation {
   type: string;
   description: string;
-  priority: "low" | "medium" | "high";
+  priority: 'low' | 'medium' | 'high';
 }
 
 export interface ChunkValidationScore {

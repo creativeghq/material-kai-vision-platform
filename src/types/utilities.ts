@@ -1,12 +1,12 @@
 /**
  * Core Utility Types Library for Material Kai Vision Platform
- * 
+ *
  * This module provides foundational utility types that enhance TypeScript's built-in
  * utility types with better error messages, more precise constraints, and advanced
  * type manipulation capabilities.
- * 
+ *
  * @fileoverview Comprehensive utility types for advanced TypeScript patterns
- * @author TypeScript Specialist  
+ * @author TypeScript Specialist
  * @version 1.0.0
  */
 
@@ -17,7 +17,7 @@
 /**
  * Makes all properties in T optional recursively, including nested objects.
  * More powerful than TypeScript's built-in Partial<T> which only affects top-level properties.
- * 
+ *
  * @template T - The type to make deeply partial
  * @example
  * ```typescript
@@ -31,7 +31,7 @@
  *     };
  *   };
  * }
- * 
+ *
  * type PartialUser = DeepPartial<User>;
  * // All properties including nested ones are optional
  * ```
@@ -49,7 +49,7 @@ export type DeepPartial<T> = {
 /**
  * Makes all properties in T required recursively, including nested objects.
  * Opposite of DeepPartial<T> - ensures no undefined values exist anywhere in the type tree.
- * 
+ *
  * @template T - The type to make deeply required
  * @example
  * ```typescript
@@ -70,7 +70,7 @@ export type DeepRequired<T> = {
 /**
  * Makes all properties in T readonly recursively, including nested objects.
  * Prevents mutation at any level of the object hierarchy.
- * 
+ *
  * @template T - The type to make deeply readonly
  * @example
  * ```typescript
@@ -95,7 +95,7 @@ export type DeepReadonly<T> = {
 /**
  * More strict version of TypeScript's Omit<T, K> with better error messages.
  * Ensures that the keys being omitted actually exist in the original type.
- * 
+ *
  * @template T - The original type
  * @template K - The keys to omit (must exist in T)
  * @example
@@ -110,7 +110,7 @@ export type StrictOmit<T, K extends keyof T> = Omit<T, K>;
 /**
  * More strict version of TypeScript's Pick<T, K> with better error messages.
  * Ensures that the keys being picked actually exist in the original type.
- * 
+ *
  * @template T - The original type
  * @template K - The keys to pick (must exist in T)
  * @example
@@ -129,7 +129,7 @@ export type StrictPick<T, K extends keyof T> = Pick<T, K>;
 /**
  * Extracts keys from type T where the property type matches type U.
  * Useful for type-safe key extraction based on value types.
- * 
+ *
  * @template T - The type to extract keys from
  * @template U - The value type to match
  * @example
@@ -140,7 +140,7 @@ export type StrictPick<T, K extends keyof T> = Pick<T, K>;
  *   active: boolean;
  *   count: number;
  * }
- * 
+ *
  * type NumberKeys = KeysOfType<Example, number>; // 'id' | 'count'
  * type StringKeys = KeysOfType<Example, string>; // 'name'
  * ```
@@ -151,7 +151,7 @@ export type KeysOfType<T, U> = {
 
 /**
  * Extracts keys from type T where the property is optional.
- * 
+ *
  * @template T - The type to extract optional keys from
  * @example
  * ```typescript
@@ -161,7 +161,7 @@ export type KeysOfType<T, U> = {
  *   email?: string;
  *   active: boolean;
  * }
- * 
+ *
  * type OptionalUserKeys = OptionalKeys<User>; // 'name' | 'email'
  * ```
  */
@@ -171,7 +171,7 @@ export type OptionalKeys<T> = {
 
 /**
  * Extracts keys from type T where the property is required.
- * 
+ *
  * @template T - The type to extract required keys from
  * @example
  * ```typescript
@@ -181,7 +181,7 @@ export type OptionalKeys<T> = {
  *   email?: string;
  *   active: boolean;
  * }
- * 
+ *
  * type RequiredUserKeys = RequiredKeys<User>; // 'id' | 'active'
  * ```
  */
@@ -196,13 +196,13 @@ export type RequiredKeys<T> = {
 /**
  * Represents a non-empty array type - an array that must contain at least one element.
  * Provides compile-time guarantee that the array is not empty.
- * 
+ *
  * @template T - The type of elements in the array
  * @example
  * ```typescript
  * const emptyArray: NonEmptyArray<string> = []; // ✗ Compile error
  * const validArray: NonEmptyArray<string> = ['hello']; // ✓ Valid
- * 
+ *
  * function processItems(items: NonEmptyArray<Material>) {
  *   // Can safely access items[0] without checking length
  *   return items[0];
@@ -213,7 +213,7 @@ export type NonEmptyArray<T> = [T, ...T[]];
 
 /**
  * Checks if an array is non-empty at runtime and narrows the type.
- * 
+ *
  * @param array - Array to check
  * @returns True if array has at least one element
  * @example
@@ -231,7 +231,7 @@ export function isNonEmptyArray<T>(array: T[]): array is NonEmptyArray<T> {
 
 /**
  * Creates a non-empty array from the provided elements.
- * 
+ *
  * @param first - First element (required)
  * @param rest - Additional elements
  * @returns Non-empty array
@@ -247,7 +247,7 @@ export function createNonEmptyArray<T>(first: T, ...rest: T[]): NonEmptyArray<T>
 
 /**
  * Gets the first element of a non-empty array (safe access).
- * 
+ *
  * @param array - Non-empty array
  * @returns First element
  */
@@ -257,7 +257,7 @@ export function head<T>(array: NonEmptyArray<T>): T {
 
 /**
  * Gets all elements except the first from a non-empty array.
- * 
+ *
  * @param array - Non-empty array
  * @returns Array of remaining elements (may be empty)
  */
@@ -272,14 +272,14 @@ export function tail<T>(array: NonEmptyArray<T>): T[] {
 /**
  * Represents a type that may or may not be a promise.
  * Useful for functions that can work with both sync and async values.
- * 
+ *
  * @template T - The wrapped type
  */
 export type MaybePromise<T> = T | Promise<T>;
 
 /**
  * Extracts the return type from a function, handling both sync and async functions.
- * 
+ *
  * @template T - Function type
  */
 export type ReturnTypeAsync<T extends (...args: unknown[]) => unknown> = T extends (
@@ -292,7 +292,7 @@ export type ReturnTypeAsync<T extends (...args: unknown[]) => unknown> = T exten
 
 /**
  * Makes specific properties optional while keeping others required.
- * 
+ *
  * @template T - Original type
  * @template K - Keys to make optional
  * @example
@@ -302,7 +302,7 @@ export type ReturnTypeAsync<T extends (...args: unknown[]) => unknown> = T exten
  *   name: string;
  *   email: string;
  * }
- * 
+ *
  * type CreateUser = PartialBy<User, 'id'>; // id is optional, name and email required
  * ```
  */
@@ -310,7 +310,7 @@ export type PartialBy<T, K extends keyof T> = StrictOmit<T, K> & Partial<StrictP
 
 /**
  * Makes specific properties required while keeping others as-is.
- * 
+ *
  * @template T - Original type
  * @template K - Keys to make required
  */
@@ -322,14 +322,14 @@ export type RequiredBy<T, K extends keyof T> = T & Required<StrictPick<T, K>>;
 
 /**
  * Creates a branded type to prevent mixing of similar primitive types.
- * 
+ *
  * @template T - Base type
  * @template Brand - Brand identifier
  * @example
  * ```typescript
  * type UserId = Brand<string, 'UserId'>;
  * type MaterialId = Brand<string, 'MaterialId'>;
- * 
+ *
  * const userId: UserId = 'user123' as UserId;
  * const materialId: MaterialId = userId; // ✗ Compile error - different brands
  * ```
@@ -418,14 +418,14 @@ export type Mutable<T> = {
 /**
  * Type representing a validation result.
  */
-export type ValidationResult<T, E = string> = 
+export type ValidationResult<T, E = string> =
   | { success: true; data: T }
   | { success: false; error: E };
 
 /**
  * Type representing a result that can succeed or fail.
  */
-export type Result<T, E = Error> = 
+export type Result<T, E = Error> =
   | { ok: true; value: T }
   | { ok: false; error: E };
 
@@ -465,7 +465,7 @@ export function err<E = Error>(error: E): Result<never, E> {
  * Type guard to check if a validation result is successful.
  */
 export function isValidationSuccess<T, E>(
-  result: ValidationResult<T, E>
+  result: ValidationResult<T, E>,
 ): result is { success: true; data: T } {
   return result.success;
 }
@@ -620,7 +620,7 @@ export function apiError<TError = string>(error: TError): ApiResponse<never, TEr
  * Type guard to check if an API response is successful.
  */
 export function isApiSuccess<TData, TError>(
-  response: ApiResponse<TData, TError>
+  response: ApiResponse<TData, TError>,
 ): response is { success: true; data: TData } {
   return response.success;
 }
@@ -629,7 +629,7 @@ export function isApiSuccess<TData, TError>(
  * Type guard to check if an API response is an error.
  */
 export function isApiError<TData, TError>(
-  response: ApiResponse<TData, TError>
+  response: ApiResponse<TData, TError>,
 ): response is { success: false; error: TError } {
   return !response.success;
 }
@@ -808,7 +808,7 @@ export type ValidationSchema<T> = {
  */
 export function validate<TInput, TOutput = TInput>(
   value: TInput,
-  validator: Validator<TInput, TOutput>
+  validator: Validator<TInput, TOutput>,
 ): ValidationResult<TOutput> {
   return validator(value);
 }
@@ -882,7 +882,7 @@ export function createEntityState<TEntity extends WithId<TId>, TId extends strin
     entities: {} as Record<TId, TEntity>,
     ids: [],
     loading: false,
-    error: null
+    error: null,
   };
 }
 
@@ -891,7 +891,7 @@ export function createEntityState<TEntity extends WithId<TId>, TId extends strin
  */
 export function addEntitiesToState<TEntity extends WithId<TId>, TId extends string | number = string>(
   state: EntityState<TEntity, TId>,
-  entities: TEntity[]
+  entities: TEntity[],
 ): EntityState<TEntity, TId> {
   const newEntities = { ...state.entities };
   const newIds = [...state.ids];
@@ -906,7 +906,7 @@ export function addEntitiesToState<TEntity extends WithId<TId>, TId extends stri
   return {
     ...state,
     entities: newEntities,
-    ids: newIds
+    ids: newIds,
   };
 }
 
@@ -916,7 +916,7 @@ export function addEntitiesToState<TEntity extends WithId<TId>, TId extends stri
 export function updateEntityInState<TEntity extends WithId<TId>, TId extends string | number = string>(
   state: EntityState<TEntity, TId>,
   id: TId,
-  updates: Partial<TEntity>
+  updates: Partial<TEntity>,
 ): EntityState<TEntity, TId> {
   const existingEntity = state.entities[id];
   if (!existingEntity) {
@@ -927,8 +927,8 @@ export function updateEntityInState<TEntity extends WithId<TId>, TId extends str
     ...state,
     entities: {
       ...state.entities,
-      [id]: { ...existingEntity, ...updates }
-    }
+      [id]: { ...existingEntity, ...updates },
+    },
   };
 }
 
@@ -937,7 +937,7 @@ export function updateEntityInState<TEntity extends WithId<TId>, TId extends str
  */
 export function removeEntityFromState<TEntity extends WithId<TId>, TId extends string | number = string>(
   state: EntityState<TEntity, TId>,
-  id: TId
+  id: TId,
 ): EntityState<TEntity, TId> {
   const entities = { ...state.entities };
   delete entities[id];
@@ -946,7 +946,7 @@ export function removeEntityFromState<TEntity extends WithId<TId>, TId extends s
   return {
     ...state,
     entities,
-    ids
+    ids,
   };
 }
 
@@ -976,7 +976,7 @@ export function createAsyncState<TData, TError = string>(): AsyncState<TData, TE
     data: null,
     loading: false,
     error: null,
-    hasLoaded: false
+    hasLoaded: false,
   };
 }
 
@@ -988,7 +988,7 @@ export function asyncLoading<TData, TError = string>(): AsyncState<TData, TError
     data: null,
     loading: true,
     error: null,
-    hasLoaded: false
+    hasLoaded: false,
   };
 }
 
@@ -1000,7 +1000,7 @@ export function asyncSuccess<TData, TError = string>(data: TData): AsyncState<TD
     data,
     loading: false,
     error: null,
-    hasLoaded: true
+    hasLoaded: true,
   };
 }
 
@@ -1012,6 +1012,6 @@ export function asyncError<TData, TError = string>(error: TError): AsyncState<TD
     data: null,
     loading: false,
     error,
-    hasLoaded: true
+    hasLoaded: true,
   };
 }

@@ -1,6 +1,6 @@
 /**
  * Standardized Error Messages and User Feedback
- * 
+ *
  * This module provides consistent, user-friendly error messages
  * and feedback for different error scenarios across the platform.
  */

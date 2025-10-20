@@ -1,12 +1,13 @@
 /**
  * Image Preprocessing Utilities
- * 
+ *
  * Handles image validation, resizing, format conversion, and preparation
  * for visual analysis processing. Supports various image formats and
  * provides security validation to prevent malicious uploads.
  */
 
 import { createHash } from 'crypto';
+
 import {
   ValidationError,
   errorLogger,
@@ -70,13 +71,13 @@ export interface ProcessedImageResult {
  * Handles all image validation, processing, and optimization tasks
  */
 export class ImagePreprocessingService {
-  
+
   /**
    * Validate image data and extract metadata
    */
   static async validateImage(
     imageData: Buffer | string,
-    source: 'upload' | 'url' = 'upload'
+    source: 'upload' | 'url' = 'upload',
   ): Promise<ImageValidationResult> {
     const startTime = Date.now();
     const result: ImageValidationResult = {
@@ -127,20 +128,20 @@ export class ImagePreprocessingService {
       }
 
       // Dimension validation
-      if (metadata.width < IMAGE_CONFIG.MIN_DIMENSIONS.width || 
+      if (metadata.width < IMAGE_CONFIG.MIN_DIMENSIONS.width ||
           metadata.height < IMAGE_CONFIG.MIN_DIMENSIONS.height) {
         result.errors.push(`Image dimensions ${metadata.width}x${metadata.height} are below minimum ${IMAGE_CONFIG.MIN_DIMENSIONS.width}x${IMAGE_CONFIG.MIN_DIMENSIONS.height}`);
         result.isValid = false;
       }
 
-      if (metadata.width > IMAGE_CONFIG.MAX_DIMENSIONS.width || 
+      if (metadata.width > IMAGE_CONFIG.MAX_DIMENSIONS.width ||
           metadata.height > IMAGE_CONFIG.MAX_DIMENSIONS.height) {
         result.errors.push(`Image dimensions ${metadata.width}x${metadata.height} exceed maximum ${IMAGE_CONFIG.MAX_DIMENSIONS.width}x${IMAGE_CONFIG.MAX_DIMENSIONS.height}`);
         result.isValid = false;
       }
 
       // Performance warnings
-      if (metadata.width > IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width || 
+      if (metadata.width > IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width ||
           metadata.height > IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height) {
         result.warnings.push(`Large image dimensions ${metadata.width}x${metadata.height} may impact processing performance. Consider resizing to ${IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width}x${IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height}`);
       }
@@ -170,7 +171,7 @@ export class ImagePreprocessingService {
     } catch (error) {
       result.isValid = false;
       result.errors.push(`Image validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
+
       errorLogger.logError(error as Error, {
         service: 'ImagePreprocessingService',
         operation: 'validateImage',
@@ -189,7 +190,7 @@ export class ImagePreprocessingService {
    */
   static async processImage(
     imageData: Buffer,
-    options: ImageProcessingOptions = {}
+    options: ImageProcessingOptions = {},
   ): Promise<ProcessedImageResult> {
     const startTime = Date.now();
     const optimizations: string[] = [];
@@ -197,12 +198,12 @@ export class ImagePreprocessingService {
     try {
       // Extract original metadata
       const originalMetadata = await this.extractImageMetadata(imageData);
-      
+
       // Determine target dimensions
       const targetDimensions = this.calculateOptimalDimensions(
         originalMetadata.width,
         originalMetadata.height,
-        options
+        options,
       );
 
       // Apply optimizations if needed
@@ -210,7 +211,7 @@ export class ImagePreprocessingService {
       let requiresProcessing = false;
 
       // Check if resizing is needed
-      if (targetDimensions.width !== originalMetadata.width || 
+      if (targetDimensions.width !== originalMetadata.width ||
           targetDimensions.height !== originalMetadata.height) {
         requiresProcessing = true;
         optimizations.push(`Resized from ${originalMetadata.width}x${originalMetadata.height} to ${targetDimensions.width}x${targetDimensions.height}`);
@@ -237,7 +238,7 @@ export class ImagePreprocessingService {
           processedBuffer,
           targetDimensions,
           targetFormat,
-          targetQuality
+          targetQuality,
         );
         processedBuffer = processed.buffer;
         processedMetadata = processed.metadata;
@@ -288,7 +289,7 @@ export class ImagePreprocessingService {
   private static async extractImageMetadata(buffer: Buffer): Promise<ImageMetadata> {
     // Simple format detection based on file signatures
     const format = this.detectImageFormat(buffer);
-    
+
     // For this implementation, we'll provide basic metadata extraction
     // In a production environment, you might want to use a library like 'sharp' or 'jimp'
     const metadata: ImageMetadata = {
@@ -309,23 +310,23 @@ export class ImagePreprocessingService {
     if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
       return 'image/jpeg';
     }
-    
+
     // PNG
     if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) {
       return 'image/png';
     }
-    
+
     // WebP
-    if (buffer.subarray(0, 4).equals(Buffer.from('RIFF', 'ascii')) && 
+    if (buffer.subarray(0, 4).equals(Buffer.from('RIFF', 'ascii')) &&
         buffer.subarray(8, 12).equals(Buffer.from('WEBP', 'ascii'))) {
       return 'image/webp';
     }
-    
+
     // BMP
     if (buffer[0] === 0x42 && buffer[1] === 0x4D) {
       return 'image/bmp';
     }
-    
+
     return 'unknown';
   }
 
@@ -405,7 +406,7 @@ export class ImagePreprocessingService {
   private static calculateOptimalDimensions(
     originalWidth: number,
     originalHeight: number,
-    options: ImageProcessingOptions
+    options: ImageProcessingOptions,
   ): { width: number; height: number } {
     let targetWidth = options.targetWidth || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width;
     let targetHeight = options.targetHeight || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height;
@@ -413,7 +414,7 @@ export class ImagePreprocessingService {
     // Maintain aspect ratio if requested
     if (options.maintainAspectRatio !== false) {
       const aspectRatio = originalWidth / originalHeight;
-      
+
       if (targetWidth / targetHeight > aspectRatio) {
         targetWidth = Math.round(targetHeight * aspectRatio);
       } else {
@@ -454,7 +455,7 @@ export class ImagePreprocessingService {
 
   /**
    * Apply image processing transformations
-   * 
+   *
    * NOTE: This is a simplified implementation for demonstration.
    * In production, you should use a proper image processing library like:
    * - sharp (Node.js)
@@ -465,11 +466,11 @@ export class ImagePreprocessingService {
     buffer: Buffer,
     dimensions: { width: number; height: number },
     format: string,
-    _quality: number
+    _quality: number,
   ): Promise<{ buffer: Buffer; metadata: ImageMetadata }> {
     // This is a placeholder implementation
     // In a real implementation, you would use an image processing library
-    
+
     // For now, return the original buffer with updated metadata
     const metadata: ImageMetadata = {
       width: dimensions.width,
@@ -488,24 +489,24 @@ export class ImagePreprocessingService {
    * Batch validate multiple images
    */
   static async batchValidateImages(
-    images: Array<{ data: Buffer | string; id: string; source?: 'upload' | 'url' }>
+    images: Array<{ data: Buffer | string; id: string; source?: 'upload' | 'url' }>,
   ): Promise<Array<{ id: string; result: ImageValidationResult }>> {
     const results: Array<{ id: string; result: ImageValidationResult }> = [];
-    
+
     // Process in small batches to avoid memory issues
     const batchSize = 5;
     for (let i = 0; i < images.length; i += batchSize) {
       const batch = images.slice(i, i + batchSize);
-      
+
       const batchPromises = batch.map(async (image) => ({
         id: image.id,
         result: await this.validateImage(image.data, image.source),
       }));
-      
+
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
     }
-    
+
     return results;
   }
 
@@ -543,10 +544,10 @@ export class ImageUtils {
   static calculateThumbnailDimensions(
     originalWidth: number,
     originalHeight: number,
-    maxSize: number = 300
+    maxSize: number = 300,
   ): { width: number; height: number } {
     const aspectRatio = originalWidth / originalHeight;
-    
+
     if (originalWidth > originalHeight) {
       return {
         width: Math.min(maxSize, originalWidth),
@@ -565,27 +566,27 @@ export class ImageUtils {
    */
   static needsProcessing(
     metadata: ImageMetadata,
-    options: ImageProcessingOptions = {}
+    options: ImageProcessingOptions = {},
   ): boolean {
     const targetWidth = options.targetWidth || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width;
     const targetHeight = options.targetHeight || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height;
-    
+
     // Check dimensions
     if (metadata.width > targetWidth || metadata.height > targetHeight) {
       return true;
     }
-    
+
     // Check format
     const optimalFormat = ImagePreprocessingService.getOptimalFormat(metadata.format);
     if (ImagePreprocessingService.normalizeFormat(metadata.format) !== optimalFormat) {
       return true;
     }
-    
+
     // Check size
     if (metadata.size > IMAGE_CONFIG.MAX_FILE_SIZE * 0.8) { // 80% threshold
       return true;
     }
-    
+
     return false;
   }
 
@@ -595,14 +596,14 @@ export class ImageUtils {
   static estimateProcessingTime(metadata: ImageMetadata): number {
     // Base time in milliseconds
     const baseTime = 500;
-    
+
     // Factor in dimensions (larger images take longer)
     const pixelCount = metadata.width * metadata.height;
     const dimensionFactor = Math.max(1, pixelCount / (1024 * 1024)); // Base on 1MP
-    
+
     // Factor in file size
     const sizeFactor = Math.max(1, metadata.size / (1024 * 1024)); // Base on 1MB
-    
+
     return Math.round(baseTime * dimensionFactor * sizeFactor);
   }
 }

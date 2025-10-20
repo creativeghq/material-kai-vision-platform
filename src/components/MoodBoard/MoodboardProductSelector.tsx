@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { MoodboardProductsService, MoodboardProduct } from '../../services/moodboard/MoodboardProductsService';
 
 interface MoodboardProductSelectorProps {
@@ -57,7 +58,7 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
         newProductId,
         positionX,
         positionY,
-        notes
+        notes,
       );
 
       setProducts([...products, product]);

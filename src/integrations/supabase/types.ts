@@ -713,10 +713,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "material_visual_analysis_material_id_fkey"
-            columns: ["material_id"]
-            referencedRelation: "materials_catalog"
-            referencedColumns: ["id"]
+            foreignKeyName: 'material_visual_analysis_material_id_fkey'
+            columns: ['material_id']
+            referencedRelation: 'materials_catalog'
+            referencedColumns: ['id']
           }
         ]
       }
@@ -777,16 +777,16 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "visual_analysis_queue_material_id_fkey"
-            columns: ["material_id"]
-            referencedRelation: "materials_catalog"
-            referencedColumns: ["id"]
+            foreignKeyName: 'visual_analysis_queue_material_id_fkey'
+            columns: ['material_id']
+            referencedRelation: 'materials_catalog'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "visual_analysis_queue_result_analysis_id_fkey"
-            columns: ["result_analysis_id"]
-            referencedRelation: "material_visual_analysis"
-            referencedColumns: ["id"]
+            foreignKeyName: 'visual_analysis_queue_result_analysis_id_fkey'
+            columns: ['result_analysis_id']
+            referencedRelation: 'material_visual_analysis'
+            referencedColumns: ['id']
           }
         ]
       }

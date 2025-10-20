@@ -1,4 +1,5 @@
 import { FunctionalMetadata } from '@/types/materials';
+
 import { MivaaIntegrationService, type PdfExtractionRequest, type ExtractionResult } from './pdf/mivaaIntegrationService';
 
 /**
@@ -125,7 +126,7 @@ export interface FunctionalMetadataExtractionResult extends ExtractionResult {
 
 /**
  * Functional Metadata API Service
- * 
+ *
  * Enhanced service that extends MivaaIntegrationService to support
  * functional metadata extraction with proper state management and error handling.
  */
@@ -140,7 +141,7 @@ export class FunctionalMetadataApiService {
    * Extract images with functional metadata from PDF document
    */
   async extractWithFunctionalMetadata(
-    request: FunctionalMetadataExtractionRequest
+    request: FunctionalMetadataExtractionRequest,
   ): Promise<FunctionalMetadataExtractionResult> {
     try {
       // Prepare the enhanced request with functional metadata parameter
@@ -193,7 +194,7 @@ export class FunctionalMetadataApiService {
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error during functional metadata extraction';
-      
+
       return {
         documentId: request.documentId,
         status: 'failed',
@@ -213,7 +214,7 @@ export class FunctionalMetadataApiService {
     functionalOptions: {
       includeFunctionalMetadata: boolean;
       confidenceThreshold: number;
-    }
+    },
   ): Promise<FunctionalMetadataResponse> {
     // Build query parameters
     const queryParams = new URLSearchParams();
@@ -264,7 +265,7 @@ export class FunctionalMetadataApiService {
    * Transform raw functional metadata to typed FunctionalMetadata interface
    */
   private transformFunctionalMetadata(
-    rawData?: FunctionalMetadataResponse['functional_properties']
+    rawData?: FunctionalMetadataResponse['functional_properties'],
   ): FunctionalMetadata | undefined {
     if (!rawData) return undefined;
 
@@ -301,8 +302,8 @@ export class FunctionalMetadataApiService {
     // Transform thermal properties
     if (rawData.thermal_properties) {
       functionalMetadata.thermalProperties = {
-        radiantHeatingCompatible: rawData.thermal_properties.highlights?.some(h => 
-          h.toLowerCase().includes('radiant') || h.toLowerCase().includes('heating')
+        radiantHeatingCompatible: rawData.thermal_properties.highlights?.some(h =>
+          h.toLowerCase().includes('radiant') || h.toLowerCase().includes('heating'),
         ),
       };
     }
@@ -319,7 +320,7 @@ export class FunctionalMetadataApiService {
       functionalMetadata.chemicalHygieneResistance = {
         chemicalCertifications: rawData.chemical_hygiene_resistance.highlights || [],
         foodSafeCertified: rawData.chemical_hygiene_resistance.highlights?.some(h =>
-          h.toLowerCase().includes('food') || h.toLowerCase().includes('safe')
+          h.toLowerCase().includes('food') || h.toLowerCase().includes('safe'),
         ),
       };
     }
@@ -359,7 +360,7 @@ export class FunctionalMetadataApiService {
    * Extract only functional metadata without images (lightweight operation)
    */
   async extractFunctionalMetadataOnly(
-    request: FunctionalMetadataExtractionRequest
+    request: FunctionalMetadataExtractionRequest,
   ): Promise<{
     functionalMetadata?: FunctionalMetadata;
     extractionSummary?: FunctionalMetadataResponse['summary'];
@@ -368,10 +369,10 @@ export class FunctionalMetadataApiService {
   }> {
     try {
       const startTime = Date.now();
-      
+
       // Use the full extraction but focus on metadata
       const result = await this.extractWithFunctionalMetadata(request);
-      
+
       return {
         ...(result.data.functionalMetadata && { functionalMetadata: result.data.functionalMetadata }),
         ...(result.data.extractionSummary && { extractionSummary: result.data.extractionSummary }),
@@ -418,7 +419,7 @@ export class FunctionalMetadataApiService {
  * Factory function to create FunctionalMetadataApiService instance
  */
 export function createFunctionalMetadataApiService(
-  mivaaService: MivaaIntegrationService
+  mivaaService: MivaaIntegrationService,
 ): FunctionalMetadataApiService {
   return new FunctionalMetadataApiService(mivaaService);
 }

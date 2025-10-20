@@ -23,6 +23,6 @@ export const useUserRole = () => {
   return {
     isAdmin: isAdmin(),
     role: getUserRole(),
-    user
+    user,
   };
 };

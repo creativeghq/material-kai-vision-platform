@@ -24,9 +24,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { applyQualityBasedRanking } from '@/services/qualityBasedRankingService';
 
 import { SearchResultCard, SearchResult } from './SearchResultCard';
-import { applyQualityBasedRanking } from '@/services/qualityBasedRankingService';
 
 // Types for sorting and filtering
 export type SortField = 'relevance' | 'semantic' | 'quality' | 'date' | 'title' | 'views';

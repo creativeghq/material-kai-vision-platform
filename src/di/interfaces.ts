@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from 'events';
+
 import { RagDocument } from '../types/rag';
 
 // ============================================================================

@@ -1,6 +1,6 @@
 /**
  * PDF Processing WebSocket Service
- * 
+ *
  * Provides real-time progress updates for PDF processing workflows
  * Integrates with ConsolidatedPDFWorkflowService for live progress monitoring
  */
@@ -110,7 +110,7 @@ class PDFProcessingWebSocketService {
   private handleWebSocketMessage(message: any) {
     try {
       const wsMessage = message as PDFProcessingWebSocketMessage;
-      
+
       if (wsMessage.type === 'progress_update' && wsMessage.jobId) {
         this.updateJobProgress(wsMessage.jobId, wsMessage.data);
       }
@@ -126,7 +126,7 @@ class PDFProcessingWebSocketService {
     if (!this.subscribers.has(jobId)) {
       this.subscribers.set(jobId, new Set());
     }
-    
+
     this.subscribers.get(jobId)!.add(callback);
 
     // Send current progress if available
@@ -214,8 +214,8 @@ class PDFProcessingWebSocketService {
    * Update specific job statistics
    */
   public updateJobStatistics(
-    jobId: string, 
-    statistics: Partial<PDFProcessingProgress['statistics']>
+    jobId: string,
+    statistics: Partial<PDFProcessingProgress['statistics']>,
   ): void {
     const progress = this.activeJobs.get(jobId);
     if (progress) {
@@ -249,13 +249,13 @@ class PDFProcessingWebSocketService {
       progress.overallProgress = 100;
       progress.endTime = new Date();
       progress.actualDuration = progress.endTime.getTime() - progress.startTime.getTime();
-      
+
       if (finalStatistics) {
         progress.statistics = { ...progress.statistics, ...finalStatistics };
       }
 
       this.notifySubscribers(jobId, progress);
-      
+
       // Clean up after 5 minutes
       setTimeout(() => {
         this.activeJobs.delete(jobId);
@@ -345,8 +345,8 @@ class PDFProcessingWebSocketService {
       progress: step.progress || 0,
       startTime: step.metadata?.startTime as Date,
       endTime: step.metadata?.endTime as Date,
-      details: Array.isArray(step.details) ? step.details.map(d => 
-        typeof d === 'string' ? d : d.message
+      details: Array.isArray(step.details) ? step.details.map(d =>
+        typeof d === 'string' ? d : d.message,
       ) : [],
       error: step.metadata?.error as string,
       metadata: step.metadata,
@@ -357,7 +357,7 @@ class PDFProcessingWebSocketService {
     const mivaaStep = steps.find(s => s.id === 'mivaa-processing');
     if (mivaaStep?.metadata) {
       const metadata = mivaaStep.metadata;
-      
+
       if (typeof metadata.chunks_created === 'number') {
         progress.statistics.chunksCreated = metadata.chunks_created;
       }

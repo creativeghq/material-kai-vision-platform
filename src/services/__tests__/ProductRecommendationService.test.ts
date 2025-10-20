@@ -183,7 +183,7 @@ describe('ProductRecommendationService', () => {
       const recommendations = await service.getPersonalizedRecommendations(
         'workspace-1',
         ['flooring', 'walls'],
-        10
+        10,
       );
 
       expect(Array.isArray(recommendations)).toBe(true);
@@ -195,7 +195,7 @@ describe('ProductRecommendationService', () => {
       const recommendations = await service.getPersonalizedRecommendations(
         'workspace-1',
         ['flooring'],
-        5
+        5,
       );
 
       recommendations.forEach(rec => {
@@ -209,7 +209,7 @@ describe('ProductRecommendationService', () => {
       const recommendations = await service.getPersonalizedRecommendations(
         'workspace-1',
         ['flooring'],
-        3
+        3,
       );
 
       expect(recommendations.length).toBeLessThanOrEqual(3);

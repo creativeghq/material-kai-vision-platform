@@ -73,7 +73,7 @@ export class RetryHelper {
   private static defaultRetryCondition(error: unknown): boolean {
     // Type guard to check if error has the expected properties
     const retryableError = error as RetryableError;
-    
+
     // Network errors
     if (retryableError.code === 'ECONNRESET' ||
         retryableError.code === 'ENOTFOUND' ||

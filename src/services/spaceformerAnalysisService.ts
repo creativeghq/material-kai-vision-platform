@@ -167,7 +167,7 @@ class SpaceformerAnalysisService {
    */
   async quickLayoutAnalysis(
     roomType: string,
-    dimensions: { width: number; height: number; depth: number }
+    dimensions: { width: number; height: number; depth: number },
   ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
       room_type: roomType,

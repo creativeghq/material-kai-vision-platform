@@ -1,6 +1,6 @@
 /**
  * Browser-Compatible API Configuration
- * 
+ *
  * This file provides API configurations that work in the browser environment
  * without requiring Node.js modules like 'fs' or 'path'.
  */

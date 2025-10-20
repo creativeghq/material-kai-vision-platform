@@ -1,6 +1,6 @@
 /**
  * Type Guards and Validation Utilities
- * 
+ *
  * Provides runtime type checking and validation functions to replace
  * unsafe 'unknown' types with proper type guards.
  */
@@ -222,7 +222,7 @@ export function ensureArray<T>(value: any): T[] {
 
 export function filterValidItems<T>(
   array: any[],
-  validator: (item: any) => item is T
+  validator: (item: any) => item is T,
 ): T[] {
   return array.filter(validator);
 }
@@ -232,28 +232,28 @@ export function filterValidItems<T>(
  */
 export function hasProperty<K extends string>(
   obj: any,
-  key: K
+  key: K,
 ): obj is Record<K, any> {
   return isObject(obj) && key in obj;
 }
 
 export function hasStringProperty<K extends string>(
   obj: any,
-  key: K
+  key: K,
 ): obj is Record<K, string> {
   return hasProperty(obj, key) && isString(obj[key]);
 }
 
 export function hasNumberProperty<K extends string>(
   obj: any,
-  key: K
+  key: K,
 ): obj is Record<K, number> {
   return hasProperty(obj, key) && isNumber(obj[key]);
 }
 
 export function hasBooleanProperty<K extends string>(
   obj: any,
-  key: K
+  key: K,
 ): obj is Record<K, boolean> {
   return hasProperty(obj, key) && isBoolean(obj[key]);
 }
@@ -277,16 +277,16 @@ export function getArrayProperty<T>(
   obj: any,
   key: string,
   validator?: (item: any) => item is T,
-  defaultValue: T[] = []
+  defaultValue: T[] = [],
 ): T[] {
   if (!hasProperty(obj, key) || !isArray(obj[key])) {
     return defaultValue;
   }
-  
+
   if (validator) {
     return filterValidItems(obj[key], validator);
   }
-  
+
   return obj[key];
 }
 

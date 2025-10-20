@@ -20,11 +20,11 @@ const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => {
   return React.createElement('mesh', { position: [0, 0, 0] },
     React.createElement('boxGeometry', { args: [2, 2, 2] }),
     React.createElement('meshStandardMaterial', {
-      color: "hsl(210 40% 98%)",
+      color: 'hsl(210 40% 98%)',
       transparent: true,
       opacity: 0.8,
-      wireframe: false
-    })
+      wireframe: false,
+    }),
   );
 };
 
@@ -33,7 +33,7 @@ const ImageTexturedCube: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
 
   return React.createElement('mesh', { position: [0, 0, 0] },
     React.createElement('boxGeometry', { args: [2, 2, 2] }),
-    React.createElement('meshStandardMaterial', { map: texture })
+    React.createElement('meshStandardMaterial', { map: texture }),
   );
 };
 
@@ -61,14 +61,14 @@ const Scene: React.FC<{
         /* Fallback placeholder */
         React.createElement('mesh', { position: [0, 0, 0] },
           React.createElement('boxGeometry', { args: [2, 2, 2] }),
-          React.createElement('meshStandardMaterial', { color: "hsl(210 40% 98%)", wireframe: true })
+          React.createElement('meshStandardMaterial', { color: 'hsl(210 40% 98%)', wireframe: true }),
         )
       )}
 
       {/* Floor plane */}
       {React.createElement('mesh', { rotation: [-Math.PI / 2, 0, 0], position: [0, -2, 0] },
         React.createElement('planeGeometry', { args: [10, 10] }),
-        React.createElement('meshStandardMaterial', { color: "#6B7280", transparent: true, opacity: 0.3 })
+        React.createElement('meshStandardMaterial', { color: '#6B7280', transparent: true, opacity: 0.3 }),
       )}
 
       <OrbitControls enablePan enableZoom enableRotate />

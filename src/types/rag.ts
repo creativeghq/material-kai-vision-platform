@@ -1,6 +1,6 @@
 /**
  * Unified RAG (Retrieval-Augmented Generation) Type Definitions
- * 
+ *
  * This file contains the single source of truth for all RAG-related interfaces
  * across the Material Kai Vision Platform. All services should import from here.
  */

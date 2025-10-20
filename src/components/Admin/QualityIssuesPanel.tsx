@@ -1,11 +1,12 @@
 /**
  * Quality Issues Panel Component
- * 
+ *
  * Displays identified quality issues with severity levels and recommendations.
  */
 
 import React from 'react';
 import { AlertTriangle, AlertCircle, Info } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { QualityIssue } from '@/services/QualityDashboardService';

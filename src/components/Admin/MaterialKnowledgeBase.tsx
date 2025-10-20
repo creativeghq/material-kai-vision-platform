@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Package,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,11 +23,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Link } from 'react-router-dom';
 
 interface DocumentChunk {
   id: string;
@@ -197,7 +196,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
       console.error('❌ Error loading knowledge base data:', error);
       console.error('Error details:', {
         message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace'
+        stack: error instanceof Error ? error.stack : 'No stack trace',
       });
       toast({
         title: 'Error',
@@ -212,14 +211,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const filteredChunks = chunks.filter(chunk =>
     chunk.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     chunk.metadata?.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chunk.metadata?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+    chunk.metadata?.title?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const filteredImages = images.filter(image =>
     image.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     image.alt_text?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     image.contextual_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    image.nearest_heading?.toLowerCase().includes(searchQuery.toLowerCase())
+    image.nearest_heading?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const getChunksByDocument = (documentId: string) => {
@@ -244,7 +243,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
       .filter(c =>
         c.document_id === chunk.document_id &&
         c.id !== chunk.id &&
-        Math.abs(c.chunk_index - chunk.chunk_index) <= 2
+        Math.abs(c.chunk_index - chunk.chunk_index) <= 2,
       )
       .slice(0, limit);
   };
@@ -348,7 +347,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">

@@ -78,7 +78,7 @@ export class LayoutAwareChunker {
       modelName: 'mixedbread-ai/mxbai-embed-xsmall-v1',
     });
     this.mivaaEmbedder = new EmbeddingGenerationService(
-      require('./embeddingGenerationService').defaultEmbeddingConfig
+      require('./embeddingGenerationService').defaultEmbeddingConfig,
     );
   }
 

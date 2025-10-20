@@ -25,7 +25,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-
 import { type FunctionalMetadata } from '@/types/materials';
 
 interface FunctionalMetadataCardProps {
@@ -63,7 +62,7 @@ const CATEGORY_CONFIG = {
   },
   surfaceGlossReflectivity: {
     icon: Star,
-    displayName: '✨ Surface Gloss/Reflectivity', 
+    displayName: '✨ Surface Gloss/Reflectivity',
     color: 'text-yellow-600',
     bgColor: 'bg-yellow-50',
   },
@@ -142,7 +141,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
 
   const renderPropertyValue = (_key: string, value: unknown): React.ReactNode => {
     if (value === null || value === undefined) return null;
-    
+
     if (typeof value === 'boolean') {
       return (
         <Badge variant={value ? 'default' : 'secondary'}>
@@ -150,15 +149,15 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
         </Badge>
       );
     }
-    
+
     if (typeof value === 'number') {
       return <span className="font-mono text-sm">{value}</span>;
     }
-    
+
     if (typeof value === 'string') {
       return <span className="text-sm">{value}</span>;
     }
-    
+
     if (typeof value === 'object' && value !== null) {
       return (
         <div className="text-xs text-muted-foreground">
@@ -166,7 +165,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
         </div>
       );
     }
-    
+
     return <span className="text-sm">{String(value)}</span>;
   };
 
@@ -185,7 +184,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
 
     const renderConfidenceIndicator = (confidence?: 'low' | 'medium' | 'high') => {
       if (!confidence || !showConfidence) return null;
-      
+
       const getConfidenceIcon = () => {
         switch (confidence) {
           case 'high': return <CheckCircle className="h-3 w-3" />;
@@ -232,7 +231,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
               </Button>
             </CollapsibleTrigger>
           </CardHeader>
-          
+
           {hasData && (
             <CollapsibleContent>
               <CardContent className="pt-0">
@@ -269,7 +268,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
                           {renderPropertyValue(propKey, propValue)}
                         </div>
                       </div>
-                      
+
                       <div className="ml-2 flex items-center gap-1">
                         <Target className="h-3 w-3 text-muted-foreground opacity-50" />
                       </div>
@@ -348,7 +347,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
           )}
         </div>
       </div>
-      
+
       {/* Application Suggestions Section */}
       {extractionSummary?.suggested_applications && extractionSummary.suggested_applications.length > 0 && (
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
@@ -384,7 +383,7 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
       {displayMode === 'compact' ? (
         <div className="grid gap-2">
           {availableCategories.slice(0, 3).map(([categoryKey, categoryData]) =>
-            renderCategoryContent(categoryKey, categoryData)
+            renderCategoryContent(categoryKey, categoryData),
           )}
           {availableCategories.length > 3 && (
             <div className="text-center">
@@ -397,11 +396,11 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
       ) : (
         <div className="grid gap-3 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1">
           {availableCategories.map(([categoryKey, categoryData]) =>
-            renderCategoryContent(categoryKey, categoryData)
+            renderCategoryContent(categoryKey, categoryData),
           )}
         </div>
       )}
-      
+
       {functionalMetadata.functionalMetadataUpdatedAt && (
         <div className="text-xs text-muted-foreground text-right mt-2">
           Last updated: {new Date(functionalMetadata.functionalMetadataUpdatedAt).toLocaleString()}

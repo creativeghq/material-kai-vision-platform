@@ -1,9 +1,10 @@
 import { performance } from 'perf_hooks';
 import { createHash } from 'crypto';
 
+import { RagDocument, RagMetadata } from '../types/rag';
+
 import { DocumentChunk, DocumentChunkingService, ChunkingStrategy } from './documentChunkingService';
 import { EmbeddingGenerationService, EmbeddingInput } from './embeddingGenerationService';
-import { RagDocument, RagMetadata } from '../types/rag';
 
 /**
  * Mivaa document structure from PDF extractor

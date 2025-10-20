@@ -1,6 +1,6 @@
 /**
  * Retrieval Quality Service
- * 
+ *
  * Validates and measures retrieval quality:
  * - Precision (correct chunks retrieved)
  * - Recall (all relevant chunks retrieved)
@@ -35,7 +35,7 @@ export class RetrievalQualityService {
   static async evaluateRetrieval(
     query: string,
     retrievedChunks: RetrievalResult[],
-    relevantChunkIds: string[]
+    relevantChunkIds: string[],
   ): Promise<RetrievalMetrics> {
     const startTime = Date.now();
 

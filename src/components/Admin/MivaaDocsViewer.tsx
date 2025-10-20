@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Book, FileText, ExternalLink, RefreshCw } from 'lucide-react';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,31 +13,31 @@ export const MivaaDocsViewer: React.FC = () => {
 
   const openDocsInNewTab = async (action: string, title: string) => {
     setLoading(action);
-    
+
     try {
       // Create a form to POST to the gateway in a new tab
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = 'https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/mivaa-gateway';
       form.target = '_blank';
-      
+
       // Add authorization header as a hidden input (this won't work for CORS)
       // Instead, we'll use a different approach
-      
+
       // For now, let's show the user how to access it
       const payload = {
         action: action,
-        payload: {}
+        payload: {},
       };
-      
+
       const url = 'https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/mivaa-gateway';
-      
+
       toast({
         title: `Opening ${title}`,
         description: `Use this payload in a REST client: ${JSON.stringify(payload)}`,
         duration: 5000,
       });
-      
+
       // For development, let's try to fetch and display
       const response = await fetch(url, {
         method: 'POST',
@@ -44,12 +45,12 @@ export const MivaaDocsViewer: React.FC = () => {
           'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
-      
+
       if (response.ok) {
         const content = await response.text();
-        
+
         // Create a new window with the content
         const newWindow = window.open('', '_blank');
         if (newWindow) {
@@ -59,7 +60,7 @@ export const MivaaDocsViewer: React.FC = () => {
       } else {
         throw new Error(`Failed to load ${title}: ${response.status}`);
       }
-      
+
     } catch (error) {
       console.error(`Error opening ${title}:`, error);
       toast({
@@ -99,7 +100,7 @@ export const MivaaDocsViewer: React.FC = () => {
 
         <TabsContent value="docs" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
+
             {/* Swagger UI */}
             <Card>
               <CardHeader>
@@ -116,7 +117,7 @@ export const MivaaDocsViewer: React.FC = () => {
                 <p className="text-sm text-muted-foreground">
                   Test API endpoints directly in the browser with request/response examples.
                 </p>
-                <Button 
+                <Button
                   onClick={() => openDocsInNewTab('docs', 'Swagger UI')}
                   disabled={loading === 'docs'}
                   className="w-full"
@@ -147,7 +148,7 @@ export const MivaaDocsViewer: React.FC = () => {
                 <p className="text-sm text-muted-foreground">
                   Beautiful, responsive documentation with detailed endpoint descriptions.
                 </p>
-                <Button 
+                <Button
                   onClick={() => openDocsInNewTab('redoc', 'ReDoc')}
                   disabled={loading === 'redoc'}
                   className="w-full"
@@ -179,7 +180,7 @@ export const MivaaDocsViewer: React.FC = () => {
                 <p className="text-sm text-muted-foreground">
                   Download the OpenAPI specification for code generation and tooling.
                 </p>
-                <Button 
+                <Button
                   onClick={() => openDocsInNewTab('openapi_json', 'OpenAPI JSON')}
                   disabled={loading === 'openapi_json'}
                   className="w-full"
@@ -210,46 +211,46 @@ export const MivaaDocsViewer: React.FC = () => {
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">Swagger UI</span>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard('{"action": "docs", "payload": {}}', 'Swagger UI payload')}
                     >
                       Copy
                     </Button>
                   </div>
-                  <code className="text-sm">{`{"action": "docs", "payload": {}}`}</code>
+                  <code className="text-sm">{'{"action": "docs", "payload": {}}'}</code>
                 </div>
-                
+
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">ReDoc</span>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard('{"action": "redoc", "payload": {}}', 'ReDoc payload')}
                     >
                       Copy
                     </Button>
                   </div>
-                  <code className="text-sm">{`{"action": "redoc", "payload": {}}`}</code>
+                  <code className="text-sm">{'{"action": "redoc", "payload": {}}'}</code>
                 </div>
-                
+
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium">OpenAPI JSON</span>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard('{"action": "openapi_json", "payload": {}}', 'OpenAPI JSON payload')}
                     >
                       Copy
                     </Button>
                   </div>
-                  <code className="text-sm">{`{"action": "openapi_json", "payload": {}}`}</code>
+                  <code className="text-sm">{'{"action": "openapi_json", "payload": {}}'}</code>
                 </div>
               </div>
-              
+
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <strong>Gateway URL:</strong> https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/mivaa-gateway

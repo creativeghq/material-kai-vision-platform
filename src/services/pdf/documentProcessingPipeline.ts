@@ -1,10 +1,11 @@
+import { RagDocument, ProcessingPipelineResult } from '../../types/rag';
+
 import {
   MivaaIntegrationConfig,
   ExtractionResult,
   TableData,
   ImageData,
 } from './mivaaIntegrationService';
-import { RagDocument, ProcessingPipelineResult } from '../../types/rag';
 
 /**
  * Text chunking configuration
@@ -164,7 +165,7 @@ export class DocumentProcessingPipeline {
           'text',
           section.pageNumber,
           j,
-          workspaceContext
+          workspaceContext,
         );
 
         // Validate the document before adding
@@ -198,7 +199,7 @@ export class DocumentProcessingPipeline {
         'table',
         table.pageNumber,
         undefined,
-        workspaceContext
+        workspaceContext,
       ));
     }
 
@@ -226,7 +227,7 @@ export class DocumentProcessingPipeline {
         'image',
         image.pageNumber,
         undefined,
-        workspaceContext
+        workspaceContext,
       ));
     }
 
@@ -434,7 +435,7 @@ export class DocumentProcessingPipeline {
     type: 'text' | 'table' | 'image',
     pageNumber?: number,
     chunkIndex?: number,
-    workspaceContext?: WorkspaceContext
+    workspaceContext?: WorkspaceContext,
   ): RagDocument {
     return {
       id,

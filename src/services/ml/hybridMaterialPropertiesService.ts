@@ -173,7 +173,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
     const result = await unifiedMLService.analyzeMaterial(imageFile, undefined, {
       preferServerSide: true,
       analysisType: 'comprehensive',
-      ...options
+      ...options,
     });
 
     return {
@@ -181,7 +181,7 @@ export class HybridMaterialPropertiesService extends BaseService<HybridMaterialP
       data: result.data,
       confidence: result.confidence,
       processingTime: result.processingTime,
-      error: result.success ? undefined : 'Server analysis failed'
+      error: result.success ? undefined : 'Server analysis failed',
     };
   }
 

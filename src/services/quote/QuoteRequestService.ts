@@ -34,7 +34,7 @@ export class QuoteRequestService {
   async submitRequest(
     cartId: string,
     workspaceId?: string,
-    notes?: string
+    notes?: string,
   ): Promise<QuoteRequest> {
     try {
       const response = await this.apiService.call<
@@ -43,7 +43,7 @@ export class QuoteRequestService {
       >(
         'quote-request-api',
         { cart_id: cartId, workspace_id: workspaceId, notes },
-        { method: 'POST' }
+        { method: 'POST' },
       );
 
       return response as unknown as QuoteRequest;
@@ -59,7 +59,7 @@ export class QuoteRequestService {
   async getRequests(
     limit: number = 50,
     offset: number = 0,
-    isAdmin: boolean = false
+    isAdmin: boolean = false,
   ): Promise<{ data: QuoteRequest[]; count: number }> {
     try {
       const response = await this.apiService.call<
@@ -68,7 +68,7 @@ export class QuoteRequestService {
       >(
         'quote-request-api',
         { limit, offset, admin: isAdmin },
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       return response as unknown as { data: QuoteRequest[]; count: number };
@@ -89,7 +89,7 @@ export class QuoteRequestService {
       >(
         'quote-request-api',
         { request_id: requestId },
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       return response as unknown as QuoteRequestWithItems;
@@ -110,7 +110,7 @@ export class QuoteRequestService {
       >(
         'quote-request-api',
         { request_id: requestId, status },
-        { method: 'PUT' }
+        { method: 'PUT' },
       );
 
       return response as unknown as QuoteRequest;

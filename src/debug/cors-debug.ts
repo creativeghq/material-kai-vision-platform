@@ -1,20 +1,20 @@
 // Debug utility to test CORS issues in the browser
 export async function debugCORSIssue() {
   console.log('🔍 CORS Debug - Environment Check');
-  
+
   // Check environment variables
   const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
   const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
-  
+
   console.log('Environment Variables:');
   console.log('  VITE_SUPABASE_URL:', supabaseUrl);
   console.log('  VITE_SUPABASE_ANON_KEY:', supabaseKey.substring(0, 50) + '...');
   console.log('  Current Origin:', window.location.origin);
   console.log('  User Agent:', navigator.userAgent);
-  
+
   const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
   console.log('  Target URL:', url);
-  
+
   // Test 1: OPTIONS request
   try {
     console.log('\n🔍 Test 1: OPTIONS Request');
@@ -24,9 +24,9 @@ export async function debugCORSIssue() {
         'Origin': window.location.origin,
         'Access-Control-Request-Method': 'POST',
         'Access-Control-Request-Headers': 'authorization, content-type',
-      }
+      },
     });
-    
+
     console.log('  Status:', optionsResponse.status, optionsResponse.statusText);
     console.log('  CORS Headers:');
     for (const [key, value] of optionsResponse.headers.entries()) {
@@ -34,18 +34,18 @@ export async function debugCORSIssue() {
         console.log('    ' + key + ':', value);
       }
     }
-    
+
     if (!optionsResponse.ok) {
       console.log('  ❌ OPTIONS failed');
       return { success: false, error: 'OPTIONS request failed' };
     }
-    
+
   } catch (error) {
     console.log('  ❌ OPTIONS Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return { success: false, error: `OPTIONS error: ${errorMessage}` };
   }
-  
+
   // Test 2: Actual POST request
   try {
     console.log('\n🔍 Test 2: POST Request');
@@ -57,10 +57,10 @@ export async function debugCORSIssue() {
       },
       body: JSON.stringify({
         action: 'health_check',
-        payload: {}
-      })
+        payload: {},
+      }),
     });
-    
+
     console.log('  Status:', response.status, response.statusText);
     console.log('  Response Headers:');
     for (const [key, value] of response.headers.entries()) {
@@ -68,7 +68,7 @@ export async function debugCORSIssue() {
         console.log('    ' + key + ':', value);
       }
     }
-    
+
     if (response.ok) {
       const data = await response.json();
       console.log('  ✅ Success:', data);
@@ -78,7 +78,7 @@ export async function debugCORSIssue() {
       console.log('  ❌ Error Response:', text);
       return { success: false, error: `HTTP ${response.status}: ${text}` };
     }
-    
+
   } catch (error) {
     console.log('  ❌ POST Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);

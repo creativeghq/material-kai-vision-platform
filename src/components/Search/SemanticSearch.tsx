@@ -91,8 +91,8 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
         limit: 20,
         similarity_threshold: 0.6,
         include_metadata: true,
-        search_type: 'semantic'
-      }
+        search_type: 'semantic',
+      },
     });
 
     if (!mivaaResponse.success) {
@@ -121,7 +121,7 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
           tags: item.metadata?.tags || item.tags || [],
           processingStatus: 'completed' as const,
           confidence: item.confidence || item.score || 0.8,
-          searchType: 'semantic'
+          searchType: 'semantic',
         },
         highlights: item.highlights || [query, 'semantic search', 'AI-powered'],
         url: item.url || `/documents/${item.document_id || item.id}`,

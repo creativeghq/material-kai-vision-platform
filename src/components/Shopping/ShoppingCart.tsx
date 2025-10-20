@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { ShoppingCartService, CartWithItems, CartItem } from '../../services/shopping/ShoppingCartService';
 
 interface ShoppingCartProps {

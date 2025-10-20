@@ -1,11 +1,12 @@
 /**
  * Quality Recommendations Panel Component
- * 
+ *
  * Displays actionable recommendations for improving quality metrics.
  */
 
 import React from 'react';
 import { Lightbulb, CheckCircle } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 

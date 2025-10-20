@@ -31,8 +31,8 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
       },
       body: JSON.stringify({
         action,
-        payload
-      })
+        payload,
+      }),
     });
 
     if (!response.ok) {
@@ -62,7 +62,7 @@ export interface UnifiedMLServiceConfig extends ServiceConfig {
   preferServerSide: boolean;
   fallbackToClient: boolean;
   confidenceThreshold: number;
-  
+
   // Client-side ML settings
   enableImageClassification: boolean;
   enableTextEmbedding: boolean;
@@ -70,7 +70,7 @@ export interface UnifiedMLServiceConfig extends ServiceConfig {
   preloadModelsOnInit: boolean;
   deviceOptimization: boolean;
   maxConcurrentOperations: number;
-  
+
   // Server-side ML settings
   defaultTimeout: number;
   enableJobPolling: boolean;
@@ -78,17 +78,17 @@ export interface UnifiedMLServiceConfig extends ServiceConfig {
   maxRetryAttempts: number;
   maxFileSize: number; // in MB
   maxFilesPerRequest: number;
-  
+
   // HuggingFace integration
   enableHuggingFace: boolean;
   huggingFaceApiKey?: string;
-  
+
   // Caching and performance
   enableCaching: boolean;
   cacheExpirationMs: number;
   enableBatchProcessing: boolean;
   maxBatchSize: number;
-  
+
   // File handling
   supportedFileTypes: string[];
   storageBasePath: string;
@@ -128,14 +128,14 @@ export interface UnifiedMLResult extends MLResult {
 
 /**
  * Unified ML Service
- * 
+ *
  * Consolidates clientMLService, serverMLService, and hybridMLService into a single,
  * intelligent service that automatically chooses the best processing method based on:
  * - Device capabilities
  * - File characteristics
  * - User preferences
  * - Service availability
- * 
+ *
  * Features:
  * - Intelligent routing between client/server/HuggingFace processing
  * - Automatic fallback mechanisms
@@ -148,14 +148,14 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
   private imageClassifier?: ImageClassifierService;
   private textEmbedder?: TextEmbedderService;
   private materialAnalyzer?: MaterialAnalyzerService;
-  
+
   // External service integrations
   private huggingFaceService?: HuggingFaceService;
-  
+
   // Caching and job tracking
   private jobCache: Map<string, any> = new Map();
   private resultCache: Map<string, UnifiedMLResult> = new Map();
-  
+
   // Default configuration
   private readonly DEFAULT_CONFIG: Partial<UnifiedMLServiceConfig> = {
     preferServerSide: false,
@@ -275,7 +275,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
   async analyzeMaterial(
     file: File | string,
     description?: string,
-    options: UnifiedMLOptions = {}
+    options: UnifiedMLOptions = {},
   ): Promise<UnifiedMLResult> {
     return this.executeOperation(async () => {
       const finalOptions = { ...this.DEFAULT_CONFIG, ...options };
@@ -301,7 +301,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
    */
   private async selectOptimalProcessingMethod(
     file: File | string,
-    options: UnifiedMLOptions
+    options: UnifiedMLOptions,
   ): Promise<'client' | 'server' | 'huggingface'> {
     // If method is explicitly specified, use it
     if (options.processingMethod && options.processingMethod !== 'auto') {
@@ -310,7 +310,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
 
     // Get device capabilities
     const deviceInfo = await DeviceDetector.getDeviceInfo();
-    
+
     // Get file size if it's a File object
     const fileSize = file instanceof File ? file.size / (1024 * 1024) : 0; // MB
 
@@ -332,7 +332,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
   private async processClientSide(
     _file: File | string,
     _description?: string,
-    _options: UnifiedMLOptions = {}
+    _options: UnifiedMLOptions = {},
   ): Promise<UnifiedMLResult> {
     if (!this.materialAnalyzer) {
       throw new Error('Material analyzer not initialized');
@@ -359,7 +359,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
   private async processServerSide(
     file: File | string,
     description?: string,
-    options: UnifiedMLOptions = {}
+    options: UnifiedMLOptions = {},
   ): Promise<UnifiedMLResult> {
     // Upload file if it's a File object
     let fileUrl: string;
@@ -406,7 +406,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
   private async processHuggingFace(
     file: File | string,
     _description?: string,
-    _options: UnifiedMLOptions = {}
+    _options: UnifiedMLOptions = {},
   ): Promise<UnifiedMLResult> {
     if (!this.huggingFaceService) {
       throw new Error('HuggingFace service not initialized');
@@ -430,7 +430,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
    */
   private async uploadFileForProcessing(file: File): Promise<string> {
     const fileName = `${this.config.storageBasePath}/${Date.now()}-${file.name}`;
-    
+
     const { error } = await supabase.storage
       .from('ml-processing')
       .upload(fileName, file);
@@ -451,7 +451,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
    */
   async classifyImage(
     imageSource: string | File,
-    options: UnifiedMLOptions = {}
+    options: UnifiedMLOptions = {},
   ): Promise<UnifiedMLResult> {
     return this.executeOperation(async () => {
       const processingMethod = await this.selectOptimalProcessingMethod(imageSource, options);
@@ -481,7 +481,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
             image_url: fileUrl,
             analysis_depth: 'standard',
             focus_areas: ['material', 'color', 'texture'],
-            ...options
+            ...options,
           },
         });
 
@@ -504,7 +504,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
    */
   async generateTextEmbedding(
     text: string,
-    options: UnifiedMLOptions = {}
+    options: UnifiedMLOptions = {},
   ): Promise<UnifiedMLResult> {
     return this.executeOperation(async () => {
       const processingMethod = await this.selectOptimalProcessingMethod(text, options);
@@ -528,7 +528,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
             analysis_depth: 'surface',
             extract_entities: false,
             generate_summary: false,
-            ...options
+            ...options,
           },
         });
 
@@ -551,7 +551,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
    */
   async batchProcess(
     files: Array<{ file: File | string; description?: string }>,
-    options: UnifiedMLOptions = {}
+    options: UnifiedMLOptions = {},
   ): Promise<Array<{ file: File | string; result: UnifiedMLResult }>> {
     const batchSize = Math.min(files.length, this.config.maxBatchSize);
     const results: Array<{ file: File | string; result: UnifiedMLResult }> = [];

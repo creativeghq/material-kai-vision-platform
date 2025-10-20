@@ -1,6 +1,6 @@
 /**
  * Unified Text Preprocessing Service
- * 
+ *
  * This service provides consistent text preprocessing across all services
  * in the Material Kai Vision Platform to ensure embedding consistency.
  */
@@ -61,7 +61,7 @@ export class UnifiedTextPreprocessor {
    */
   async preprocessText(
     text: string,
-    options?: Partial<ChunkingOptions>
+    options?: Partial<ChunkingOptions>,
   ): Promise<TextPreprocessingResult> {
     const startTime = performance.now();
     const chunkingOptions = { ...this.defaultChunkingOptions, ...options };
@@ -99,7 +99,7 @@ export class UnifiedTextPreprocessor {
    */
   private createChunks(text: string, options: ChunkingOptions): TextChunk[] {
     const chunks: TextChunk[] = [];
-    
+
     if (text.length <= options.maxChunkSize) {
       // Text is small enough to be a single chunk
       chunks.push({
@@ -125,7 +125,7 @@ export class UnifiedTextPreprocessor {
     while (currentPosition < text.length) {
       const endPosition = Math.min(
         currentPosition + options.maxChunkSize,
-        text.length
+        text.length,
       );
 
       let chunkText = text.substring(currentPosition, endPosition);
@@ -164,7 +164,7 @@ export class UnifiedTextPreprocessor {
       const actualChunkLength = chunkText.length;
       currentPosition += Math.max(
         actualChunkLength - options.overlapSize,
-        options.minChunkSize
+        options.minChunkSize,
       );
       chunkIndex++;
     }
@@ -232,7 +232,7 @@ export class UnifiedTextPreprocessor {
 
     // Apply preprocessing but preserve query structure
     let preprocessed = textPreprocessor.normalize(query);
-    
+
     // For queries, don't truncate as aggressively
     if (preprocessed.length > DEFAULT_EMBEDDING_CONFIG.textPreprocessing.maxLength) {
       preprocessed = textPreprocessor.truncate(preprocessed, 2000); // Allow longer queries
@@ -253,10 +253,10 @@ export class UnifiedTextPreprocessor {
    */
   async batchPreprocess(
     texts: string[],
-    options?: Partial<ChunkingOptions>
+    options?: Partial<ChunkingOptions>,
   ): Promise<TextPreprocessingResult[]> {
     const results: TextPreprocessingResult[] = [];
-    
+
     for (const text of texts) {
       try {
         const result = await this.preprocessText(text, options);
@@ -291,10 +291,10 @@ export class UnifiedTextPreprocessor {
     overlapEfficiency: number;
   } {
     const compressionRatio = result.metadata.preprocessedLength / result.metadata.originalLength;
-    const averageChunkSize = result.chunks.length > 0 
+    const averageChunkSize = result.chunks.length > 0
       ? result.chunks.reduce((sum, chunk) => sum + chunk.metadata.preprocessedLength, 0) / result.chunks.length
       : 0;
-    
+
     // Calculate overlap efficiency (how much text is duplicated due to overlap)
     const totalChunkLength = result.chunks.reduce((sum, chunk) => sum + chunk.metadata.preprocessedLength, 0);
     const overlapEfficiency = result.metadata.preprocessedLength / totalChunkLength;

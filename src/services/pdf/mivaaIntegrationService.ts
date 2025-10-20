@@ -1,7 +1,7 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
+import { ProcessingPipelineResult } from '../../types/rag';
 
 import { DocumentProcessingPipeline } from './documentProcessingPipeline';
-import { ProcessingPipelineResult } from '../../types/rag';
 
 /**
  * Configuration interface for Mivaa PDF Integration Service
@@ -364,7 +364,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
               columnCount: 0, // TODO: Calculate from CSV data
               headers: [], // TODO: Extract from CSV data
             })),
-            metadata: undefined
+            metadata: undefined,
           };
           break;
         }
@@ -381,7 +381,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
               description: '', // TODO: Add image description
               imageBuffer: Buffer.from(image.image_data, 'base64'), // Convert base64 to Buffer
             })),
-            metadata: undefined
+            metadata: undefined,
           };
           break;
         }
@@ -599,8 +599,8 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         },
         body: JSON.stringify({
           action,
-          payload
-        })
+          payload,
+        }),
       });
 
       if (!response.ok) {

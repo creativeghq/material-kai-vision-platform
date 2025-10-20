@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { QuoteRequestService, QuoteRequest } from '../../services/quote/QuoteRequestService';
 
 interface QuoteRequestsPanelProps {
@@ -29,7 +30,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
       const { data, count } = await quoteService.getRequests(
         pageSize,
         page * pageSize,
-        true // admin view
+        true, // admin view
       );
 
       let filtered = data;

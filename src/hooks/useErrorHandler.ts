@@ -1,11 +1,12 @@
 /**
  * Error Handler Hook
- * 
+ *
  * Provides error handling utilities for functional components
  * that can't use error boundaries directly.
  */
 
 import { useCallback, useState, useEffect } from 'react';
+
 import { useToast } from '@/hooks/use-toast';
 
 export interface ErrorInfo {
@@ -39,7 +40,7 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
     if (reportToService) {
       // In a real app, send this to your error tracking service
       console.error('Error Report:', errorInfo);
-      
+
       // Example: Send to Sentry, LogRocket, or custom endpoint
       // Sentry.captureException(new Error(errorInfo.message), { extra: errorInfo });
     }
@@ -48,11 +49,11 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
   const handleError = useCallback((
     error: Error | string,
     action?: string,
-    additionalInfo?: Record<string, any>
+    additionalInfo?: Record<string, any>,
   ) => {
     const errorMessage = typeof error === 'string' ? error : error.message;
     const errorStack = typeof error === 'string' ? undefined : error.stack;
-    
+
     const errorInfo: ErrorInfo = {
       message: errorMessage,
       stack: errorStack,
@@ -85,7 +86,7 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
   const handleAsyncError = useCallback(async <T>(
     asyncFn: () => Promise<T>,
     action?: string,
-    fallbackValue?: T
+    fallbackValue?: T,
   ): Promise<T | undefined> => {
     try {
       return await asyncFn();
@@ -101,12 +102,12 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
 
   const wrapFunction = useCallback(<T extends (...args: any[]) => any>(
     fn: T,
-    action?: string
+    action?: string,
   ): T => {
     return ((...args: Parameters<T>) => {
       try {
         const result = fn(...args);
-        
+
         // Handle async functions
         if (result && typeof result.then === 'function') {
           return result.catch((error: Error) => {
@@ -114,7 +115,7 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
             throw error; // Re-throw to maintain promise chain
           });
         }
-        
+
         return result;
       } catch (error) {
         handleError(error as Error, action);
@@ -175,7 +176,7 @@ export function useGlobalErrorHandler() {
       handleError(
         new Error(event.reason?.message || 'Unhandled Promise Rejection'),
         'Unhandled Promise Rejection',
-        { reason: event.reason }
+        { reason: event.reason },
       );
     };
 
@@ -187,7 +188,7 @@ export function useGlobalErrorHandler() {
           filename: event.filename,
           lineno: event.lineno,
           colno: event.colno,
-        }
+        },
       );
     };
 

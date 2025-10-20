@@ -1,19 +1,14 @@
 /**
  * Visual Feature Extraction Service
- * 
+ *
  * Orchestrates the complete visual feature extraction pipeline, coordinating
- * image preprocessing, LLaMA vision analysis, embedding generation, and 
+ * image preprocessing, LLaMA vision analysis, embedding generation, and
  * database storage for the visual search system.
  */
 
 import {
-  ImagePreprocessingService,
-  ProcessedImageResult,
-  ImageMetadata
-} from './imagePreprocessing';
-import {
   GatewayRequest,
-  GatewayResponse
+  GatewayResponse,
 } from '../api/mivaa-gateway';
 import { supabase } from '../integrations/supabase/client';
 import { Database } from '../integrations/supabase/types';
@@ -23,6 +18,12 @@ import {
   errorLogger,
 } from '../core/errors';
 import { createErrorContext } from '../core/errors/utils';
+
+import {
+  ImagePreprocessingService,
+  ProcessedImageResult,
+  ImageMetadata,
+} from './imagePreprocessing';
 
 // MIVAA Vision Analysis Result Interface (replacing the deleted LLaMA service types)
 export interface MaterialVisionAnalysisResult {
@@ -164,7 +165,7 @@ export interface QueueProcessingStatus {
 
 /**
  * Visual Feature Extraction Service
- * 
+ *
  * Main orchestrator for the visual search pipeline. Coordinates image preprocessing,
  * LLaMA vision analysis, embedding generation, and database storage.
  */
@@ -179,18 +180,18 @@ export class VisualFeatureExtractionService {
       const mivaaServiceUrl = 'http://localhost:8000';
       const apiKey = 'development-key';
       const timeout = 30000;
-      
+
       // Map action to MIVAA endpoint
       const endpointMap: Record<string, { path: string; method: string }> = {
         'llama_vision_analysis': { path: '/api/semantic-analysis', method: 'POST' },
         'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
       };
-      
+
       const endpoint = endpointMap[request.action];
       if (!endpoint) {
         throw new Error(`Unknown MIVAA action: ${request.action}`);
       }
-      
+
       const mivaaUrl = `${mivaaServiceUrl}${endpoint.path}`;
       const requestOptions: RequestInit = {
         method: endpoint.method,
@@ -200,18 +201,18 @@ export class VisualFeatureExtractionService {
           'User-Agent': 'Visual-Feature-Extraction/1.0.0',
         },
         signal: AbortSignal.timeout(timeout),
-        body: JSON.stringify(request.payload)
+        body: JSON.stringify(request.payload),
       };
-      
+
       const response = await fetch(mivaaUrl, requestOptions);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`MIVAA service error (${response.status}): ${errorText}`);
       }
-      
+
       const data = await response.json();
-      
+
       return {
         success: true,
         data,
@@ -226,21 +227,21 @@ export class VisualFeatureExtractionService {
       errorLogger.logError(error as Error, {
         service: 'VisualFeatureExtractionService',
         operation: 'callMivaaAnalysis',
-        request_action: request.action
+        request_action: request.action,
       });
-      
+
       return {
         success: false,
         error: {
           code: 'MIVAA_CALL_FAILED',
           message: error instanceof Error ? error.message : 'Unknown MIVAA call error',
-          details: String(error)
+          details: String(error),
         },
         metadata: {
           timestamp: new Date().toISOString(),
           processingTime: 0,
-          version: '1.0.0'
-        }
+          version: '1.0.0',
+        },
       };
     }
   }
@@ -259,7 +260,7 @@ export class VisualFeatureExtractionService {
         overall_analysis: {
           description: 'Analysis failed',
         },
-        error_message: mivaaResponse.error?.message || 'MIVAA analysis failed'
+        error_message: mivaaResponse.error?.message || 'MIVAA analysis failed',
       };
     }
 
@@ -272,7 +273,7 @@ export class VisualFeatureExtractionService {
       processing_time_ms: mivaaResponse.metadata.processingTime,
       cost_info: {
         cost: (data.cost_info as any)?.cost || 0,
-        tokens_used: (data.cost_info as any)?.tokens_used
+        tokens_used: (data.cost_info as any)?.tokens_used,
       },
       materials_detected: (data.materials_detected as any[]) || [{
         material_type: (data.material_type as string) || 'unknown',
@@ -282,15 +283,15 @@ export class VisualFeatureExtractionService {
           color: data.color as string,
           finish: data.finish as string,
           pattern: data.pattern as string,
-          ...(data.properties as Record<string, unknown> || {})
-        }
+          ...(data.properties as Record<string, unknown> || {}),
+        },
       }],
       overall_analysis: {
         description: (data.description as string) || (data.overall_analysis as any)?.description || '',
         style_assessment: (data.style_assessment as string) || (data.overall_analysis as any)?.style_assessment,
         technical_properties: (data.technical_properties as Record<string, unknown>) || (data.overall_analysis as any)?.technical_properties,
-        ...(data.overall_analysis as Record<string, unknown> || {})
-      }
+        ...(data.overall_analysis as Record<string, unknown> || {}),
+      },
     };
   }
 
@@ -318,9 +319,9 @@ export class VisualFeatureExtractionService {
           context: params.context,
           options: {
             include_confidence_scores: true,
-            include_detailed_properties: params.include_embeddings
-          }
-        }
+            include_detailed_properties: params.include_embeddings,
+          },
+        },
       };
 
       const clipRequest: GatewayRequest = {
@@ -332,15 +333,15 @@ export class VisualFeatureExtractionService {
           embedding_type: 'visual_similarity',
           options: {
             normalize: true,
-            dimensions: 512
-          }
-        }
+            dimensions: 512,
+          },
+        },
       };
 
       // Execute both requests in parallel using Promise.all
       const [llamaResponse, clipResponse] = await Promise.all([
         this.callMivaaAnalysis(llamaRequest),
-        params.include_clip_analysis ? this.callMivaaAnalysis(clipRequest) : Promise.resolve(null)
+        params.include_clip_analysis ? this.callMivaaAnalysis(clipRequest) : Promise.resolve(null),
       ]);
 
       // Adapt LLaMA response
@@ -355,7 +356,7 @@ export class VisualFeatureExtractionService {
     } catch (error) {
       errorLogger.logError(error as Error, {
         service: 'VisualFeatureExtractionService',
-        operation: 'performParallelMivaaAnalysis'
+        operation: 'performParallelMivaaAnalysis',
       });
 
       // Return failed LLaMA result and null embeddings
@@ -368,7 +369,7 @@ export class VisualFeatureExtractionService {
         overall_analysis: {
           description: 'Parallel analysis failed',
         },
-        error_message: error instanceof Error ? error.message : 'Parallel analysis failed'
+        error_message: error instanceof Error ? error.message : 'Parallel analysis failed',
       };
 
       return [failedResult, {}];
@@ -389,7 +390,7 @@ export class VisualFeatureExtractionService {
       embedding_type: 'clip_512d',
       model_used: data.model_used || 'clip-vit-base-patch32',
       processing_time_ms: clipResponse.metadata.processingTime || 0,
-      confidence_score: data.confidence || 1.0
+      confidence_score: data.confidence || 1.0,
     };
   }
 
@@ -398,7 +399,7 @@ export class VisualFeatureExtractionService {
    */
   private static async combineEmbeddingResults(
     llamaResult: MaterialVisionAnalysisResult,
-    clipEmbeddings: Record<string, unknown> | null
+    clipEmbeddings: Record<string, unknown> | null,
   ): Promise<Record<string, unknown>> {
     const combined: Record<string, unknown> = {};
 
@@ -406,7 +407,7 @@ export class VisualFeatureExtractionService {
     if (llamaResult.overall_analysis?.description) {
       // Generate description embedding from LLaMA text output
       const descriptionEmbedding = await this.generateTextEmbedding(
-        llamaResult.overall_analysis.description
+        llamaResult.overall_analysis.description,
       );
       if (descriptionEmbedding) {
         combined.description_embedding = descriptionEmbedding;
@@ -416,7 +417,7 @@ export class VisualFeatureExtractionService {
     // Add material type embedding
     if (llamaResult.materials_detected?.[0]?.material_type) {
       const materialTypeEmbedding = await this.generateTextEmbedding(
-        llamaResult.materials_detected[0].material_type
+        llamaResult.materials_detected[0].material_type,
       );
       if (materialTypeEmbedding) {
         combined.material_type_embedding = materialTypeEmbedding;
@@ -479,7 +480,7 @@ export class VisualFeatureExtractionService {
    * Extract visual features from a single image
    */
   static async extractFeatures(
-    request: VisualFeatureExtractionRequest
+    request: VisualFeatureExtractionRequest,
   ): Promise<VisualFeatureExtractionResult> {
     const startTime = Date.now();
     const extractionId = `extract_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -492,14 +493,14 @@ export class VisualFeatureExtractionService {
           extractionId,
           request.material_id || 'unknown',
           `Image preprocessing failed: ${preprocessedImage.error}`,
-          startTime
+          startTime,
         );
       }
 
       // 2. Check for existing analysis (deduplication)
       const existingAnalysis = await this.checkExistingAnalysis(
         preprocessedImage.hash,
-        request.analysis_options?.analysis_type || 'comprehensive'
+        request.analysis_options?.analysis_type || 'comprehensive',
       );
 
       if (existingAnalysis) {
@@ -515,15 +516,15 @@ export class VisualFeatureExtractionService {
         analysis_type: request.analysis_options?.analysis_type || 'comprehensive',
         context: request.context || {},
         include_embeddings: request.analysis_options?.include_embeddings || false,
-        include_clip_analysis: request.analysis_options?.include_clip_analysis !== false
+        include_clip_analysis: request.analysis_options?.include_clip_analysis !== false,
       });
-      
+
       if (!llamaResult.success) {
         return this.createErrorResult(
           extractionId,
           request.material_id || 'unknown',
           `LLaMA analysis failed: ${llamaResult.error_message}`,
-          startTime
+          startTime,
         );
       }
 
@@ -538,7 +539,7 @@ export class VisualFeatureExtractionService {
         image_url: request.image_url || undefined,
         image_dimensions: preprocessedImage.processedMetadata || preprocessedImage.originalMetadata,
         embeddings: embeddings,
-        user_id: request.user_id
+        user_id: request.user_id,
       });
 
       // 6. Update materials catalog if needed
@@ -564,27 +565,27 @@ export class VisualFeatureExtractionService {
           processing_time_ms: Date.now() - startTime,
           image_hash: preprocessedImage.hash,
           llama_model_version: llamaResult.model_used || 'llama-3.2-vision',
-          pipeline_version: '1.0.0'
+          pipeline_version: '1.0.0',
         },
         cost_info: {
           llama_analysis_cost: llamaResult.cost_info?.cost || 0,
           embedding_cost: embeddings ? 0.001 : 0,
-          total_cost: (llamaResult.cost_info?.cost || 0) + (embeddings ? 0.001 : 0)
-        }
+          total_cost: (llamaResult.cost_info?.cost || 0) + (embeddings ? 0.001 : 0),
+        },
       };
 
     } catch (error) {
       errorLogger.logError(error as Error, {
         extraction_id: extractionId,
         service: 'VisualFeatureExtractionService',
-        operation: 'extractFeatures'
+        operation: 'extractFeatures',
       });
 
       return this.createErrorResult(
         extractionId,
         request.material_id || 'unknown',
         `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        startTime
+        startTime,
       );
     }
   }
@@ -594,7 +595,7 @@ export class VisualFeatureExtractionService {
    */
   static async queueForProcessing(
     request: VisualFeatureExtractionRequest,
-    priority: number = 5
+    priority: number = 5,
   ): Promise<{ queue_id: string; estimated_processing_time?: Date }> {
     try {
       // Preprocess image to get hash and basic metadata
@@ -602,7 +603,7 @@ export class VisualFeatureExtractionService {
       if (!preprocessed.success) {
         throw new ValidationError(
           `Image preprocessing failed: ${preprocessed.error}`,
-          createErrorContext('VisualFeatureExtractionService.queueForProcessing', 'preprocessing_failed')
+          createErrorContext('VisualFeatureExtractionService.queueForProcessing', 'preprocessing_failed'),
         );
       }
 
@@ -619,9 +620,9 @@ export class VisualFeatureExtractionService {
           processing_options: {
             include_embeddings: request.analysis_options?.include_embeddings,
             include_clip_analysis: request.analysis_options?.include_clip_analysis,
-            context: request.context
+            context: request.context,
           },
-          status: 'pending'
+          status: 'pending',
         })
         .select('id')
         .single();
@@ -629,19 +630,19 @@ export class VisualFeatureExtractionService {
       if (error) {
         throw new ExternalServiceError(
           `Failed to queue for processing: ${error.message}`,
-          createErrorContext('VisualFeatureExtractionService.queueForProcessing', 'database_insert_failed')
+          createErrorContext('VisualFeatureExtractionService.queueForProcessing', 'database_insert_failed'),
         );
       }
 
       return {
         queue_id: data.id,
-        estimated_processing_time: this.estimateProcessingTime(priority)
+        estimated_processing_time: this.estimateProcessingTime(priority),
       };
 
     } catch (error) {
       errorLogger.logError(error as Error, {
         service: 'VisualFeatureExtractionService',
-        operation: 'queueForProcessing'
+        operation: 'queueForProcessing',
       });
       throw error;
     }
@@ -651,7 +652,7 @@ export class VisualFeatureExtractionService {
    * Get processing status for queued items
    */
   static async getProcessingStatus(
-    queueIds: string[]
+    queueIds: string[],
   ): Promise<Record<string, QueueProcessingStatus>> {
     try {
       const { data, error } = await supabase
@@ -662,7 +663,7 @@ export class VisualFeatureExtractionService {
       if (error) {
         throw new ExternalServiceError(
           `Failed to get processing status: ${error.message}`,
-          createErrorContext('VisualFeatureExtractionService.getProcessingStatus', 'database_query_failed')
+          createErrorContext('VisualFeatureExtractionService.getProcessingStatus', 'database_query_failed'),
         );
       }
 
@@ -679,8 +680,8 @@ export class VisualFeatureExtractionService {
           queue_id: item.id as string,
           status: validStatus,
           processing_metadata: {
-            processing_time_ms: (item.processing_time_ms as number) || undefined
-          }
+            processing_time_ms: (item.processing_time_ms as number) || undefined,
+          },
         };
       });
 
@@ -689,7 +690,7 @@ export class VisualFeatureExtractionService {
     } catch (error) {
       errorLogger.logError(error as Error, {
         service: 'VisualFeatureExtractionService',
-        operation: 'getProcessingStatus'
+        operation: 'getProcessingStatus',
       });
       throw error;
     }
@@ -698,30 +699,30 @@ export class VisualFeatureExtractionService {
   // Helper Methods
 
   private static async preprocessImage(
-    request: VisualFeatureExtractionRequest
+    request: VisualFeatureExtractionRequest,
   ): Promise<ProcessedImageResult> {
     if (request.image_data) {
       // Convert string/Uint8Array to Buffer for processing
       const buffer = typeof request.image_data === 'string'
         ? Buffer.from(request.image_data, 'base64')
         : Buffer.from(request.image_data);
-      
+
       return ImagePreprocessingService.processImage(buffer, {
         targetWidth: 1024,
         targetHeight: 1024,
         quality: 0.85,
-        format: 'jpeg'
+        format: 'jpeg',
       });
     } else if (request.image_url) {
       // For URLs, we'd need to fetch the image first
       const response = await fetch(request.image_url);
       const buffer = Buffer.from(await response.arrayBuffer());
-      
+
       return ImagePreprocessingService.processImage(buffer, {
         targetWidth: 1024,
         targetHeight: 1024,
         quality: 0.85,
-        format: 'jpeg'
+        format: 'jpeg',
       });
     } else {
       return {
@@ -730,14 +731,14 @@ export class VisualFeatureExtractionService {
         hash: '',
         processingTime: 0,
         optimizations: [],
-        error: 'Either image_data or image_url must be provided'
+        error: 'Either image_data or image_url must be provided',
       };
     }
   }
 
   private static async checkExistingAnalysis(
     imageHash: string,
-    _analysisType: string
+    _analysisType: string,
   ): Promise<unknown | null> {
     try {
       const { data, error } = await supabase
@@ -759,7 +760,7 @@ export class VisualFeatureExtractionService {
   private static formatExistingAnalysisResult(
     existingAnalysis: Record<string, unknown>,
     extractionId: string,
-    startTime: number
+    startTime: number,
   ): VisualFeatureExtractionResult {
     return {
       success: true,
@@ -778,12 +779,12 @@ export class VisualFeatureExtractionService {
         processing_time_ms: Date.now() - startTime,
         image_hash: (existingAnalysis.source_image_hash as string) || '',
         llama_model_version: (existingAnalysis.llama_model_version as string) || '',
-        pipeline_version: '1.0.0'
+        pipeline_version: '1.0.0',
       },
       cost_info: {
         llama_analysis_cost: 0, // No cost for cached result
-        total_cost: 0
-      }
+        total_cost: 0,
+      },
     };
   }
 
@@ -820,7 +821,7 @@ export class VisualFeatureExtractionService {
       clip_embedding: params.embeddings?.clip_embedding ?
         JSON.stringify(params.embeddings.clip_embedding) : null,
       created_by: params.user_id,
-      processing_status: 'completed'
+      processing_status: 'completed',
     };
 
     const { data, error } = await supabase
@@ -832,7 +833,7 @@ export class VisualFeatureExtractionService {
     if (error) {
       throw new ExternalServiceError(
         `Failed to store visual analysis: ${error.message}`,
-        createErrorContext('VisualFeatureExtractionService.storeVisualAnalysis', 'database_insert_failed')
+        createErrorContext('VisualFeatureExtractionService.storeVisualAnalysis', 'database_insert_failed'),
       );
     }
 
@@ -842,14 +843,14 @@ export class VisualFeatureExtractionService {
   private static async updateMaterialsCatalog(
     materialId: string,
     llamaResult: MaterialVisionAnalysisResult,
-    embeddings?: Record<string, unknown>
+    embeddings?: Record<string, unknown>,
   ): Promise<void> {
     try {
       const updateData: Record<string, unknown> = {
         category: this.extractMaterialType(llamaResult),  // Fixed: use 'category' not 'material_type'
         updated_at: new Date().toISOString(),
         llama_analysis: this.extractVisualCharacteristics(llamaResult),  // Fixed: use 'llama_analysis' not 'analysis_summary'
-        visual_analysis_confidence: this.extractConfidenceScore(llamaResult)
+        visual_analysis_confidence: this.extractConfidenceScore(llamaResult),
       };
 
       // Add embeddings if available - use embedding_1536 for consistency
@@ -865,7 +866,7 @@ export class VisualFeatureExtractionService {
     } catch (error) {
       errorLogger.logError(error as Error, {
         service: 'VisualFeatureExtractionService',
-        operation: 'updateMaterialsCatalog'
+        operation: 'updateMaterialsCatalog',
       });
       // Don't throw - catalog update is non-critical
     }
@@ -875,7 +876,7 @@ export class VisualFeatureExtractionService {
     extractionId: string,
     materialId: string,
     errorMessage: string,
-    startTime: number
+    startTime: number,
   ): VisualFeatureExtractionResult {
     return {
       success: false,
@@ -894,13 +895,13 @@ export class VisualFeatureExtractionService {
         processing_time_ms: Date.now() - startTime,
         image_hash: '',
         llama_model_version: '',
-        pipeline_version: '1.0.0'
+        pipeline_version: '1.0.0',
       },
       cost_info: {
         llama_analysis_cost: 0,
-        total_cost: 0
+        total_cost: 0,
       },
-      error: errorMessage
+      error: errorMessage,
     };
   }
 

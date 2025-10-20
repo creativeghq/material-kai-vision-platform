@@ -191,7 +191,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
             safety_data: materialData.safety_data,
             standards: materialData.standards,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           });
 
         if (error) throw error;

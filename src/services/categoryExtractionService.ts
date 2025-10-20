@@ -1,11 +1,12 @@
 /**
  * Category Extraction Service
- * 
+ *
  * Handles AI-powered extraction of material and product categories
  * from document content using MIVAA and other AI services
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { dynamicCategoryManagementService, CategoryExtractionResult } from './dynamicCategoryManagementService';
 
 export interface CategoryExtractionOptions {
@@ -28,12 +29,12 @@ export interface ExtractedCategoryData {
 
 class CategoryExtractionService {
   private static instance: CategoryExtractionService;
-  
+
   private readonly PRODUCT_KEYWORDS = {
     tiles: ['tile', 'tiles', 'flooring', 'floor tile', 'wall tile', 'ceramic tile', 'porcelain tile'],
     decor: ['decor', 'decoration', 'decorative', 'ornament', 'art', 'sculpture', 'vase', 'planter'],
     lighting: ['light', 'lighting', 'lamp', 'fixture', 'chandelier', 'sconce', 'pendant', 'led'],
-    furniture: ['furniture', 'chair', 'table', 'desk', 'cabinet', 'shelf', 'sofa', 'bed']
+    furniture: ['furniture', 'chair', 'table', 'desk', 'cabinet', 'shelf', 'sofa', 'bed'],
   };
 
   private readonly MATERIAL_KEYWORDS = {
@@ -44,7 +45,7 @@ class CategoryExtractionService {
     concrete: ['concrete', 'cement', 'mortar', 'aggregate'],
     plastics: ['plastic', 'polymer', 'vinyl', 'acrylic', 'polycarbonate'],
     textiles: ['fabric', 'textile', 'cotton', 'wool', 'silk', 'linen', 'polyester'],
-    stone: ['stone', 'marble', 'granite', 'limestone', 'slate', 'travertine', 'quartzite']
+    stone: ['stone', 'marble', 'granite', 'limestone', 'slate', 'travertine', 'quartzite'],
   };
 
   private constructor() {}
@@ -62,7 +63,7 @@ class CategoryExtractionService {
   public async extractCategories(
     content: string,
     documentId: string,
-    options: CategoryExtractionOptions = {}
+    options: CategoryExtractionOptions = {},
   ): Promise<ExtractedCategoryData> {
     const startTime = Date.now();
     const {
@@ -70,7 +71,7 @@ class CategoryExtractionService {
       includeMaterialCategories = true,
       confidenceThreshold = 0.6,
       maxCategories = 10,
-      extractionMethods = ['ai', 'keyword', 'pattern']
+      extractionMethods = ['ai', 'keyword', 'pattern'],
     } = options;
 
     const extractedCategories: CategoryExtractionResult[] = [];
@@ -86,7 +87,7 @@ class CategoryExtractionService {
       if (extractionMethods.includes('keyword')) {
         const keywordCategories = await this.extractCategoriesWithKeywords(content, {
           includeProductCategories,
-          includeMaterialCategories
+          includeMaterialCategories,
         });
         extractedCategories.push(...keywordCategories);
       }
@@ -99,7 +100,7 @@ class CategoryExtractionService {
 
       // Merge and deduplicate results
       const mergedCategories = this.mergeAndDeduplicateCategories(extractedCategories);
-      
+
       // Filter by confidence threshold and limit
       const filteredCategories = mergedCategories
         .filter(cat => cat.confidence >= confidenceThreshold)
@@ -114,8 +115,8 @@ class CategoryExtractionService {
           extractionMethod: extractionMethods.join(', '),
           processingTime,
           documentId,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
     } catch (error) {
       console.error('Category extraction failed:', error);
@@ -125,8 +126,8 @@ class CategoryExtractionService {
           extractionMethod: 'error',
           processingTime: Date.now() - startTime,
           documentId,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
     }
   }
@@ -147,9 +148,9 @@ class CategoryExtractionService {
           extractionTypes: ['material_category', 'product_category'],
           options: {
             includeContext: true,
-            confidenceThreshold: 0.5
-          }
-        })
+            confidenceThreshold: 0.5,
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -161,7 +162,7 @@ class CategoryExtractionService {
         categoryKey: cat.category_key,
         confidence: cat.confidence,
         extractedFrom: 'ai',
-        context: cat.context || ''
+        context: cat.context || '',
       }));
     } catch (error) {
       console.error('AI category extraction failed:', error);
@@ -174,7 +175,7 @@ class CategoryExtractionService {
    */
   private async extractCategoriesWithKeywords(
     content: string,
-    options: { includeProductCategories: boolean; includeMaterialCategories: boolean }
+    options: { includeProductCategories: boolean; includeMaterialCategories: boolean },
   ): Promise<CategoryExtractionResult[]> {
     const results: CategoryExtractionResult[] = [];
     const contentLower = content.toLowerCase();
@@ -189,7 +190,7 @@ class CategoryExtractionService {
             categoryKey,
             confidence,
             extractedFrom: 'keyword',
-            context: `Found keywords: ${matches.join(', ')}`
+            context: `Found keywords: ${matches.join(', ')}`,
           });
         }
       }
@@ -205,7 +206,7 @@ class CategoryExtractionService {
             categoryKey,
             confidence,
             extractedFrom: 'keyword',
-            context: `Found keywords: ${matches.join(', ')}`
+            context: `Found keywords: ${matches.join(', ')}`,
           });
         }
       }
@@ -227,7 +228,7 @@ class CategoryExtractionService {
       { pattern: /decorative\s+(?:panel|element|item)/gi, category: 'decor', confidence: 0.7 },
       { pattern: /(?:ceiling|pendant|table)\s+(?:light|lamp)/gi, category: 'lighting', confidence: 0.8 },
       { pattern: /led\s+(?:light|lighting|fixture)/gi, category: 'lighting', confidence: 0.8 },
-      
+
       // Material category patterns
       { pattern: /(?:solid|engineered)\s+wood/gi, category: 'wood', confidence: 0.8 },
       { pattern: /stainless\s+steel/gi, category: 'metals', confidence: 0.9 },
@@ -242,7 +243,7 @@ class CategoryExtractionService {
           categoryKey: category,
           confidence,
           extractedFrom: 'pattern',
-          context: `Pattern matches: ${matches.slice(0, 3).join(', ')}`
+          context: `Pattern matches: ${matches.slice(0, 3).join(', ')}`,
         });
       }
     }
@@ -258,22 +259,22 @@ class CategoryExtractionService {
 
     for (const category of categories) {
       const existing = categoryMap.get(category.categoryKey);
-      
+
       if (!existing) {
         categoryMap.set(category.categoryKey, category);
       } else {
         // Merge with higher confidence and combined context
         const mergedConfidence = Math.max(existing.confidence, category.confidence);
         const mergedContext = `${existing.context}; ${category.context}`;
-        const mergedExtractedFrom = existing.extractedFrom === category.extractedFrom 
-          ? existing.extractedFrom 
+        const mergedExtractedFrom = existing.extractedFrom === category.extractedFrom
+          ? existing.extractedFrom
           : `${existing.extractedFrom}, ${category.extractedFrom}`;
 
         categoryMap.set(category.categoryKey, {
           categoryKey: category.categoryKey,
           confidence: mergedConfidence,
           extractedFrom: mergedExtractedFrom,
-          context: mergedContext
+          context: mergedContext,
         });
       }
     }
@@ -286,7 +287,7 @@ class CategoryExtractionService {
    */
   public async updateDocumentCategories(
     documentId: string,
-    extractedData: ExtractedCategoryData
+    extractedData: ExtractedCategoryData,
   ): Promise<void> {
     try {
       // Store extraction results in document metadata
@@ -296,8 +297,8 @@ class CategoryExtractionService {
           metadata: {
             extracted_categories: extractedData.categories,
             category_extraction_metadata: extractedData.metadata,
-            last_category_update: new Date().toISOString()
-          }
+            last_category_update: new Date().toISOString(),
+          },
         })
         .eq('id', documentId);
 
@@ -308,7 +309,7 @@ class CategoryExtractionService {
         if (category.confidence > 0.8) {
           await dynamicCategoryManagementService.autoUpdateCategoriesFromDocument(
             documentId,
-            { content: category.context }
+            { content: category.context },
           );
         }
       }
@@ -336,7 +337,7 @@ class CategoryExtractionService {
 
       const extractedData = await this.extractCategories(data.content, documentId, {
         confidenceThreshold: 0.5,
-        maxCategories: 5
+        maxCategories: 5,
       });
 
       return extractedData.categories;
@@ -354,7 +355,7 @@ export const categoryExtractionService = CategoryExtractionService.getInstance()
 export async function extractCategoriesFromContent(
   content: string,
   documentId: string,
-  options?: CategoryExtractionOptions
+  options?: CategoryExtractionOptions,
 ): Promise<ExtractedCategoryData> {
   return await categoryExtractionService.extractCategories(content, documentId, options);
 }
@@ -365,7 +366,7 @@ export async function getCategorySuggestions(documentId: string): Promise<Catego
 
 export async function updateDocumentCategories(
   documentId: string,
-  extractedData: ExtractedCategoryData
+  extractedData: ExtractedCategoryData,
 ): Promise<void> {
   return await categoryExtractionService.updateDocumentCategories(documentId, extractedData);
 }

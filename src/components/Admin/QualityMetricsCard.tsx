@@ -1,12 +1,13 @@
 /**
  * Quality Metrics Card Component
- * 
+ *
  * Displays quality metrics for a specific service (Image Validation,
  * Product Enrichment, or Validation Rules).
  */
 
 import React from 'react';
 import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 

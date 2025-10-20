@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { Chrome } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Chrome } from 'lucide-react';
 
 /**
  * OAuth Sign-In Buttons

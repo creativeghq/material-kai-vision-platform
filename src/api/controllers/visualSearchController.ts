@@ -1,6 +1,6 @@
 /**
  * Visual Search API Controller
- * 
+ *
  * Provides API endpoints for visual search functionality, orchestrating calls
  * to the Supabase visual search edge function while maintaining consistent
  * API patterns with the rest of the application.
@@ -134,7 +134,7 @@ export class VisualSearchController {
       if (!requestData.image) {
         res.status(400).json({
           error: 'Image is required',
-          code: 'MISSING_IMAGE'
+          code: 'MISSING_IMAGE',
         });
         return;
       }
@@ -143,7 +143,7 @@ export class VisualSearchController {
       if (!this.supabaseClient) {
         res.status(500).json({
           error: 'Visual search service not initialized',
-          code: 'SERVICE_NOT_INITIALIZED'
+          code: 'SERVICE_NOT_INITIALIZED',
         });
         return;
       }
@@ -158,8 +158,8 @@ export class VisualSearchController {
           visual: 0.4,
           semantic: 0.3,
           properties: 0.2,
-          confidence: 0.1
-        }
+          confidence: 0.1,
+        },
       };
 
       // Call the Supabase unified material search function
@@ -169,17 +169,17 @@ export class VisualSearchController {
           body: searchRequest,
           headers: {
             'Content-Type': 'application/json',
-            ...this.extractAuthHeaders(req)
-          }
-        }
+            ...this.extractAuthHeaders(req),
+          },
+        },
       );
 
       if (error) {
-        console.error('Visual search function error:', error);
+        // Visual search function error
         res.status(500).json({
           error: 'Visual search failed',
           code: 'SEARCH_FUNCTION_ERROR',
-          details: error.message
+          details: error.message,
         });
         return;
       }
@@ -189,15 +189,15 @@ export class VisualSearchController {
         success: true,
         data: data,
         searchType: searchRequest.searchType,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
     } catch (error: unknown) {
-      console.error('Search by image error:', error);
+      // Search by image error
       res.status(500).json({
         error: 'Internal server error during image search',
         code: 'INTERNAL_ERROR',
-        details: (error as Error).message
+        details: (error as Error).message,
       });
     }
   };
@@ -214,7 +214,7 @@ export class VisualSearchController {
       if (!requestData.description) {
         res.status(400).json({
           error: 'Description is required',
-          code: 'MISSING_DESCRIPTION'
+          code: 'MISSING_DESCRIPTION',
         });
         return;
       }
@@ -223,7 +223,7 @@ export class VisualSearchController {
       if (!this.supabaseClient) {
         res.status(500).json({
           error: 'Visual search service not initialized',
-          code: 'SERVICE_NOT_INITIALIZED'
+          code: 'SERVICE_NOT_INITIALIZED',
         });
         return;
       }
@@ -237,8 +237,8 @@ export class VisualSearchController {
         fusion: requestData.fusion || {
           semantic: 0.6,
           properties: 0.3,
-          confidence: 0.1
-        }
+          confidence: 0.1,
+        },
       };
 
       // Call the Supabase unified material search function
@@ -248,17 +248,17 @@ export class VisualSearchController {
           body: searchRequest,
           headers: {
             'Content-Type': 'application/json',
-            ...this.extractAuthHeaders(req)
-          }
-        }
+            ...this.extractAuthHeaders(req),
+          },
+        },
       );
 
       if (error) {
-        console.error('Visual search function error:', error);
+        // Visual search function error
         res.status(500).json({
           error: 'Visual search failed',
           code: 'SEARCH_FUNCTION_ERROR',
-          details: error.message
+          details: error.message,
         });
         return;
       }
@@ -268,15 +268,15 @@ export class VisualSearchController {
         success: true,
         data: data,
         searchType: searchRequest.searchType,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
     } catch (error: unknown) {
-      console.error('Search by description error:', error);
+      // Search by description error
       res.status(500).json({
         error: 'Internal server error during description search',
         code: 'INTERNAL_ERROR',
-        details: (error as Error).message
+        details: (error as Error).message,
       });
     }
   };
@@ -293,7 +293,7 @@ export class VisualSearchController {
       if (!requestData.image && !requestData.description) {
         res.status(400).json({
           error: 'Either image or description is required',
-          code: 'MISSING_INPUT'
+          code: 'MISSING_INPUT',
         });
         return;
       }
@@ -302,7 +302,7 @@ export class VisualSearchController {
       if (!this.supabaseClient) {
         res.status(500).json({
           error: 'Visual search service not initialized',
-          code: 'SERVICE_NOT_INITIALIZED'
+          code: 'SERVICE_NOT_INITIALIZED',
         });
         return;
       }
@@ -318,8 +318,8 @@ export class VisualSearchController {
           visual: 0.4,
           semantic: 0.3,
           properties: 0.2,
-          confidence: 0.1
-        }
+          confidence: 0.1,
+        },
       };
 
       // Call the Supabase unified material search function
@@ -329,17 +329,17 @@ export class VisualSearchController {
           body: searchRequest,
           headers: {
             'Content-Type': 'application/json',
-            ...this.extractAuthHeaders(req)
-          }
-        }
+            ...this.extractAuthHeaders(req),
+          },
+        },
       );
 
       if (error) {
-        console.error('Visual search function error:', error);
+        // Visual search function error
         res.status(500).json({
           error: 'Visual search failed',
           code: 'SEARCH_FUNCTION_ERROR',
-          details: error.message
+          details: error.message,
         });
         return;
       }
@@ -349,15 +349,15 @@ export class VisualSearchController {
         success: true,
         data: data,
         searchType: 'hybrid',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
     } catch (error: unknown) {
-      console.error('Hybrid search error:', error);
+      // Hybrid search error
       res.status(500).json({
         error: 'Internal server error during hybrid search',
         code: 'INTERNAL_ERROR',
-        details: (error as Error).message
+        details: (error as Error).message,
       });
     }
   };
@@ -374,7 +374,7 @@ export class VisualSearchController {
       if (!requestData.properties || Object.keys(requestData.properties).length === 0) {
         res.status(400).json({
           error: 'Material properties are required',
-          code: 'MISSING_PROPERTIES'
+          code: 'MISSING_PROPERTIES',
         });
         return;
       }
@@ -383,7 +383,7 @@ export class VisualSearchController {
       if (!this.supabaseClient) {
         res.status(500).json({
           error: 'Visual search service not initialized',
-          code: 'SERVICE_NOT_INITIALIZED'
+          code: 'SERVICE_NOT_INITIALIZED',
         });
         return;
       }
@@ -393,7 +393,7 @@ export class VisualSearchController {
         searchType: 'properties',
         properties: requestData.properties,
         filters: requestData.filters || {},
-        limit: requestData.limit || 20
+        limit: requestData.limit || 20,
       };
 
       // Call the Supabase unified material search function
@@ -403,17 +403,17 @@ export class VisualSearchController {
           body: searchRequest,
           headers: {
             'Content-Type': 'application/json',
-            ...this.extractAuthHeaders(req)
-          }
-        }
+            ...this.extractAuthHeaders(req),
+          },
+        },
       );
 
       if (error) {
-        console.error('Visual search function error:', error);
+        // Visual search function error
         res.status(500).json({
           error: 'Visual search failed',
           code: 'SEARCH_FUNCTION_ERROR',
-          details: error.message
+          details: error.message,
         });
         return;
       }
@@ -423,15 +423,15 @@ export class VisualSearchController {
         success: true,
         data: data,
         searchType: 'properties',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
     } catch (error: unknown) {
-      console.error('Search by properties error:', error);
+      // Search by properties error
       res.status(500).json({
         error: 'Internal server error during property search',
         code: 'INTERNAL_ERROR',
-        details: (error as Error).message
+        details: (error as Error).message,
       });
     }
   };
@@ -448,7 +448,7 @@ export class VisualSearchController {
       if (!this.supabaseClient) {
         res.status(500).json({
           error: 'Visual search service not initialized',
-          code: 'SERVICE_NOT_INITIALIZED'
+          code: 'SERVICE_NOT_INITIALIZED',
         });
         return;
       }
@@ -458,7 +458,7 @@ export class VisualSearchController {
         action: 'analytics',
         searchId: requestData.searchId,
         timeRange: requestData.timeRange,
-        metrics: requestData.metrics || ['search_count', 'response_time', 'success_rate']
+        metrics: requestData.metrics || ['search_count', 'response_time', 'success_rate'],
       };
 
       // Call the Supabase unified material search function
@@ -468,17 +468,17 @@ export class VisualSearchController {
           body: analyticsRequest,
           headers: {
             'Content-Type': 'application/json',
-            ...this.extractAuthHeaders(req)
-          }
-        }
+            ...this.extractAuthHeaders(req),
+          },
+        },
       );
 
       if (error) {
-        console.error('Visual search analytics error:', error);
+        // Visual search analytics error
         res.status(500).json({
           error: 'Analytics retrieval failed',
           code: 'ANALYTICS_ERROR',
-          details: error.message
+          details: error.message,
         });
         return;
       }
@@ -487,15 +487,15 @@ export class VisualSearchController {
       res.status(200).json({
         success: true,
         data: data,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
     } catch (error: unknown) {
-      console.error('Search analytics error:', error);
+      // Search analytics error
       res.status(500).json({
         error: 'Internal server error during analytics retrieval',
         code: 'INTERNAL_ERROR',
-        details: (error as Error).message
+        details: (error as Error).message,
       });
     }
   };
@@ -511,7 +511,7 @@ export class VisualSearchController {
         service: 'visual-search-api',
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        supabaseClient: this.supabaseClient ? 'connected' : 'disconnected'
+        supabaseClient: this.supabaseClient ? 'connected' : 'disconnected',
       };
 
       res.status(200).json(health);
@@ -520,7 +520,7 @@ export class VisualSearchController {
         service: 'visual-search-api',
         status: 'unhealthy',
         error: (error as Error).message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   };
@@ -530,7 +530,7 @@ export class VisualSearchController {
    */
   private extractAuthHeaders(req: Request): Record<string, string> {
     const authHeaders: Record<string, string> = {};
-    
+
     // Extract Authorization header
     if (req.headers.authorization) {
       const authHeader = Array.isArray(req.headers.authorization)

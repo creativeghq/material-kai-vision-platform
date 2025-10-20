@@ -28,7 +28,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-
 import {
   Material,
   MaterialCategory,
@@ -115,7 +114,7 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
           material.metadata?.installationMethod?.toLowerCase().includes(searchLower) ||
           material.metadata?.application?.toLowerCase().includes(searchLower) ||
           material.standards.some(standard => standard.toLowerCase().includes(searchLower));
-        
+
         if (!matchesSearch) return false;
       }
 
@@ -144,7 +143,7 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
     // Sort materials
     filtered.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (filters.sortBy) {
         case 'name':
           comparison = a.name.localeCompare(b.name);
@@ -170,7 +169,7 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
 
   const updateFilter = useCallback(<K extends keyof FilterState>(
     key: K,
-    value: FilterState[K]
+    value: FilterState[K],
   ) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
@@ -282,8 +281,8 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select 
-                  value={filters.category} 
+                <Select
+                  value={filters.category}
                   onValueChange={(value: MaterialCategory | 'all') => updateFilter('category', value)}
                 >
                   <SelectTrigger id="category">
@@ -421,7 +420,7 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
             <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No materials found</h3>
             <p className="text-muted-foreground">
-              {materials.length === 0 
+              {materials.length === 0
                 ? 'No materials in the catalog yet.'
                 : 'Try adjusting your filters or search terms.'
               }
@@ -429,8 +428,8 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
           </CardContent>
         </Card>
       ) : (
-        <div className={viewMode === 'grid' 
-          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
+        <div className={viewMode === 'grid'
+          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
           : 'space-y-4'
         }>
           {filteredAndSortedMaterials.map((material) => (
@@ -550,7 +549,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                   <Hash className="h-4 w-4" />
                   Material Properties
                 </Label>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {material.metadata?.finish && (
                     <div className="flex items-center gap-2">

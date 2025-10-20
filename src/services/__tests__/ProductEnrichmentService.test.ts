@@ -2,8 +2,9 @@
  * Product Enrichment Service Tests
  */
 
-import { ProductEnrichmentService } from '../ProductEnrichmentService';
 import { ProductEnrichmentRequest } from '@/types/product-enrichment';
+
+import { ProductEnrichmentService } from '../ProductEnrichmentService';
 
 // Mock Supabase
 jest.mock('@/integrations/supabase/client', () => {

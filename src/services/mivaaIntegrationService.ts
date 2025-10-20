@@ -1,6 +1,6 @@
 /**
  * MIVAA Integration Service
- * 
+ *
  * Provides unified access to MIVAA PDF Processing Service endpoints
  * with proper authentication, error handling, and response standardization.
  */
@@ -125,8 +125,8 @@ export class MivaaIntegrationService {
                 metadata: {
                   ...image.metadata,
                   storage_path: storagePath,
-                  url_fixed_at: new Date().toISOString()
-                }
+                  url_fixed_at: new Date().toISOString(),
+                },
               })
               .eq('id', image.id);
 
@@ -155,10 +155,10 @@ export class MivaaIntegrationService {
   private async callMivaaEndpoint<T>(
     endpoint: string,
     method: 'GET' | 'POST' = 'POST',
-    data?: any
+    data?: any,
   ): Promise<MivaaResponse<T>> {
     const startTime = Date.now();
-    
+
     try {
       const url = `${this.config.baseUrl}${endpoint}`;
       const headers: Record<string, string> = {
@@ -229,7 +229,7 @@ export class MivaaIntegrationService {
    */
   private async callMivaaViaSupabase<T>(
     action: string,
-    payload: any
+    payload: any,
   ): Promise<MivaaResponse<T>> {
     try {
       const response = await this.callMivaaGatewayDirect(action, payload);
@@ -246,7 +246,7 @@ export class MivaaIntegrationService {
           metadata: {
             timestamp: new Date().toISOString(),
             processingTime: 0,
-            endpoint: `/functions/v1/mivaa-gateway`,
+            endpoint: '/functions/v1/mivaa-gateway',
             version: '1.0.0',
           },
         };
@@ -265,7 +265,7 @@ export class MivaaIntegrationService {
         metadata: {
           timestamp: new Date().toISOString(),
           processingTime: 0,
-          endpoint: `/functions/v1/mivaa-gateway`,
+          endpoint: '/functions/v1/mivaa-gateway',
           version: '1.0.0',
         },
       };
@@ -288,7 +288,7 @@ export class MivaaIntegrationService {
    */
   async analyzeMaterial(
     imageData: string,
-    options: MaterialAnalysisOptions = {}
+    options: MaterialAnalysisOptions = {},
   ): Promise<MivaaResponse> {
     return this.callMivaaViaSupabase('material_recognition', {
       image_data: imageData,
@@ -304,7 +304,7 @@ export class MivaaIntegrationService {
    */
   async semanticSearch(
     query: string,
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): Promise<MivaaResponse> {
     return this.callMivaaViaSupabase('semantic_search', {
       query,
@@ -320,7 +320,7 @@ export class MivaaIntegrationService {
    */
   async processPDF(
     fileUrl: string,
-    options: PDFProcessingOptions = {}
+    options: PDFProcessingOptions = {},
   ): Promise<MivaaResponse> {
     return this.callMivaaViaSupabase('pdf_extract', {
       file_url: fileUrl,
@@ -346,7 +346,7 @@ export class MivaaIntegrationService {
    */
   async generateMaterialEmbeddings(
     imageData: string,
-    embeddingTypes: string[] = ['clip']
+    embeddingTypes: string[] = ['clip'],
   ): Promise<MivaaResponse> {
     return this.callMivaaViaSupabase('material_embeddings', {
       image_data: imageData,
@@ -359,7 +359,7 @@ export class MivaaIntegrationService {
    */
   async visualMaterialSearch(
     imageData: string,
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): Promise<MivaaResponse> {
     return this.callMivaaEndpoint('/api/search/materials/visual', 'POST', {
       query_image: imageData,
@@ -376,7 +376,7 @@ export class MivaaIntegrationService {
    */
   async analyzeImage(
     imageData: string,
-    options: { includeOCR?: boolean; includeObjects?: boolean; imageId?: string } = {}
+    options: { includeOCR?: boolean; includeObjects?: boolean; imageId?: string } = {},
   ): Promise<MivaaResponse> {
     const analysisTypes = [];
     if (options.includeOCR !== false) analysisTypes.push('ocr');
@@ -399,7 +399,7 @@ export class MivaaIntegrationService {
   async queryDocument(
     documentId: string,
     question: string,
-    options: { maxContextChunks?: number } = {}
+    options: { maxContextChunks?: number } = {},
   ): Promise<MivaaResponse> {
     return this.callMivaaEndpoint(`/api/documents/${documentId}/query`, 'POST', {
       question,
@@ -420,7 +420,7 @@ export class MivaaIntegrationService {
    */
   async batchAnalyzeImages(
     images: Array<{ id: string; data: string }>,
-    options: MaterialAnalysisOptions = {}
+    options: MaterialAnalysisOptions = {},
   ): Promise<MivaaResponse> {
     return this.callMivaaEndpoint('/api/v1/images/analyze/batch', 'POST', {
       image_ids: images.map(img => img.id),
@@ -454,8 +454,8 @@ export class MivaaIntegrationService {
         },
         body: JSON.stringify({
           action,
-          payload
-        })
+          payload,
+        }),
       });
 
       if (!response.ok) {

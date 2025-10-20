@@ -169,7 +169,7 @@ describe('SearchOptimizationService', () => {
 
       for (let i = 1; i < response.results.length; i++) {
         expect(response.results[i - 1].combined_score).toBeGreaterThanOrEqual(
-          response.results[i].combined_score
+          response.results[i].combined_score,
         );
       }
     });

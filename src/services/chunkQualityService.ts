@@ -1,6 +1,6 @@
 /**
  * Chunk Quality Service
- * 
+ *
  * Calculates and stores quality metrics for chunks and images
  * Integrates with the PDF workflow to assess processing quality
  */
@@ -127,7 +127,7 @@ export class ChunkQualityService {
   scoreChunk(
     chunkId: string,
     content: string,
-    metadata: Record<string, any>
+    metadata: Record<string, any>,
   ): ChunkQualityData {
     console.log(`🎯 scoreChunk called for ${chunkId}`);
     const semanticCompleteness = this.calculateSemanticCompleteness(content);
@@ -213,7 +213,7 @@ export class ChunkQualityService {
    */
   async updateChunkQuality(
     chunkId: string,
-    qualityData: ChunkQualityData
+    qualityData: ChunkQualityData,
   ): Promise<void> {
     console.log(`📝 Updating chunk quality for ${chunkId}:`, {
       coherence_score: qualityData.coherence_score,
@@ -229,7 +229,7 @@ export class ChunkQualityService {
         details: {
           coherence_score: qualityData.coherence_score,
           quality_assessment: qualityData.quality_assessment,
-        }
+        },
       });
 
     const { error } = await supabase
@@ -254,7 +254,7 @@ export class ChunkQualityService {
           details: {
             error: error.message,
             code: error.code,
-          }
+          },
         });
 
       throw error;
@@ -270,7 +270,7 @@ export class ChunkQualityService {
         event: 'update_success',
         details: {
           coherence_score: qualityData.coherence_score,
-        }
+        },
       });
   }
 

@@ -340,8 +340,8 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
       },
       body: JSON.stringify({
         action,
-        payload
-      })
+        payload,
+      }),
     });
 
     if (!response.ok) {

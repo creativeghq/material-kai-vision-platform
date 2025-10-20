@@ -1,13 +1,14 @@
 /**
  * Product Recommendation Service
- * 
+ *
  * Provides AI-powered product recommendations based on quality metrics,
  * user preferences, and enrichment data.
  */
 
+import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService } from './base/BaseService';
 import { QualityDashboardService } from './QualityDashboardService';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface ProductRecommendation {
   id: string;
@@ -129,7 +130,7 @@ class ProductRecommendationServiceImpl extends BaseService {
   async getPersonalizedRecommendations(
     workspaceId: string,
     userPreferences: string[],
-    limit: number = 10
+    limit: number = 10,
   ): Promise<ProductRecommendation[]> {
     return this.executeOperation(async () => {
       const { data: products, error } = await supabase

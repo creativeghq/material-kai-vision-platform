@@ -1,6 +1,6 @@
 /**
  * Unified Embedding Configuration
- * 
+ *
  * This configuration ensures consistency across all services that generate
  * or use embeddings in the Material Kai Vision Platform.
  */
@@ -118,7 +118,7 @@ export class TextPreprocessor {
    */
   truncate(text: string, maxLength?: number): string {
     const limit = maxLength || this.config.maxLength;
-    
+
     if (text.length <= limit) {
       return text;
     }
@@ -196,14 +196,14 @@ export class EmbeddingValidator {
    * Validate embedding output
    */
   static validateEmbedding(
-    embedding: number[], 
-    config: EmbeddingModelConfig
+    embedding: number[],
+    config: EmbeddingModelConfig,
   ): { valid: boolean; error?: string; normalized?: number[] } {
     // Check dimensions
     if (!this.validateDimensions(embedding, config.dimensions)) {
-      return { 
-        valid: false, 
-        error: `Invalid dimensions: expected ${config.dimensions}, got ${embedding.length}` 
+      return {
+        valid: false,
+        error: `Invalid dimensions: expected ${config.dimensions}, got ${embedding.length}`,
       };
     }
 
@@ -233,7 +233,7 @@ export class EmbeddingCacheKey {
    */
   static generate(text: string, modelName: string, strategy: 'content-hash' | 'content-model-hash' = 'content-model-hash'): string {
     const crypto = require('crypto');
-    
+
     switch (strategy) {
       case 'content-hash':
         return crypto.createHash('sha256').update(text).digest('hex');

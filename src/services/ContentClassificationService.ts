@@ -1,17 +1,18 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { BaseService } from "./base/BaseService";
+import Anthropic from '@anthropic-ai/sdk';
+
+import { BaseService } from './base/BaseService';
 
 /**
  * Content Classification Types
  */
 export enum ContentType {
-  PRODUCT = "product",
-  SPECIFICATION = "specification",
-  INTRODUCTION = "introduction",
-  LEGAL_DISCLAIMER = "legal_disclaimer",
-  TECHNICAL_DETAIL = "technical_detail",
-  MARKETING = "marketing",
-  OTHER = "other",
+  PRODUCT = 'product',
+  SPECIFICATION = 'specification',
+  INTRODUCTION = 'introduction',
+  LEGAL_DISCLAIMER = 'legal_disclaimer',
+  TECHNICAL_DETAIL = 'technical_detail',
+  MARKETING = 'marketing',
+  OTHER = 'other',
 }
 
 export interface ClassificationResult {
@@ -41,21 +42,21 @@ export interface ClassifyChunkResponse {
  */
 export class ContentClassificationService extends BaseService {
   private anthropicClient: Anthropic;
-  private model: string = "claude-4-5-haiku-20250514";
+  private model: string = 'claude-4-5-haiku-20250514';
   private maxTokens: number = 1024;
   private temperature: number = 0.1;
 
   constructor() {
     super({
-      name: "ContentClassificationService",
-      version: "1.0.0",
-      environment: "production",
+      name: 'ContentClassificationService',
+      version: '1.0.0',
+      environment: 'production',
       enabled: true,
     });
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is required");
+      throw new Error('ANTHROPIC_API_KEY environment variable is required');
     }
 
     this.anthropicClient = new Anthropic({ apiKey });
@@ -65,7 +66,7 @@ export class ContentClassificationService extends BaseService {
    * Classify a single chunk of text
    */
   async classifyChunk(
-    request: ClassifyChunkRequest
+    request: ClassifyChunkRequest,
   ): Promise<ClassifyChunkResponse> {
     const startTime = Date.now();
 
@@ -78,14 +79,14 @@ export class ContentClassificationService extends BaseService {
         temperature: this.temperature,
         messages: [
           {
-            role: "user",
+            role: 'user',
             content: prompt,
           },
         ],
       });
 
       const responseText =
-        response.content[0].type === "text" ? response.content[0].text : "";
+        response.content[0].type === 'text' ? response.content[0].text : '';
       const classification = this.parseClassificationResponse(responseText);
 
       return {
@@ -94,7 +95,7 @@ export class ContentClassificationService extends BaseService {
         processing_time_ms: Date.now() - startTime,
       };
     } catch (error) {
-      this.logger.error("Classification error:", error);
+      this.logger.error('Classification error:', error);
       throw error;
     }
   }
@@ -103,7 +104,7 @@ export class ContentClassificationService extends BaseService {
    * Classify multiple chunks in batch
    */
   async classifyChunks(
-    requests: ClassifyChunkRequest[]
+    requests: ClassifyChunkRequest[],
   ): Promise<ClassifyChunkResponse[]> {
     const results: ClassifyChunkResponse[] = [];
 
@@ -126,10 +127,10 @@ export class ContentClassificationService extends BaseService {
   private buildClassificationPrompt(request: ClassifyChunkRequest): string {
     const contextInfo = request.context
       ? `\nContext: ${request.context}`
-      : "";
+      : '';
     const titleInfo = request.pdf_title
       ? `\nPDF Title: ${request.pdf_title}`
-      : "";
+      : '';
 
     return `You are a content classification expert. Classify the following text chunk from a PDF document.
 
@@ -164,7 +165,7 @@ Respond in JSON format:
       // Extract JSON from response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error("No JSON found in response");
+        throw new Error('No JSON found in response');
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
@@ -184,15 +185,15 @@ Respond in JSON format:
         content_type:
           contentTypeMap[parsed.content_type] || ContentType.OTHER,
         confidence: Math.min(1, Math.max(0, parsed.confidence || 0)),
-        reasoning: parsed.reasoning || "",
+        reasoning: parsed.reasoning || '',
         sub_categories: parsed.sub_categories || [],
       };
     } catch (error) {
-      this.logger.error("Failed to parse classification response:", error);
+      this.logger.error('Failed to parse classification response:', error);
       return {
         content_type: ContentType.OTHER,
         confidence: 0,
-        reasoning: "Failed to parse response",
+        reasoning: 'Failed to parse response',
         sub_categories: [],
       };
     }
@@ -218,12 +219,12 @@ Respond in JSON format:
   filterByContentType(
     results: ClassifyChunkResponse[],
     contentType: ContentType,
-    minConfidence: number = 0.7
+    minConfidence: number = 0.7,
   ): ClassifyChunkResponse[] {
     return results.filter(
       (r) =>
         r.classification.content_type === contentType &&
-        r.classification.confidence >= minConfidence
+        r.classification.confidence >= minConfidence,
     );
   }
 
@@ -240,7 +241,7 @@ Respond in JSON format:
   protected async doHealthCheck(): Promise<void> {
     // Verify Anthropic client is available
     if (!this.anthropicClient) {
-      throw new Error("Anthropic client not initialized");
+      throw new Error('Anthropic client not initialized');
     }
   }
 }

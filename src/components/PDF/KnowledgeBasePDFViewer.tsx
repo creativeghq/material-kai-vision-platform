@@ -15,14 +15,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-
 import { EnhancedFunctionalMetadataCard } from '@/components/FunctionalMetadata/EnhancedFunctionalMetadataCard';
 import { type FunctionalMetadata } from '@/types/materials';
+
 import { PDFImageGallery } from './PDFImageGallery';
 
 interface PDFChunk {
@@ -135,7 +135,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {hasMetadata && (
             <Button
@@ -148,7 +148,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
               {metadataVisible ? 'Hide' : 'Show'} Metadata
             </Button>
           )}
-          
+
           {entry.metadata?.storage_info?.pdf_storage_url && (
             <Button
               variant="outline"
@@ -165,10 +165,10 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
 
       {/* Main Content Layout */}
       <div className={`grid gap-6 ${metadataVisible && hasMetadata ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
-        
+
         {/* PDF Content Section */}
         <div className="space-y-4">
-          
+
           {/* Content Preview */}
           <Card>
             <CardHeader>
@@ -179,7 +179,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm">{entry.content}</p>
-              
+
               {entry.semantic_tags && entry.semantic_tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {entry.semantic_tags.map((tag, idx) => (
@@ -195,8 +195,8 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
           {/* Chunks Section */}
           {chunks.length > 0 && (
             <Card>
-              <Collapsible 
-                open={expandedSections.has('chunks')} 
+              <Collapsible
+                open={expandedSections.has('chunks')}
                 onOpenChange={() => toggleSection('chunks')}
               >
                 <CardHeader className="pb-3">
@@ -206,19 +206,19 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                         <Layers className="h-5 w-5" />
                         PDF Content Chunks ({chunks.length})
                       </CardTitle>
-                      {expandedSections.has('chunks') ? 
-                        <ChevronDown className="h-4 w-4" /> : 
+                      {expandedSections.has('chunks') ?
+                        <ChevronDown className="h-4 w-4" /> :
                         <ChevronRight className="h-4 w-4" />
                       }
                     </Button>
                   </CollapsibleTrigger>
                 </CardHeader>
-                
+
                 <CollapsibleContent>
                   <CardContent className="pt-0">
                     <div className="space-y-3">
                       {chunks.map((chunk) => (
-                        <div 
+                        <div
                           key={chunk.id}
                           className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50 ${
                             selectedChunk?.id === chunk.id ? 'border-primary bg-primary/5' : ''
@@ -244,7 +244,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                             </div>
                             <MousePointer className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
                           </div>
-                          
+
                           {selectedChunk?.id === chunk.id && hasMetadata && metadataVisible && (
                             <div className="mt-4 pt-4 border-t">
                               <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
@@ -358,11 +358,11 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                 {selectedChunk.text}
               </div>
             </div>
-            
+
             {selectedChunk.htmlContent && selectedChunk.htmlContent !== selectedChunk.text && (
               <div>
                 <h4 className="text-sm font-medium mb-2">HTML Content</h4>
-                <div 
+                <div
                   className="bg-gray-50 p-3 rounded-lg text-sm prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{ __html: selectedChunk.htmlContent }}
                 />

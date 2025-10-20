@@ -1,11 +1,12 @@
 /**
  * Analytics Service
- * 
+ *
  * Tracks and analyzes platform metrics including usage, performance, and quality.
  */
 
-import { BaseService } from './base/BaseService';
 import { supabase } from '@/integrations/supabase/client';
+
+import { BaseService } from './base/BaseService';
 
 export interface AnalyticsEvent {
   event_type: string;

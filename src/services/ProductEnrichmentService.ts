@@ -4,7 +4,6 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { BaseService, ServiceConfig } from './base/BaseService';
 import {
   ProductEnrichment,
   ProductEnrichmentInsert,
@@ -18,6 +17,8 @@ import {
   ProductEnrichmentStatus,
   ProductCategory,
 } from '@/types/product-enrichment';
+
+import { BaseService, ServiceConfig } from './base/BaseService';
 
 /**
  * Product Enrichment Service Configuration
@@ -97,7 +98,7 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
         productDescription,
         metadata,
         specifications,
-        imageReferences
+        imageReferences,
       );
 
       // Determine enrichment status
@@ -329,7 +330,7 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
     description: string | undefined,
     metadata: any,
     specifications: any,
-    images: any
+    images: any,
   ): number {
     let score = 0;
     let maxScore = 0;

@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
+
 import { ChunkSearchEnhancementService } from '../ChunkSearchEnhancementService';
 import { ChunkSearchRequest, EnhancedSearchResult } from '../ChunkSearchEnhancementService';
 

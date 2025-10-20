@@ -1,6 +1,4 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   Shield,
   Sparkles,
@@ -10,8 +8,11 @@ import {
   Beaker,
   Volume2,
   Leaf,
-  Ruler
+  Ruler,
 } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   FunctionalMetadata,
 } from '@/types/materials';
@@ -147,7 +148,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {data.radiantHeatingCompatible !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Radiant Heating:</span>
-          <Badge variant={data.radiantHeatingCompatible ? "default" : "secondary"}>
+          <Badge variant={data.radiantHeatingCompatible ? 'default' : 'secondary'}>
             {data.radiantHeatingCompatible ? 'Compatible' : 'Not Compatible'}
           </Badge>
         </div>
@@ -181,7 +182,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {data.frostResistance !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Frost Resistance:</span>
-          <Badge variant={data.frostResistance ? "default" : "secondary"}>
+          <Badge variant={data.frostResistance ? 'default' : 'secondary'}>
             {data.frostResistance ? 'Yes' : 'No'}
           </Badge>
         </div>
@@ -189,7 +190,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {data.moldMildewResistant !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Mold/Mildew Resistant:</span>
-          <Badge variant={data.moldMildewResistant ? "default" : "secondary"}>
+          <Badge variant={data.moldMildewResistant ? 'default' : 'secondary'}>
             {data.moldMildewResistant ? 'Yes' : 'No'}
           </Badge>
         </div>
@@ -232,7 +233,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {data.foodSafeCertified !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Food Safe:</span>
-          <Badge variant={data.foodSafeCertified ? "default" : "secondary"}>
+          <Badge variant={data.foodSafeCertified ? 'default' : 'secondary'}>
             {data.foodSafeCertified ? 'Certified' : 'Not Certified'}
           </Badge>
         </div>
@@ -272,7 +273,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
           {data.electricalProperties.antiStatic !== undefined && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Anti-static:</span>
-              <Badge variant={data.electricalProperties.antiStatic ? "default" : "secondary"}>
+              <Badge variant={data.electricalProperties.antiStatic ? 'default' : 'secondary'}>
                 {data.electricalProperties.antiStatic ? 'Yes' : 'No'}
               </Badge>
             </div>
@@ -280,7 +281,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
           {data.electricalProperties.conductive !== undefined && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Conductive:</span>
-              <Badge variant={data.electricalProperties.conductive ? "default" : "secondary"}>
+              <Badge variant={data.electricalProperties.conductive ? 'default' : 'secondary'}>
                 {data.electricalProperties.conductive ? 'Yes' : 'No'}
               </Badge>
             </div>
@@ -341,7 +342,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {data.edgeProperties?.rectifiedEdges !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Rectified Edges:</span>
-          <Badge variant={data.edgeProperties.rectifiedEdges ? "default" : "secondary"}>
+          <Badge variant={data.edgeProperties.rectifiedEdges ? 'default' : 'secondary'}>
             {data.edgeProperties.rectifiedEdges ? 'Yes' : 'No'}
           </Badge>
         </div>
@@ -361,7 +362,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {data.specialProperties?.translucent !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Translucent:</span>
-          <Badge variant={data.specialProperties.translucent ? "default" : "secondary"}>
+          <Badge variant={data.specialProperties.translucent ? 'default' : 'secondary'}>
             {data.specialProperties.translucent ? 'Yes' : 'No'}
           </Badge>
         </div>
@@ -377,7 +378,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Shield,
       data: functionalMetadata.slipSafetyRatings,
       renderFn: renderSlipSafetyRatings,
-      color: 'text-red-600'
+      color: 'text-red-600',
     },
     {
       key: 'surfaceGlossReflectivity',
@@ -385,7 +386,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Sparkles,
       data: functionalMetadata.surfaceGlossReflectivity,
       renderFn: renderSurfaceGloss,
-      color: 'text-purple-600'
+      color: 'text-purple-600',
     },
     {
       key: 'mechanicalPropertiesExtended',
@@ -393,7 +394,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Hammer,
       data: functionalMetadata.mechanicalPropertiesExtended,
       renderFn: renderMechanicalProperties,
-      color: 'text-gray-600'
+      color: 'text-gray-600',
     },
     {
       key: 'thermalProperties',
@@ -401,7 +402,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Thermometer,
       data: functionalMetadata.thermalProperties,
       renderFn: renderThermalProperties,
-      color: 'text-orange-600'
+      color: 'text-orange-600',
     },
     {
       key: 'waterMoistureResistance',
@@ -409,7 +410,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Droplets,
       data: functionalMetadata.waterMoistureResistance,
       renderFn: renderWaterResistance,
-      color: 'text-blue-600'
+      color: 'text-blue-600',
     },
     {
       key: 'chemicalHygieneResistance',
@@ -417,7 +418,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Beaker,
       data: functionalMetadata.chemicalHygieneResistance,
       renderFn: renderChemicalResistance,
-      color: 'text-green-600'
+      color: 'text-green-600',
     },
     {
       key: 'acousticElectricalProperties',
@@ -425,7 +426,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Volume2,
       data: functionalMetadata.acousticElectricalProperties,
       renderFn: renderAcousticProperties,
-      color: 'text-indigo-600'
+      color: 'text-indigo-600',
     },
     {
       key: 'environmentalSustainability',
@@ -433,7 +434,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Leaf,
       data: functionalMetadata.environmentalSustainability,
       renderFn: renderEnvironmentalProperties,
-      color: 'text-emerald-600'
+      color: 'text-emerald-600',
     },
     {
       key: 'dimensionalAesthetic',
@@ -441,7 +442,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       icon: Ruler,
       data: functionalMetadata.dimensionalAesthetic,
       renderFn: renderDimensionalProperties,
-      color: 'text-pink-600'
+      color: 'text-pink-600',
     },
   ];
 
@@ -466,7 +467,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
         {categoriesWithData.map((category) => {
           const IconComponent = category.icon;
           return (
-            <div 
+            <div
               key={category.key}
               className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => onCategoryClick?.(category.key)}
@@ -493,12 +494,12 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
           </Badge>
         )}
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {categoriesWithData.map((category) => {
           const IconComponent = category.icon;
           return (
-            <Card 
+            <Card
               key={category.key}
               className={`cursor-pointer hover:shadow-md transition-shadow ${
                 onCategoryClick ? 'hover:bg-muted/20' : ''

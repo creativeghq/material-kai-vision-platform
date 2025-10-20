@@ -6,17 +6,17 @@ import {
   AlertTriangle,
   RefreshCw,
   Server,
-  Globe
+  Globe,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 /**
@@ -41,8 +41,8 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
       },
       body: JSON.stringify({
         action,
-        payload
-      })
+        payload,
+      }),
     });
 
     if (!response.ok) {
@@ -156,8 +156,8 @@ const PackagesPanel: React.FC = () => {
             critical: true,
             status: 'active' as PackageStatus,
             version: '1.0.0',
-            error: undefined
-          }
+            error: undefined,
+          },
         ];
         setMivaaPackages(updatedMivaaPackages);
       }

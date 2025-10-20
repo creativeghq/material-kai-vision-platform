@@ -1,6 +1,6 @@
 /**
  * ✅ API Response Validation Utilities
- * 
+ *
  * Provides runtime validation for API responses to ensure data integrity
  * and catch integration issues early.
  */
@@ -97,7 +97,7 @@ export const validateMaterialRecognitionResponse = (response: any): ValidationRe
     isValid: errors.length === 0,
     data: validatedMaterials,
     errors,
-    warnings
+    warnings,
   };
 };
 
@@ -153,7 +153,7 @@ export const validateAITestResponse = (response: any): ValidationResult => {
     isValid: errors.length === 0,
     data: data,
     errors,
-    warnings
+    warnings,
   };
 };
 
@@ -214,7 +214,7 @@ export const validateVisualSearchResponse = (response: any): ValidationResult =>
     isValid: errors.length === 0,
     data: data,
     errors,
-    warnings
+    warnings,
   };
 };
 
@@ -260,7 +260,7 @@ export const validateStandardizedApiResponse = (response: any): ValidationResult
     isValid: errors.length === 0,
     data: response.data,
     errors,
-    warnings
+    warnings,
   };
 };
 
@@ -268,7 +268,7 @@ export const validateStandardizedApiResponse = (response: any): ValidationResult
 export const validateAndLog = <T>(
   response: any,
   validator: (response: any) => ValidationResult<T>,
-  context: string
+  context: string,
 ): ValidationResult<T> => {
   const result = validator(response);
 

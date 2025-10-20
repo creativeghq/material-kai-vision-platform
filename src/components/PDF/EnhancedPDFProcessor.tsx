@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { supabase } from '@/integrations/supabase/client';
 import {
 
   Upload,
@@ -17,6 +16,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
 import { useToast } from '@/hooks/use-toast';
 
 /**
@@ -52,8 +51,8 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
       },
       body: JSON.stringify({
         action,
-        payload
-      })
+        payload,
+      }),
     });
 
     if (!response.ok) {
@@ -239,7 +238,7 @@ export function EnhancedPDFProcessor() {
             query: searchQuery,
             limit: 10,
             similarity_threshold: 0.7,
-            include_metadata: true
+            include_metadata: true,
           },
         },
       });
@@ -391,7 +390,7 @@ export function EnhancedPDFProcessor() {
             metadata: { source: 'mivaa_markdown' },
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-          }
+          },
         ],
         images: extractionResult?.content?.images || [],
         layout: [], // MIVAA doesn't provide layout data yet
@@ -406,7 +405,7 @@ export function EnhancedPDFProcessor() {
             totalChunks: extractionResult?.content?.chunks?.length || 1,
             totalImages: extractionResult?.content?.images?.length || 0,
             wordCount: extractionResult?.metrics?.word_count || 0,
-            pageCount: extractionResult?.metrics?.page_count || 0
+            pageCount: extractionResult?.metrics?.page_count || 0,
           },
           processingTimeMs: (extractionResult?.metrics?.processing_time_seconds || 0) * 1000,
           createdAt: new Date().toISOString(),

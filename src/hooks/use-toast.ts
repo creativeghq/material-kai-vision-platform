@@ -184,7 +184,7 @@ function useToast() {
     toast,
     dismiss: (toastId?: string) => dispatch({
       type: actionTypes.DISMISS_TOAST,
-      ...(toastId !== undefined && { toastId })
+      ...(toastId !== undefined && { toastId }),
     }),
   };
 }

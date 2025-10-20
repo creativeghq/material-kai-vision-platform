@@ -82,13 +82,13 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     materials: [],
     organizations: [],
     locations: [],
-    people: []
+    people: [],
   });
   const [availableEntities, setAvailableEntities] = useState<AvailableEntities>({
     materials: [],
     organizations: [],
     locations: [],
-    people: []
+    people: [],
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -107,7 +107,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         materials: [],
         organizations: [],
         locations: [],
-        people: []
+        people: [],
       };
 
       data?.forEach((item: any) => {
@@ -262,7 +262,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           limit: 15,
           includeImages: true,
           includeMetafields: true,
-          includeRelationships: false
+          includeRelationships: false,
         });
       } else if (actualSearchType === 'image') {
         // Image-based search using MaterialSearchService with image analysis
@@ -272,7 +272,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           limit: 12,
           includeImages: true,
           includeMetafields: true,
-          includeRelationships: false
+          includeRelationships: false,
         });
       } else {
         // Hybrid search (text + image) using MaterialSearchService
@@ -282,7 +282,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           limit: 20,
           includeImages: true,
           includeMetafields: true,
-          includeRelationships: false
+          includeRelationships: false,
         });
       }
 
@@ -324,8 +324,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         metadata: {
           category: result.category,
           properties: result.properties,
-          metafield_values: result.metafield_values
-        }
+          metafield_values: result.metafield_values,
+        },
       }));
 
       // Sort by similarity score
@@ -363,7 +363,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         limit: 8,
         includeImages: false,
         includeMetafields: false,
-        includeRelationships: false
+        includeRelationships: false,
       });
 
       if (!quickResponse.success) {
@@ -379,8 +379,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         source: 'quick_search',
         metadata: {
           category: result.category,
-          properties: result.properties
-        }
+          properties: result.properties,
+        },
       }));
 
       setResults(formatted);
@@ -568,12 +568,12 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                             if (checked) {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                materials: [...prev.materials, material]
+                                materials: [...prev.materials, material],
                               }));
                             } else {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                materials: prev.materials.filter(m => m !== material)
+                                materials: prev.materials.filter(m => m !== material),
                               }));
                             }
                           }}
@@ -607,12 +607,12 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                             if (checked) {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                organizations: [...prev.organizations, org]
+                                organizations: [...prev.organizations, org],
                               }));
                             } else {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                organizations: prev.organizations.filter(o => o !== org)
+                                organizations: prev.organizations.filter(o => o !== org),
                               }));
                             }
                           }}
@@ -646,12 +646,12 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                             if (checked) {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                locations: [...prev.locations, location]
+                                locations: [...prev.locations, location],
                               }));
                             } else {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                locations: prev.locations.filter(l => l !== location)
+                                locations: prev.locations.filter(l => l !== location),
                               }));
                             }
                           }}
@@ -685,12 +685,12 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                             if (checked) {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                people: [...prev.people, person]
+                                people: [...prev.people, person],
                               }));
                             } else {
                               setEntityFilters(prev => ({
                                 ...prev,
-                                people: prev.people.filter(p => p !== person)
+                                people: prev.people.filter(p => p !== person),
                               }));
                             }
                           }}
@@ -720,7 +720,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                         className="h-2 w-2 ml-1 cursor-pointer"
                         onClick={() => setEntityFilters(prev => ({
                           ...prev,
-                          materials: prev.materials.filter(m => m !== material)
+                          materials: prev.materials.filter(m => m !== material),
                         }))}
                       />
                     </Badge>
@@ -733,7 +733,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                         className="h-2 w-2 ml-1 cursor-pointer"
                         onClick={() => setEntityFilters(prev => ({
                           ...prev,
-                          organizations: prev.organizations.filter(o => o !== org)
+                          organizations: prev.organizations.filter(o => o !== org),
                         }))}
                       />
                     </Badge>
@@ -746,7 +746,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                         className="h-2 w-2 ml-1 cursor-pointer"
                         onClick={() => setEntityFilters(prev => ({
                           ...prev,
-                          locations: prev.locations.filter(l => l !== location)
+                          locations: prev.locations.filter(l => l !== location),
                         }))}
                       />
                     </Badge>
@@ -759,7 +759,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                         className="h-2 w-2 ml-1 cursor-pointer"
                         onClick={() => setEntityFilters(prev => ({
                           ...prev,
-                          people: prev.people.filter(p => p !== person)
+                          people: prev.people.filter(p => p !== person),
                         }))}
                       />
                     </Badge>
@@ -772,7 +772,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     materials: [],
                     organizations: [],
                     locations: [],
-                    people: []
+                    people: [],
                   })}
                   disabled={!entityFilters.materials.length &&
                            !entityFilters.organizations.length &&

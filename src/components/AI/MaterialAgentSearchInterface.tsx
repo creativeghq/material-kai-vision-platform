@@ -430,7 +430,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         try {
           console.log('👁️ Performing visual search...');
           const imageFiles = attachedFiles.filter(file => file.type.startsWith('image/'));
-          
+
           for (const imageFile of imageFiles) {
             try {
               // Call the visual search API endpoint
@@ -504,8 +504,8 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               similarity_threshold: similarityThreshold,
               limit: 20,
               include_metadata: true,
-              search_type: 'semantic'
-            }
+              search_type: 'semantic',
+            },
           });
 
           if (similarityResponse.success && similarityResponse.data?.results) {
@@ -518,12 +518,12 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                 similarity_score: result.similarity_score || 0,
                 metadata: result.metadata || {},
                 document_type: result.document_type || 'material',
-                source: result.source || 'vector_search'
+                source: result.source || 'vector_search',
               })),
               processing_time_ms: similarityResponse.data.processing_time_ms || 0,
               total_results: similarityResponse.data.results.length,
               search_type: 'semantic',
-              threshold_used: similarityThreshold
+              threshold_used: similarityThreshold,
             };
             console.log('✅ Vector similarity search completed:', similaritySearchResults);
             enhancedContext.similaritySearchResults = similaritySearchResults;
@@ -893,13 +893,13 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                                 name: match.name,
                                 description: match.description || 'No description available',
                                 relevanceScore: match.similarity_score,
-                                source: 'visual_search'
+                                source: 'visual_search',
                               })}
                               className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
                             >
                               {match.thumbnail_url && (
-                                <img 
-                                  src={match.thumbnail_url} 
+                                <img
+                                  src={match.thumbnail_url}
                                   alt={match.name}
                                   className="w-full h-16 object-cover rounded mb-1"
                                 />
@@ -944,7 +944,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                                 name: result.title,
                                 description: result.content,
                                 relevanceScore: result.similarity_score,
-                                source: 'similarity_search'
+                                source: 'similarity_search',
                               })}
                               className="p-3 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
                             >
