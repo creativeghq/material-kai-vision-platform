@@ -202,6 +202,11 @@ export class ConsolidatedPDFWorkflowService {
   ): Promise<string> {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
+    console.log('🚀 [PDF Processing] Starting PDF processing workflow');
+    console.log(`📋 [PDF Processing] Job ID: ${jobId}`);
+    console.log(`📄 [PDF Processing] File: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`⚙️  [PDF Processing] Options:`, options);
+
     // Create MIVAA workflow steps
     const steps = this.createWorkflowSteps();
 
@@ -219,13 +224,16 @@ export class ConsolidatedPDFWorkflowService {
     };
 
     this.jobs.set(jobId, job);
+    console.log(`✅ [PDF Processing] Job created and registered`);
 
     // Initialize WebSocket tracking for real-time progress
     pdfProcessingWebSocketService.startJob(jobId, file.name);
+    console.log(`🔌 [PDF Processing] WebSocket tracking initialized`);
 
     this.notifyUpdate(job);
 
     // Start MIVAA processing workflow
+    console.log(`🔄 [PDF Processing] Starting MIVAA workflow execution`);
     this.executeMivaaWorkflow(jobId, file, options);
 
     return jobId;
@@ -317,16 +325,25 @@ export class ConsolidatedPDFWorkflowService {
     file: File,
     options: ConsolidatedProcessingOptions,
   ) {
+    console.log(`🔄 [MIVAA Workflow] Starting workflow for job ${jobId}`);
     try {
       const job = this.jobs.get(jobId);
-      if (!job) return;
+      if (!job) {
+        console.error(`❌ [MIVAA Workflow] Job ${jobId} not found in jobs map`);
+        return;
+      }
+
+      console.log(`✅ [MIVAA Workflow] Job found, starting authentication step`);
 
       // Step 1: Authentication
       await this.executeStep(jobId, 'auth', async () => {
+        console.log(`🔐 [Auth] Checking user authentication...`);
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error || !user) {
+          console.error(`❌ [Auth] Authentication failed:`, error);
           throw new Error('User not authenticated');
         }
+        console.log(`✅ [Auth] User authenticated: ${user.email} (${user.id})`);
         return {
           details: [
             this.createSuccessDetail(`Authenticated user: ${user.email}`),
@@ -338,20 +355,31 @@ export class ConsolidatedPDFWorkflowService {
       });
 
       // Step 2: File Upload
+      console.log(`📤 [Upload] Starting file upload step`);
       const uploadResult: unknown = await this.executeStep(jobId, 'upload', async () => {
         const fileName = `${Date.now()}-${file.name}`;
         const { data: { user } } = await supabase.auth.getUser();
         const fullPath = `${user!.id}/${fileName}`;
 
+        console.log(`📤 [Upload] Uploading to: pdf-documents/${fullPath}`);
+        console.log(`📤 [Upload] File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+
         const { error } = await supabase.storage
           .from('pdf-documents')
           .upload(fullPath, file);
 
-        if (error) throw new Error(`Upload failed: ${error.message}`);
+        if (error) {
+          console.error(`❌ [Upload] Upload failed:`, error);
+          throw new Error(`Upload failed: ${error.message}`);
+        }
+
+        console.log(`✅ [Upload] File uploaded successfully`);
 
         const { data: { publicUrl } } = supabase.storage
           .from('pdf-documents')
           .getPublicUrl(fullPath);
+
+        console.log(`🔗 [Upload] Public URL: ${publicUrl}`);
 
         return {
           details: [
@@ -386,9 +414,15 @@ export class ConsolidatedPDFWorkflowService {
       });
 
       // Step 4: MIVAA Processing
+      console.log(`🤖 [MIVAA] Starting MIVAA processing step`);
       const mivaaResult = await this.executeStep(jobId, 'mivaa-processing', async () => {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
+        if (!user) {
+          console.error(`❌ [MIVAA] User not authenticated`);
+          throw new Error('User not authenticated');
+        }
+
+        console.log(`✅ [MIVAA] User authenticated for MIVAA processing`);
 
         // Update progress: Starting MIVAA processing
         this.updateJobStep(jobId, 'mivaa-processing', {
@@ -416,6 +450,8 @@ export class ConsolidatedPDFWorkflowService {
           },
         };
 
+        console.log(`📋 [MIVAA] Processing request:`, processingRequest);
+
         // Update progress: Sending to MIVAA
         this.updateJobStep(jobId, 'mivaa-processing', {
           progress: 30,
@@ -438,6 +474,7 @@ export class ConsolidatedPDFWorkflowService {
         });
 
         // Convert File to FormData for RAG upload endpoint
+        console.log(`📦 [MIVAA] Preparing FormData for RAG upload`);
         const formData = new FormData();
         formData.append('file', file);
         formData.append('title', file.name);
@@ -445,8 +482,17 @@ export class ConsolidatedPDFWorkflowService {
         formData.append('chunk_size', String(processingRequest.options.chunkSize || 1000));
         formData.append('chunk_overlap', String(processingRequest.options.overlap || 200));
 
+        console.log(`📦 [MIVAA] FormData prepared:`, {
+          filename: file.name,
+          enable_embedding: true,
+          chunk_size: processingRequest.options.chunkSize || 1000,
+          chunk_overlap: processingRequest.options.overlap || 200,
+        });
+
         // Call RAG upload endpoint directly (not through gateway, as it requires multipart/form-data)
+        console.log(`🚀 [MIVAA] Calling MIVAA RAG upload endpoint...`);
         const response = await this.callMivaaRagUpload(formData);
+        console.log(`📥 [MIVAA] RAG upload response:`, response);
 
         // Check for MIVAA gateway errors in the response data (direct call format)
         if (!response.success && response.error) {
@@ -2197,23 +2243,33 @@ export class ConsolidatedPDFWorkflowService {
     const mivaaServiceUrl = 'https://v1api.materialshub.gr';
     const mivaaApiKey = (import.meta as any).env?.VITE_MIVAA_API_KEY || Deno.env.get('MIVAA_API_KEY') || '';
 
+    console.log(`🔑 [MIVAA RAG] Checking API key...`);
+    console.log(`🔑 [MIVAA RAG] API key present: ${!!mivaaApiKey}`);
+    if (mivaaApiKey) {
+      console.log(`🔑 [MIVAA RAG] API key length: ${mivaaApiKey.length} characters`);
+    }
+
     if (!mivaaApiKey) {
+      console.error(`❌ [MIVAA RAG] MIVAA API key not configured!`);
       throw new Error('MIVAA API key not configured');
     }
 
     const url = `${mivaaServiceUrl}/api/v1/rag/documents/upload`;
+    console.log(`🌐 [MIVAA RAG] Target URL: ${url}`);
 
     try {
       // Add timeout to prevent hanging requests (10 minutes for PDF processing)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.error('🚨 RAG upload request timeout after 10 minutes');
+        console.error('🚨 [MIVAA RAG] Request timeout after 10 minutes');
         controller.abort();
       }, 600000); // 10 minute timeout for PDF processing
 
-      console.log('🔍 Making MIVAA RAG upload request:', {
+      console.log('🚀 [MIVAA RAG] Making MIVAA RAG upload request:', {
         url,
         timestamp: new Date().toISOString(),
+        method: 'POST',
+        hasAuth: !!mivaaApiKey,
       });
 
       const response = await fetch(url, {
@@ -2227,24 +2283,30 @@ export class ConsolidatedPDFWorkflowService {
 
       clearTimeout(timeoutId);
 
-      console.log('🔍 MIVAA RAG upload response:', {
+      console.log('📥 [MIVAA RAG] MIVAA RAG upload response received:', {
         status: response.status,
         statusText: response.statusText,
+        ok: response.ok,
         timestamp: new Date().toISOString(),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ [MIVAA RAG] HTTP error ${response.status}:`, errorText);
         throw new Error(`MIVAA RAG upload failed: HTTP ${response.status} ${response.statusText} - ${errorText}`);
       }
 
+      console.log(`📦 [MIVAA RAG] Parsing response JSON...`);
       const data = await response.json();
+      console.log(`✅ [MIVAA RAG] Response data:`, data);
 
       // Check for application-level errors
       if (!data.success && data.error) {
+        console.error(`❌ [MIVAA RAG] Application error:`, data.error);
         throw new Error(`MIVAA RAG upload failed: ${data.error.message || 'Unknown error'}`);
       }
 
+      console.log(`✅ [MIVAA RAG] Upload successful!`);
       return {
         success: true,
         data: data.data || data,
