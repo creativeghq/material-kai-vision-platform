@@ -109,7 +109,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
     setLoading(true);
     try {
       // Load chunks with document information
-      const { data: chunksData, error: chunksError } = await supabase
+      console.log('📊 Loading chunks from database...');
+      const { data: chunksData, error: chunksError, count: chunksCount } = await supabase
         .from('document_chunks')
         .select(`
           *,
@@ -120,42 +121,60 @@ export const MaterialKnowledgeBase: React.FC = () => {
             processing_status,
             created_at
           )
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      if (chunksError) throw chunksError;
+      if (chunksError) {
+        console.error('❌ Error loading chunks:', chunksError);
+        throw chunksError;
+      }
+      console.log(`✅ Loaded ${chunksData?.length || 0} chunks (total count: ${chunksCount})`);
       setChunks(chunksData || []);
 
       // Load images
-      const { data: imagesData, error: imagesError } = await supabase
+      console.log('🖼️ Loading images from database...');
+      const { data: imagesData, error: imagesError, count: imagesCount } = await supabase
         .from('document_images')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      if (imagesError) throw imagesError;
+      if (imagesError) {
+        console.error('❌ Error loading images:', imagesError);
+        throw imagesError;
+      }
+      console.log(`✅ Loaded ${imagesData?.length || 0} images (total count: ${imagesCount})`);
       setImages(imagesData || []);
 
       // Load embeddings - query both embeddings and document_vectors tables
       // First try document_vectors (primary), then fall back to embeddings table
+      console.log('🔢 Loading embeddings from database...');
       let embeddingsData: any[] = [];
 
-      const { data: vectorsData, error: vectorsError } = await supabase
+      const { data: vectorsData, error: vectorsError, count: vectorsCount } = await supabase
         .from('document_vectors')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (!vectorsError && vectorsData && vectorsData.length > 0) {
+        console.log(`✅ Loaded ${vectorsData.length} embeddings from document_vectors (total count: ${vectorsCount})`);
         embeddingsData = vectorsData;
       } else {
+        if (vectorsError) {
+          console.warn('⚠️ document_vectors query failed:', vectorsError);
+        } else {
+          console.log('⚠️ No embeddings found in document_vectors table');
+        }
+
         // Fall back to embeddings table
-        const { data: embeddingsTableData, error: embeddingsError } = await supabase
+        const { data: embeddingsTableData, error: embeddingsError, count: embeddingsCount } = await supabase
           .from('embeddings')
-          .select('*')
+          .select('*', { count: 'exact' })
           .order('created_at', { ascending: false });
 
         if (embeddingsError) {
-          console.warn('Failed to load embeddings:', embeddingsError);
+          console.warn('⚠️ embeddings table query failed:', embeddingsError);
         } else {
+          console.log(`✅ Loaded ${embeddingsTableData?.length || 0} embeddings from embeddings table (total count: ${embeddingsCount})`);
           embeddingsData = embeddingsTableData || [];
         }
       }
@@ -177,20 +196,24 @@ export const MaterialKnowledgeBase: React.FC = () => {
       setProducts(productsData || []);
 
       // Calculate stats
+      console.log('📈 Calculating statistics...');
       const uniqueDocuments = new Set(chunksData?.map((c: any) => c.document_id) || []).size;
       const avgChunkSize = chunksData?.length ?
         chunksData.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / chunksData.length : 0;
       const avgConfidence = imagesData?.length ?
         imagesData.reduce((sum: number, img: any) => sum + (img.confidence || 0), 0) / imagesData.length : 0;
 
-      setStats({
+      const calculatedStats = {
         totalChunks: chunksData?.length || 0,
         totalImages: imagesData?.length || 0,
         totalEmbeddings: embeddingsData?.length || 0,
         totalDocuments: uniqueDocuments,
         avgChunkSize: Math.round(avgChunkSize),
         avgConfidence: Math.round(avgConfidence * 100) / 100,
-      });
+      };
+
+      console.log('📊 Final stats:', calculatedStats);
+      setStats(calculatedStats);
 
     } catch (error) {
       console.error('❌ Error loading knowledge base data:', error);
@@ -257,6 +280,27 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
   const getTotalPages = () => {
     return Math.ceil(filteredChunks.length / itemsPerPage);
+  };
+
+  // Generate smart pagination numbers with ellipsis
+  const getPaginationNumbers = () => {
+    const totalPages = getTotalPages();
+    const delta = 2; // Number of pages to show on each side of current page
+    const range: (number | string)[] = [];
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 || // Always show first page
+        i === totalPages || // Always show last page
+        (i >= currentPage - delta && i <= currentPage + delta) // Show pages around current
+      ) {
+        range.push(i);
+      } else if (range[range.length - 1] !== '...') {
+        range.push('...');
+      }
+    }
+
+    return range;
   };
 
   const getDocumentDisplayName = (chunk: DocumentChunk) => {
@@ -742,24 +786,40 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="px-3"
+                      >
+                        &lt;&lt;
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                         disabled={currentPage === 1}
+                        className="px-3"
                       >
-                        Previous
+                        &lt;
                       </Button>
 
-                      {/* Numeric pagination */}
+                      {/* Smart pagination with ellipsis */}
                       <div className="flex gap-1">
-                        {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((page) => (
-                          <Button
-                            key={page}
-                            variant={currentPage === page ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setCurrentPage(page)}
-                            className="w-8 h-8 p-0"
-                          >
-                            {page}
-                          </Button>
+                        {getPaginationNumbers().map((page, index) => (
+                          page === '...' ? (
+                            <span key={`ellipsis-${index}`} className="px-2 py-1 text-muted-foreground">
+                              ...
+                            </span>
+                          ) : (
+                            <Button
+                              key={page}
+                              variant={currentPage === page ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setCurrentPage(page as number)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {page}
+                            </Button>
+                          )
                         ))}
                       </div>
 
@@ -768,8 +828,18 @@ export const MaterialKnowledgeBase: React.FC = () => {
                         size="sm"
                         onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
                         disabled={currentPage === getTotalPages()}
+                        className="px-3"
                       >
-                        Next
+                        &gt;
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(getTotalPages())}
+                        disabled={currentPage === getTotalPages()}
+                        className="px-3"
+                      >
+                        &gt;&gt;
                       </Button>
                     </div>
                   )}

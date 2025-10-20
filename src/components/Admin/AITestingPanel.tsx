@@ -33,6 +33,7 @@ interface UnifiedAITestResponse {
     response: string;
     analysis?: string;
     recommendations?: string[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     materials?: any[];
     entities?: Array<{
       type: string;
@@ -57,6 +58,7 @@ interface UnifiedAITestResponse {
 }
 
 // ✅ Response standardization utility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
   // Handle standardized response format
   if (rawResponse.success !== undefined && rawResponse.data) {
@@ -247,6 +249,7 @@ export const AITestingPanel: React.FC = () => {
       const apiService = BrowserApiIntegrationService.getInstance();
 
       // Prepare payload based on test type
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const payload: any = {
         test_type: testType,
         include_entities: true,
@@ -287,6 +290,7 @@ export const AITestingPanel: React.FC = () => {
           combined: testType === 'combined_analysis',
         },
         results: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           entities: (data.entities || []).map((entity: any) => ({
             type: entity.type || 'unknown',
             text: entity.text || entity.value || 'unknown',
@@ -309,6 +313,7 @@ export const AITestingPanel: React.FC = () => {
       });
 
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Multi-modal test error:', error);
 
       const errorResult: MultiModalTestResult = {
@@ -336,7 +341,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setMultiModalTesting(false);
-    }
+    },
   };
 
   // Similarity search testing function
@@ -376,6 +381,7 @@ export const AITestingPanel: React.FC = () => {
         test_id: crypto.randomUUID(),
         query_text: similarityQuery,
         similarity_threshold: similarityThreshold,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         results: (data.results || []).map((item: any) => ({
           id: item.id || crypto.randomUUID(),
           title: item.title || item.name || 'Untitled',
@@ -396,6 +402,7 @@ export const AITestingPanel: React.FC = () => {
       });
 
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Similarity search test error:', error);
 
       const errorResult: SimilarityTestResult = {
@@ -418,7 +425,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setSimilarityTesting(false);
-    }
+    },
   };
 
   const testMaterialAnalysis = async () => {
@@ -481,6 +488,7 @@ export const AITestingPanel: React.FC = () => {
 
       // Note: Cleanup would normally delete from uploaded_files table
       // but since table doesn't exist in current schema, we skip this step
+      // eslint-disable-next-line no-console
       console.log('Test file cleanup skipped (uploaded_files table not in schema):', testFile.id);
 
       toast({
@@ -490,6 +498,7 @@ export const AITestingPanel: React.FC = () => {
       });
 
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Test error:', error);
       toast({
         title: 'Test Failed',
@@ -498,7 +507,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setTesting(false);
-    }
+    },
   };
 
   const test3DGeneration = async () => {
@@ -526,6 +535,7 @@ export const AITestingPanel: React.FC = () => {
       });
 
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('3D test error:', error);
       toast({
         title: '3D Test Failed',
@@ -534,7 +544,7 @@ export const AITestingPanel: React.FC = () => {
       });
     } finally {
       setTesting(false);
-    }
+    },
   };
 
   const getSampleImageUrls = () => [

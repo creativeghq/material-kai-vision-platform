@@ -1,4 +1,3 @@
-// @ts-ignore - Temporary workaround for import issue
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
@@ -11,6 +10,7 @@ import { monitoringService } from '@/services/monitoring/monitoringService';
 
 import { AdminGuard } from './components/Layout/AdminGuard';
 
+// @ts-ignore - Temporary workaround for import issue
 // Import CORS debug utility for troubleshooting
 import './debug/cors-debug';
 import Index from './pages/Index';
@@ -29,8 +29,8 @@ import { MaterialRecognition } from './components/Recognition/MaterialRecognitio
 import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
 import { Designer3DPage } from './components/3D/Designer3DPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
-import { Layout } from './components/Layout/Layout';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
+import { Layout } from './components/Layout/Layout';
 import { OCRProcessor } from './components/OCR/OCRProcessor';
 import { IntegratedRAGManagement } from './components/Admin/IntegratedRAGManagement';
 import PDFProcessing from './pages/PDFProcessing';

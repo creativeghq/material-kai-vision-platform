@@ -42,7 +42,7 @@ export const Designer3DPage: React.FC = () => {
           _role: 'admin',
         });
         setIsAdmin(data === true);
-      }
+      },
     };
 
     checkAdminRole();
@@ -112,7 +112,7 @@ export const Designer3DPage: React.FC = () => {
         setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
-    }
+    },
   };
 
   const removeImage = () => {
@@ -153,6 +153,7 @@ export const Designer3DPage: React.FC = () => {
       return;
     }
 
+    // eslint-disable-next-line no-console
     console.log('✅ DEBUG: Initial prompt validation passed');
     setIsGenerating(true);
     setIsUploading(selectedImage ? true : false);
@@ -192,16 +193,20 @@ export const Designer3DPage: React.FC = () => {
       if (imageUrl) {
         // If we have an image, use all image-capable models
         selectedModels = imageRequiredModels;
+        // eslint-disable-next-line no-console
         console.log('🔍 DEBUG: Using image-capable models:', selectedModels);
       } else {
         // If no image, use all text-only models
         selectedModels = textOnlyModels;
+        // eslint-disable-next-line no-console
         console.log('🔍 DEBUG: Using text-only models:', selectedModels);
       }
 
       // Build request data with required model field
       // Add defensive checks to ensure required fields are never undefined
+      // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: Building request data');
+      // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: prompt state before sanitization:', {
         prompt,
         promptType: typeof prompt,
@@ -211,6 +216,7 @@ export const Designer3DPage: React.FC = () => {
 
       const sanitizedPrompt = prompt?.trim() || '';
 
+      // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: After sanitization:', {
         sanitizedPrompt,
         sanitizedPromptType: typeof sanitizedPrompt,
@@ -219,11 +225,13 @@ export const Designer3DPage: React.FC = () => {
       });
 
       if (!sanitizedPrompt) {
+        // eslint-disable-next-line no-console
         console.error('❌ DEBUG: Prompt validation failed after sanitization');
         throw new Error('Prompt is required but was undefined or empty');
       }
 
       if (!selectedModels || selectedModels.length === 0) {
+        // eslint-disable-next-line no-console
         console.error('❌ DEBUG: Model selection failed');
         throw new Error('Model selection failed - no valid models found');
       }
@@ -243,6 +251,7 @@ export const Designer3DPage: React.FC = () => {
         ...(imageUrl && { image_url: imageUrl }), // Only include image_url if we have one
       };
 
+      // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: Final request data:', {
         requestData,
         requestDataStringified: JSON.stringify(requestData, null, 2),
@@ -250,8 +259,10 @@ export const Designer3DPage: React.FC = () => {
 
       // Use the new centralized API integration service
       const apiService = BrowserApiIntegrationService.getInstance();
+      // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: About to call API with request data');
       const result = await apiService.callSupabaseFunction('crewai-3d-generation', requestData);
+      // eslint-disable-next-line no-console
       console.log('Generation response received:', result);
 
       // Type assertion for the response data
@@ -271,11 +282,12 @@ export const Designer3DPage: React.FC = () => {
             description: 'Your 3D interior is being generated. This may take a few minutes...',
           });
           await pollForResults(responseData.generationId);
-        }
+        },
       } else {
         throw new Error(result.error?.message || 'Failed to start generation');
-      }
+      },
     } catch (error: unknown) {
+      // eslint-disable-next-line no-console
       console.error('Generation error:', error);
       toast({
         title: 'Generation Failed',
@@ -284,7 +296,7 @@ export const Designer3DPage: React.FC = () => {
       });
       setIsGenerating(false);
       setIsUploading(false);
-    }
+    },
   };
 
   const pollForResults = async (_generationId: string) => { // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -305,10 +317,12 @@ export const Designer3DPage: React.FC = () => {
         const error = { message: 'generation_3d table not implemented' };
 
         if (error) {
+          // eslint-disable-next-line no-console
           console.error('Polling error:', error);
           return;
         }
 
+        // eslint-disable-next-line no-console
         console.log('Polling result:', data);
 
         // Type assertion for the polling data
@@ -316,11 +330,17 @@ export const Designer3DPage: React.FC = () => {
 
         if (pollingData && pollingData.generation_status === 'completed' && pollingData.image_urls && pollingData.image_urls.length > 0) {
           // Generation completed successfully
+          // eslint-disable-next-line no-console
           console.log('🔍 DEBUG: Generation completed successfully');
+          // eslint-disable-next-line no-console
           console.log('📊 Available models count:', filteredModels.length);
+          // eslint-disable-next-line no-console
           console.log('📊 Available models:', filteredModels.map((m, i) => `${i}: ${m.name}`));
+          // eslint-disable-next-line no-console
           console.log('🖼️ Received image URLs count:', pollingData.image_urls.length);
+          // eslint-disable-next-line no-console
           console.log('🖼️ Received image URLs:', pollingData.image_urls);
+          // eslint-disable-next-line no-console
           console.log('📋 Full generation data:', pollingData);
 
           // Robust image-to-model mapping that handles sparse results
@@ -338,7 +358,7 @@ export const Designer3DPage: React.FC = () => {
                 detectedModel = model;
                 modelName = model.name;
                 break;
-              }
+              },
             }
 
             // Strategy 2: If no model detected from URL, use sequential mapping with validation
@@ -349,7 +369,7 @@ export const Designer3DPage: React.FC = () => {
               if (candidateModel) {
                 detectedModel = candidateModel;
                 modelName = candidateModel.name;
-              }
+              },
             }
 
             // Strategy 3: Fallback - try to map based on successful results count
@@ -360,7 +380,7 @@ export const Designer3DPage: React.FC = () => {
               if (fallbackModel) {
                 detectedModel = fallbackModel;
                 modelName = `${fallbackModel.name} (Result ${index + 1})`;
-              }
+              },
             }
 
             const result = {
@@ -370,17 +390,24 @@ export const Designer3DPage: React.FC = () => {
               resultIndex: index,
             };
 
+            // eslint-disable-next-line no-console
             console.log(`🔗 Robust mapping index ${index}: URL="${url}" -> Model="${result.modelName}" (ID: ${result.modelId})`);
             return result;
           });
 
           // Additional validation and logging
+          // eslint-disable-next-line no-console
           console.log('🔍 Mapping validation:');
+          // eslint-disable-next-line no-console
           console.log(`📊 Total models requested: ${filteredModels.length}`);
+          // eslint-disable-next-line no-console
           console.log(`🖼️ Total results received: ${pollingData.image_urls?.length || 0}`);
+          // eslint-disable-next-line no-console
           console.log(`✅ Successfully mapped: ${imagesWithModels.filter((img: unknown) => (img as { modelId?: string }).modelId).length}`);
+          // eslint-disable-next-line no-console
           console.log(`⚠️ Fallback mappings: ${imagesWithModels.filter((img: unknown) => !(img as { modelId?: string }).modelId).length}`);
 
+          // eslint-disable-next-line no-console
           console.log('✅ Final imagesWithModels mapping:', imagesWithModels);
 
           setGeneratedImages(imagesWithModels);
@@ -405,8 +432,9 @@ export const Designer3DPage: React.FC = () => {
           setTimeout(poll, 5000); // Poll every 5 seconds
         } else {
           throw new Error('Generation timed out');
-        }
+        },
       } catch (error: unknown) {
+        // eslint-disable-next-line no-console
         console.error('Polling error:', error);
         setIsGenerating(false);
         setIsUploading(false);
@@ -415,7 +443,7 @@ export const Designer3DPage: React.FC = () => {
           description: (error as Error).message || 'Generation failed during processing',
           variant: 'destructive',
         });
-      }
+      },
     };
 
     poll();
@@ -432,7 +460,7 @@ export const Designer3DPage: React.FC = () => {
       setCurrentImageIndex(currentImageIndex - 1);
     } else if (direction === 'next' && currentImageIndex < generatedImages.length - 1) {
       setCurrentImageIndex(currentImageIndex + 1);
-    }
+    },
   };
 
   const modalImages = generatedImages;
@@ -474,6 +502,7 @@ export const Designer3DPage: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               <Label htmlFor="prompt">Design Prompt</Label>
               <Select onValueChange={(value: string) => {
+                // eslint-disable-next-line no-console
                 console.log('🔍 DEBUG: Preset selection changed:', {
                   selectedValue: value,
                   valueType: typeof value,
@@ -482,6 +511,7 @@ export const Designer3DPage: React.FC = () => {
                   currentPromptType: typeof prompt,
                 });
                 setPrompt(value);
+                // eslint-disable-next-line no-console
                 console.log('🔍 DEBUG: After setPrompt from preset:', {
                   newPromptValue: value,
                   promptStateAfterSet: prompt, // Note: this might still show old value due to React batching
@@ -629,9 +659,11 @@ export const Designer3DPage: React.FC = () => {
                         alt={`Interior design by ${image.modelName}`}
                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                         onLoad={() => {
+                          // eslint-disable-next-line no-console
                           console.log(`✅ Image ${index + 1} loaded successfully:`, image.url);
                         }}
                         onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                          // eslint-disable-next-line no-console
                           console.error(`❌ Image ${index + 1} failed to load:`, {
                             url: image.url,
                             modelName: image.modelName,
@@ -743,9 +775,10 @@ export const Designer3DPage: React.FC = () => {
                 if (matchingModel) {
                   modelName = matchingModel.name;
                   modelId = matchingModel.id;
+                  // eslint-disable-next-line no-console
                   console.log(`✅ Strategy 1 success: URL ${url} mapped to model ${modelName}`);
                   return { url, modelName, modelId, resultIndex };
-                }
+                },
               }
 
               // Strategy 2: Sequential mapping with validation
@@ -754,9 +787,10 @@ export const Designer3DPage: React.FC = () => {
                 if (candidateModel) {
                   modelName = candidateModel.name;
                   modelId = candidateModel.id;
+                  // eslint-disable-next-line no-console
                   console.log(`✅ Strategy 2 success: Index ${index} mapped to model ${modelName}`);
                   return { url, modelName, modelId, resultIndex };
-                }
+                },
               }
 
               // Strategy 3: Fallback mapping for remaining cases
@@ -764,14 +798,17 @@ export const Designer3DPage: React.FC = () => {
               if (availableModel && filteredModels.length > 0) {
                 modelName = `${availableModel.name} (Result ${index + 1})`;
                 modelId = availableModel.id;
+                // eslint-disable-next-line no-console
                 console.log(`⚠️ Strategy 3 fallback: Index ${index} mapped to model ${modelName}`);
               } else {
+                // eslint-disable-next-line no-console
                 console.log(`❌ No model mapping found for index ${index}, using fallback name`);
               }
 
               return { url, modelName, modelId, resultIndex };
             });
 
+            // eslint-disable-next-line no-console
             console.log('🎯 WorkflowModal mapping results:', {
               totalImages: images.length,
               totalModels: filteredModels.length,

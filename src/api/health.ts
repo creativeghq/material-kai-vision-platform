@@ -67,7 +67,7 @@ export async function healthCheck(): Promise<HealthStatus> {
       details.database = 'Connected successfully';
     } else {
       details.database = `Connection error: ${error.message}`;
-    }
+    },
   } catch (error) {
     details.database = `Database check failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
@@ -85,7 +85,7 @@ export async function healthCheck(): Promise<HealthStatus> {
 
     if (memoryPercentage > 90) {
       checks.memory = 'unhealthy';
-    }
+    },
   }
 
   // Check critical dependencies
@@ -132,7 +132,7 @@ export async function readinessCheck(): Promise<ReadinessStatus> {
       details.database = 'Database is ready';
     } else {
       details.database = `Database not ready: ${error.message}`;
-    }
+    },
   } catch (error) {
     details.database = `Database check failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
@@ -182,7 +182,7 @@ export function createHealthEndpoint() {
         timestamp: new Date().toISOString(),
         error: error instanceof Error ? error.message : 'Unknown error',
       });
-    }
+    },
   };
 }
 
@@ -202,7 +202,7 @@ export function createReadinessEndpoint() {
         timestamp: new Date().toISOString(),
         error: error instanceof Error ? error.message : 'Unknown error',
       });
-    }
+    },
   };
 }
 
@@ -234,7 +234,7 @@ export async function handleHealthRequest(): Promise<Response> {
         'Cache-Control': 'no-cache',
       },
     });
-  }
+  },
 }
 
 /**
@@ -264,5 +264,5 @@ export async function handleReadinessRequest(): Promise<Response> {
         'Cache-Control': 'no-cache',
       },
     });
-  }
+  },
 }

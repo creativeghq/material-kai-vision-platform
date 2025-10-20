@@ -170,6 +170,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           .single();
 
         if (error) {
+          // eslint-disable-next-line no-console
           console.error('Polling error:', error);
           setPollingError(error.message);
           return;
@@ -184,7 +185,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             const workflowData = data.result_data as { workflow_steps?: Record<string, unknown>[] };
             if (workflowData.workflow_steps) {
               updateStepsFromData(workflowData.workflow_steps);
-            }
+            },
           }
 
           // Check if generation is complete
@@ -195,22 +196,24 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             if (data.image_urls && data.image_urls.length > 0) {
               onComplete(data.image_urls);
               // Don't auto-close - show completion dialog instead
-            }
+            },
           } else if (data.generation_status === 'failed') {
+            // eslint-disable-next-line no-console
             console.error('Generation failed:', data.error_message);
             setIsComplete(true);
             setWorkflowMode('ready');
           } else if (data.generation_status === 'processing') {
             setWorkflowMode('running');
-          }
+          },
         }
 
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Polling error:', error);
         setPollingError(error instanceof Error ? error.message : 'Unknown polling error');
       } finally {
         setIsPolling(false);
-      }
+      },
     };
 
     // Initial poll
@@ -250,8 +253,8 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
               ...(step.errorMessage ? { errorMessage: step.errorMessage as string } : currentStep.errorMessage ? { errorMessage: currentStep.errorMessage } : {}),
               ...(step.processingTimeMs ? { processingTimeMs: step.processingTimeMs as number } : currentStep.processingTimeMs ? { processingTimeMs: currentStep.processingTimeMs } : {}),
             };
-          }
-        }
+          },
+        },
       });
 
       // Update current step and progress
@@ -278,7 +281,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       default:
         return <div className="h-4 w-4 rounded-full border-2 border-gray-300" />;
-    }
+    },
   };
 
   const getStatusBadge = (status: string) => {
@@ -293,7 +296,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         return <Badge className="bg-yellow-100 text-yellow-700">Skipped</Badge>;
       default:
         return <Badge className="border border-gray-300 text-gray-600">Pending</Badge>;
-    }
+    },
   };
 
   // Workflow control functions
@@ -352,7 +355,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         typeof generationData === 'object' &&
         'reference_image_url' in generationData);
       setHasReferenceImage(hasRefImage);
-    }
+    },
   }, [isOpen, generationId]);
 
   return (

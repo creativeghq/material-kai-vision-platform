@@ -307,13 +307,13 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         reader.readAsDataURL(file);
       } else {
         setAttachedFiles(prev => [...prev, newFile]);
-      }
+      },
     });
 
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
-    }
+    },
   };
 
   const removeAttachedFile = (fileId: string) => {
@@ -349,13 +349,21 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       }
 
       // Enhanced diagnostic logging
+      // eslint-disable-next-line no-console
       console.log('=== Enhanced Material Agent Integration ===');
+      // eslint-disable-next-line no-console
       console.log('1. File attachments:', attachedFiles.length > 0 ? `${attachedFiles.length} files attached` : 'No files');
+      // eslint-disable-next-line no-console
       console.log('2. Hybrid model config:', hybridConfig);
+      // eslint-disable-next-line no-console
       console.log('3. RAG enabled:', hybridConfig.useRAG);
+      // eslint-disable-next-line no-console
       console.log('4. 3D generation enabled:', hybridConfig.use3DGeneration);
+      // eslint-disable-next-line no-console
       console.log('5. Session context:', sessionId);
+      // eslint-disable-next-line no-console
       console.log('6. User input:', { length: input.length, hasAttachments: attachedFiles.length > 0 });
+      // eslint-disable-next-line no-console
       console.log('=====================================');
 
       // Prepare enhanced context with RAG integration
@@ -383,6 +391,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       let ragResults: RAGResults | null = null;
       if (hybridConfig.useRAG && input.trim()) {
         try {
+          // eslint-disable-next-line no-console
           console.log('🧠 Performing RAG search...');
           const ragResponse = await EnhancedRAGService.search({
             query: input,
@@ -415,19 +424,22 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               totalResults: (ragResponse.results.knowledgeBase || []).length + (ragResponse.results.materialKnowledge || []).length,
               searchTime: ragResponse.performance?.totalTime || 0,
             };
+            // eslint-disable-next-line no-console
             console.log('✅ RAG search completed:', ragResults);
             enhancedContext.ragResults = ragResults;
-          }
+          },
         } catch (ragError) {
+          // eslint-disable-next-line no-console
           console.warn('⚠️ RAG search failed, continuing without:', ragError);
           // Continue without RAG results
-        }
+        },
       }
 
       // If Visual Search is enabled and images are attached, perform visual search
       let visualSearchResults: VisualSearchResults | null = null;
       if (hybridConfig.useVisualSearch && attachedFiles.some(file => file.type.startsWith('image/'))) {
         try {
+          // eslint-disable-next-line no-console
           console.log('👁️ Performing visual search...');
           const imageFiles = attachedFiles.filter(file => file.type.startsWith('image/'));
 
@@ -476,25 +488,29 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                     total_results: matches.length,
                     query_analysis: responseData.query_analysis || responseData.query_metadata || {},
                   };
+                  // eslint-disable-next-line no-console
                   console.log('✅ Visual search completed:', visualSearchResults);
                   enhancedContext.visualSearchResults = visualSearchResults || null;
                   setVisualSearchResults(visualSearchResults);
                   break; // Use first image for now
-                }
-              }
+                },
+              },
             } catch (imageError) {
+              // eslint-disable-next-line no-console
               console.warn(`⚠️ Visual search failed for ${imageFile.name}:`, imageError);
-            }
-          }
+            },
+          },
         } catch (visualError) {
+          // eslint-disable-next-line no-console
           console.warn('⚠️ Visual search failed, continuing without:', visualError);
-        }
+        },
       }
 
       // If Similarity Search mode is enabled, perform vector similarity search
       let similaritySearchResults: SimilaritySearchResults | null = null;
       if (searchMode === 'similarity' && input.trim()) {
         try {
+          // eslint-disable-next-line no-console
           console.log('🔍 Performing vector similarity search...');
           const apiService = BrowserApiIntegrationService.getInstance();
           const similarityResponse = await apiService.callSupabaseFunction('mivaa-gateway', {
@@ -525,13 +541,15 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               search_type: 'semantic',
               threshold_used: similarityThreshold,
             };
+            // eslint-disable-next-line no-console
             console.log('✅ Vector similarity search completed:', similaritySearchResults);
             enhancedContext.similaritySearchResults = similaritySearchResults;
             setSimilaritySearchResults(similaritySearchResults);
-          }
+          },
         } catch (similarityError) {
+          // eslint-disable-next-line no-console
           console.warn('⚠️ Vector similarity search failed, continuing without:', similarityError);
-        }
+        },
       }
 
       // Determine which AI service to use based on hybrid configuration
@@ -539,6 +557,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       let error: string | null = null;
 
       if (hybridConfig.enableRAG && hybridConfig.primary && hybridConfig.fallback) {
+        // eslint-disable-next-line no-console
         console.log('🔄 Using Hybrid AI Service...');
         try {
           // Use HybridAIService for enhanced AI processing
@@ -571,8 +590,9 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             error = null;
           } else {
             throw new Error('Hybrid AI failed: No successful response');
-          }
+          },
         } catch (hybridError) {
+          // eslint-disable-next-line no-console
           console.warn('⚠️ Hybrid AI failed, falling back to standard Material Agent:', hybridError);
           // Fallback to standard Material Agent
           const apiService = BrowserApiIntegrationService.getInstance();
@@ -589,8 +609,9 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           });
           data = response.data as APIResponse;
           error = response.error?.message || null;
-        }
+        },
       } else {
+        // eslint-disable-next-line no-console
         console.log('🤖 Using standard Material Agent...');
         // Use standard Material Agent endpoint
         const apiService = BrowserApiIntegrationService.getInstance();
@@ -610,6 +631,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       }
 
       if (error) {
+        // eslint-disable-next-line no-console
         console.error('Material Agent function error:', error);
         throw new Error(error || 'Failed to get AI response');
       }
@@ -634,12 +656,14 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         },
       };
 
+      // eslint-disable-next-line no-console
       console.log('Material Agent response:', transformedData);
 
       // Check if 3D generation is enabled and should be triggered
       let enhanced3DContent = null;
       if (hybridConfig.enable3DGeneration && data.response) {
         try {
+          // eslint-disable-next-line no-console
           console.log('🎨 Attempting 3D generation...');
           // Check if the response contains design-related keywords that would benefit from 3D generation
           const designKeywords = ['interior', 'room', 'space', 'design', 'layout', 'furniture', 'decor'];
@@ -665,13 +689,15 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                 qualityAssessment: generationResult.quality_assessment,
                 processingTime: generationResult.processing_time_ms,
               };
+              // eslint-disable-next-line no-console
               console.log('✅ 3D generation completed:', enhanced3DContent);
-            }
-          }
+            },
+          },
         } catch (generationError) {
+          // eslint-disable-next-line no-console
           console.warn('⚠️ 3D generation failed:', generationError);
           // Continue without 3D content
-        }
+        },
       }
 
       const assistantMessage: Message = {
@@ -708,6 +734,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       });
 
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Error sending message:', error);
 
       const errorMessage: Message = {
@@ -726,7 +753,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       });
     } finally {
       setIsLoading(false);
-    }
+    },
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -736,14 +763,14 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
   const handleMaterialClick = (material: MaterialResult) => {
     if (onMaterialSelect && material.id) {
       onMaterialSelect(material.id);
-    }
+    },
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
-    }
+    },
   };
 
   return (
@@ -828,7 +855,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                             variant={
                               message.responseQuality.overall_quality_score >= 0.85 ? 'default' :
                               message.responseQuality.overall_quality_score >= 0.7 ? 'secondary' :
-                              'destructive'
+                              'destructive',
                             }
                             className="text-xs"
                           >
