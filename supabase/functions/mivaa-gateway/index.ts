@@ -47,21 +47,16 @@ async function handleFileUpload(req: Request): Promise<Response> {
     console.log('📦 Processing file upload for RAG')
 
     // Get the form data from the request
-    const incomingFormData = await req.formData()
+    const formData = await req.formData()
 
     // Log form data fields (without file content)
-    const fields: string[] = []
-    for (const [key] of incomingFormData.entries()) {
-      fields.push(key)
-    }
-    console.log('📋 Form fields:', fields)
-
-    // Create new FormData to forward to MIVAA
-    // We need to reconstruct it because Deno's FormData might not be directly forwardable
-    const outgoingFormData = new FormData()
-
-    for (const [key, value] of incomingFormData.entries()) {
-      outgoingFormData.append(key, value)
+    console.log('📋 Form fields:')
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`  ${key}: File(${value.name}, ${value.size} bytes)`)
+      } else {
+        console.log(`  ${key}: ${value}`)
+      }
     }
 
     // Forward the form data to MIVAA RAG upload endpoint
@@ -73,7 +68,7 @@ async function handleFileUpload(req: Request): Promise<Response> {
       headers: {
         'Authorization': `Bearer ${MIVAA_API_KEY}`,
       },
-      body: outgoingFormData,
+      body: formData,
     })
 
     console.log(`📥 MIVAA Response: ${response.status} ${response.statusText}`)
