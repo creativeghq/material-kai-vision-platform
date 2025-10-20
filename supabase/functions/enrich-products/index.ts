@@ -11,6 +11,10 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+// Anthropic API configuration
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+
 /**
  * Product Enrichment Edge Function
  * Enriches chunks with product metadata and descriptions
@@ -66,11 +70,18 @@ Deno.serve(async (req) => {
       return createErrorResponse('No chunks found', 404);
     }
 
-    // Enrich each chunk
+    // Enrich each chunk using Anthropic Claude
     const enrichments = [];
     for (const chunk of chunks) {
-      const enrichment = enrichChunk(chunk, workspace_id, rules);
-      enrichments.push(enrichment);
+      try {
+        const enrichment = await enrichChunkWithClaude(chunk, workspace_id, rules);
+        enrichments.push(enrichment);
+      } catch (error) {
+        console.error(`Failed to enrich chunk ${chunk.id} with Claude:`, error);
+        // Fallback to basic enrichment
+        const enrichment = enrichChunk(chunk, workspace_id, rules);
+        enrichments.push(enrichment);
+      }
     }
 
     // Insert enrichments into database
@@ -105,7 +116,106 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Enrich a single chunk with product data
+ * Enrich a single chunk with product data using Anthropic Claude
+ */
+async function enrichChunkWithClaude(chunk: any, workspaceId: string, rules: any) {
+  if (!ANTHROPIC_API_KEY) {
+    // Fallback to basic enrichment if API key not available
+    return enrichChunk(chunk, workspaceId, rules);
+  }
+
+  try {
+    const content = chunk.content || '';
+
+    const prompt = `You are an expert product analyst and technical writer. Analyze this product content and provide comprehensive enrichment:
+
+CONTENT TO ANALYZE:
+${content}
+
+Provide enrichment in JSON format:
+{
+  "product_name": "<primary product name>",
+  "product_category": "<category>",
+  "product_description": "<1-2 sentence summary>",
+  "specifications": {
+    "<spec_name>": "<value>",
+    "<spec_name>": "<value>"
+  },
+  "related_products": ["<related_product_1>", "<related_product_2>"],
+  "confidence_score": <0-1>,
+  "key_features": ["<feature1>", "<feature2>"],
+  "use_cases": ["<use_case1>", "<use_case2>"]
+}
+
+Focus on:
+1. Accurate product identification
+2. Clear, professional descriptions
+3. Comprehensive specifications
+4. Related products that complement this one
+5. High confidence only if information is clear`;
+
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 2048,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const enrichmentText = data.content[0].text;
+    const enrichmentData = JSON.parse(enrichmentText);
+
+    const confidenceScore = enrichmentData.confidence_score || 0;
+    const enrichmentStatus =
+      confidenceScore >= 0.7
+        ? 'enriched'
+        : confidenceScore >= 0.4
+          ? 'partial'
+          : 'failed';
+
+    return {
+      chunk_id: chunk.id,
+      workspace_id: workspaceId,
+      enrichment_status: enrichmentStatus,
+      product_name: enrichmentData.product_name || '',
+      product_category: enrichmentData.product_category || '',
+      product_description: enrichmentData.product_description || '',
+      specifications: enrichmentData.specifications || {},
+      related_products: enrichmentData.related_products || [],
+      confidence_score: confidenceScore,
+      enrichment_score: confidenceScore,
+      enriched_at: new Date().toISOString(),
+      metadata: {
+        key_features: enrichmentData.key_features,
+        use_cases: enrichmentData.use_cases,
+        model_used: 'claude-3-5-sonnet-20241022',
+      },
+    };
+  } catch (error) {
+    console.error('Claude enrichment failed:', error);
+    // Fallback to basic enrichment
+    return enrichChunk(chunk, workspaceId, rules);
+  }
+}
+
+/**
+ * Enrich a single chunk with product data (basic enrichment)
  */
 function enrichChunk(chunk: any, workspaceId: string, rules: any) {
   const content = chunk.content || '';

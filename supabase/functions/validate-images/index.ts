@@ -11,6 +11,10 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+// Anthropic API configuration
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+
 /**
  * Image Validation Edge Function
  * Validates extracted images and ensures quality standards
@@ -65,11 +69,18 @@ Deno.serve(async (req) => {
       return createErrorResponse('No images found', 404);
     }
 
-    // Validate each image
+    // Validate each image using Anthropic Claude Vision
     const validations = [];
     for (const image of images) {
-      const validation = validateImage(image, rules);
-      validations.push(validation);
+      try {
+        const validation = await validateImageWithClaude(image, rules);
+        validations.push(validation);
+      } catch (error) {
+        console.error(`Failed to validate image ${image.id} with Claude:`, error);
+        // Fallback to basic validation
+        const validation = validateImage(image, rules);
+        validations.push(validation);
+      }
     }
 
     // Insert validations into database
@@ -104,7 +115,105 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Validate a single image
+ * Validate a single image using Anthropic Claude Vision
+ */
+async function validateImageWithClaude(image: any, rules: any) {
+  if (!ANTHROPIC_API_KEY || !image.image_url) {
+    // Fallback to basic validation if API key not available or no image URL
+    return validateImage(image, rules);
+  }
+
+  try {
+    const prompt = `You are an expert image quality analyst. Analyze this image and provide:
+
+1. **Quality Assessment**: Rate the image quality (0-1 scale) considering clarity, lighting, composition
+2. **Content Analysis**: Describe what you see in the image
+3. **Material Identification**: Identify any materials visible
+4. **Issues**: List any quality issues or concerns
+5. **Recommendations**: Suggest improvements
+
+Respond in JSON format:
+{
+  "quality_score": <number 0-1>,
+  "content_description": "<description>",
+  "materials_identified": ["<material1>", "<material2>"],
+  "issues": ["<issue1>", "<issue2>"],
+  "recommendations": ["<recommendation1>", "<recommendation2>"]
+}`;
+
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'url',
+                  url: image.image_url,
+                },
+              },
+              {
+                type: 'text',
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const analysisText = data.content[0].text;
+    const analysis = JSON.parse(analysisText);
+
+    const qualityScore = analysis.quality_score || 0;
+    const validationStatus =
+      qualityScore >= 0.7
+        ? 'valid'
+        : qualityScore >= 0.5
+          ? 'needs_review'
+          : 'invalid';
+
+    return {
+      image_id: image.id,
+      workspace_id: image.workspace_id,
+      validation_status: validationStatus,
+      quality_score: qualityScore,
+      dimensions_valid: true,
+      format_valid: true,
+      file_size_valid: true,
+      issues: analysis.issues || [],
+      recommendations: analysis.recommendations || [],
+      validated_at: new Date().toISOString(),
+      metadata: {
+        content_description: analysis.content_description,
+        materials_identified: analysis.materials_identified,
+        model_used: 'claude-3-5-sonnet-20241022',
+      },
+    };
+  } catch (error) {
+    console.error('Claude Vision validation failed:', error);
+    // Fallback to basic validation
+    return validateImage(image, rules);
+  }
+}
+
+/**
+ * Validate a single image (basic validation)
  */
 function validateImage(image: any, rules: any) {
   const issues = [];

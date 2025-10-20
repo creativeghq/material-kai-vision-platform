@@ -95,6 +95,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pagination state for chunks
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+
   const [activeTab, setActiveTab] = useState('overview');
   const { toast } = useToast();
 
@@ -132,21 +136,31 @@ export const MaterialKnowledgeBase: React.FC = () => {
       if (imagesError) throw imagesError;
       setImages(imagesData || []);
 
-      // Load embeddings with chunk information - FIX: Get actual embedding metadata
-      const { data: embeddingsData, error: embeddingsError } = await supabase
+      // Load embeddings - query both embeddings and document_vectors tables
+      // First try document_vectors (primary), then fall back to embeddings table
+      let embeddingsData: any[] = [];
+
+      const { data: vectorsData, error: vectorsError } = await supabase
         .from('document_vectors')
-        .select(`
-          *,
-          document_chunks!inner(
-            id,
-            document_id,
-            content,
-            chunk_index
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (embeddingsError) throw embeddingsError;
+      if (!vectorsError && vectorsData && vectorsData.length > 0) {
+        embeddingsData = vectorsData;
+      } else {
+        // Fall back to embeddings table
+        const { data: embeddingsTableData, error: embeddingsError } = await supabase
+          .from('embeddings')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (embeddingsError) {
+          console.warn('Failed to load embeddings:', embeddingsError);
+        } else {
+          embeddingsData = embeddingsTableData || [];
+        }
+      }
+
       setEmbeddings(embeddingsData || []);
 
       // Load products created from PDF chunks
@@ -233,6 +247,17 @@ export const MaterialKnowledgeBase: React.FC = () => {
         Math.abs(c.chunk_index - chunk.chunk_index) <= 2
       )
       .slice(0, limit);
+  };
+
+  // Pagination helpers
+  const getPaginatedChunks = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredChunks.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(filteredChunks.length / itemsPerPage);
   };
 
   const getDocumentDisplayName = (chunk: DocumentChunk) => {
@@ -410,7 +435,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
           <TabsTrigger value="chunks">Chunks ({stats?.totalChunks || 0})</TabsTrigger>
           <TabsTrigger value="images">Images ({stats?.totalImages || 0})</TabsTrigger>
           <TabsTrigger value="embeddings">Embeddings ({stats?.totalEmbeddings || 0})</TabsTrigger>
-          <TabsTrigger value="products">📦 Products</TabsTrigger>
+          <TabsTrigger value="products">📦 Products ({products.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -529,7 +554,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {filteredChunks.map((chunk) => {
+                  {/* Pagination Info */}
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredChunks.length)} of {filteredChunks.length} chunks
+                    </span>
+                  </div>
+
+                  {/* Chunks List */}
+                  {getPaginatedChunks().map((chunk) => {
                     const relatedImages = getImagesByChunk(chunk.id);
                     const embedding = getEmbeddingByChunk(chunk.id);
 
@@ -703,6 +736,44 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       </Collapsible>
                     );
                   })}
+
+                  {/* Pagination Controls */}
+                  {getTotalPages() > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+
+                      {/* Numeric pagination */}
+                      <div className="flex gap-1">
+                        {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setCurrentPage(page)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
+                        disabled={currentPage === getTotalPages()}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

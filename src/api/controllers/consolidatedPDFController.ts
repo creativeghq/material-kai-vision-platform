@@ -228,7 +228,7 @@ export class AuthenticationHelper {
 
       return authResult.authContext;
     } catch (error) {
-      console.error('Authentication error:', error);
+      // Authentication error - return unauthenticated state
       return { isAuthenticated: false };
     }
   }
@@ -248,7 +248,7 @@ export class AuthenticationHelper {
       // JWT tokens have full access by default
       return true;
     } catch (error) {
-      console.error('Endpoint access check error:', error);
+      // Endpoint access check error - deny access
       return false;
     }
   }
@@ -281,8 +281,7 @@ export class RateLimitHelper {
         .or(`ip_address.eq.${clientIP}${userId ? `,user_id.eq.${userId}` : ''}`);
 
       if (error) {
-        console.error('Rate limit check error:', error);
-        // Allow on error to avoid blocking legitimate requests
+        // Rate limit check error - allow on error to avoid blocking legitimate requests
         return {
           allowed: true,
           limit: rateLimit,
@@ -335,10 +334,10 @@ export class RateLimitHelper {
           response_status: responseStatus ?? null,
           response_time_ms: responseTime ?? null,
           is_internal_request: await apiGatewayService.isInternalIP(clientIP),
-          rate_limit_exceeded: rateLimitExceeded ?? false
+          rate_limit_exceeded: rateLimitExceeded ?? false,
         });
     } catch (error) {
-      console.error('Failed to log API usage:', error);
+      // Failed to log API usage - continue without logging
     }
   }
 }
@@ -374,7 +373,7 @@ export class ConsolidatedPDFController {
    */
   async initialize(): Promise<void> {
     await this.mivaaService.initialize();
-    console.log('ConsolidatedPDFController initialized successfully');
+    // ConsolidatedPDFController initialized successfully
   }
 
   /**

@@ -290,6 +290,20 @@ export class ConsolidatedPDFWorkflowService {
         status: 'pending',
         details: [],
       },
+      {
+        id: 'anthropic-image-validation',
+        name: 'Anthropic Image Validation',
+        description: 'Validate extracted images using Claude 3.5 Sonnet Vision',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'anthropic-product-enrichment',
+        name: 'Anthropic Product Enrichment',
+        description: 'Enrich product data using Claude 3.5 Sonnet',
+        status: 'pending',
+        details: [],
+      },
     ];
   }
 
@@ -410,26 +424,27 @@ export class ConsolidatedPDFWorkflowService {
           ],
         });
 
-        // Use bulk processing for all PDFs (more reliable and consistent)
+        // Use RAG upload endpoint for full LlamaIndex processing with image extraction and embeddings
         this.updateJobStep(jobId, 'mivaa-processing', {
           progress: 25,
           details: [
             'Initializing MIVAA processing...',
             'Preparing document for analysis',
-            'Sending document to MIVAA service...',
-            '🔄 Using MIVAA bulk processing for reliable handling...',
+            'Sending document to MIVAA RAG service...',
+            '🔄 Using MIVAA RAG upload for full processing with images and embeddings...',
           ],
         });
 
-        const response = await this.callMivaaGatewayDirect('bulk_process', {
-          urls: [processingRequest.fileUrl],
-          batch_size: 1,
-          processing_options: {
-            extract_text: true,
-            extract_images: processingRequest.options.includeImages !== false,
-            extract_tables: true,
-          }
-        });
+        // Convert File to FormData for RAG upload endpoint
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('title', file.name);
+        formData.append('enable_embedding', 'true');
+        formData.append('chunk_size', String(processingRequest.options.chunkSize || 1000));
+        formData.append('chunk_overlap', String(processingRequest.options.overlap || 200));
+
+        // Call RAG upload endpoint directly (not through gateway, as it requires multipart/form-data)
+        const response = await this.callMivaaRagUpload(formData);
 
         // Check for MIVAA gateway errors in the response data (direct call format)
         if (!response.success && response.error) {
@@ -748,6 +763,171 @@ export class ConsolidatedPDFWorkflowService {
             qualityAssessmentCompleted: true,
           },
         };
+      });
+
+      // Step 9: Anthropic Image Validation
+      await this.executeStep(jobId, 'anthropic-image-validation', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for image validation'),
+              ],
+              metadata: {
+                imageValidationSkipped: true,
+              },
+            };
+          }
+
+          // Fetch images for this document
+          const { data: images } = await supabase
+            .from('document_images')
+            .select('*')
+            .eq('document_id', documentId);
+
+          if (!images || images.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No images found to validate'),
+              ],
+              metadata: {
+                imagesValidated: 0,
+              },
+            };
+          }
+
+          // Call Anthropic image validation endpoint
+          const { data: { user } } = await supabase.auth.getUser();
+          const response = await fetch(
+            `${(import.meta as any).env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr'}/api/v1/anthropic/images/validate`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${(import.meta as any).env?.VITE_MIVAA_API_KEY || ''}`,
+              },
+              body: JSON.stringify({
+                image_ids: images.map((img: any) => img.id),
+                workspace_id: user?.id || 'default',
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Image validation failed: ${response.statusText}`);
+          }
+
+          const validationResult = await response.json();
+
+          return {
+            details: [
+              this.createSuccessDetail(`Validated ${images.length} images using Claude Vision`),
+              this.createSuccessDetail(`Valid images: ${validationResult.stats?.valid || 0}`),
+              this.createSuccessDetail(`Images needing review: ${validationResult.stats?.needs_review || 0}`),
+              this.createSuccessDetail('Anthropic Claude 3.5 Sonnet Vision used'),
+            ],
+            metadata: {
+              imagesValidated: images.length,
+              validationStats: validationResult.stats,
+            },
+          };
+        } catch (error) {
+          console.warn('Anthropic image validation failed:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Image validation skipped: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              imageValidationError: true,
+            },
+          };
+        }
+      });
+
+      // Step 10: Anthropic Product Enrichment
+      await this.executeStep(jobId, 'anthropic-product-enrichment', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for product enrichment'),
+              ],
+              metadata: {
+                productEnrichmentSkipped: true,
+              },
+            };
+          }
+
+          // Fetch chunks for this document
+          const { data: chunks } = await supabase
+            .from('document_chunks')
+            .select('*')
+            .eq('document_id', documentId)
+            .limit(100); // Limit to first 100 chunks for enrichment
+
+          if (!chunks || chunks.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No chunks found to enrich'),
+              ],
+              metadata: {
+                chunksEnriched: 0,
+              },
+            };
+          }
+
+          // Call Anthropic product enrichment endpoint
+          const { data: { user } } = await supabase.auth.getUser();
+          const response = await fetch(
+            `${(import.meta as any).env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr'}/api/v1/anthropic/products/enrich`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${(import.meta as any).env?.VITE_MIVAA_API_KEY || ''}`,
+              },
+              body: JSON.stringify({
+                chunk_ids: chunks.map((chunk: any) => chunk.id),
+                workspace_id: user?.id || 'default',
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Product enrichment failed: ${response.statusText}`);
+          }
+
+          const enrichmentResult = await response.json();
+
+          return {
+            details: [
+              this.createSuccessDetail(`Enriched ${chunks.length} chunks using Claude Sonnet`),
+              this.createSuccessDetail(`Enriched products: ${enrichmentResult.stats?.enriched || 0}`),
+              this.createSuccessDetail(`Partial enrichments: ${enrichmentResult.stats?.partial || 0}`),
+              this.createSuccessDetail('Anthropic Claude 3.5 Sonnet used'),
+            ],
+            metadata: {
+              chunksEnriched: chunks.length,
+              enrichmentStats: enrichmentResult.stats,
+            },
+          };
+        } catch (error) {
+          console.warn('Anthropic product enrichment failed:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Product enrichment skipped: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              productEnrichmentError: true,
+            },
+          };
+        }
       });
 
       console.log(`MIVAA PDF workflow completed successfully for: ${file.name}`);
@@ -1143,51 +1323,10 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       // Note: Images should have been fetched from Supabase above
-      // If still no images but metadata shows they exist, create placeholder records
+      // If no images found, log warning but don't create placeholders
       if (images.length === 0 && imagesCount > 0) {
         console.warn(`⚠️ Metadata shows ${imagesCount} images should exist, but none were found in database for document ${documentId}`);
-        console.warn(`Creating placeholder image records based on metadata count...`);
-
-        // Create placeholder image records so the UI knows images were detected
-        // This helps track that images were extracted even if they're not fully stored
-        try {
-          const placeholderImages = [];
-          for (let i = 0; i < Math.min(imagesCount, 50); i++) { // Limit to 50 to avoid too many inserts
-            placeholderImages.push({
-              document_id: documentId,
-              workspace_id: user.id,
-              image_url: `placeholder_image_${documentId}_${i}`,
-              image_type: 'extracted',
-              page_number: Math.floor(i / 5) + 1, // Estimate ~5 images per page
-              confidence: 0.5, // Lower confidence for placeholders
-              caption: `Image ${i + 1} (extracted by MIVAA)`,
-              alt_text: `Extracted image ${i + 1}`,
-              processing_status: 'extracted_not_stored',
-              metadata: {
-                source: 'mivaa_pdf_processing',
-                placeholder: true,
-                reason: 'MIVAA extracted images but did not store them in database',
-                total_images_detected: imagesCount,
-                image_index: i
-              }
-            });
-          }
-
-          if (placeholderImages.length > 0) {
-            const { error: placeholderError } = await supabase
-              .from('document_images')
-              .insert(placeholderImages);
-
-            if (!placeholderError) {
-              console.log(`✅ Created ${placeholderImages.length} placeholder image records`);
-              images = placeholderImages;
-            } else {
-              console.error(`❌ Failed to create placeholder images:`, placeholderError);
-            }
-          }
-        } catch (placeholderError) {
-          console.error('❌ Error creating placeholder images:', placeholderError);
-        }
+        console.warn(`This indicates MIVAA LlamaIndex processing did not extract/store images. Check MIVAA service logs.`);
       }
 
       // Final validation - only throw error if we still have no data after fallback
@@ -1320,28 +1459,10 @@ export class ConsolidatedPDFWorkflowService {
               // Continue processing even if quality scoring fails
             }
 
-            // Generate and store embedding for this chunk
-            try {
-              // For now, create a placeholder embedding
-              // In a real implementation, you'd call an embedding service
-              const embedding = Array.from({ length: 1536 }, () => Math.random() - 0.5);
-
-              const { error: embeddingError } = await supabase
-                .from('embeddings')
-                .insert({
-                  chunk_id: chunkId,
-                  workspace_id: user.id,
-                  embedding: embedding,
-                  model_name: 'text-embedding-3-small',
-                  dimensions: 1536
-                });
-
-              if (!embeddingError) {
-                embeddingsStored++;
-              }
-            } catch (embeddingError) {
-              console.warn('Failed to store embedding:', embeddingError);
-            }
+            // Note: Embeddings are generated by MIVAA LlamaIndex service during processing
+            // They are stored in document_vectors table by the MIVAA backend
+            // No need to generate placeholders here - if embeddings are missing,
+            // it means MIVAA processing didn't complete properly
           }
         }
       }
@@ -2042,6 +2163,96 @@ export class ConsolidatedPDFWorkflowService {
       const genericError = error instanceof Error ? error.message : String(error);
       console.error('❌ MIVAA gateway error:', genericError);
       throw new Error(`MIVAA gateway error: ${genericError}`);
+    }
+  }
+
+  /**
+   * Call MIVAA RAG upload endpoint directly for full LlamaIndex processing
+   * This endpoint stores images and embeddings to the database
+   */
+  private async callMivaaRagUpload(formData: FormData): Promise<any> {
+    const mivaaServiceUrl = 'https://v1api.materialshub.gr';
+    const mivaaApiKey = (import.meta as any).env?.VITE_MIVAA_API_KEY || Deno.env.get('MIVAA_API_KEY') || '';
+
+    if (!mivaaApiKey) {
+      throw new Error('MIVAA API key not configured');
+    }
+
+    const url = `${mivaaServiceUrl}/api/v1/rag/documents/upload`;
+
+    try {
+      // Add timeout to prevent hanging requests (10 minutes for PDF processing)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error('🚨 RAG upload request timeout after 10 minutes');
+        controller.abort();
+      }, 600000); // 10 minute timeout for PDF processing
+
+      console.log(`🔍 Making MIVAA RAG upload request:`, {
+        url,
+        timestamp: new Date().toISOString()
+      });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${mivaaApiKey}`,
+        },
+        body: formData,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log(`🔍 MIVAA RAG upload response:`, {
+        status: response.status,
+        statusText: response.statusText,
+        timestamp: new Date().toISOString()
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`MIVAA RAG upload failed: HTTP ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      // Check for application-level errors
+      if (!data.success && data.error) {
+        throw new Error(`MIVAA RAG upload failed: ${data.error.message || 'Unknown error'}`);
+      }
+
+      return {
+        success: true,
+        data: data.data || data,
+        error: null
+      };
+    } catch (error) {
+      console.error('MIVAA RAG upload failed:', error);
+
+      // Provide specific error messages based on error type
+      if (error instanceof Error && error.name === 'AbortError') {
+        const timeoutError = 'MIVAA RAG upload timed out after 10 minutes. This PDF appears to be very complex or large. Please try with a smaller PDF or contact support for assistance with large documents.';
+        console.error('🚨 Request timeout:', timeoutError);
+        throw new Error(timeoutError);
+      }
+
+      if (error instanceof Error && error.message.includes('Failed to fetch')) {
+        const networkError = 'Network connection failed. Please check your internet connection and try again.';
+        console.error('🌐 Network error:', networkError);
+        throw new Error(networkError);
+      }
+
+      if (error instanceof Error && error.message.includes('401')) {
+        const authError = 'Authentication failed. Please check your MIVAA API key configuration.';
+        console.error('🔐 Auth error:', authError);
+        throw new Error(authError);
+      }
+
+      // Generic error with helpful message
+      const genericError = error instanceof Error ? error.message : String(error);
+      console.error('❌ MIVAA RAG upload error:', genericError);
+      throw new Error(`MIVAA RAG upload error: ${genericError}`);
     }
   }
 
