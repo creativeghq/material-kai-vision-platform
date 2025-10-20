@@ -1,4 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+// Legacy Next.js API route - not used in Vite app
+type NextApiRequest = any;
+type NextApiResponse = any;
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -10,13 +12,6 @@ interface CategoryExtractionRequest {
     includeContext?: boolean;
     confidenceThreshold?: number;
   };
-}
-
-interface CategoryExtractionResult {
-  category_key: string;
-  confidence: number;
-  extracted_from: string;
-  context: string;
 }
 
 export default async function handler(

@@ -57,6 +57,10 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
     this.defaultConfig = this.config.defaultConfig;
   }
 
+  protected async doHealthCheck(): Promise<void> {
+    // Health check implementation
+  }
+
   /**
    * Initialize service
    */

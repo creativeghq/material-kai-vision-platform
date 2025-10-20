@@ -52,11 +52,22 @@ export class AnthropicProductEnrichmentService extends BaseService<ServiceConfig
     if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY environment variable is required');
     }
+  }
 
-    this.anthropicClient = new Anthropic({ apiKey });
+  protected async doHealthCheck(): Promise<void> {
+    // Health check implementation - just verify the service is ready
+    if (!this.anthropicClient) {
+      throw new Error('Anthropic client not initialized');
+    }
   }
 
   protected async doInitialize(): Promise<void> {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY environment variable is required');
+    }
+
+    this.anthropicClient = new Anthropic({ apiKey });
     console.log('AnthropicProductEnrichmentService initialized');
   }
 

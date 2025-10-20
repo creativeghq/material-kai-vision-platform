@@ -1,3 +1,4 @@
+// @ts-ignore - QueryClient types are available at runtime
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 

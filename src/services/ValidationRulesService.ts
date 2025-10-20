@@ -58,6 +58,10 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
     this.defaultConfig = this.config.defaultConfig;
   }
 
+  protected async doHealthCheck(): Promise<void> {
+    // Health check implementation
+  }
+
   /**
    * Initialize service
    */

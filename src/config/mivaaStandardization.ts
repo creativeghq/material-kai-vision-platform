@@ -94,7 +94,7 @@ export const StandardMivaaPayloadSchema = z.object({
     language: z.string().optional(),
     quality: z.enum(['standard', 'high']).optional(),
   }).passthrough().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -200,9 +200,6 @@ export class MivaaPayloadTransformer {
       throw new Error(`Unknown MIVAA action: ${action}`);
     }
 
-    // Base MIVAA payload
-    const mivaaPayload: any = {};
-
     // Handle different endpoint requirements
     if (action === 'pdf_process_document') {
       return {
@@ -251,7 +248,7 @@ export class MivaaPayloadTransformer {
     return 'url';
   }
 
-  private static transformOptions(legacyPayload: any, action: string): StandardMivaaPayload['options'] {
+  private static transformOptions(legacyPayload: any, _action: string): StandardMivaaPayload['options'] {
     const options: StandardMivaaPayload['options'] = {};
 
     // Extract common options
@@ -320,15 +317,4 @@ export class MivaaErrorHandler {
 // =============================================================================
 // EXPORTS
 // =============================================================================
-
-export type {
-  StandardMivaaPayload,
-  StandardMivaaResponse,
-};
-
-export {
-  StandardMivaaPayloadSchema,
-  MIVAA_ACTION_MAP,
-  MivaaPayloadTransformer,
-  MivaaErrorHandler,
-};
+// All exports are already declared inline above

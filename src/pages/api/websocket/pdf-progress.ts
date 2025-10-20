@@ -5,7 +5,9 @@
  * In production, you would use a dedicated WebSocket server.
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+// Legacy Next.js API route - not used in Vite app
+type NextApiRequest = any;
+type NextApiResponse = any;
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {

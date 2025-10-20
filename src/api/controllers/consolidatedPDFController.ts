@@ -703,7 +703,7 @@ export class ConsolidatedPDFController {
         success: false,
         error: 'PDF processing failed',
         code: 'PROCESSING_ERROR',
-        data: { message: error instanceof Error ? error.message : 'Unknown error' },
+        data: { message: _error instanceof Error ? _error.message : 'Unknown error' },
         timestamp: new Date().toISOString(),
       };
     }

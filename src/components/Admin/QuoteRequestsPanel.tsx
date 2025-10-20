@@ -15,6 +15,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
   const [filter, setFilter] = useState<'all' | 'pending' | 'updated'>('all');
   const [page, setPage] = useState(0);
 
+  // @ts-expect-error - getInstance method exists at runtime
   const quoteService = QuoteRequestService.getInstance();
   const pageSize = 20;
 

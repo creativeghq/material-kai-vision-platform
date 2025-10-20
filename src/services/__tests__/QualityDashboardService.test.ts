@@ -237,9 +237,9 @@ describe('QualityDashboardService', () => {
   });
 
   describe('Service Health', () => {
-    it('should report service health', () => {
+    it('should report service health', async () => {
       try {
-        const health = service.getHealth();
+        const health = await service.getHealth();
         if (health) {
           expect(health.status).toBeDefined();
           expect(['healthy', 'degraded', 'unhealthy']).toContain(health.status);

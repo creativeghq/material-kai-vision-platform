@@ -693,7 +693,7 @@ export function validateMaterialBatch(materials: Partial<Material>[]): {
       isValid: allErrors.length === 0,
       errors: allErrors,
       warnings: allWarnings,
-    }
+    },
     individual: individualResults,
     summary,
   };

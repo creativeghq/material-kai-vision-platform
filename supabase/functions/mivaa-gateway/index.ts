@@ -38,6 +38,104 @@ const MIVAA_ENDPOINTS = {
   'openapi_json': { path: '/openapi.json', method: 'GET' },
 }
 
+/**
+ * Handle file upload for RAG processing
+ * Forwards multipart/form-data to MIVAA RAG upload endpoint
+ */
+async function handleFileUpload(req: Request): Promise<Response> {
+  try {
+    console.log('📦 Processing file upload for RAG')
+
+    // Get the form data from the request
+    const formData = await req.formData()
+
+    // Log form data fields (without file content)
+    const fields: string[] = []
+    for (const [key] of formData.entries()) {
+      fields.push(key)
+    }
+    console.log('📋 Form fields:', fields)
+
+    // Forward the form data to MIVAA RAG upload endpoint
+    const mivaaUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/upload`
+    console.log(`📡 Forwarding to MIVAA: POST ${mivaaUrl}`)
+
+    const response = await fetch(mivaaUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+      },
+      body: formData,
+    })
+
+    console.log(`📥 MIVAA Response: ${response.status} ${response.statusText}`)
+
+    const responseText = await response.text()
+
+    // Try to parse as JSON
+    let responseData
+    try {
+      responseData = JSON.parse(responseText)
+      console.log('📊 Response data:', responseData)
+    } catch (parseError) {
+      console.error('❌ Failed to parse response as JSON:', responseText.substring(0, 500))
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid response from MIVAA',
+          details: responseText.substring(0, 200),
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (!response.ok) {
+      console.error(`❌ MIVAA returned error: ${response.status}`)
+      return new Response(
+        JSON.stringify({
+          error: 'MIVAA processing failed',
+          status: response.status,
+          details: responseData,
+        }),
+        {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Return successful response
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: responseData,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ File upload error:', errorMessage)
+
+    return new Response(
+      JSON.stringify({
+        error: 'File upload failed',
+        message: errorMessage,
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -45,6 +143,15 @@ serve(async (req) => {
   }
 
   try {
+    const contentType = req.headers.get('content-type') || ''
+
+    // Handle multipart/form-data for file uploads (RAG upload endpoint)
+    if (contentType.includes('multipart/form-data')) {
+      console.log('🚀 MIVAA Gateway: Handling multipart/form-data file upload')
+      return await handleFileUpload(req)
+    }
+
+    // Handle regular JSON requests
     const { action, payload } = await req.json()
 
     console.log(`🚀 MIVAA Gateway Request: ${action}`, payload)
@@ -173,8 +280,11 @@ serve(async (req) => {
         responseData = JSON.parse(responseText)
         console.log(`📥 MIVAA Response: ${response.status}`, responseData)
       } catch (parseError) {
-        // If JSON parsing fails, it's likely an HTML error page
-        console.error(`❌ Failed to parse MIVAA response as JSON. Response text: ${responseText.substring(0, 500)}`)
+        // If JSON parsing fails, it's likely an HTML error page or invalid JSON
+        console.error(`❌ Failed to parse MIVAA response as JSON`)
+        console.error(`❌ Response status: ${response.status} ${response.statusText}`)
+        console.error(`❌ Response text (first 1000 chars): ${responseText.substring(0, 1000)}`)
+        console.error(`❌ Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
         throw new Error(`MIVAA API returned non-JSON response: ${response.status} ${response.statusText}. Response: ${responseText.substring(0, 200)}`)
       }
     }

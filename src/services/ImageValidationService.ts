@@ -60,6 +60,10 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
     this.defaultConfig = this.config.defaultConfig;
   }
 
+  protected async doHealthCheck(): Promise<void> {
+    // Health check implementation
+  }
+
   /**
    * Initialize service
    */

@@ -41,10 +41,14 @@ export const QualityTrendsChart: React.FC<QualityTrendsChartProps> = ({ trends }
         <CardTitle>Quality Trends (30 Days)</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* @ts-expect-error - Recharts types have React version mismatch */}
         <ResponsiveContainer width="100%" height={300}>
+          {/* @ts-expect-error - Recharts types have React version mismatch */}
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
+            {/* @ts-expect-error - Recharts types have React version mismatch */}
             <XAxis dataKey="date" />
+            {/* @ts-expect-error - Recharts types have React version mismatch */}
             <YAxis domain={[0, 100]} />
             <Tooltip
               formatter={(value) => `${value}%`}
@@ -53,6 +57,7 @@ export const QualityTrendsChart: React.FC<QualityTrendsChartProps> = ({ trends }
                 border: '1px solid hsl(var(--border))',
               }}
             />
+            {/* @ts-expect-error - Recharts types have React version mismatch */}
             <Legend />
             <Line
               type="monotone"

@@ -489,8 +489,8 @@ export class ConsolidatedPDFWorkflowService {
           chunk_overlap: processingRequest.options.overlap || 200,
         });
 
-        // Call RAG upload endpoint directly (not through gateway, as it requires multipart/form-data)
-        console.log(`🚀 [MIVAA] Calling MIVAA RAG upload endpoint...`);
+        // Call RAG upload endpoint through Supabase edge function (supports multipart/form-data)
+        console.log(`🚀 [MIVAA] Calling MIVAA RAG upload via edge function...`);
         const response = await this.callMivaaRagUpload(formData);
         console.log(`📥 [MIVAA] RAG upload response:`, response);
 
@@ -2236,25 +2236,19 @@ export class ConsolidatedPDFWorkflowService {
   }
 
   /**
-   * Call MIVAA RAG upload endpoint directly for full LlamaIndex processing
+   * Call MIVAA RAG upload endpoint through Supabase edge function
    * This endpoint stores images and embeddings to the database
+   * Uses edge function to keep API key secure on server side
    */
   private async callMivaaRagUpload(formData: FormData): Promise<any> {
-    const mivaaServiceUrl = 'https://v1api.materialshub.gr';
-    const mivaaApiKey = (import.meta as any).env?.VITE_MIVAA_API_KEY || Deno.env.get('MIVAA_API_KEY') || '';
+    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+    const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 
-    console.log(`🔑 [MIVAA RAG] Checking API key...`);
-    console.log(`🔑 [MIVAA RAG] API key present: ${!!mivaaApiKey}`);
-    if (mivaaApiKey) {
-      console.log(`🔑 [MIVAA RAG] API key length: ${mivaaApiKey.length} characters`);
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration not found');
     }
 
-    if (!mivaaApiKey) {
-      console.error(`❌ [MIVAA RAG] MIVAA API key not configured!`);
-      throw new Error('MIVAA API key not configured');
-    }
-
-    const url = `${mivaaServiceUrl}/api/v1/rag/documents/upload`;
+    const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
     console.log(`🌐 [MIVAA RAG] Target URL: ${url}`);
 
     try {
@@ -2265,17 +2259,17 @@ export class ConsolidatedPDFWorkflowService {
         controller.abort();
       }, 600000); // 10 minute timeout for PDF processing
 
-      console.log('🚀 [MIVAA RAG] Making MIVAA RAG upload request:', {
+      console.log('🚀 [MIVAA RAG] Making MIVAA RAG upload request via edge function:', {
         url,
         timestamp: new Date().toISOString(),
         method: 'POST',
-        hasAuth: !!mivaaApiKey,
+        hasAuth: !!supabaseKey,
       });
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${mivaaApiKey}`,
+          'Authorization': `Bearer ${supabaseKey}`,
         },
         body: formData,
         signal: controller.signal,

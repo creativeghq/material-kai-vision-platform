@@ -16,6 +16,7 @@
     "test:workflow:comprehensive": "node scripts/testing/comprehensive-workflow-testing.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.67.0",
     "@hookform/resolvers": "^5.2.1",
     "@huggingface/transformers": "^3.7.4",
     "@radix-ui/react-accordion": "^1.2.12",
