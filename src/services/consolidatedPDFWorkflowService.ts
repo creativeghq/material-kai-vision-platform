@@ -2030,7 +2030,6 @@ export class ConsolidatedPDFWorkflowService {
                 // Don't fail the entire process if category extraction fails
               }
             }
-            }
 
             // Complete WebSocket tracking with final statistics (only if workflow job ID is available)
             if (workflowJobId) {
@@ -2075,8 +2074,6 @@ export class ConsolidatedPDFWorkflowService {
           } else {
             console.warn(`Unknown MIVAA job status: ${status}`);
           }
-        } else {
-          console.warn('Failed to get job status');
         }
 
         // Wait 5 seconds before next poll
