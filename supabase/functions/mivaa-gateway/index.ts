@@ -59,9 +59,9 @@ async function handleFileUpload(req: Request): Promise<Response> {
       }
     }
 
-    // Forward the form data to MIVAA RAG upload endpoint
-    const mivaaUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/upload`
-    console.log(`📡 Forwarding to MIVAA: POST ${mivaaUrl}`)
+    // Forward the form data to MIVAA RAG async upload endpoint
+    const mivaaUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/upload-async`
+    console.log(`📡 Forwarding to MIVAA async endpoint: POST ${mivaaUrl}`)
 
     const response = await fetch(mivaaUrl, {
       method: 'POST',
@@ -96,6 +96,79 @@ async function handleFileUpload(req: Request): Promise<Response> {
         }),
         {
           status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Check if response is 202 Accepted (async job started)
+    if (response.status === 202) {
+      console.log('📋 Async job started, polling for completion...')
+
+      const jobId = responseData.job_id
+      const statusUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/job/${jobId}`
+
+      // Poll for job completion (max 2 minutes, check every 2 seconds)
+      const maxAttempts = 60
+      const pollInterval = 2000
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+
+        console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}...`)
+
+        const statusResponse = await fetch(statusUrl, {
+          headers: {
+            'Authorization': `Bearer ${MIVAA_API_KEY}`,
+          },
+        })
+
+        if (!statusResponse.ok) {
+          console.error(`❌ Failed to get job status: ${statusResponse.status}`)
+          continue
+        }
+
+        const jobData = await statusResponse.json()
+        console.log(`📊 Job status: ${jobData.status}, progress: ${jobData.progress}%`)
+
+        if (jobData.status === 'completed') {
+          console.log('✅ Job completed successfully!')
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: jobData.result,
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        } else if (jobData.status === 'failed') {
+          console.error('❌ Job failed:', jobData.error)
+          return new Response(
+            JSON.stringify({
+              error: 'Document processing failed',
+              details: jobData.error,
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+      }
+
+      // Timeout - job didn't complete in time
+      console.error('⏱️  Job polling timed out')
+      return new Response(
+        JSON.stringify({
+          error: 'Processing timeout',
+          message: 'Document processing is taking longer than expected. Please check job status later.',
+          job_id: jobId,
+          status_url: `/api/rag/documents/job/${jobId}`,
+        }),
+        {
+          status: 408,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
