@@ -79,7 +79,14 @@ async function handleFileUpload(req: Request): Promise<Response> {
     let responseData
     try {
       responseData = JSON.parse(responseText)
-      console.log('📊 Response data:', responseData)
+      console.log('📊 Response data:', JSON.stringify(responseData, null, 2))
+
+      // Check if MIVAA returned an error status even with HTTP 200
+      if (responseData.status === 'error') {
+        console.error('⚠️  MIVAA returned status="error" even though HTTP status is 200')
+        console.error('⚠️  Error details:', responseData.error || 'No error details provided')
+        console.error('⚠️  Message:', responseData.message)
+      }
     } catch (parseError) {
       console.error('❌ Failed to parse response as JSON:', responseText.substring(0, 500))
       return new Response(
@@ -109,7 +116,8 @@ async function handleFileUpload(req: Request): Promise<Response> {
       )
     }
 
-    // Return successful response
+    // Return successful response (even if MIVAA has internal errors)
+    // The frontend will need to check responseData.status
     return new Response(
       JSON.stringify({
         success: true,
