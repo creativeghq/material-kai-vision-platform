@@ -108,8 +108,9 @@ async function handleFileUpload(req: Request): Promise<Response> {
       const jobId = responseData.job_id
       const statusUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/job/${jobId}`
 
-      // Poll for job completion (max 2 minutes, check every 2 seconds)
-      const maxAttempts = 60
+      // Poll for job completion (max 4 minutes, check every 2 seconds)
+      // Edge function has 150-second timeout, so we can poll for ~140 seconds max
+      const maxAttempts = 70
       const pollInterval = 2000
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
