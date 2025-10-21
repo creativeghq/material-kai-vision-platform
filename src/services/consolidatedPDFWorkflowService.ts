@@ -1854,33 +1854,53 @@ export class ConsolidatedPDFWorkflowService {
 
   /**
    * Poll MIVAA job status until completion
+   * @param jobIdOrMivaaJobId - Either the workflow job ID or MIVAA job ID
+   * @param mivaaJobId - Optional MIVAA job ID if first param is workflow job ID
    */
-  private async pollMivaaJobStatus(jobId: string, mivaaJobId: string): Promise<any> {
+  private async pollMivaaJobStatus(jobIdOrMivaaJobId: string, mivaaJobId?: string): Promise<any> {
+    // Determine which ID is which
+    const workflowJobId = mivaaJobId ? jobIdOrMivaaJobId : undefined;
+    const actualMivaaJobId = mivaaJobId || jobIdOrMivaaJobId;
+
     const maxAttempts = 120; // 10 minutes max (5 second intervals)
     let attempts = 0;
 
     while (attempts < maxAttempts) {
       try {
-        // Use direct job status endpoint (this works correctly)
-        const statusResponse = await this.callMivaaGatewayDirect('get_job_status', { job_id: mivaaJobId });
+        // Use new edge function job status endpoint
+        const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+        const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+
+        const statusUrl = `${supabaseUrl}/functions/v1/mivaa-gateway/job-status/${actualMivaaJobId}`;
+
+        const statusResponse = await fetch(statusUrl, {
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+        });
+
+        if (!statusResponse.ok) {
+          console.error(`❌ Failed to get job status: ${statusResponse.status}`);
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          continue;
+        }
+
+        const responseData = await statusResponse.json();
+        const jobData = responseData.data;
 
         console.log(`🔍 MIVAA job status check (attempt ${attempts + 1}):`, {
-          success: statusResponse.success,
-          jobId: mivaaJobId,
-          status: statusResponse.data?.status,
-          progress: statusResponse.data?.progress_percentage,
-          chunks: statusResponse.data?.details?.chunks_created || statusResponse.data?.parameters?.chunks_created,
-          images: statusResponse.data?.details?.images_extracted || statusResponse.data?.parameters?.images_extracted,
-          currentPage: statusResponse.data?.details?.current_page || statusResponse.data?.parameters?.current_page,
-          totalPages: statusResponse.data?.details?.total_pages || statusResponse.data?.parameters?.total_pages,
+          jobId: actualMivaaJobId,
+          status: jobData?.status,
+          progress: jobData?.progress,
         });
 
         // Extract progress details from MIVAA response
-        let progressPercentage = statusResponse.data?.progress_percentage || 0;
-        const currentPage = statusResponse.data?.details?.current_page || statusResponse.data?.parameters?.current_page || 0;
-        const totalPages = statusResponse.data?.details?.total_pages || statusResponse.data?.parameters?.total_pages || 0;
-        const chunksCreated = statusResponse.data?.details?.chunks_created || statusResponse.data?.parameters?.chunks_created || 0;
-        const imagesExtracted = statusResponse.data?.details?.images_extracted || statusResponse.data?.parameters?.images_extracted || 0;
+        let progressPercentage = jobData?.progress || 0;
+        const currentPage = 0; // Not available in new format
+        const totalPages = 0; // Not available in new format
+        const chunksCreated = 0; // Will be available when completed
+        const imagesExtracted = 0; // Will be available when completed
 
         // Calculate progress based on pages processed if MIVAA doesn't provide percentage
         if (!progressPercentage && totalPages > 0 && currentPage > 0) {
@@ -1895,52 +1915,52 @@ export class ConsolidatedPDFWorkflowService {
         // Calculate frontend progress: map MIVAA 0-100% to our 30-90% range
         const frontendProgress = 30 + (progressPercentage / 100) * 60;
 
-        // Update progress with real-time page and count information
-        this.updateJobStep(jobId, 'mivaa-processing', {
-          progress: Math.round(frontendProgress),
-          details: [
-            'Initializing MIVAA processing...',
-            'Preparing document for analysis',
-            'Sending document to MIVAA service...',
-            `✅ Job started with ID: ${mivaaJobId}`,
-            `⏳ Processing PDF (${Math.round(progressPercentage)}% complete)`,
-            ...(totalPages > 0 ? [`📄 Pages: ${currentPage}/${totalPages} processed`] : []),
-            ...(chunksCreated > 0 ? [`📝 Chunks Generated: ${chunksCreated}`] : []),
-            ...(imagesExtracted > 0 ? [`🖼️ Images Extracted: ${imagesExtracted}`] : []),
-          ],
-        });
+        // Update progress with real-time information (only if workflow job ID is available)
+        if (workflowJobId) {
+          this.updateJobStep(workflowJobId, 'mivaa-processing', {
+            progress: Math.round(frontendProgress),
+            details: [
+              'Initializing MIVAA processing...',
+              'Preparing document for analysis',
+              'Sending document to MIVAA service...',
+              `✅ Job started with ID: ${actualMivaaJobId}`,
+              `⏳ Processing PDF (${Math.round(progressPercentage)}% complete)`,
+            ],
+          });
+        }
 
-        if (statusResponse.success && statusResponse.data) {
-          const job = statusResponse.data;
-          const status = job.status;
+        if (jobData) {
+          const status = jobData.status;
 
           if (status === 'completed') {
-            // Extract actual processing results from job details
-            const details = job.details || {};
-            const parameters = job.parameters || {};
-            const results = details.results || parameters.results || [];
+            // Extract actual processing results from job result
+            const result = jobData.result || {};
+            const details = result.details || {};
+            const parameters = result.parameters || {};
 
-            const chunksCreated = details.chunks_created || parameters.chunks_created || 0;
-            const imagesExtracted = details.images_extracted || parameters.images_extracted || 0;
-            const textLength = details.text_length || parameters.text_length || 0;
+            const chunksCreated = details.chunks_created || parameters.chunks_created || result.chunks_created || 0;
+            const imagesExtracted = details.images_extracted || parameters.images_extracted || result.images_extracted || 0;
+            const textLength = details.text_length || parameters.text_length || result.text_length || 0;
             const kbEntries = details.kb_entries_saved || parameters.kb_entries_saved || 0;
-            const documentId = details.document_id || parameters.document_id;
+            const documentId = details.document_id || parameters.document_id || result.document_id;
 
-            // Job completed successfully
-            this.updateJobStep(jobId, 'mivaa-processing', {
+            // Job completed successfully (only update if workflow job ID is available)
+            if (workflowJobId) {
+              this.updateJobStep(workflowJobId, 'mivaa-processing', {
               progress: 90,
               details: [
                 'Initializing MIVAA processing...',
                 'Preparing document for analysis',
                 'Sending document to MIVAA service...',
-                `✅ Job started with ID: ${mivaaJobId}`,
+                `✅ Job started with ID: ${actualMivaaJobId}`,
                 '✅ Processing completed successfully!',
                 `📝 Generated ${chunksCreated} text chunks`,
                 `🖼️ Extracted ${imagesExtracted} images`,
                 `📄 Processed ${textLength} characters of text`,
                 `💾 Created ${kbEntries} knowledge base entries`,
               ],
-            });
+              });
+            }
 
             // Extract categories from processed content
             if (documentId) {
@@ -1981,46 +2001,51 @@ export class ConsolidatedPDFWorkflowService {
                     categories: extractedCategories.categories.map(c => c.categoryKey),
                   });
 
-                  // Update WebSocket service with category extraction statistics
-                  pdfProcessingWebSocketService.updateJobStatistics(jobId, {
-                    categoriesExtracted: extractedCategories.categories.length,
-                  });
+                  // Update WebSocket service with category extraction statistics (only if workflow job ID is available)
+                  if (workflowJobId) {
+                    pdfProcessingWebSocketService.updateJobStatistics(workflowJobId, {
+                      categoriesExtracted: extractedCategories.categories.length,
+                    });
 
-                  // Add category extraction to processing details
-                  this.updateJobStep(jobId, 'mivaa-processing', {
-                    progress: 95,
-                    details: [
-                      'Initializing MIVAA processing...',
-                      'Preparing document for analysis',
-                      'Sending document to MIVAA service...',
-                      `✅ Job started with ID: ${mivaaJobId}`,
-                      '✅ Processing completed successfully!',
-                      `📝 Generated ${chunksCreated} text chunks`,
-                      `🖼️ Extracted ${imagesExtracted} images`,
-                      `📄 Processed ${textLength} characters of text`,
-                      `💾 Created ${kbEntries} knowledge base entries`,
-                      `🏷️ Extracted ${extractedCategories.categories.length} categories`,
-                    ],
-                  });
+                    // Add category extraction to processing details
+                    this.updateJobStep(workflowJobId, 'mivaa-processing', {
+                      progress: 95,
+                      details: [
+                        'Initializing MIVAA processing...',
+                        'Preparing document for analysis',
+                        'Sending document to MIVAA service...',
+                        `✅ Job started with ID: ${actualMivaaJobId}`,
+                        '✅ Processing completed successfully!',
+                        `📝 Generated ${chunksCreated} text chunks`,
+                        `🖼️ Extracted ${imagesExtracted} images`,
+                        `📄 Processed ${textLength} characters of text`,
+                        `💾 Created ${kbEntries} knowledge base entries`,
+                        `🏷️ Extracted ${extractedCategories.categories.length} categories`,
+                      ],
+                    });
+                  }
                 }
               } catch (categoryError) {
                 console.error('⚠️ Category extraction failed:', categoryError);
                 // Don't fail the entire process if category extraction fails
               }
             }
+            }
 
-            // Complete WebSocket tracking with final statistics
-            pdfProcessingWebSocketService.completeJob(jobId, {
-              chunksCreated,
-              imagesExtracted,
-              textLength,
-              kbEntriesSaved: kbEntries,
-            });
+            // Complete WebSocket tracking with final statistics (only if workflow job ID is available)
+            if (workflowJobId) {
+              pdfProcessingWebSocketService.completeJob(workflowJobId, {
+                chunksCreated,
+                imagesExtracted,
+                textLength,
+                kbEntriesSaved: kbEntries,
+              });
+            }
 
             // Return the actual processing results
             return {
               success: true,
-              job_id: mivaaJobId,
+              job_id: actualMivaaJobId,
               document_id: documentId,
               status: 'completed',
               message: 'Async processing completed successfully',
@@ -2037,67 +2062,21 @@ export class ConsolidatedPDFWorkflowService {
                 images_extracted: imagesExtracted,
                 text_length: textLength,
                 kb_entries_saved: kbEntries,
-                processing_method: 'mivaa_bulk',
+                processing_method: 'mivaa_async',
               },
-              sources: results,
             };
           } else if (status === 'failed' || status === 'error') {
             // Job failed
-            const errorMessage = job.error_message || job.error || 'Processing failed';
+            const errorMessage = jobData.error || jobData.error_message || 'Processing failed';
             throw new Error(`MIVAA job failed: ${errorMessage}`);
           } else if (status === 'processing' || status === 'pending' || status === 'running') {
-            // Job still running, show real-time progress
-            const details = job.details || {};
-            const parameters = job.parameters || {};
-            const progress = job.progress_percentage || 0;
-            const currentStep = job.current_step || details.current_step || 'Processing...';
-            const chunksCreated = details.chunks_created || parameters.chunks_created || 0;
-            const imagesExtracted = details.images_extracted || parameters.images_extracted || 0;
-            const textLength = details.text_length || parameters.text_length || 0;
-            const pagesProcessed = details.pages_processed || parameters.pages_processed || 0;
-            const totalPages = details.total_pages || parameters.total_pages || 0;
-            const currentPage = details.current_page || parameters.current_page || 0;
-
-            // Calculate frontend progress (30% to 90% range)
-            const frontendProgress = 30 + Math.min(60, (progress / 100) * 60);
-
-            // Build detailed progress information
-            const progressDetails = [
-              'Initializing MIVAA processing...',
-              'Preparing document for analysis',
-              'Sending document to MIVAA service...',
-              `✅ Job started with ID: ${mivaaJobId}`,
-              `⏳ ${currentStep} (${Math.round(frontendProgress)}% complete)`,
-            ];
-
-            // Add page progress if available
-            if (totalPages > 0) {
-              progressDetails.push(`📄 Pages: ${pagesProcessed}/${totalPages} processed`);
-              if (currentPage > 0) {
-                progressDetails.push(`📍 Currently processing page ${currentPage}`);
-              }
-            }
-
-            // Add generation counts
-            progressDetails.push(`📝 Chunks Generated: ${chunksCreated}`);
-            progressDetails.push(`🖼️ Images Extracted: ${imagesExtracted}`);
-
-            if (textLength > 0) {
-              progressDetails.push(`📊 Text Processed: ${(textLength / 1000).toFixed(1)}K characters`);
-            }
-
-            // Update progress with real-time data
-            this.updateJobStep(jobId, 'mivaa-processing', {
-              progress: frontendProgress,
-              details: progressDetails,
-            });
-
-            console.log(`MIVAA job ${mivaaJobId} status: ${status}, progress: ${progress}%, pages: ${pagesProcessed}/${totalPages}, chunks: ${chunksCreated}, images: ${imagesExtracted}`);
+            // Job still running, continue polling
+            console.log(`MIVAA job ${actualMivaaJobId} status: ${status}, progress: ${progressPercentage}%`);
           } else {
             console.warn(`Unknown MIVAA job status: ${status}`);
           }
         } else {
-          console.warn('Failed to get job status:', statusResponse);
+          console.warn('Failed to get job status');
         }
 
         // Wait 5 seconds before next poll
@@ -2108,24 +2087,28 @@ export class ConsolidatedPDFWorkflowService {
         console.error(`Error polling MIVAA job status (attempt ${attempts + 1}):`, error);
         attempts++;
 
-        // Update job with polling error details
-        this.updateJobStep(jobId, 'mivaa-processing', {
-          progress: Math.max(30, Math.min(80, 30 + (attempts / maxAttempts) * 50)),
-          details: [
-            `⏳ Polling attempt ${attempts}/${maxAttempts}`,
-            `⚠️ Temporary polling error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            '🔄 Retrying in 5 seconds...',
-          ],
-        });
+        // Update job with polling error details (only if workflow job ID is available)
+        if (workflowJobId) {
+          this.updateJobStep(workflowJobId, 'mivaa-processing', {
+            progress: Math.max(30, Math.min(80, 30 + (attempts / maxAttempts) * 50)),
+            details: [
+              `⏳ Polling attempt ${attempts}/${maxAttempts}`,
+              `⚠️ Temporary polling error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              '🔄 Retrying in 5 seconds...',
+            ],
+          });
+        }
 
         if (attempts >= maxAttempts) {
           const timeoutError = `MIVAA job polling failed after ${maxAttempts} attempts (${maxAttempts * 5} seconds). The PDF processing may still be running in the background. Please check back later or contact support.`;
-          this.updateJobStep(jobId, 'mivaa-processing', {
-            status: 'failed',
-            progress: 0,
-            details: [this.createErrorDetail('Polling Timeout', timeoutError)],
-            error: timeoutError,
-          });
+          if (workflowJobId) {
+            this.updateJobStep(workflowJobId, 'mivaa-processing', {
+              status: 'failed',
+              progress: 0,
+              details: [this.createErrorDetail('Polling Timeout', timeoutError)],
+              error: timeoutError,
+            });
+          }
           throw new Error(timeoutError);
         }
 
@@ -2135,12 +2118,14 @@ export class ConsolidatedPDFWorkflowService {
     }
 
     const timeoutError = `MIVAA job polling timed out after ${maxAttempts} attempts (${maxAttempts * 5} seconds). The PDF processing may still be running in the background.`;
-    this.updateJobStep(jobId, 'mivaa-processing', {
-      status: 'failed',
-      progress: 0,
-      details: [this.createErrorDetail('Processing Timeout', timeoutError)],
-      error: timeoutError,
-    });
+    if (workflowJobId) {
+      this.updateJobStep(workflowJobId, 'mivaa-processing', {
+        status: 'failed',
+        progress: 0,
+        details: [this.createErrorDetail('Processing Timeout', timeoutError)],
+        error: timeoutError,
+      });
+    }
     throw new Error(timeoutError);
   }
 
@@ -2293,6 +2278,21 @@ export class ConsolidatedPDFWorkflowService {
       console.log(`📦 [MIVAA RAG] Parsing response JSON...`);
       const data = await response.json();
       console.log(`✅ [MIVAA RAG] Response data:`, data);
+
+      // Check if async processing (HTTP 202)
+      if (response.status === 202 && data.success && data.data?.job_id) {
+        console.log(`📋 [MIVAA RAG] Async job started with ID: ${data.data.job_id}`);
+        console.log(`🔄 [MIVAA RAG] Starting polling for job completion...`);
+
+        // Poll for job completion
+        const jobResult = await this.pollMivaaJobStatus(data.data.job_id);
+
+        return {
+          success: true,
+          data: jobResult,
+          error: null,
+        };
+      }
 
       // Check for application-level errors
       if (!data.success && data.error) {

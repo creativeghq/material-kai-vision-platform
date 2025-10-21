@@ -103,73 +103,23 @@ async function handleFileUpload(req: Request): Promise<Response> {
 
     // Check if response is 202 Accepted (async job started)
     if (response.status === 202) {
-      console.log('📋 Async job started, polling for completion...')
+      console.log('📋 Async job started, returning job ID to frontend for polling')
 
       const jobId = responseData.job_id
-      const statusUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/job/${jobId}`
 
-      // Poll for job completion (max 4 minutes, check every 2 seconds)
-      // Edge function has 150-second timeout, so we can poll for ~140 seconds max
-      const maxAttempts = 70
-      const pollInterval = 2000
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval))
-
-        console.log(`🔄 Polling attempt ${attempt + 1}/${maxAttempts}...`)
-
-        const statusResponse = await fetch(statusUrl, {
-          headers: {
-            'Authorization': `Bearer ${MIVAA_API_KEY}`,
-          },
-        })
-
-        if (!statusResponse.ok) {
-          console.error(`❌ Failed to get job status: ${statusResponse.status}`)
-          continue
-        }
-
-        const jobData = await statusResponse.json()
-        console.log(`📊 Job status: ${jobData.status}, progress: ${jobData.progress}%`)
-
-        if (jobData.status === 'completed') {
-          console.log('✅ Job completed successfully!')
-          return new Response(
-            JSON.stringify({
-              success: true,
-              data: jobData.result,
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
-          )
-        } else if (jobData.status === 'failed') {
-          console.error('❌ Job failed:', jobData.error)
-          return new Response(
-            JSON.stringify({
-              error: 'Document processing failed',
-              details: jobData.error,
-            }),
-            {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
-          )
-        }
-      }
-
-      // Timeout - job didn't complete in time
-      console.error('⏱️  Job polling timed out')
+      // Return job ID immediately to frontend
+      // Frontend will poll for status using the job status endpoint
       return new Response(
         JSON.stringify({
-          error: 'Processing timeout',
-          message: 'Document processing is taking longer than expected. Please check job status later.',
-          job_id: jobId,
-          status_url: `/api/rag/documents/job/${jobId}`,
+          success: true,
+          data: {
+            job_id: jobId,
+            status: 'pending',
+            message: 'Document processing started. Use job_id to check status.',
+          },
         }),
         {
-          status: 408,
+          status: 202,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
@@ -221,6 +171,67 @@ async function handleFileUpload(req: Request): Promise<Response> {
   }
 }
 
+/**
+ * Handle job status check
+ * Forwards to MIVAA job status endpoint
+ */
+async function handleJobStatus(jobId: string): Promise<Response> {
+  try {
+    console.log(`🔍 Checking job status for: ${jobId}`)
+
+    const statusUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/job/${jobId}`
+
+    const response = await fetch(statusUrl, {
+      headers: {
+        'Authorization': `Bearer ${MIVAA_API_KEY}`,
+      },
+    })
+
+    if (!response.ok) {
+      console.error(`❌ Failed to get job status: ${response.status}`)
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to get job status',
+          details: `MIVAA returned ${response.status}`,
+        }),
+        {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const jobData = await response.json()
+    console.log(`📊 Job status: ${jobData.status}`)
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: jobData,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ Job status check error:', errorMessage)
+
+    return new Response(
+      JSON.stringify({
+        error: 'Job status check failed',
+        details: errorMessage,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -228,7 +239,16 @@ serve(async (req) => {
   }
 
   try {
+    const url = new URL(req.url)
     const contentType = req.headers.get('content-type') || ''
+
+    // Handle job status check via URL path
+    // Example: /job-status/abc-123-def
+    if (url.pathname.startsWith('/job-status/')) {
+      const jobId = url.pathname.replace('/job-status/', '')
+      console.log('🚀 MIVAA Gateway: Handling job status check')
+      return await handleJobStatus(jobId)
+    }
 
     // Handle multipart/form-data for file uploads (RAG upload endpoint)
     if (contentType.includes('multipart/form-data')) {
