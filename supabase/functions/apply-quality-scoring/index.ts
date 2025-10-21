@@ -216,13 +216,169 @@ function scoreChunk(
   };
 }
 
+// ✅ NEW: Product Quality Scoring Functions
+interface ProductQualityData {
+  product_id: string;
+  quality_score: number;
+  confidence_score: number;
+  completeness_score: number;
+  quality_metrics: {
+    name_quality: number;
+    description_quality: number;
+    metadata_richness: number;
+    specification_completeness: number;
+    overall_score: number;
+  };
+  quality_assessment: string;
+}
+
+function scoreProduct(
+  productId: string,
+  name: string,
+  description: string,
+  longDescription: string,
+  specifications: any,
+  metadata: any
+): ProductQualityData {
+  // Name quality (0-1)
+  const nameQuality = calculateProductNameQuality(name);
+
+  // Description quality (0-1)
+  const descriptionQuality = calculateProductDescriptionQuality(description, longDescription);
+
+  // Metadata richness (0-1)
+  const metadataRichness = calculateProductMetadataRichness(metadata);
+
+  // Specification completeness (0-1)
+  const specificationCompleteness = calculateProductSpecificationCompleteness(specifications);
+
+  // Overall quality score
+  const overallScore = (
+    nameQuality * 0.25 +
+    descriptionQuality * 0.35 +
+    metadataRichness * 0.2 +
+    specificationCompleteness * 0.2
+  );
+
+  // Confidence based on data availability
+  const confidenceScore = calculateProductConfidence(name, description, specifications, metadata);
+
+  // Completeness based on required fields
+  const completenessScore = calculateProductCompleteness(name, description, specifications);
+
+  return {
+    product_id: productId,
+    quality_score: Math.round(overallScore * 100) / 100,
+    confidence_score: Math.round(confidenceScore * 100) / 100,
+    completeness_score: Math.round(completenessScore * 100) / 100,
+    quality_metrics: {
+      name_quality: nameQuality,
+      description_quality: descriptionQuality,
+      metadata_richness: metadataRichness,
+      specification_completeness: specificationCompleteness,
+      overall_score: overallScore,
+    },
+    quality_assessment: getQualityAssessment(overallScore),
+  };
+}
+
+function calculateProductNameQuality(name: string): number {
+  if (!name || name.length === 0) return 0;
+
+  // Check for meaningful name (not just "Product" or "Untitled")
+  const genericNames = ['product', 'untitled', 'item', 'material', 'unknown'];
+  const isGeneric = genericNames.some(generic =>
+    name.toLowerCase().includes(generic.toLowerCase())
+  );
+
+  if (isGeneric) return 0.3;
+
+  // Length and structure quality
+  const lengthScore = Math.min(name.length / 50, 1); // Optimal around 50 chars
+  const hasUppercase = /[A-Z]/.test(name) ? 1 : 0.8;
+  const hasNumbers = /\d/.test(name) ? 1 : 0.9; // Product codes are good
+
+  return (lengthScore * 0.5 + hasUppercase * 0.3 + hasNumbers * 0.2);
+}
+
+function calculateProductDescriptionQuality(description: string, longDescription: string): number {
+  const desc = description || '';
+  const longDesc = longDescription || '';
+  const combinedLength = desc.length + longDesc.length;
+
+  if (combinedLength === 0) return 0;
+
+  // Length quality (optimal 100-500 chars)
+  const lengthScore = combinedLength < 50 ? combinedLength / 50 :
+                     combinedLength > 500 ? Math.max(0.7, 1 - (combinedLength - 500) / 1000) : 1;
+
+  // Content quality indicators
+  const hasSpecifications = /\d+\s*(mm|cm|inch|x|×)/.test(desc + longDesc) ? 1 : 0.7;
+  const hasMaterials = /(ceramic|porcelain|tile|wood|metal|glass|stone)/.test(desc + longDesc) ? 1 : 0.8;
+  const hasFeatures = /(design|collection|series|finish|color|texture)/.test(desc + longDesc) ? 1 : 0.8;
+
+  return (lengthScore * 0.4 + hasSpecifications * 0.25 + hasMaterials * 0.2 + hasFeatures * 0.15);
+}
+
+function calculateProductMetadataRichness(metadata: any): number {
+  if (!metadata || typeof metadata !== 'object') return 0;
+
+  const keys = Object.keys(metadata);
+  const valueCount = keys.filter(key =>
+    metadata[key] !== null &&
+    metadata[key] !== undefined &&
+    metadata[key] !== ''
+  ).length;
+
+  // Score based on number of meaningful metadata fields
+  return Math.min(valueCount / 10, 1); // Optimal around 10 fields
+}
+
+function calculateProductSpecificationCompleteness(specifications: any): number {
+  if (!specifications || typeof specifications !== 'object') return 0;
+
+  const importantSpecs = ['dimensions', 'material', 'finish', 'color', 'size', 'weight'];
+  const availableSpecs = importantSpecs.filter(spec =>
+    specifications[spec] !== null &&
+    specifications[spec] !== undefined &&
+    specifications[spec] !== ''
+  ).length;
+
+  return availableSpecs / importantSpecs.length;
+}
+
+function calculateProductConfidence(name: string, description: string, specifications: any, metadata: any): number {
+  const hasName = name && name.length > 0 ? 1 : 0;
+  const hasDescription = description && description.length > 0 ? 1 : 0;
+  const hasSpecs = specifications && Object.keys(specifications).length > 0 ? 1 : 0;
+  const hasMetadata = metadata && Object.keys(metadata).length > 0 ? 1 : 0;
+
+  return (hasName * 0.4 + hasDescription * 0.3 + hasSpecs * 0.2 + hasMetadata * 0.1);
+}
+
+function calculateProductCompleteness(name: string, description: string, specifications: any): number {
+  const requiredFields = [
+    name && name.length > 0,
+    description && description.length > 0,
+    specifications && Object.keys(specifications).length > 0
+  ];
+
+  const completedFields = requiredFields.filter(Boolean).length;
+  return completedFields / requiredFields.length;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { document_id } = await req.json();
+    const {
+      document_id,
+      include_products = false,
+      include_images = false,
+      comprehensive = false
+    } = await req.json();
 
     if (!document_id) {
       return new Response(
@@ -230,6 +386,9 @@ serve(async (req) => {
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
+
+    console.log(`🎯 Enhanced quality scoring for document: ${document_id}`);
+    console.log(`📋 Options: products=${include_products}, images=${include_images}, comprehensive=${comprehensive}`);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") || "",
@@ -313,14 +472,98 @@ serve(async (req) => {
       }
     }
 
-    console.log(`✅ Quality scoring completed: ${scoredCount}/${allChunks.length} chunks scored`);
+    console.log(`✅ Chunk quality scoring completed: ${scoredCount}/${allChunks.length} chunks scored`);
+
+    // ✅ NEW: Product Quality Scoring
+    let scoredProducts = 0;
+    let totalProducts = 0;
+
+    if (include_products) {
+      console.log(`🏷️ Starting product quality scoring...`);
+
+      // Fetch all products for the document
+      const { data: allProducts, error: productsError } = await supabase
+        .from("products")
+        .select("id, name, description, long_description, specifications, metadata")
+        .eq("source_document_id", document_id);
+
+      if (productsError) {
+        console.error("Error fetching products:", productsError);
+      } else if (allProducts && allProducts.length > 0) {
+        console.log(`📊 Found ${allProducts.length} products to score`);
+        totalProducts = allProducts.length;
+
+        for (let i = 0; i < allProducts.length; i++) {
+          const product = allProducts[i];
+          try {
+            const productQualityData = scoreProduct(
+              product.id,
+              product.name || "",
+              product.description || "",
+              product.long_description || "",
+              product.specifications || {},
+              product.metadata || {}
+            );
+
+            const { error: updateError } = await supabase
+              .from("products")
+              .update({
+                quality_score: productQualityData.quality_score,
+                confidence_score: productQualityData.confidence_score,
+                completeness_score: productQualityData.completeness_score,
+                quality_metrics: productQualityData.quality_metrics,
+                quality_assessment: productQualityData.quality_assessment,
+              })
+              .eq("id", product.id);
+
+            if (!updateError) {
+              scoredProducts++;
+            } else {
+              console.error(`Failed to update product ${product.id}:`, updateError);
+            }
+
+            if ((i + 1) % 10 === 0) {
+              console.log(`📊 Scored ${i + 1}/${allProducts.length} products`);
+            }
+          } catch (error) {
+            console.error(`Error scoring product ${product.id}:`, error);
+          }
+        }
+      }
+
+      console.log(`✅ Product quality scoring completed: ${scoredProducts}/${totalProducts} products scored`);
+    }
+
+    // Calculate overall document quality score
+    let documentQualityScore = 0;
+    if (scoredCount > 0) {
+      const { data: avgChunkQuality } = await supabase
+        .from("document_chunks")
+        .select("coherence_score")
+        .eq("document_id", document_id)
+        .not("coherence_score", "is", null);
+
+      if (avgChunkQuality && avgChunkQuality.length > 0) {
+        const avgScore = avgChunkQuality.reduce((sum: number, chunk: any) =>
+          sum + (chunk.coherence_score || 0), 0) / avgChunkQuality.length;
+        documentQualityScore = Math.round(avgScore * 100) / 100;
+      }
+    }
 
     return new Response(
       JSON.stringify({
-        message: "Quality scoring completed",
+        message: "Enhanced quality scoring completed",
         document_id,
         total_chunks: allChunks.length,
         scored_chunks: scoredCount,
+        total_products: totalProducts,
+        scored_products: scoredProducts,
+        document_quality_score: documentQualityScore,
+        options: {
+          include_products,
+          include_images,
+          comprehensive
+        }
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
