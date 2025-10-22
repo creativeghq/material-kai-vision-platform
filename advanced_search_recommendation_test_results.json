@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-10-22T12:45:30.210Z",
+  "testConfig": {
+    "WORKSPACE_ID": "ffafc28b-1b8b-4b0d-b226-9f9a6154004e",
+    "TEST_USER_ID": "test-user-1761137128829",
+    "SUPABASE_URL": "https://bgbavxtjlbvgplozizxu.supabase.co",
+    "ADVANCED_SEARCH_FUNCTION_URL": "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/advanced-search-recommendation",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjkwMDI5NzQsImV4cCI6MjA0NDU3ODk3NH0.Ej8JQl6Ej8JQl6Ej8JQl6Ej8JQl6Ej8JQl6Ej8JQl6",
+    "verbose": true
+  },
+  "results": {
+    "multiModalSearch": {
+      "textSearch": false,
+      "hybridSearch": false,
+      "multimodalSearch": false,
+      "performanceGood": true
+    },
+    "recommendations": {
+      "contentBased": false,
+      "trending": false,
+      "qualityBased": false,
+      "diversityGood": false
+    },
+    "userBehavior": {
+      "interactionTracking": false,
+      "preferencesUpdate": false,
+      "behaviorProfile": false,
+      "analytics": true
+    },
+    "performance": {
+      "searchSpeed": 67,
+      "recommendationSpeed": 64,
+      "overallGrade": "Excellent"
+    },
+    "overallSuccess": false
+  },
+  "summary": {
+    "overallSuccess": false,
+    "multiModalSearchPassed": false,
+    "recommendationsPassed": false,
+    "userBehaviorPassed": false,
+    "performanceGrade": "Excellent"
+  }
+}
