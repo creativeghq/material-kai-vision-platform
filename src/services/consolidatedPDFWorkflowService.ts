@@ -9,6 +9,7 @@ import { MetafieldService } from './metafieldService';
 import { EntityRelationshipService } from './entityRelationshipService';
 import { fallbackEmbeddingService } from './fallbackEmbeddingService';
 import { MultiModalImageProductAssociationService } from './multiModalImageProductAssociationService';
+import { CanonicalMetadataSchemaService } from './canonicalMetadataSchemaService';
 
 
 // Define interfaces locally to avoid importing from React components
@@ -319,6 +320,13 @@ export class ConsolidatedPDFWorkflowService {
         id: 'multi-modal-association',
         name: 'Multi-Modal Image-Product Association',
         description: 'Create intelligent image-product links using spatial, caption, and CLIP similarity',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'canonical-metadata-extraction',
+        name: 'Canonical Metadata Extraction',
+        description: 'Extract comprehensive metadata using canonical schema with 120+ fields',
         status: 'pending',
         details: [],
       },
@@ -1048,6 +1056,115 @@ export class ConsolidatedPDFWorkflowService {
             ],
             metadata: {
               multiModalAssociationError: true,
+            },
+          };
+        }
+      });
+
+      // Step 12: Canonical Metadata Extraction
+      await this.executeStep(jobId, 'canonical-metadata-extraction', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for canonical metadata extraction'),
+              ],
+              metadata: {
+                canonicalMetadataSkipped: true,
+              },
+            };
+          }
+
+          // Get all products for this document
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('id, name, description, long_description')
+            .eq('source_document_id', documentId);
+
+          if (productsError) {
+            throw new Error(`Failed to get products: ${productsError.message}`);
+          }
+
+          if (!products || products.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No products found for canonical metadata extraction'),
+              ],
+              metadata: {
+                canonicalMetadataSkipped: true,
+              },
+            };
+          }
+
+          let totalProductsProcessed = 0;
+          let totalFieldsExtracted = 0;
+          let averageConfidence = 0;
+
+          // Extract canonical metadata for each product
+          for (const product of products) {
+            try {
+              const content = [
+                product.name,
+                product.description,
+                product.long_description,
+              ].filter(Boolean).join('\n\n');
+
+              if (content.trim()) {
+                const extractionResult = await CanonicalMetadataSchemaService.extractCanonicalMetadata(
+                  content,
+                  product.id,
+                  {
+                    confidenceThreshold: 0.6,
+                    extractionMethod: 'ai_extraction',
+                    validateRequired: true,
+                  }
+                );
+
+                totalProductsProcessed++;
+                totalFieldsExtracted += extractionResult.extractedFields;
+                averageConfidence += extractionResult.confidence;
+              }
+            } catch (productError) {
+              console.warn(`⚠️ Failed to extract metadata for product ${product.id}:`, productError);
+            }
+          }
+
+          // Calculate final metrics
+          if (totalProductsProcessed > 0) {
+            averageConfidence = averageConfidence / totalProductsProcessed;
+          }
+
+          const details = [
+            this.createInfoDetail(`Processed ${totalProductsProcessed} products for canonical metadata extraction`),
+            this.createInfoDetail(`Extracted ${totalFieldsExtracted} total metadata fields`),
+            this.createInfoDetail(`Average extraction confidence: ${(averageConfidence * 100).toFixed(1)}%`),
+          ];
+
+          if (totalProductsProcessed > 0) {
+            details.push(this.createInfoDetail('✅ Canonical metadata extraction completed successfully'));
+          }
+
+          return {
+            details,
+            metadata: {
+              productsProcessed: totalProductsProcessed,
+              fieldsExtracted: totalFieldsExtracted,
+              averageConfidence,
+              canonicalMetadataCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Canonical metadata extraction error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Canonical metadata extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              canonicalMetadataError: true,
             },
           };
         }
