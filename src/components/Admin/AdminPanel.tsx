@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MetadataFieldsManagement } from './MetadataFieldsManagement';
 import { AITestingPanel } from './AITestingPanel';
 import { QualityMetricsDashboard } from './QualityMetricsDashboard';
+import { HumanReviewPanel } from './HumanReviewPanel';
 
 interface AnalyticsEvent {
   id: string;
@@ -252,12 +253,13 @@ export const AdminPanel: React.FC = () => {
       </div>
 
       <Tabs defaultValue="recent" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="recent">Recent Activity</TabsTrigger>
           <TabsTrigger value="scores">Score Analysis</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="rag">RAG System</TabsTrigger>
           <TabsTrigger value="quality">Quality Metrics</TabsTrigger>
+          <TabsTrigger value="review">Human Review</TabsTrigger>
           <TabsTrigger value="metadata">Metadata Fields</TabsTrigger>
           <TabsTrigger value="testing">AI Testing</TabsTrigger>
         </TabsList>
@@ -436,6 +438,10 @@ export const AdminPanel: React.FC = () => {
 
         <TabsContent value="quality" className="space-y-4">
           <QualityMetricsDashboard />
+        </TabsContent>
+
+        <TabsContent value="review" className="space-y-4">
+          <HumanReviewPanel />
         </TabsContent>
 
         <TabsContent value="metadata" className="space-y-4">
