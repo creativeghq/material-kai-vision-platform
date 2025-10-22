@@ -8,6 +8,7 @@ import { chunkQualityService } from './chunkQualityService';
 import { MetafieldService } from './metafieldService';
 import { EntityRelationshipService } from './entityRelationshipService';
 import { fallbackEmbeddingService } from './fallbackEmbeddingService';
+import { MultiModalImageProductAssociationService } from './multiModalImageProductAssociationService';
 
 
 // Define interfaces locally to avoid importing from React components
@@ -311,6 +312,13 @@ export class ConsolidatedPDFWorkflowService {
         id: 'anthropic-product-enrichment',
         name: 'Anthropic Product Enrichment',
         description: 'Enrich product data using Claude 3.5 Sonnet',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'multi-modal-association',
+        name: 'Multi-Modal Image-Product Association',
+        description: 'Create intelligent image-product links using spatial, caption, and CLIP similarity',
         status: 'pending',
         details: [],
       },
@@ -973,6 +981,73 @@ export class ConsolidatedPDFWorkflowService {
             ],
             metadata: {
               productEnrichmentError: true,
+            },
+          };
+        }
+      });
+
+      // Step 11: Multi-Modal Image-Product Association
+      await this.executeStep(jobId, 'multi-modal-association', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for multi-modal association'),
+              ],
+              metadata: {
+                multiModalAssociationSkipped: true,
+              },
+            };
+          }
+
+          // Create intelligent image-product associations
+          const associationResult = await MultiModalImageProductAssociationService.createDocumentAssociations(
+            documentId,
+            {
+              weights: { spatial: 0.4, caption: 0.3, clip: 0.3 }, // 40% spatial, 30% caption, 30% CLIP
+              overallThreshold: 0.6, // Only create associations with 60%+ confidence
+              maxAssociationsPerImage: 3,
+              maxAssociationsPerProduct: 5,
+            }
+          );
+
+          const details = [
+            this.createInfoDetail(`Evaluated ${associationResult.totalEvaluated} potential image-product combinations`),
+            this.createInfoDetail(`Created ${associationResult.associationsCreated} intelligent associations`),
+            this.createInfoDetail(`Average confidence: ${(associationResult.averageConfidence * 100).toFixed(1)}%`),
+          ];
+
+          // Add top associations to details
+          if (associationResult.associations.length > 0) {
+            details.push(this.createInfoDetail('Top associations:'));
+            associationResult.associations.slice(0, 3).forEach((assoc, i) => {
+              details.push(this.createInfoDetail(
+                `  ${i + 1}. Score: ${(assoc.overallScore * 100).toFixed(1)}% - ${assoc.reasoning}`
+              ));
+            });
+          }
+
+          return {
+            details,
+            metadata: {
+              associationsCreated: associationResult.associationsCreated,
+              totalEvaluated: associationResult.totalEvaluated,
+              averageConfidence: associationResult.averageConfidence,
+              multiModalAssociationCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Multi-modal association error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Multi-modal association failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              multiModalAssociationError: true,
             },
           };
         }
