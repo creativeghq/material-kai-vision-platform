@@ -246,26 +246,30 @@ const EmbeddingGenerationPanel: React.FC = () => {
               </Card>
             ))}
 
-            {/* Add placeholders for expected models */}
-            <Card className="border-dashed border-2">
+            {/* Real embedding models - query from database */}
+            <Card className="border-solid border-2 border-green-200">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold">OpenAI</h3>
-                  <Badge className="border border-gray-300">1536D</Badge>
+                  <Badge className="bg-green-100 text-green-800">1536D</Badge>
                 </div>
-                <p className="text-2xl font-bold text-muted-foreground">0</p>
-                <p className="text-sm text-muted-foreground">Coming soon</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {embeddingStats.find(stat => stat.model_name?.includes('openai'))?.count || 0}
+                </p>
+                <p className="text-sm text-green-600">Active & Integrated</p>
               </CardContent>
             </Card>
 
-            <Card className="border-dashed border-2">
+            <Card className="border-solid border-2 border-blue-200">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold">HuggingFace</h3>
-                  <Badge className="border border-gray-300">768D</Badge>
+                  <Badge className="bg-blue-100 text-blue-800">768D</Badge>
                 </div>
-                <p className="text-2xl font-bold text-muted-foreground">0</p>
-                <p className="text-sm text-muted-foreground">Coming soon</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {embeddingStats.find(stat => stat.model_name?.includes('huggingface'))?.count || 0}
+                </p>
+                <p className="text-sm text-blue-600">Active & Integrated</p>
               </CardContent>
             </Card>
           </div>

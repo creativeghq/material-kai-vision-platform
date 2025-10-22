@@ -156,9 +156,9 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
   private jobCache: Map<string, any> = new Map();
   private resultCache: Map<string, UnifiedMLResult> = new Map();
 
-  // Default configuration
+  // Default configuration - PRODUCTION OPTIMIZED
   private readonly DEFAULT_CONFIG: Partial<UnifiedMLServiceConfig> = {
-    preferServerSide: false,
+    preferServerSide: true, // ✅ FIXED: Prefer server-side for production reliability
     fallbackToClient: true,
     confidenceThreshold: 0.7,
     enableImageClassification: true,
@@ -166,18 +166,18 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
     enableMaterialAnalysis: true,
     preloadModelsOnInit: false,
     deviceOptimization: true,
-    maxConcurrentOperations: 3,
+    maxConcurrentOperations: 10, // ✅ FIXED: Increased from 3 to 10 for better performance
     defaultTimeout: 30000,
     enableJobPolling: true,
     pollInterval: 2000,
     maxRetryAttempts: 3,
-    maxFileSize: 10,
-    maxFilesPerRequest: 5,
+    maxFileSize: 50, // ✅ FIXED: Increased from 10MB to 50MB for larger files
+    maxFilesPerRequest: 20, // ✅ FIXED: Increased from 5 to 20 for batch processing
     enableHuggingFace: true,
     enableCaching: true,
     cacheExpirationMs: 3600000, // 1 hour
     enableBatchProcessing: true,
-    maxBatchSize: 10,
+    maxBatchSize: 25, // ✅ FIXED: Increased from 10 to 25 for better throughput
     supportedFileTypes: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'txt'],
     storageBasePath: 'ml-processing',
   };

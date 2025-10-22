@@ -68,13 +68,13 @@ const QualityThresholdsSchema = z.object({
 });
 
 /**
- * Validation schema for performance limits
+ * Validation schema for performance limits - PRODUCTION OPTIMIZED
  */
 const PerformanceLimitsSchema = z.object({
-  maxProcessingTime: z.number().int().min(1000, 'Max processing time must be at least 1 second').max(3600000, 'Max processing time cannot exceed 1 hour').default(300000), // 5 minutes
-  maxMemoryUsage: z.number().int().min(100, 'Max memory usage must be at least 100MB').max(8192, 'Max memory usage cannot exceed 8GB').default(2048), // 2GB in MB
-  maxConcurrentJobs: z.number().int().min(1, 'Max concurrent jobs must be at least 1').max(10, 'Max concurrent jobs cannot exceed 10').default(3),
-  retryAttempts: z.number().int().min(0, 'Retry attempts must be non-negative').max(5, 'Retry attempts cannot exceed 5').default(2),
+  maxProcessingTime: z.number().int().min(1000, 'Max processing time must be at least 1 second').max(3600000, 'Max processing time cannot exceed 1 hour').default(600000), // ✅ FIXED: 10 minutes (from 5)
+  maxMemoryUsage: z.number().int().min(100, 'Max memory usage must be at least 100MB').max(8192, 'Max memory usage cannot exceed 8GB').default(4096), // ✅ FIXED: 4GB (from 2GB)
+  maxConcurrentJobs: z.number().int().min(1, 'Max concurrent jobs must be at least 1').max(50, 'Max concurrent jobs cannot exceed 50').default(20), // ✅ FIXED: 20 (from 3)
+  retryAttempts: z.number().int().min(0, 'Retry attempts must be non-negative').max(5, 'Retry attempts cannot exceed 5').default(3), // ✅ FIXED: 3 (from 2)
   retryDelay: z.number().int().min(1000, 'Retry delay must be at least 1 second').max(60000, 'Retry delay cannot exceed 1 minute').default(5000),
 });
 

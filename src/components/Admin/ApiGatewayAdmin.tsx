@@ -163,36 +163,47 @@ export const ApiGatewayAdmin: React.FC = () => {
 
   const categories = Array.from(new Set(endpoints.map(ep => ep.category))).sort();
 
-  const getEndpointResponseExample = (path: string) => {
-    const examples: Record<string, string> = {
+  const getEndpointResponseExample = async (path: string) => {
+    // Try to get real response from the endpoint
+    try {
+      const response = await fetch(path, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return JSON.stringify(data, null, 2);
+      }
+    } catch (error) {
+      console.warn(`Failed to fetch real response from ${path}:`, error);
+    }
+
+    // Fallback to schema-based examples if endpoint is not available
+    const schemaExamples: Record<string, string> = {
       '/api/materials': JSON.stringify({
-        data: [
-          { id: 'uuid', name: 'Material Name', category: 'metals', properties: {} },
-        ],
+        data: 'Real materials data would be fetched from database',
         success: true,
+        note: 'This is a schema example - real endpoint may be unavailable',
       }, null, 2),
       '/api/recognition': JSON.stringify({
-        data: {
-          detected_materials: ['Steel', 'Aluminum'],
-          confidence_score: 0.95,
-          processing_time_ms: 1200,
-        },
+        data: 'Real recognition results would be returned',
         success: true,
+        note: 'This is a schema example - real endpoint may be unavailable',
       }, null, 2),
       '/api/search': JSON.stringify({
-        data: {
-          results: [],
-          total: 0,
-          query_time_ms: 45,
-        },
+        data: 'Real search results would be returned',
         success: true,
+        note: 'This is a schema example - real endpoint may be unavailable',
       }, null, 2),
     };
 
-    return examples[path] || JSON.stringify({
-      data: {},
+    return schemaExamples[path] || JSON.stringify({
+      data: 'Real endpoint response would be shown here',
       success: true,
-      message: 'Operation completed successfully',
+      note: 'This is a schema example - real endpoint may be unavailable',
     }, null, 2);
   };
 
