@@ -33,6 +33,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
   const [stats, setStats] = useState<EmbeddingStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [embeddingStats, setEmbeddingStats] = useState<Array<{model_name: string; count: number}>>([]);
   const { toast } = useToast();
 
   const fetchEmbeddingStats = useCallback(async () => {
@@ -56,6 +57,25 @@ const EmbeddingGenerationPanel: React.FC = () => {
 
       if (materialError) throw materialError;
       if (knowledgeError) throw knowledgeError;
+
+      // ✅ FIXED: Load real embedding model statistics from database
+      const { data: embeddingModelStats, error: embeddingError } = await supabase
+        .from('embeddings')
+        .select('model_name')
+        .not('model_name', 'is', null);
+
+      // Process embedding model counts
+      const modelCounts: Record<string, number> = {};
+      embeddingModelStats?.forEach((embedding) => {
+        const modelName = embedding.model_name || 'unknown';
+        modelCounts[modelName] = (modelCounts[modelName] || 0) + 1;
+      });
+
+      // Set embedding stats for the UI
+      setEmbeddingStats(Object.entries(modelCounts).map(([model_name, count]) => ({
+        model_name,
+        count
+      })));
 
       // Process embedding types - simulate different embedding types for materials
       const embeddingTypeCounts: Record<string, { count: number; dimension: number }> = {};

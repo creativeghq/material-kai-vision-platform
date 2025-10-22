@@ -1,4 +1,5 @@
 import { BaseService, ServiceConfig } from '../base/BaseService';
+import { supabase } from '@/integrations/supabase/client';
 
 import { MLResult, MaterialAnalysisResult, ImageClassificationResult } from './types';
 import { ImageClassifierService } from './imageClassifier';
@@ -373,105 +374,91 @@ export class MaterialAnalyzerService extends BaseService<MaterialAnalyzerService
     return 'other';
   }
 
-  private static initializeKnowledgeBase() {
-    // Steel properties template
-    this.knowledgeBase.set('steel', {
-      physicalProperties: {
-        density: 7850,
-        hardness: 250,
-        elasticity: 200000,
-        thermalConductivity: 50,
-        electricalConductivity: 6,
-        magneticProperties: 'ferromagnetic',
-        porosity: 0,
-        surfaceRoughness: 1.6,
-      },
-      mechanicalProperties: {
-        tensileStrength: 400,
-        compressiveStrength: 400,
-        flexuralStrength: 400,
-        fatigueResistance: 8,
-        impactResistance: 9,
-        wearResistance: 8,
-        creepResistance: 7,
-      },
-      environmentalProperties: {
-        weatherResistance: 4,
-        uvResistance: 9,
-        moistureResistance: 3,
-        temperatureRange: { min: -40, max: 500 },
-        fireResistance: 9,
-        recyclability: 10,
-        carbonFootprint: 6,
-        toxicity: 'low',
-      },
-    });
+  private static async initializeKnowledgeBase() {
+    // ✅ FIXED: Load material properties from database instead of hardcoded values
+    try {
+      const { data: materials, error } = await supabase
+        .from('products')
+        .select('name, category, metadata')
+        .not('metadata', 'is', null);
 
-    // Concrete properties template
-    this.knowledgeBase.set('concrete', {
-      physicalProperties: {
-        density: 2400,
-        hardness: 150,
-        elasticity: 30000,
-        thermalConductivity: 1.7,
-        electricalConductivity: 0,
-        magneticProperties: 'non-magnetic',
-        porosity: 15,
-        surfaceRoughness: 50,
-      },
-      mechanicalProperties: {
-        tensileStrength: 4,
-        compressiveStrength: 30,
-        flexuralStrength: 5,
-        fatigueResistance: 6,
-        impactResistance: 4,
-        wearResistance: 7,
-        creepResistance: 8,
-      },
-      environmentalProperties: {
-        weatherResistance: 8,
-        uvResistance: 10,
-        moistureResistance: 6,
-        temperatureRange: { min: -20, max: 200 },
-        fireResistance: 10,
-        recyclability: 8,
-        carbonFootprint: 4,
-        toxicity: 'very low',
-      },
-    });
+      if (error) {
+        console.warn('Failed to load materials from database, using fallback:', error);
+        this.initializeFallbackKnowledgeBase();
+        return;
+      }
 
-    // Plastic (PVC) properties template
-    this.knowledgeBase.set('plastic', {
-      physicalProperties: {
-        density: 1400,
-        hardness: 80,
-        elasticity: 3000,
-        thermalConductivity: 0.2,
-        electricalConductivity: 0,
-        magneticProperties: 'non-magnetic',
-        porosity: 0,
-        surfaceRoughness: 0.8,
+      // Process database materials into knowledge base
+      for (const material of materials || []) {
+        const materialName = material.name?.toLowerCase();
+        const metadata = material.metadata || {};
+        const properties = metadata.properties || {};
+
+        if (materialName && properties) {
+          this.knowledgeBase.set(materialName, {
+            physicalProperties: {
+              density: properties.density || 0,
+              hardness: properties.hardness || 0,
+              elasticity: properties.elasticity || 0,
+              thermalConductivity: properties.thermal_conductivity || 0,
+              electricalConductivity: properties.electrical_conductivity || 0,
+              magneticProperties: properties.magnetic_properties || 'unknown',
+              porosity: properties.porosity || 0,
+              surfaceRoughness: properties.surface_roughness || 0,
+            },
+            mechanicalProperties: {
+              tensileStrength: properties.tensile_strength || 0,
+              compressiveStrength: properties.compressive_strength || 0,
+              flexuralStrength: properties.flexural_strength || 0,
+              fatigueResistance: properties.fatigue_resistance || 0,
+              impactResistance: properties.impact_resistance || 0,
+              wearResistance: properties.wear_resistance || 0,
+              creepResistance: properties.creep_resistance || 0,
+            },
+            environmentalProperties: {
+              weatherResistance: properties.weather_resistance || 0,
+              uvResistance: properties.uv_resistance || 0,
+              moistureResistance: properties.moisture_resistance || 0,
+              temperatureRange: properties.temperature_range || { min: 0, max: 100 },
+              fireResistance: properties.fire_resistance || 0,
+              recyclability: properties.recyclability || 0,
+              carbonFootprint: properties.carbon_footprint || 0,
+              toxicity: properties.toxicity || 'unknown',
+            },
+          });
+        }
+      }
+
+      console.log(`✅ Loaded ${this.knowledgeBase.size} materials from database`);
+    } catch (error) {
+      console.error('Error loading materials from database:', error);
+      this.initializeFallbackKnowledgeBase();
+    }
+  }
+
+  /**
+   * Fallback knowledge base with essential material templates
+   */
+  private static initializeFallbackKnowledgeBase() {
+    console.log('🔄 Using fallback knowledge base with essential materials');
+
+    // Essential material templates for fallback
+    const essentialMaterials = {
+      steel: {
+        physicalProperties: { density: 7850, hardness: 250, elasticity: 200000 },
+        mechanicalProperties: { tensileStrength: 400, compressiveStrength: 400 },
+        environmentalProperties: { weatherResistance: 4, recyclability: 10 },
       },
-      mechanicalProperties: {
-        tensileStrength: 50,
-        compressiveStrength: 60,
-        flexuralStrength: 80,
-        fatigueResistance: 6,
-        impactResistance: 5,
-        wearResistance: 6,
-        creepResistance: 5,
+      concrete: {
+        physicalProperties: { density: 2400, hardness: 150, elasticity: 30000 },
+        mechanicalProperties: { tensileStrength: 4, compressiveStrength: 30 },
+        environmentalProperties: { weatherResistance: 8, recyclability: 8 },
       },
-      environmentalProperties: {
-        weatherResistance: 7,
-        uvResistance: 5,
-        moistureResistance: 9,
-        temperatureRange: { min: -20, max: 60 },
-        fireResistance: 3,
-        recyclability: 6,
-        carbonFootprint: 3,
-        toxicity: 'low',
-      },
-    });
+    };
+
+    for (const [name, properties] of Object.entries(essentialMaterials)) {
+      this.knowledgeBase.set(name, properties as Partial<MaterialProperties>);
+    }
   }
 
   private async performVisualAnalysis(imageBitmap: ImageBitmap): Promise<{

@@ -40,7 +40,7 @@ export interface RecommendationResponse {
 }
 
 class ProductRecommendationServiceImpl extends BaseService {
-  private qualityDashboardService: QualityDashboardService;
+  private qualityDashboardService: typeof QualityDashboardService;
 
   constructor() {
     super({

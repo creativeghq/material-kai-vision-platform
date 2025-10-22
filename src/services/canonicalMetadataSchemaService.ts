@@ -399,7 +399,15 @@ export class CanonicalMetadataSchemaService {
     includeCategories?: (keyof CanonicalMetadataSchema)[]
   ): Partial<CanonicalMetadataSchema> {
     const canonicalMetadata: Partial<CanonicalMetadataSchema> = {
-      coreIdentity: {},
+      coreIdentity: {
+        name: String(extractedMetadata.name || extractedMetadata.title || 'Unknown Material'),
+        subcategory: String(extractedMetadata.subcategory || ''),
+        brand: String(extractedMetadata.brand || ''),
+        model: String(extractedMetadata.model || ''),
+        version: String(extractedMetadata.version || ''),
+        description: String(extractedMetadata.description || ''),
+        tags: Array.isArray(extractedMetadata.tags) ? extractedMetadata.tags : [],
+      },
       physicalProperties: {},
       visualProperties: {},
       technicalSpecifications: {},
@@ -414,7 +422,13 @@ export class CanonicalMetadataSchemaService {
 
       if (category && (!includeCategories || includeCategories.includes(category))) {
         if (!canonicalMetadata[category]) {
-          canonicalMetadata[category] = {};
+          if (category === 'coreIdentity') {
+            canonicalMetadata[category] = {
+              name: 'Unknown Material',
+            };
+          } else {
+            canonicalMetadata[category] = {};
+          }
         }
         (canonicalMetadata[category] as any)[fieldName] = value;
       }
@@ -488,13 +502,13 @@ export class CanonicalMetadataSchemaService {
 
       if (metafieldDefs) {
         const fieldDefinitions = new Map(
-          metafieldDefs.map(def => [def.field_name, def])
+          metafieldDefs.map(def => [String(def.field_name), def as any])
         );
 
         await MetafieldService.saveProductMetafields(
           productId,
           rawMetadata,
-          fieldDefinitions,
+          fieldDefinitions as any,
           'canonical_schema_extraction'
         );
       }

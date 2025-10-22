@@ -209,7 +209,7 @@ export class IntegratedWorkflowService {
 
       // Use validated data
       const validatedMaterials = validationResult.data || [];
-      const materialData = validatedMaterials[0] || {};
+      const materialData = validatedMaterials[0] || {} as any;
 
       // Handle legacy format fallback if validation passed but no materials found
       if (validatedMaterials.length === 0) {

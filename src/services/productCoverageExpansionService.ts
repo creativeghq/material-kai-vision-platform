@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { BaseService } from '@/core/services/BaseService';
+import { BaseService } from './base/BaseService';
 
 export interface ProductCoverageConfig {
   // Coverage settings
@@ -75,7 +75,7 @@ export interface CoverageExpansionResult {
   recommendations: string[];
 }
 
-export class ProductCoverageExpansionService extends BaseService<ProductCoverageConfig> {
+export class ProductCoverageExpansionService extends BaseService {
   private readonly DEFAULT_CONFIG: ProductCoverageConfig = {
     enableUnlimitedProducts: true,
     intelligentChunkMapping: true,
@@ -99,8 +99,18 @@ export class ProductCoverageExpansionService extends BaseService<ProductCoverage
       enabled: true,
       timeout: 300000,
       retries: 2,
-      defaultConfig: { ...config },
+
     });
+  }
+
+  protected async doInitialize(): Promise<void> {
+    console.log('ProductCoverageExpansionService initialized');
+  }
+
+  protected async doHealthCheck(): Promise<void> {
+    if (!this.isInitialized) {
+      throw new Error('Service not initialized');
+    }
   }
 
   /**

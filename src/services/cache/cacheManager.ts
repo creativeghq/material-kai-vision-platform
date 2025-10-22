@@ -109,8 +109,8 @@ export class CacheManager {
       results[name] = cache.cleanExpired();
     }
 
-    const totalCleaned = Object.values(results).reduce((sum: number, count: any) => sum + (count as number), 0);
-    if (totalCleaned > 0) {
+    const totalCleaned = Object.values(results).reduce((sum: number, count: any) => sum + Number(count), 0);
+    if (Number(totalCleaned) > 0) {
       console.log(`🧹 Cleaned ${totalCleaned} expired cache entries`);
     }
 
@@ -174,8 +174,8 @@ export class CacheManager {
       results[name] = cache.invalidatePattern(pattern);
     }
 
-    const totalInvalidated = Object.values(results).reduce((sum: number, count: any) => sum + (count as number), 0);
-    if (totalInvalidated > 0) {
+    const totalInvalidated = Object.values(results).reduce((sum: number, count: any) => sum + Number(count), 0);
+    if (Number(totalInvalidated) > 0) {
       console.log(`🗑️ Invalidated ${totalInvalidated} cache entries matching pattern: ${pattern}`);
     }
 

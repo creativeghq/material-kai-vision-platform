@@ -92,7 +92,7 @@ class AnalyticsServiceImpl extends BaseService {
   /**
    * Get analytics metrics for a workspace
    */
-  async getMetrics(workspaceId: string, days: number = 30): Promise<AnalyticsMetrics> {
+  async getAnalyticsMetrics(workspaceId: string, days: number = 30): Promise<AnalyticsMetrics> {
     return this.executeOperation(async () => {
       const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 

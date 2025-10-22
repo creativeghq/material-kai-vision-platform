@@ -182,8 +182,8 @@ export class MultiVectorSearchService {
         searchTime: Date.now() - startTime,
         metadata: {
           embeddingTypesUsed: [],
-          weightsApplied: weights || this.DEFAULT_WEIGHTS,
-          filtersApplied: filters || {},
+          weightsApplied: query.weights || this.DEFAULT_WEIGHTS,
+          filtersApplied: query.filters || {},
           searchStrategy: 'error',
         },
       };

@@ -38,7 +38,7 @@ export interface OptimizedSearchResponse {
 }
 
 class SearchOptimizationServiceImpl extends BaseService {
-  private qualityDashboardService: QualityDashboardService;
+  private qualityDashboardService: typeof QualityDashboardService;
 
   constructor() {
     super({

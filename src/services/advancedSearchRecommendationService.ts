@@ -14,7 +14,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { BaseService } from './base/BaseService';
+import { BaseService, ServiceConfig } from './base/BaseService';
 import { MultiVectorSearchService } from './multiVectorSearchService';
 import { AnalyticsService } from './AnalyticsService';
 
@@ -260,12 +260,40 @@ export interface RecommendationResponse {
  */
 export class AdvancedSearchRecommendationService extends BaseService {
   private multiVectorService: MultiVectorSearchService;
-  private analyticsService: AnalyticsService;
-  
+  private analyticsService: typeof AnalyticsService;
+
   constructor() {
-    super('AdvancedSearchRecommendationService');
+    const config: ServiceConfig = {
+      name: 'AdvancedSearchRecommendationService',
+      version: '1.0.0',
+      environment: 'production',
+      enabled: true,
+      timeout: 30000,
+      retries: 3,
+    };
+    super(config);
     this.multiVectorService = new MultiVectorSearchService();
-    this.analyticsService = new AnalyticsService();
+    this.analyticsService = AnalyticsService;
+  }
+
+  /**
+   * Initialize the service
+   */
+  protected async doInitialize(): Promise<void> {
+    // Initialize dependencies
+    await this.multiVectorService.initialize();
+    console.log('AdvancedSearchRecommendationService initialized');
+  }
+
+  /**
+   * Health check implementation
+   */
+  protected async doHealthCheck(): Promise<void> {
+    // Check if service is responsive
+    if (!this.isInitialized) {
+      throw new Error('Service not initialized');
+    }
+    // Additional health checks can be added here
   }
 
   /**
@@ -570,7 +598,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
         options: { limit: request.limit || 15 }
       };
 
-      const visualResults = await this.multiVectorService.search(visualQuery);
+      const visualResults = await MultiVectorSearchService.search(visualQuery);
 
       return visualResults.results.map(result => ({
         id: result.id,
@@ -618,7 +646,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
         options: { limit: request.limit || 15 }
       };
 
-      const semanticResults = await this.multiVectorService.search(semanticQuery);
+      const semanticResults = await MultiVectorSearchService.search(semanticQuery);
 
       return semanticResults.results.map(result => ({
         id: result.id,
@@ -1049,7 +1077,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
         options: { limit: request.limit || 10 }
       };
 
-      const embeddingResults = await this.multiVectorService.search(embeddingQuery);
+      const embeddingResults = await MultiVectorSearchService.search(embeddingQuery);
 
       return embeddingResults.results.map(result => ({
         id: `embedding-${result.id}`,
@@ -1364,7 +1392,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
 
       // Return a subset as similar users (simplified)
       return uniqueUsers.slice(0, 5).map(uid => ({
-        userId: uid,
+        userId: String(uid),
         similarity: 0.7 + Math.random() * 0.3, // Simplified similarity score
       }));
     } catch (error) {

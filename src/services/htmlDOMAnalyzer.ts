@@ -858,6 +858,7 @@ export class HTMLDOMAnalyzer {
         images: [],
         tables: [],
         textBlocks: [],
+        productCandidates: (data.product_candidates as any) || [],
       };
 
     } catch (error) {

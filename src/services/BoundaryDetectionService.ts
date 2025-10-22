@@ -61,12 +61,37 @@ export class BoundaryDetectionService extends BaseService {
 
     this.embeddingService = new EmbeddingGenerationService({
       embedding: {
-        provider: 'openai',
-        model: 'text-embedding-3-small',
-        dimensions: 1536,
-        batchSize: 100,
-        timeout: 30000,
-        retryAttempts: 3,
+        primary: {
+          name: 'text-embedding-3-small',
+          provider: 'openai',
+          dimensions: 1536,
+          maxTokens: 8191,
+          costPerToken: 0.0001,
+          normalization: 'l2',
+          batchSize: 100,
+        },
+        fallback: [],
+        textPreprocessing: {
+          maxLength: 8000,
+          truncateStrategy: 'tail',
+          normalization: {
+            lowercase: false,
+            removeSpecialChars: false,
+            removeExtraWhitespace: true,
+            removeNewlines: false,
+          },
+        },
+        caching: {
+          enabled: true,
+          ttl: 86400,
+          keyStrategy: 'content-model-hash',
+        },
+        validation: {
+          minTextLength: 1,
+          maxTextLength: 8000,
+          validateDimensions: true,
+          validateNormalization: true,
+        },
       },
       mivaa: {
         gatewayUrl: process.env.MIVAA_GATEWAY_URL || '',
@@ -110,7 +135,7 @@ export class BoundaryDetectionService extends BaseService {
         metadata: { page_number: chunk.page_number },
       }));
 
-      const embeddingResults = await this.embeddingService.generateBatch(
+      const embeddingResults = await this.embeddingService.generateBatchEmbeddings(
         embeddingInputs,
       );
 
@@ -406,7 +431,7 @@ export class BoundaryDetectionService extends BaseService {
    * Initialize the service
    */
   protected async doInitialize(): Promise<void> {
-    await this.embeddingService.initialize();
+    // EmbeddingGenerationService initializes automatically
   }
 
   /**

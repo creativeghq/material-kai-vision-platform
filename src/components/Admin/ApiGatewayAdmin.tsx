@@ -43,6 +43,7 @@ export const ApiGatewayAdmin: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
   const [endpointDetailsOpen, setEndpointDetailsOpen] = useState(false);
+  const [responseExample, setResponseExample] = useState<string>('');
   const [, setSelectedApiKey] = useState<ApiKey | null>(null);
 
   // Global rate limits state
@@ -58,6 +59,12 @@ export const ApiGatewayAdmin: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (selectedEndpoint) {
+      loadResponseExample(selectedEndpoint.path);
+    }
+  }, [selectedEndpoint]);
 
   const loadData = async () => {
     try {
@@ -163,7 +170,7 @@ export const ApiGatewayAdmin: React.FC = () => {
 
   const categories = Array.from(new Set(endpoints.map(ep => ep.category))).sort();
 
-  const getEndpointResponseExample = async (path: string) => {
+  const loadResponseExample = async (path: string) => {
     // Try to get real response from the endpoint
     try {
       const response = await fetch(path, {
@@ -175,7 +182,8 @@ export const ApiGatewayAdmin: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        return JSON.stringify(data, null, 2);
+        setResponseExample(JSON.stringify(data, null, 2));
+        return;
       }
     } catch (error) {
       console.warn(`Failed to fetch real response from ${path}:`, error);
@@ -200,11 +208,13 @@ export const ApiGatewayAdmin: React.FC = () => {
       }, null, 2),
     };
 
-    return schemaExamples[path] || JSON.stringify({
+    const fallbackExample = schemaExamples[path] || JSON.stringify({
       data: 'Real endpoint response would be shown here',
       success: true,
       note: 'This is a schema example - real endpoint may be unavailable',
     }, null, 2);
+
+    setResponseExample(fallbackExample);
   };
 
   if (loading) {
@@ -785,7 +795,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                   <div className="p-4 border rounded-lg bg-muted/50">
                     <h4 className="font-medium text-sm mb-2">Expected Response</h4>
                     <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {getEndpointResponseExample(selectedEndpoint.path)}
+                      {responseExample}
                     </pre>
                   </div>
                 </div>

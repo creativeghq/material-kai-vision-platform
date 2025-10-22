@@ -10,7 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { BaseService } from './base/BaseService';
+import { BaseService, ServiceConfig } from './base/BaseService';
 
 export interface PerformanceMetrics {
   // Product Detection Metrics
@@ -95,6 +95,35 @@ export interface PerformanceReport {
 
 export class PerformanceMonitoringService extends BaseService {
   private metricsCache: Map<string, any> = new Map();
+
+  constructor() {
+    const config: ServiceConfig = {
+      name: 'PerformanceMonitoringService',
+      version: '1.0.0',
+      environment: 'production',
+      enabled: true,
+      timeout: 30000,
+      retries: 3,
+    };
+    super(config);
+  }
+
+  /**
+   * Initialize the service
+   */
+  protected async doInitialize(): Promise<void> {
+    console.log('PerformanceMonitoringService initialized');
+  }
+
+  /**
+   * Health check implementation
+   */
+  protected async doHealthCheck(): Promise<void> {
+    if (!this.isInitialized) {
+      throw new Error('Service not initialized');
+    }
+  }
+
   private alertThresholds: Record<string, number> = {
     // Performance thresholds
     averageProcessingTime: 30000, // 30 seconds

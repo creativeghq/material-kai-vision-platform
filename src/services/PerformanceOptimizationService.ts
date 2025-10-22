@@ -36,7 +36,7 @@ export interface PerformanceReport {
 }
 
 class PerformanceOptimizationServiceImpl extends BaseService {
-  private qualityDashboardService: QualityDashboardService;
+  private qualityDashboardService: typeof QualityDashboardService;
   private performanceCache: Map<string, PerformanceMetrics> = new Map();
 
   constructor() {
