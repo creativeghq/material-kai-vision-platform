@@ -1,47 +1,26 @@
-// Temporary stub client for build compatibility
-// This will be replaced by Edge Functions in deployment
+import { createClient } from '@supabase/supabase-js';
 
-// Mock Supabase client for build-time compatibility
-export const supabase = {
+// Get environment variables from Vercel/GitHub Secrets
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Please check your Vercel Environment Variables.');
+}
+
+// Create and export the Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-    signInWithOAuth: () => Promise.resolve({ data: null, error: null }),
-    signOut: () => Promise.resolve({ error: null }),
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
   },
-  from: (table: string) => ({
-    select: () => ({
-      eq: () => ({
-        single: () => Promise.resolve({ data: null, error: null }),
-        limit: () => Promise.resolve({ data: [], error: null }),
-        order: () => Promise.resolve({ data: [], error: null }),
-      }),
-      not: () => ({
-        is: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
-        }),
-      }),
-      limit: () => Promise.resolve({ data: [], error: null }),
-      order: () => Promise.resolve({ data: [], error: null }),
-    }),
-    insert: () => Promise.resolve({ data: null, error: null }),
-    update: () => ({
-      eq: () => Promise.resolve({ data: null, error: null }),
-    }),
-    delete: () => ({
-      eq: () => Promise.resolve({ data: null, error: null }),
-    }),
-    upsert: () => Promise.resolve({ data: null, error: null }),
-  }),
-  storage: {
-    from: () => ({
-      upload: () => Promise.resolve({ data: null, error: null }),
-      getPublicUrl: () => ({ data: { publicUrl: '' } }),
-    }),
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+      heartbeatIntervalMs: 30000,
+    },
   },
-  functions: {
-    invoke: () => Promise.resolve({ data: null, error: null }),
-  },
-};
+});
 
-// Note: This is a build-time stub. In production, all database operations
-// should go through Edge Functions using the Supabase MCP architecture.
+export default supabase;

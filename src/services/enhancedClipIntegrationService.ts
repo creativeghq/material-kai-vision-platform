@@ -12,7 +12,7 @@
  * - Batch processing for large-scale similarity computations
  */
 
-// Removed direct Supabase client - using Edge Functions instead
+import { supabase } from '@/integrations/supabase/client';
 import { VisualFeatureExtractionService } from './visualFeatureExtractionService';
 // import { MaterialVisualSearchService } from './materialVisualSearchService'; // TODO: Add when available
 

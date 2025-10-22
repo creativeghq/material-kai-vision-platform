@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
-// Removed direct Supabase client - using Edge Functions instead
+import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import {
   Select,
   SelectContent,

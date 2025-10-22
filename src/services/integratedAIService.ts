@@ -1,4 +1,4 @@
-// Removed direct Supabase client - using Edge Functions instead
+import { supabase } from '@/integrations/supabase/client';
 import {
   ValidationError,
   APIError,

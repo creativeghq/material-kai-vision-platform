@@ -1,18 +1,58 @@
 # API Documentation
 
-**Last Updated**: 2025-10-21
-**Phase Status**: Phase 2 ✅ Complete, Phase 3 ⏳ Partial (Chunk Relationships Integrated)
-**New Features**: ✅ Two-Stage Product Classification System (Task 6 Complete)
+**Last Updated**: 2025-10-22
+**Phase Status**: Phase 2 ✅ Complete, Phase 3 ✅ Complete (Production Ready)
+**Architecture**: ✅ Pure Supabase MCP + Edge Functions (No Direct Client Connections)
+**New Features**: ✅ Two-Stage Product Classification System, ✅ Supabase MCP Architecture
 
 ## 🌐 API Architecture Overview
 
-The Material Kai Vision Platform uses a multi-layered API architecture:
+The Material Kai Vision Platform uses a **pure Supabase MCP (Model Context Protocol) architecture**:
 
 1. **Frontend API Layer** - React application API calls
-2. **Backend API Gateway** - Node.js/TypeScript API routing
-3. **MIVAA Microservice** - Python FastAPI service
-4. **Supabase Edge Functions** - Serverless functions (including Phase 2-3 quality & validation)
-5. **External API Integrations** - Third-party services
+2. **Supabase Edge Functions** - All database operations via MCP (NO direct client connections)
+3. **MIVAA Microservice** - Python FastAPI service for AI processing
+4. **External API Integrations** - Third-party AI services (OpenAI, Anthropic, HuggingFace)
+
+## 🏗️ **Supabase MCP Architecture** ⭐ **NEW**
+
+### **Critical Architecture Change**
+The platform now uses **pure Supabase MCP (Model Context Protocol)** for all database operations:
+
+- ❌ **NO Direct Client Connections**: No `@supabase/supabase-js` package usage
+- ✅ **Edge Functions Only**: All database operations through Supabase Edge Functions
+- ✅ **MCP Protocol**: Database operations via Supabase MCP API calls
+- ✅ **Security**: No client-side database credentials or direct access
+- ✅ **Scalability**: Serverless architecture with automatic scaling
+
+### **Database Operations Pattern**
+All frontend components use Edge Functions instead of direct Supabase client:
+
+```typescript
+// ❌ OLD: Direct Supabase client (REMOVED)
+// import { supabase } from '@/integrations/supabase/client';
+// const { data } = await supabase.from('products').select('*');
+
+// ✅ NEW: Edge Functions via MCP
+const response = await fetch('/api/products/list', {
+  method: 'GET',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  }
+});
+const data = await response.json();
+```
+
+### **Edge Functions Endpoints**
+All database operations are handled by Supabase Edge Functions:
+
+- `/functions/v1/products-management` - Product CRUD operations
+- `/functions/v1/chunks-management` - Chunk operations
+- `/functions/v1/images-management` - Image operations
+- `/functions/v1/pdf-processing-metrics` - PDF processing data
+- `/functions/v1/3d-generation-status` - 3D generation status
+- `/functions/v1/auth-management` - Authentication operations
 
 ## 📊 Quality & Validation APIs
 

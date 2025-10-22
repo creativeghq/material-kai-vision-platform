@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-// Removed direct Supabase client - using Edge Functions instead
+import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { EnhancedRAGService } from '@/services/enhancedRAGService';
 import { HybridAIService } from '@/services/hybridAIService';
