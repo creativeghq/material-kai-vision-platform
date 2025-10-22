@@ -12,7 +12,7 @@
  * Organizes existing 120+ metafields into logical categories for intelligent extraction.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { MetafieldService } from './metafieldService';
 
 export interface CanonicalMetadataSchema {

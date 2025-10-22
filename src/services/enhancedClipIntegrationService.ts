@@ -14,7 +14,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { VisualFeatureExtractionService } from './visualFeatureExtractionService';
-import { MaterialVisualSearchService } from './materialVisualSearchService';
+// import { MaterialVisualSearchService } from './materialVisualSearchService'; // TODO: Add when available
 
 export interface ClipEmbedding {
   embedding: number[];
@@ -80,6 +80,15 @@ export interface ProductRecommendation {
   confidence: number;
 }
 
+export interface ClipIntegrationStats {
+  productsWithEmbeddings: number;
+  imagesWithEmbeddings: number;
+  totalEmbeddings: number;
+  averageEmbeddingDimensions: number;
+  modelDistribution: Record<string, number>;
+  lastUpdated: string;
+}
+
 export class EnhancedClipIntegrationService {
   private static readonly CLIP_EMBEDDING_DIMENSION = 512;
   private static readonly SIMILARITY_THRESHOLD = 0.75;
@@ -108,25 +117,42 @@ export class EnhancedClipIntegrationService {
         }
       }
 
-      // Use MaterialVisualSearchService to generate text embeddings via CLIP
-      const materialSearchService = new MaterialVisualSearchService();
-      
-      // Generate CLIP text embeddings
-      const embeddingResult = await materialSearchService.generateMaterialEmbeddings(
-        productText, // Use text instead of image_data for text embeddings
-        ['clip']
-      );
+      // Generate CLIP text embeddings using MIVAA gateway directly
+      const response = await fetch(`${process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000'}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'clip_embedding_generation',
+          payload: {
+            text_query: productText,
+            embedding_type: 'text_similarity',
+            options: {
+              normalize: true,
+              dimensions: 512,
+            },
+          },
+        }),
+      });
 
-      if (!embeddingResult.success || !embeddingResult.embeddings?.clip) {
-        console.warn(`⚠️ Failed to generate CLIP embeddings for product: ${productId}`);
+      if (!response.ok) {
+        console.warn(`⚠️ Failed to generate CLIP embeddings for product: ${productId} - HTTP ${response.status}`);
+        return null;
+      }
+
+      const result = await response.json();
+
+      if (!result.success || !result.data?.embedding) {
+        console.warn(`⚠️ Failed to generate CLIP embeddings for product: ${productId} - Invalid response`);
         return null;
       }
 
       const clipEmbedding: ClipEmbedding = {
-        embedding: embeddingResult.embeddings.clip,
-        model: embeddingResult.embedding_metadata?.model_versions?.clip || 'clip-vit-base-patch32',
-        dimensions: embeddingResult.embeddings.clip.length,
-        confidence: 1.0,
+        embedding: result.data.embedding,
+        model: result.data.model_used || 'clip-vit-base-patch32',
+        dimensions: result.data.embedding.length,
+        confidence: result.data.confidence || 1.0,
         created_at: new Date().toISOString(),
       };
 
@@ -351,14 +377,40 @@ export class EnhancedClipIntegrationService {
   }
 
   /**
-   * Generate CLIP embedding for image data
+   * Generate CLIP embedding for image data using MIVAA gateway
    */
   private static async generateImageClipEmbedding(imageData: string): Promise<number[] | null> {
     try {
-      const materialSearchService = new MaterialVisualSearchService();
-      const result = await materialSearchService.generateMaterialEmbeddings(imageData, ['clip']);
+      // Use MIVAA gateway directly for image embedding generation
+      const response = await fetch(`${process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000'}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'clip_embedding_generation',
+          payload: {
+            image_data: imageData,
+            embedding_type: 'visual_similarity',
+            options: {
+              normalize: true,
+              dimensions: 512,
+            },
+          },
+        }),
+      });
 
-      return result.success && result.embeddings?.clip ? result.embeddings.clip : null;
+      if (!response.ok) {
+        throw new Error(`MIVAA gateway error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data?.embedding) {
+        return Array.isArray(result.data.embedding) ? result.data.embedding : null;
+      }
+
+      return null;
     } catch (error) {
       console.error('❌ Error generating image CLIP embedding:', error);
       return null;
@@ -366,13 +418,40 @@ export class EnhancedClipIntegrationService {
   }
 
   /**
-   * Generate CLIP embedding for text query
+   * Generate CLIP embedding for text query using MIVAA gateway
    */
   private static async generateTextClipEmbedding(textQuery: string): Promise<number[] | null> {
     try {
-      // Use VisualFeatureExtractionService to generate text embedding
-      const embedding = await VisualFeatureExtractionService.generateTextEmbedding(textQuery);
-      return embedding ? Array.from(embedding) : null;
+      // Use MIVAA gateway directly for text embedding generation
+      const response = await fetch(`${process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000'}/api/mivaa/gateway`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'clip_embedding_generation',
+          payload: {
+            text_query: textQuery,
+            embedding_type: 'text_similarity',
+            options: {
+              normalize: true,
+              dimensions: 512,
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`MIVAA gateway error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data?.embedding) {
+        return Array.isArray(result.data.embedding) ? result.data.embedding : null;
+      }
+
+      return null;
     } catch (error) {
       console.error('❌ Error generating text CLIP embedding:', error);
       return null;
