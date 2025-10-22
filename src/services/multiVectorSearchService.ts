@@ -59,9 +59,12 @@ export interface MultiVectorSearchResult {
   id: string;
   type: 'product' | 'chunk' | 'image';
   name?: string;
+  title?: string;
   description?: string;
   content?: string;
   imageUrl?: string;
+  thumbnailUrl?: string;
+  category?: string;
   similarity: {
     overall: number;
     text?: number;
@@ -72,8 +75,13 @@ export interface MultiVectorSearchResult {
     application?: number;
   };
   confidence: number;
+  similarity_score?: number;
+  quality_score?: number;
+  confidence_score?: number;
   metadata?: Record<string, any>;
   embeddings?: Record<string, number[]>;
+  tags?: string[];
+  properties?: Record<string, any>;
 }
 
 export interface SearchResponse {

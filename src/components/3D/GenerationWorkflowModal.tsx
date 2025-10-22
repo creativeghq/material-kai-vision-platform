@@ -156,18 +156,26 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         setIsPolling(true);
         setPollingError(null);
 
-        // Import supabase client dynamically
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.SUPABASE_URL!,
-          process.env.SUPABASE_ANON_KEY!,
-        );
+        // Use Edge Function to get generation status
+        const response = await fetch(`/api/3d-generation-status/${generationId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        const { data, error } = await supabase
-          .from('generation_3d')
-          .select('*')
-          .eq('id', generationId)
-          .single();
+        if (!response.ok) {
+          throw new Error(`Failed to fetch generation status: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to fetch generation status');
+        }
+
+        const data = result.data;
+        const error = null;
 
         if (error) {
           // eslint-disable-next-line no-console

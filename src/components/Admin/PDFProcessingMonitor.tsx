@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 
 interface PDFMetrics {
   totalDocuments: number;
@@ -21,10 +20,7 @@ export const PDFProcessingMonitor: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient(
-    process.env.REACT_APP_SUPABASE_URL || '',
-    process.env.REACT_APP_SUPABASE_ANON_KEY || ''
-  );
+
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -32,53 +28,25 @@ export const PDFProcessingMonitor: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch document count
-        const { count: docCount } = await supabase
-          .from('documents')
-          .select('*', { count: 'exact', head: true });
+        // Use Edge Function to fetch PDF processing metrics
+        const response = await fetch('/api/pdf-processing-metrics', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        // Fetch chunk count
-        const { count: chunkCount } = await supabase
-          .from('document_chunks')
-          .select('*', { count: 'exact', head: true });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch metrics: ${response.statusText}`);
+        }
 
-        // Fetch embedding count
-        const { count: embeddingCount } = await supabase
-          .from('document_vectors')
-          .select('*', { count: 'exact', head: true });
+        const data = await response.json();
 
-        // Fetch image count
-        const { count: imageCount } = await supabase
-          .from('document_images')
-          .select('*', { count: 'exact', head: true });
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch metrics');
+        }
 
-        // Fetch product count
-        const { count: productCount } = await supabase
-          .from('products')
-          .select('*', { count: 'exact', head: true });
-
-        const totalDocs = docCount || 0;
-        const totalChunks = chunkCount || 0;
-        const totalEmbed = embeddingCount || 0;
-        const totalImg = imageCount || 0;
-        const totalProd = productCount || 0;
-
-        const newMetrics: PDFMetrics = {
-          totalDocuments: totalDocs,
-          totalChunks: totalChunks,
-          totalEmbeddings: totalEmbed,
-          totalImages: totalImg,
-          totalProducts: totalProd,
-          embeddingSuccessRate: totalDocs > 0 ? (totalEmbed / totalChunks) * 100 : 0,
-          imageExtractionRate: totalDocs > 0 ? (totalImg / totalDocs) * 100 : 0,
-          productGenerationRate: totalDocs > 0 ? (totalProd / totalDocs) * 100 : 0,
-          averageChunksPerDocument: totalDocs > 0 ? totalChunks / totalDocs : 0,
-          averageEmbeddingsPerDocument: totalDocs > 0 ? totalEmbed / totalDocs : 0,
-          averageImagesPerDocument: totalDocs > 0 ? totalImg / totalDocs : 0,
-          averageProductsPerDocument: totalDocs > 0 ? totalProd / totalDocs : 0,
-        };
-
-        setMetrics(newMetrics);
+        setMetrics(data.metrics);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch metrics');
       } finally {

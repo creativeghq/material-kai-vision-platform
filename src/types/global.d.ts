@@ -6,22 +6,7 @@ declare module '@tanstack/react-query' {
 
 
 
-declare module '@supabase/supabase-js' {
-  export const createClient: any;
-  export const SupabaseClient: any;
-  export const AuthError: any;
-  export const PostgrestError: any;
-  export const StorageError: any;
-  export const FunctionsError: any;
-  export const RealtimeChannel: any;
-  export const RealtimeClient: any;
-  export const GoTrueClient: any;
-  export const SupabaseAuthClient: any;
-  export const SupabaseQueryBuilder: any;
-  export const SupabaseStorageClient: any;
-  export const SupabaseFunctionsClient: any;
-  export const SupabaseRealtimeClient: any;
-}
+// Removed Supabase declarations - using Edge Functions instead
 
 declare module 'three' {
   export const TextureLoader: any;
@@ -74,10 +59,7 @@ declare module '@react-three/drei' {
   export const Environment: ComponentType<any>;
 }
 
-declare module '@supabase/supabase-js' {
-  export const createClient: any;
-  export * from 'supabase';
-}
+// Removed duplicate Supabase declarations
 
 // Suppress automatic type library inclusion
 declare module 'babel__core' {}
