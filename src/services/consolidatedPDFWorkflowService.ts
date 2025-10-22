@@ -10,6 +10,7 @@ import { EntityRelationshipService } from './entityRelationshipService';
 import { fallbackEmbeddingService } from './fallbackEmbeddingService';
 import { MultiModalImageProductAssociationService } from './multiModalImageProductAssociationService';
 import { CanonicalMetadataSchemaService } from './canonicalMetadataSchemaService';
+import { EnhancedClipIntegrationService } from './enhancedClipIntegrationService';
 
 
 // Define interfaces locally to avoid importing from React components
@@ -327,6 +328,13 @@ export class ConsolidatedPDFWorkflowService {
         id: 'canonical-metadata-extraction',
         name: 'Canonical Metadata Extraction',
         description: 'Extract comprehensive metadata using canonical schema with 120+ fields',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'enhanced-clip-integration',
+        name: 'Enhanced CLIP Integration',
+        description: 'Generate CLIP embeddings for products and enhance image-product matching',
         status: 'pending',
         details: [],
       },
@@ -1165,6 +1173,146 @@ export class ConsolidatedPDFWorkflowService {
             ],
             metadata: {
               canonicalMetadataError: true,
+            },
+          };
+        }
+      });
+
+      // Step 13: Enhanced CLIP Integration
+      await this.executeStep(jobId, 'enhanced-clip-integration', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for CLIP integration'),
+              ],
+              metadata: {
+                clipIntegrationSkipped: true,
+              },
+            };
+          }
+
+          // Get all products for this document
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('id, name, description, long_description')
+            .eq('source_document_id', documentId);
+
+          if (productsError) {
+            throw new Error(`Failed to get products: ${productsError.message}`);
+          }
+
+          if (!products || products.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No products found for CLIP integration'),
+              ],
+              metadata: {
+                clipIntegrationSkipped: true,
+              },
+            };
+          }
+
+          let embeddingsGenerated = 0;
+          let associationsEnhanced = 0;
+          let totalProcessingTime = 0;
+
+          // Generate CLIP embeddings for products
+          for (const product of products) {
+            try {
+              const startTime = Date.now();
+              const content = [
+                product.name,
+                product.description,
+                product.long_description,
+              ].filter(Boolean).join('\n\n');
+
+              const embedding = await EnhancedClipIntegrationService.generateProductClipEmbeddings(
+                product.id,
+                content,
+                { forceRegenerate: false }
+              );
+
+              if (embedding) {
+                embeddingsGenerated++;
+              }
+
+              totalProcessingTime += Date.now() - startTime;
+
+            } catch (error) {
+              console.warn(`⚠️ Failed to generate CLIP embedding for product ${product.id}:`, error);
+            }
+          }
+
+          // Enhance existing image-product associations with real CLIP scores
+          const { data: associations, error: associationsError } = await supabase
+            .from('image_product_associations')
+            .select('image_id, product_id')
+            .in('product_id', products.map(p => p.id));
+
+          if (!associationsError && associations) {
+            for (const assoc of associations.slice(0, 20)) { // Limit to avoid timeout
+              try {
+                const clipResult = await EnhancedClipIntegrationService.calculateRealClipScore(
+                  assoc.image_id,
+                  assoc.product_id
+                );
+
+                if (clipResult.confidence > 0.7) {
+                  // Update association with real CLIP score
+                  await supabase
+                    .from('image_product_associations')
+                    .update({
+                      clip_score: clipResult.score,
+                      confidence: clipResult.confidence,
+                      metadata: {
+                        ...clipResult.metadata,
+                        enhanced_clip: true,
+                        updated_at: new Date().toISOString(),
+                      },
+                    })
+                    .eq('image_id', assoc.image_id)
+                    .eq('product_id', assoc.product_id);
+
+                  associationsEnhanced++;
+                }
+              } catch (error) {
+                console.warn(`⚠️ Failed to enhance association ${assoc.image_id}-${assoc.product_id}:`, error);
+              }
+            }
+          }
+
+          const details = [
+            this.createInfoDetail(`Generated CLIP embeddings for ${embeddingsGenerated} products`),
+            this.createInfoDetail(`Enhanced ${associationsEnhanced} image-product associations`),
+            this.createInfoDetail(`Total processing time: ${totalProcessingTime}ms`),
+          ];
+
+          if (embeddingsGenerated > 0 || associationsEnhanced > 0) {
+            details.push(this.createInfoDetail('✅ Enhanced CLIP integration completed successfully'));
+          }
+
+          return {
+            details,
+            metadata: {
+              embeddingsGenerated,
+              associationsEnhanced,
+              totalProcessingTime,
+              clipIntegrationCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Enhanced CLIP integration error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Enhanced CLIP integration failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              clipIntegrationError: true,
             },
           };
         }

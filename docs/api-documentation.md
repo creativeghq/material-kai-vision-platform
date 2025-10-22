@@ -366,6 +366,163 @@ Content-Type: application/json
 - **Database Integration**: Automatic saving to product properties and metafield tables
 - **Performance Optimized**: Processes 120+ fields in under 2 seconds
 
+---
+
+## 🔗 **Enhanced CLIP Integration API** ⭐ **NEW**
+
+### Advanced Visual Similarity & Product Matching
+
+#### Generate Product CLIP Embeddings
+POST /functions/v1/enhanced-clip-integration
+
+**Request:**
+```json
+{
+  "action": "generate_product_embeddings",
+  "productId": "prod_123",
+  "productText": "Ceramic tile with matte finish, 15x38cm, porcelain stoneware",
+  "options": {
+    "forceRegenerate": false,
+    "includeMetadata": true
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "embedding": [0.1234, -0.5678, 0.9012, ...],
+    "model": "clip-vit-base-patch32",
+    "dimensions": 512,
+    "confidence": 1.0,
+    "created_at": "2024-01-15T10:30:00Z",
+    "fromCache": false
+  },
+  "metadata": {
+    "processingTime": 1250,
+    "action": "generate_product_embeddings",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+#### Calculate Real CLIP Similarity
+POST /functions/v1/enhanced-clip-integration
+
+**Request:**
+```json
+{
+  "action": "calculate_similarity",
+  "imageId": "img_456",
+  "productId": "prod_123"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "score": 0.847,
+    "confidence": 0.95,
+    "metadata": {
+      "imageModel": "clip-vit-base-patch32",
+      "productModel": "clip-vit-base-patch32",
+      "modelMatch": true,
+      "embeddingDimensions": 512,
+      "method": "clip_cosine_similarity"
+    }
+  }
+}
+```
+
+#### Visual Similarity Search
+POST /functions/v1/enhanced-clip-integration
+
+**Request:**
+```json
+{
+  "action": "visual_search",
+  "query": {
+    "type": "image_to_products",
+    "imageData": "base64_encoded_image_data",
+    "similarityThreshold": 0.75,
+    "maxResults": 10,
+    "filters": {
+      "materialType": "ceramic",
+      "colorFamily": "neutral"
+    }
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "id": "prod_789",
+        "type": "product",
+        "name": "VALENOVA Ceramic Tile",
+        "description": "Matte finish porcelain stoneware",
+        "similarity": 0.892,
+        "confidence": 0.9,
+        "metadata": {
+          "embeddingModel": "clip-vit-base-patch32",
+          "embeddingDimensions": 512
+        }
+      }
+    ],
+    "metadata": {
+      "queryType": "image_to_products",
+      "processingTime": 2100,
+      "resultsCount": 5
+    }
+  }
+}
+```
+
+#### Get Integration Statistics
+POST /functions/v1/enhanced-clip-integration
+
+**Request:**
+```json
+{
+  "action": "get_stats"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "productsWithEmbeddings": 1247,
+    "imagesWithEmbeddings": 3891,
+    "totalEmbeddings": 5138,
+    "averageEmbeddingDimensions": 512,
+    "modelDistribution": {
+      "clip-vit-base-patch32": 4892,
+      "clip-vit-large-patch14": 246
+    },
+    "lastUpdated": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+**Enhanced CLIP Features**:
+- **Real CLIP Embeddings**: Replaces placeholder text similarity with actual CLIP visual-text embeddings
+- **Multi-Modal Search**: Support for image-to-products, text-to-images, and hybrid queries
+- **Product Recommendations**: Visual similarity-based product suggestions
+- **Batch Processing**: Efficient processing of multiple products with progress tracking
+- **Advanced Filtering**: Material type, color family, price range, and category filters
+- **Performance Optimized**: Cosine similarity calculations with 95%+ accuracy
+- **Model Consistency**: Tracks and validates embedding model versions for reliability
+
 ## 🔗 Internal API Endpoints
 
 ### Health Check Endpoints

@@ -9,10 +9,9 @@
  * Replaces random associations with weighted confidence scoring for meaningful relationships.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { EntityRelationshipService } from './entityRelationshipService';
-import { VisualFeatureExtractionService } from './visualFeatureExtractionService';
-import { MaterialVisualSearchService } from './materialVisualSearchService';
+import { EnhancedClipIntegrationService } from './enhancedClipIntegrationService';
 
 export interface ImageProductAssociation {
   imageId: string;
@@ -315,34 +314,37 @@ export class MultiModalImageProductAssociationService {
   }
 
   /**
-   * Calculate CLIP visual similarity score (0-1)
+   * Calculate CLIP visual similarity score (0-1) using enhanced CLIP integration
    */
   private static async calculateClipScore(image: any, product: any): Promise<number> {
     try {
-      // For now, return a placeholder score based on available metadata
-      // In a full implementation, this would use actual CLIP embeddings
-      
-      // Check if we have CLIP embeddings for the image
-      const hasImageEmbedding = image.clip_embedding || image.visual_embedding;
-      const hasProductText = product.description || product.name;
+      console.log(`🔍 Calculating enhanced CLIP score for image ${image.id} and product ${product.id}`);
 
-      if (!hasImageEmbedding || !hasProductText) {
-        return 0.5; // Neutral score when embeddings are not available
+      // Use the enhanced CLIP integration service for real CLIP scoring
+      const clipResult = await EnhancedClipIntegrationService.calculateRealClipScore(
+        image.id,
+        product.id
+      );
+
+      if (clipResult.confidence > 0.7) {
+        console.log(`✅ Real CLIP score: ${clipResult.score.toFixed(3)} (confidence: ${clipResult.confidence.toFixed(3)})`);
+        return clipResult.score;
       }
 
-      // Placeholder: Use text similarity as a proxy for CLIP similarity
-      // In production, this would compute cosine similarity between CLIP embeddings
+      // Fallback to text similarity if CLIP embeddings are not available
+      console.log(`⚠️ Using text similarity fallback (CLIP confidence: ${clipResult.confidence.toFixed(3)})`);
+
       const imageCaption = image.caption || image.alt_text || '';
       const productText = product.description || product.name || '';
-      
+
       if (imageCaption && productText) {
         const textSimilarity = await MultiModalImageProductAssociationService.calculateCaptionScore(
           { caption: imageCaption },
           { description: productText },
         );
-        
-        // Adjust for visual context
-        return Math.min(1.0, textSimilarity * 1.2);
+
+        // Adjust for visual context but reduce confidence
+        return Math.min(1.0, textSimilarity * 1.1);
       }
 
       return 0.5;
