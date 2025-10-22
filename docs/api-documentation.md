@@ -3670,8 +3670,224 @@ node scripts/test-products-from-knowledge-base.js
 node scripts/test-products-system-complete.js
 ```
 
+---
+
+## 🚀 Multi-Vector Storage API (Task 11)
+
+### Multi-Vector Operations Endpoint
+
+**Endpoint**: `POST /functions/v1/multi-vector-operations`
+
+#### Generate Embeddings
+```json
+{
+  "action": "generate_embeddings",
+  "entityType": "product",
+  "entityId": "product-uuid",
+  "embeddingTypes": ["text", "visual", "color", "texture", "application"],
+  "options": {
+    "forceRegenerate": false,
+    "includeMetadata": true
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "entityId": "product-uuid",
+  "embeddingsGenerated": {
+    "text_embedding_1536": [0.234, -0.156, ...],
+    "visual_clip_embedding_512": [0.445, 0.123, ...],
+    "color_embedding_256": [0.789, -0.234, ...],
+    "texture_embedding_256": [0.567, 0.890, ...],
+    "application_embedding_512": [0.123, -0.456, ...]
+  },
+  "metadata": {
+    "generated_at": "2025-10-22T07:11:11.695Z",
+    "model_versions": {
+      "text_model": "text-embedding-3-small",
+      "clip_model": "clip-vit-base-patch32",
+      "color_model": "color-palette-extractor-v1",
+      "texture_model": "texture-analysis-v1",
+      "application_model": "use-case-classifier-v1"
+    },
+    "generation_time_ms": 1500,
+    "confidence_scores": {
+      "text": 0.95,
+      "visual": 0.88,
+      "color": 0.82,
+      "texture": 0.79,
+      "application": 0.85
+    }
+  }
+}
+```
+
+#### Multi-Vector Search
+```json
+{
+  "action": "search",
+  "searchQuery": {
+    "text": "modern bathroom tiles",
+    "imageData": "base64_image_data",
+    "colors": ["#FFFFFF", "#F5F5F5"],
+    "texture": "matte",
+    "application": "bathroom",
+    "weights": {
+      "text": 0.25,
+      "visual": 0.25,
+      "multimodal": 0.20,
+      "color": 0.10,
+      "texture": 0.10,
+      "application": 0.10
+    }
+  },
+  "options": {
+    "searchType": "products",
+    "maxResults": 20,
+    "minSimilarity": 0.7
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "query": { ... },
+  "results": [
+    {
+      "id": "product-uuid",
+      "type": "product",
+      "name": "Modern Ceramic Bathroom Tiles",
+      "description": "Waterproof ceramic tiles perfect for bathrooms",
+      "similarity": {
+        "overall": 0.92,
+        "text": 0.89,
+        "visual": 0.94,
+        "multimodal": 0.91,
+        "color": 0.88,
+        "texture": 0.85,
+        "application": 0.96
+      },
+      "confidence": 0.92,
+      "metadata": {
+        "category": "tiles",
+        "material": "ceramic",
+        "application": "bathroom"
+      }
+    }
+  ],
+  "totalFound": 15,
+  "searchTime": 245,
+  "metadata": {
+    "searchStrategy": "multi_vector_weighted",
+    "embeddingTypes": ["text", "visual", "color", "texture", "application"],
+    "weights": { ... }
+  }
+}
+```
+
+#### Batch Generate Embeddings
+```json
+{
+  "action": "batch_generate",
+  "entityType": "product",
+  "entityIds": ["product-1", "product-2", "product-3"],
+  "embeddingTypes": ["text", "visual", "color"],
+  "options": {
+    "batchSize": 5,
+    "forceRegenerate": false
+  }
+}
+```
+
+#### Get Statistics
+```json
+{
+  "action": "get_statistics"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "statistics": {
+    "products": {
+      "total": 150,
+      "withTextEmbeddings": 145,
+      "withVisualEmbeddings": 120,
+      "withColorEmbeddings": 98,
+      "withTextureEmbeddings": 87,
+      "withApplicationEmbeddings": 92
+    },
+    "chunks": {
+      "total": 2340,
+      "withTextEmbeddings": 2340,
+      "withVisualEmbeddings": 1890
+    },
+    "embeddingCoverage": {
+      "products": {
+        "text": 96.7,
+        "visual": 80.0,
+        "color": 65.3,
+        "texture": 58.0,
+        "application": 61.3
+      }
+    }
+  }
+}
+```
+
+### Multi-Vector Search Service Integration
+
+The `MultiVectorSearchService` provides TypeScript methods for frontend integration:
+
+```typescript
+import { MultiVectorSearchService } from '@/services/multiVectorSearchService';
+
+// Perform multi-vector search
+const results = await MultiVectorSearchService.search({
+  text: "waterproof bathroom tiles",
+  imageUrl: "https://example.com/tile-image.jpg",
+  colors: ["#FFFFFF", "#F5F5F5"],
+  weights: {
+    text: 0.3,
+    visual: 0.3,
+    color: 0.2,
+    multimodal: 0.2
+  },
+  filters: {
+    categories: ["tiles"],
+    priceRange: { min: 10, max: 100 }
+  },
+  options: {
+    searchType: "products",
+    maxResults: 20,
+    sortBy: "similarity"
+  }
+});
+
+// Calculate similarity between vectors
+const similarity = MultiVectorSearchService.calculateCosineSimilarity(
+  vector1,
+  vector2
+);
+
+// Get search statistics
+const stats = await MultiVectorSearchService.getSearchStatistics();
+```
+
+---
+
 ## 🔗 Related Documentation
 
+- [Multi-Vector Storage System](./multi-vector-storage-system.md) - Complete implementation guide
+- [Embeddings & Search Strategy](./embeddings-search-strategy.md) - Multi-vector search strategy
+- [Database Schema](./database-schema.md) - Multi-vector database structure
 - [Security & Authentication](./security-authentication.md) - API security
 - [Setup & Configuration](./setup-configuration.md) - API configuration
 - [AI & ML Services](./ai-ml-services.md) - AI API integrations
