@@ -389,6 +389,7 @@ serve(async (req) => {
 
     console.log(`🎯 Enhanced quality scoring for document: ${document_id}`);
     console.log(`📋 Options: products=${include_products}, images=${include_images}, comprehensive=${comprehensive}`);
+    console.log(`📋 Request body received:`, JSON.stringify({ document_id, include_products, include_images, comprehensive }));
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") || "",

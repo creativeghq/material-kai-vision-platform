@@ -48,6 +48,36 @@ export interface LayoutAnalysisResult {
   images: ImageElement[];
   tables: TableElement[];
   textBlocks: TextBlock[];
+  productCandidates: ProductCandidate[];
+}
+
+export interface ProductCandidate {
+  id: string;
+  name: string;
+  confidence: number;
+  pageNumber: number;
+  boundingBox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  contentType: 'product' | 'index' | 'sustainability' | 'technical' | 'moodboard' | 'unknown';
+  patterns: {
+    hasProductName: boolean;
+    hasDimensions: boolean;
+    hasDesignerAttribution: boolean;
+    hasProductDescription: boolean;
+  };
+  extractedData: {
+    productName?: string;
+    dimensions?: string[];
+    designer?: string;
+    colors?: string[];
+    materials?: string[];
+  };
+  associatedElements: string[]; // Element IDs
+  qualityScore: number;
 }
 
 export interface ImageElement {
@@ -124,6 +154,9 @@ export class HTMLDOMAnalyzer {
       // Extract text blocks with semantic information
       const textBlocks = await this.extractTextBlocks(doc);
 
+      // ✅ NEW: Extract product candidates using layout-based detection
+      const productCandidates = await this.extractProductCandidates(doc, elements, textBlocks);
+
       // Store analysis results if documentId provided
       if (documentId) {
         await this.storeAnalysisResults(documentId, {
@@ -132,10 +165,11 @@ export class HTMLDOMAnalyzer {
           images,
           tables,
           textBlocks,
+          productCandidates,
         });
       }
 
-      console.log(`HTML analysis completed: ${elements.length} elements, ${images.length} images, ${tables.length} tables`);
+      console.log(`HTML analysis completed: ${elements.length} elements, ${images.length} images, ${tables.length} tables, ${productCandidates.length} product candidates`);
 
       return {
         structure,
@@ -143,6 +177,7 @@ export class HTMLDOMAnalyzer {
         images,
         tables,
         textBlocks,
+        productCandidates,
       };
 
     } catch (error) {
@@ -763,7 +798,7 @@ export class HTMLDOMAnalyzer {
    */
   private async storeAnalysisResults(documentId: string, results: LayoutAnalysisResult): Promise<void> {
     try {
-      // Store layout analysis
+      // Store layout analysis with product candidates
       await supabase
         .from('document_layout_analysis')
         .insert({
@@ -772,10 +807,17 @@ export class HTMLDOMAnalyzer {
           layout_elements: results.elements as unknown,
           reading_order: results.structure.readingOrder as unknown,
           structure_confidence: results.structure.metadata.confidence,
-          processing_version: '1.0.0',
+          processing_version: '1.1.0', // Updated version for product candidate support
+          analysis_metadata: {
+            product_candidates: results.productCandidates,
+            total_candidates: results.productCandidates.length,
+            high_quality_candidates: results.productCandidates.filter(c => c.qualityScore > 0.7).length,
+            analysis_timestamp: new Date().toISOString(),
+            layout_analysis_version: '1.1.0'
+          } as unknown,
         });
 
-      console.log('Layout analysis results stored successfully');
+      console.log(`Layout analysis results stored successfully with ${results.productCandidates.length} product candidates`);
     } catch (error) {
       console.error('Error storing layout analysis results:', error);
     }
@@ -822,6 +864,254 @@ export class HTMLDOMAnalyzer {
       console.error('Error retrieving analysis results:', error);
       return null;
     }
+  }
+
+  /**
+   * ✅ NEW: Extract product candidates using layout-based detection
+   */
+  async extractProductCandidates(
+    doc: Document,
+    elements: DOMElement[],
+    textBlocks: TextBlock[]
+  ): Promise<ProductCandidate[]> {
+    const candidates: ProductCandidate[] = [];
+
+    console.log('🔍 Starting layout-based product candidate detection...');
+
+    // Analyze each text block for product patterns
+    for (const textBlock of textBlocks) {
+      const candidate = await this.analyzeTextBlockForProduct(textBlock, elements);
+      if (candidate && candidate.confidence > 0.3) { // Minimum confidence threshold
+        candidates.push(candidate);
+      }
+    }
+
+    // Filter out non-product content (index, sustainability, technical)
+    const filteredCandidates = candidates.filter(candidate =>
+      candidate.contentType === 'product' && candidate.qualityScore > 0.5
+    );
+
+    console.log(`🎯 Found ${filteredCandidates.length} high-quality product candidates from ${candidates.length} total candidates`);
+
+    return filteredCandidates;
+  }
+
+  /**
+   * ✅ NEW: Analyze a text block for product patterns
+   */
+  private async analyzeTextBlockForProduct(
+    textBlock: TextBlock,
+    elements: DOMElement[]
+  ): Promise<ProductCandidate | null> {
+    const text = textBlock.text;
+    const id = `product_candidate_${textBlock.id}`;
+
+    // Skip very short text blocks
+    if (text.length < 50) return null;
+
+    // Detect content type first
+    const contentType = this.classifyContentType(text);
+
+    // Skip non-product content early
+    if (contentType !== 'product' && contentType !== 'unknown') {
+      return null;
+    }
+
+    // Extract product patterns
+    const patterns = this.detectProductPatterns(text);
+    const extractedData = this.extractProductData(text);
+
+    // Calculate confidence based on patterns found
+    let confidence = 0;
+    if (patterns.hasProductName) confidence += 0.4;
+    if (patterns.hasDimensions) confidence += 0.3;
+    if (patterns.hasDesignerAttribution) confidence += 0.2;
+    if (patterns.hasProductDescription) confidence += 0.1;
+
+    // Calculate quality score
+    const qualityScore = this.calculateProductQualityScore(text, patterns, extractedData);
+
+    return {
+      id,
+      name: extractedData.productName || `Product Candidate ${textBlock.id}`,
+      confidence,
+      pageNumber: textBlock.pageNumber,
+      boundingBox: textBlock.bbox,
+      contentType: contentType as any,
+      patterns,
+      extractedData,
+      associatedElements: [textBlock.id],
+      qualityScore,
+    };
+  }
+
+  /**
+   * ✅ NEW: Classify content type based on text patterns
+   */
+  private classifyContentType(text: string): string {
+    const lowerText = text.toLowerCase();
+
+    // Index/Table of Contents patterns
+    if (
+      lowerText.includes('table of contents') ||
+      lowerText.includes('index') ||
+      lowerText.includes('contents') ||
+      (lowerText.includes('page') && lowerText.match(/\d+/)) ||
+      lowerText.match(/\.{3,}/) // Dotted lines typical in TOC
+    ) {
+      return 'index';
+    }
+
+    // Sustainability/Certification patterns
+    if (
+      lowerText.includes('sustainability') ||
+      lowerText.includes('certification') ||
+      lowerText.includes('environmental') ||
+      lowerText.includes('eco-friendly') ||
+      lowerText.includes('carbon footprint') ||
+      lowerText.includes('recycled') ||
+      lowerText.includes('leed') ||
+      lowerText.includes('greenguard')
+    ) {
+      return 'sustainability';
+    }
+
+    // Technical specifications patterns
+    if (
+      lowerText.includes('technical characteristics') ||
+      lowerText.includes('specifications') ||
+      lowerText.includes('technical data') ||
+      lowerText.includes('properties') ||
+      (lowerText.includes('mm') && lowerText.includes('thickness')) ||
+      lowerText.includes('weight per') ||
+      lowerText.includes('fire rating')
+    ) {
+      return 'technical';
+    }
+
+    // Moodboard patterns
+    if (
+      lowerText.includes('moodboard') ||
+      lowerText.includes('mood board') ||
+      lowerText.includes('inspiration') ||
+      lowerText.includes('collection overview') ||
+      (lowerText.includes('contrast') && !lowerText.match(/[A-Z]{2,}/))
+    ) {
+      return 'moodboard';
+    }
+
+    // Product patterns (UPPERCASE names, dimensions)
+    if (
+      text.match(/[A-Z]{2,}/) && // Has uppercase words
+      (text.match(/\d+\s*[×x]\s*\d+/) || text.match(/\d+\s*mm/)) // Has dimensions
+    ) {
+      return 'product';
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * ✅ NEW: Detect product-specific patterns in text
+   */
+  private detectProductPatterns(text: string): ProductCandidate['patterns'] {
+    return {
+      hasProductName: this.hasProductNamePattern(text),
+      hasDimensions: this.hasDimensionPattern(text),
+      hasDesignerAttribution: this.hasDesignerPattern(text),
+      hasProductDescription: this.hasProductDescriptionPattern(text),
+    };
+  }
+
+  private hasProductNamePattern(text: string): boolean {
+    // Look for UPPERCASE product names (2+ consecutive uppercase letters)
+    return /[A-Z]{2,}/.test(text);
+  }
+
+  private hasDimensionPattern(text: string): boolean {
+    // Look for dimension patterns: "12×45", "20x40", "15 x 38", "120mm"
+    return /\d+\s*[×x]\s*\d+|\d+\s*mm|\d+\s*cm/.test(text);
+  }
+
+  private hasDesignerPattern(text: string): boolean {
+    // Look for designer attribution patterns
+    return /by\s+[A-Z][a-z]+|BY\s+[A-Z]+|designed\s+by|studio|estudi/i.test(text);
+  }
+
+  private hasProductDescriptionPattern(text: string): boolean {
+    // Look for product description indicators
+    return text.length > 100 && /material|texture|finish|color|collection/i.test(text);
+  }
+
+  /**
+   * ✅ NEW: Extract structured product data from text
+   */
+  private extractProductData(text: string): ProductCandidate['extractedData'] {
+    const data: ProductCandidate['extractedData'] = {};
+
+    // Extract product name (UPPERCASE words)
+    const productNameMatch = text.match(/\b[A-Z]{2,}(?:\s+[A-Z]{2,})*\b/);
+    if (productNameMatch) {
+      data.productName = productNameMatch[0];
+    }
+
+    // Extract dimensions
+    const dimensionMatches = text.match(/\d+\s*[×x]\s*\d+|\d+\s*mm|\d+\s*cm/g);
+    if (dimensionMatches) {
+      data.dimensions = dimensionMatches;
+    }
+
+    // Extract designer/studio
+    const designerMatch = text.match(/(?:by|BY)\s+([A-Z][a-zA-Z\s{}]+)|(?:studio|estudi)\s*([A-Z][a-zA-Z\s{}]*)/i);
+    if (designerMatch) {
+      data.designer = (designerMatch[1] || designerMatch[2]).trim();
+    }
+
+    // Extract colors (common color names and patterns)
+    const colorMatches = text.match(/\b(?:white|black|grey|gray|beige|taupe|sand|clay|anthracite|cream|ivory|brown|blue|green|red|yellow|orange|purple|pink)\b/gi);
+    if (colorMatches) {
+      data.colors = [...new Set(colorMatches.map(c => c.toLowerCase()))];
+    }
+
+    // Extract materials
+    const materialMatches = text.match(/\b(?:ceramic|porcelain|stone|marble|granite|wood|metal|glass|concrete|tile|vinyl|laminate)\b/gi);
+    if (materialMatches) {
+      data.materials = [...new Set(materialMatches.map(m => m.toLowerCase()))];
+    }
+
+    return data;
+  }
+
+  /**
+   * ✅ NEW: Calculate quality score for product candidate
+   */
+  private calculateProductQualityScore(
+    text: string,
+    patterns: ProductCandidate['patterns'],
+    extractedData: ProductCandidate['extractedData']
+  ): number {
+    let score = 0;
+
+    // Base score for having product patterns
+    if (patterns.hasProductName) score += 0.3;
+    if (patterns.hasDimensions) score += 0.25;
+    if (patterns.hasDesignerAttribution) score += 0.2;
+    if (patterns.hasProductDescription) score += 0.15;
+
+    // Bonus for extracted data quality
+    if (extractedData.productName && extractedData.productName.length > 2) score += 0.1;
+    if (extractedData.dimensions && extractedData.dimensions.length > 0) score += 0.1;
+    if (extractedData.designer) score += 0.1;
+    if (extractedData.colors && extractedData.colors.length > 0) score += 0.05;
+    if (extractedData.materials && extractedData.materials.length > 0) score += 0.05;
+
+    // Penalty for very short content
+    if (text.length < 100) score *= 0.5;
+
+    // Penalty for index-like content
+    if (text.toLowerCase().includes('page') && text.match(/\d+/)) score *= 0.3;
+
+    return Math.min(1.0, score);
   }
 }
 
