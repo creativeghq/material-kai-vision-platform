@@ -121,21 +121,21 @@ export const MaterialKnowledgeBase: React.FC = () => {
       }
 
       // Get user's workspace
-      const { data: workspaceData, error: workspaceError } = await supabase
+      const { data: workspaceDataArray, error: workspaceError } = await supabase
         .from('workspace_members')
         .select('workspace_id')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
-        .limit(1)
-        .single();
+        .limit(1);
 
-      if (workspaceError || !workspaceData) {
+      if (workspaceError || !workspaceDataArray || workspaceDataArray.length === 0) {
         console.error('❌ Error getting workspace:', workspaceError);
+        console.error('❌ User has no active workspace membership');
         return;
       }
 
-      const workspaceId = workspaceData.workspace_id;
+      const workspaceId = workspaceDataArray[0].workspace_id;
       console.log(`✅ Using workspace: ${workspaceId}`);
 
       // Load ALL chunks with document information (no limit)
