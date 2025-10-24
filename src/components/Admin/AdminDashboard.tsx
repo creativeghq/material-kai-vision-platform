@@ -98,15 +98,10 @@ const AdminDashboard: React.FC = () => {
 
   const loadPackageStatus = useCallback(async () => {
     try {
-      // Use Supabase MIVAA gateway for health check
-      const { supabase } = await import('@/integrations/supabase/client');
-      await supabase.functions.invoke('mivaa-gateway', {
-        body: {
-          action: 'health_check',
-          payload: {},
-        },
-      });
-
+      // DISABLED: Health check call was causing 500 errors on page load
+      // The mivaa-gateway health check is not critical for dashboard initialization
+      // Re-enable only after MIVAA service is properly configured
+      console.log('⏭️ Skipping MIVAA health check during dashboard load');
     } catch (error) {
       console.error('Error loading package status:', error);
     }

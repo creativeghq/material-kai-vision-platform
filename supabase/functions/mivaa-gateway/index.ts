@@ -419,6 +419,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('❌ MIVAA Gateway Error:', errorMessage);
     console.error('❌ Full error:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
 
     // Provide more detailed error information
     const errorDetails = {
@@ -427,9 +428,10 @@ serve(async (req) => {
       timestamp: new Date().toISOString(),
       mivaaServiceUrl: MIVAA_SERVICE_URL,
       apiKeyConfigured: !!Deno.env.get('MIVAA_API_KEY'),
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
     };
 
-    console.error('❌ Error details:', errorDetails);
+    console.error('❌ Error details:', JSON.stringify(errorDetails, null, 2));
 
     return new Response(
       JSON.stringify(errorDetails),

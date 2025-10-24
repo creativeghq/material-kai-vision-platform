@@ -102,12 +102,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Load page immediately, then fetch data in background
+    setLoading(false);
+    // Start loading data asynchronously without blocking UI
     loadKnowledgeBaseData();
   }, []);
 
   const loadKnowledgeBaseData = async () => {
-    setLoading(true);
     try {
+      // Don't set loading=true to keep UI responsive
+      console.log('🚀 Starting background data load...');
       // Load ALL chunks with document information (no limit)
       console.log('📊 Loading chunks from database...');
       let allChunks: any[] = [];
@@ -268,11 +272,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
       });
       toast({
         title: 'Error',
-        description: 'Failed to load knowledge base data',
+        description: 'Failed to load knowledge base data in background',
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
     }
   };
 
