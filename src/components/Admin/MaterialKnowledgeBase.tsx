@@ -270,10 +270,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       if (productsError) {
         console.error('❌ Error loading products:', productsError);
-        throw productsError;
+        // Don't throw - just log and continue with empty products
+        setProducts([]);
+      } else {
+        console.log(`✅ Loaded ${productsData?.length || 0} products from database`);
+        setProducts(productsData || []);
       }
-      console.log(`✅ Loaded ${productsData?.length || 0} products from database`);
-      setProducts(productsData || []);
 
       // Calculate stats
       console.log('📈 Calculating statistics...');
