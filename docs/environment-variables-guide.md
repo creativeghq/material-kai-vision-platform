@@ -11,30 +11,36 @@ The Material Kai Vision Platform uses **NO .env files**. All environment variabl
 
 ### Frontend (Vercel)
 
-These variables are needed for the React frontend to run on Vercel:
+These variables are needed for the React frontend to run on Vercel. **Use `NEXT_PUBLIC_` prefix for all public variables**:
 
-#### Core Supabase
+#### Core Supabase (REQUIRED)
 ```
-SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-SUPABASE_ANON_KEY=<your-supabase-anon-key>
+NEXT_PUBLIC_SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
-#### Stripe (CRM - Credit System & Subscriptions)
+#### Stripe (CRM - Credit System & Subscriptions) (REQUIRED)
 ```
 STRIPE_PUBLISHABLE_KEY=pk_live_<your-stripe-publishable-key>
 ```
 
-#### MIVAA Service
+#### MIVAA Service (REQUIRED)
 ```
-MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
+NEXT_PUBLIC_MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
 MIVAA_API_KEY=<your-mivaa-jwt-token>
 ```
+⚠️ **Note**: `MIVAA_API_KEY` is used by Supabase Edge Functions (not exposed to frontend). The edge function reads this from Supabase secrets, not Vercel env vars.
 
 #### External APIs (Optional)
 ```
 VITE_OPENAI_API_KEY=<optional-openai-key>
 VITE_HUGGINGFACE_API_KEY=<optional-huggingface-key>
 VITE_REPLICATE_API_TOKEN=<optional-replicate-token>
+```
+
+#### WebSocket (Optional)
+```
+NEXT_PUBLIC_WS_URL=<optional-websocket-url>
 ```
 
 #### Monitoring (Optional)
@@ -123,6 +129,33 @@ VITE_HUGGINGFACE_API_KEY=<optional>
 
 **⚠️ IMPORTANT**: Never commit `.env.local` to git. Add it to `.gitignore`.
 
+## 📊 Environment Variables Summary Table
+
+### Vercel Frontend Variables
+| Variable | Required | Purpose | Prefix |
+|----------|----------|---------|--------|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL | `NEXT_PUBLIC_` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anonymous key | `NEXT_PUBLIC_` |
+| `STRIPE_PUBLISHABLE_KEY` | ✅ | Stripe public key | None |
+| `NEXT_PUBLIC_MIVAA_GATEWAY_URL` | ✅ | MIVAA service URL | `NEXT_PUBLIC_` |
+| `MIVAA_API_KEY` | ✅ | MIVAA authentication (for edge functions) | None |
+| `NEXT_PUBLIC_WS_URL` | ⚠️ | WebSocket URL | `NEXT_PUBLIC_` |
+| `VITE_OPENAI_API_KEY` | ⚠️ | OpenAI fallback embeddings | `VITE_` |
+| `VITE_HUGGINGFACE_API_KEY` | ⚠️ | HuggingFace API | `VITE_` |
+| `VITE_REPLICATE_API_TOKEN` | ⚠️ | Replicate API | `VITE_` |
+| `VITE_SENTRY_DSN` | ⚠️ | Error tracking | `VITE_` |
+
+### Supabase Edge Functions Secrets
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `MIVAA_API_KEY` | ✅ | MIVAA service authentication |
+| `OPENAI_API_KEY` | ✅ | OpenAI API access |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Database admin access |
+| `STRIPE_SECRET_KEY` | ✅ | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | ✅ | Stripe webhook validation |
+
+---
+
 ## 📝 How Variables Are Used
 
 ### In Frontend Code
@@ -136,6 +169,8 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const MIVAA_GATEWAY_URL = process.env.MIVAA_GATEWAY_URL;
 const MIVAA_API_KEY = process.env.MIVAA_API_KEY;
 ```
+
+**Important**: The `NEXT_PUBLIC_` prefix in Vercel is automatically stripped by Vite during build. The vite.config.ts maps these to `process.env` variables without the prefix.
 
 ### In Supabase Client
 
@@ -233,6 +268,89 @@ STRIPE_PUBLISHABLE_KEY=pk_live_...
 | `VERCEL_TOKEN` | String | ✅ | GitHub | Deployment automation |
 | `DEPLOY_SSH_KEY` | String | ✅ | GitHub | Server deployment |
 
+---
+
+## 🔧 Troubleshooting
+
+### Issue: "mivaa-gateway 500 Error"
+```
+Failed to load resource: the server responded with a status of 500
+```
+
+**Causes**:
+1. `MIVAA_API_KEY` not set in Supabase Edge Functions Secrets
+2. Invalid or expired MIVAA API key
+3. MIVAA service is down
+
+**Solution**:
+1. Go to Supabase Dashboard → Edge Functions → Secrets
+2. Verify `MIVAA_API_KEY` is set and valid
+3. Check MIVAA service status at https://v1api.materialshub.gr/health
+
+### Issue: "OpenAI API key not found"
+```
+⚠️ OpenAI API key not found - fallback embedding generation will not work
+```
+
+**Cause**: `VITE_OPENAI_API_KEY` not set in Vercel
+
+**Solution**:
+1. Go to Vercel Dashboard → Project Settings → Environment Variables
+2. Add `VITE_OPENAI_API_KEY=<your-openai-key>`
+3. Redeploy the project
+
+### Issue: "Supabase configuration not found"
+```
+Error: Supabase configuration not found
+```
+
+**Cause**: `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` not set in Vercel
+
+**Solution**:
+1. Go to Vercel Dashboard → Project Settings → Environment Variables
+2. Add both Supabase variables with `NEXT_PUBLIC_` prefix
+3. Redeploy the project
+
+### Issue: "WebSocket disabled"
+```
+📡 WebSocket disabled - NEXT_PUBLIC_WS_URL not configured
+```
+
+**Cause**: `NEXT_PUBLIC_WS_URL` not set (this is optional)
+
+**Solution**:
+- If you need WebSocket support, add `NEXT_PUBLIC_WS_URL=<your-websocket-url>` to Vercel
+- Otherwise, this warning is safe to ignore
+
+### Issue: "Document chunks 400 error"
+```
+Failed to load resource: the server responded with a status of 400
+```
+
+**Causes**:
+1. Invalid query parameters
+2. Missing Supabase authentication
+3. RLS policy blocking access
+
+**Solution**:
+1. Check browser console for detailed error message
+2. Verify Supabase RLS policies allow the query
+3. Check that `NEXT_PUBLIC_SUPABASE_ANON_KEY` has correct permissions
+
+---
+
+## ✅ Verification Checklist
+
+- [ ] Vercel has all `NEXT_PUBLIC_*` variables set
+- [ ] Vercel has `MIVAA_API_KEY` set
+- [ ] Supabase Edge Functions Secrets has `MIVAA_API_KEY`
+- [ ] Supabase Edge Functions Secrets has `OPENAI_API_KEY`
+- [ ] GitHub Secrets has all required keys for CI/CD
+- [ ] No console warnings about missing API keys
+- [ ] mivaa-gateway requests return 200 status
+- [ ] Embedding generation works without errors
+- [ ] Document chunks load successfully
+
 ## 🚀 Setting Up Variables
 
 ### 1. Vercel Environment Variables
@@ -248,7 +366,20 @@ MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
 MIVAA_API_KEY=<your-key>
 ```
 
-### 2. GitHub Secrets
+### 2. Supabase Edge Functions Secrets
+
+Go to Supabase Dashboard → Edge Functions → Secrets
+
+Add these secrets:
+```
+MIVAA_API_KEY=<your-mivaa-jwt-token>
+OPENAI_API_KEY=<your-openai-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+STRIPE_SECRET_KEY=sk_live_<your-stripe-secret-key>
+STRIPE_WEBHOOK_SECRET=whsec_<your-stripe-webhook-secret>
+```
+
+### 3. GitHub Secrets
 
 ```bash
 # Go to GitHub Repository
