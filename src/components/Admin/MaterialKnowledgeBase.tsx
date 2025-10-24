@@ -160,25 +160,30 @@ export const MaterialKnowledgeBase: React.FC = () => {
       let imagesHasMore = true;
 
       while (imagesHasMore) {
-        const { data: imagesData, error: imagesError, count: imagesCount } = await supabase
-          .from('document_images')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .range(imagePage * pageSize, (imagePage + 1) * pageSize - 1);
+        try {
+          const { data: imagesData, error: imagesError, count: imagesCount } = await supabase
+            .from('document_images')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(imagePage * pageSize, (imagePage + 1) * pageSize - 1);
 
-        if (imagesError) {
-          console.error('❌ Error loading images:', imagesError);
-          throw imagesError;
-        }
-
-        if (!imagesData || imagesData.length === 0) {
+          if (imagesError) {
+            console.error('❌ Error loading images:', imagesError);
+            console.error('❌ Error details:', { code: imagesError.code, message: imagesError.message });
+            // Don't throw - continue with empty images
+            imagesHasMore = false;
+          } else if (!imagesData || imagesData.length === 0) {
+            imagesHasMore = false;
+          } else {
+            allImages = allImages.concat(imagesData);
+            imagesTotalCount = imagesCount || 0;
+            console.log(`📷 Fetched image page ${imagePage + 1}: ${imagesData.length} images (total so far: ${allImages.length}/${imagesTotalCount})`);
+            imagePage++;
+            imagesHasMore = imagesData.length === pageSize;
+          }
+        } catch (err) {
+          console.error('❌ Exception loading images:', err);
           imagesHasMore = false;
-        } else {
-          allImages = allImages.concat(imagesData);
-          imagesTotalCount = imagesCount || 0;
-          console.log(`📷 Fetched image page ${imagePage + 1}: ${imagesData.length} images (total so far: ${allImages.length}/${imagesTotalCount})`);
-          imagePage++;
-          imagesHasMore = imagesData.length === pageSize;
         }
       }
 
@@ -237,15 +242,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       // Calculate stats
       console.log('📈 Calculating statistics...');
-      const uniqueDocuments = new Set(chunksData?.map((c: unknown) => (c as any).document_id) || []).size;
-      const avgChunkSize = chunksData?.length ?
-        chunksData.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / chunksData.length : 0;
-      const avgConfidence = imagesData?.length ?
-        imagesData.reduce((sum: number, img: any) => sum + (img.confidence || 0), 0) / imagesData.length : 0;
+      const uniqueDocuments = new Set(allChunks?.map((c: unknown) => (c as any).document_id) || []).size;
+      const avgChunkSize = allChunks?.length ?
+        allChunks.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / allChunks.length : 0;
+      const avgConfidence = allImages?.length ?
+        allImages.reduce((sum: number, img: any) => sum + (img.confidence || 0), 0) / allImages.length : 0;
 
       const calculatedStats = {
-        totalChunks: chunksData?.length || 0,
-        totalImages: imagesData?.length || 0,
+        totalChunks: allChunks?.length || 0,
+        totalImages: allImages?.length || 0,
         totalEmbeddings: embeddingsData?.length || 0,
         totalDocuments: uniqueDocuments,
         avgChunkSize: Math.round(avgChunkSize),
