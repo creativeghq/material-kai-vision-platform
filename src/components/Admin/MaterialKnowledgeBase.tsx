@@ -120,7 +120,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
         return;
       }
 
-      // Get user's workspace
+      // Get user's workspace (now allowed by RLS policy)
       const { data: workspaceDataArray, error: workspaceError } = await supabase
         .from('workspace_members')
         .select('workspace_id')
