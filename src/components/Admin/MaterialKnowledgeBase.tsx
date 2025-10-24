@@ -1038,8 +1038,20 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredImages.map((image) => (
                     <Card key={image.id} className="overflow-hidden">
-                      <div className="aspect-video bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                      <div className="aspect-video bg-muted flex items-center justify-center overflow-hidden">
+                        {image.image_url ? (
+                          <img
+                            src={image.image_url}
+                            alt={image.caption || 'Document image'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.warn(`Failed to load image: ${image.image_url}`);
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                        )}
                       </div>
                       <CardContent className="p-4">
                         <div className="space-y-2">
@@ -1090,41 +1102,77 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   Details
                                 </Button>
                               </DialogTrigger>
-                              <DialogContent className="max-w-4xl">
+                              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                                 <DialogHeader>
                                   <DialogTitle>Image Details</DialogTitle>
                                 </DialogHeader>
-                                <div className="space-y-4">
-                                  <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                                    <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                                <div className="flex-1 overflow-y-auto pr-4 space-y-4">
+                                  <div className="aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+                                    {image.image_url ? (
+                                      <img
+                                        src={image.image_url}
+                                        alt={image.caption || 'Document image'}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          console.warn(`Failed to load image in modal: ${image.image_url}`);
+                                          (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                    ) : (
+                                      <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                                    )}
                                   </div>
 
                                   <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <h4 className="font-medium mb-2">Basic Information</h4>
-                                      <div className="space-y-1 text-sm">
-                                        <p><strong>Type:</strong> {image.image_type || 'Unknown'}</p>
-                                        <p><strong>Page:</strong> {image.page_number || 'N/A'}</p>
-                                        <p><strong>Confidence:</strong> {Math.round((image.confidence || 0) * 100)}%</p>
-                                        <p><strong>Status:</strong> {image.processing_status || 'N/A'}</p>
+                                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                                      <h4 className="font-semibold mb-3 text-blue-900 dark:text-blue-100">Basic Information</h4>
+                                      <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                          <span className="text-blue-700 dark:text-blue-300">Type:</span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">{image.image_type || 'Unknown'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-blue-700 dark:text-blue-300">Page:</span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">{image.page_number || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-blue-700 dark:text-blue-300">Confidence:</span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">{Math.round((image.confidence || 0) * 100)}%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-blue-700 dark:text-blue-300">Status:</span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">{image.processing_status || 'N/A'}</span>
+                                        </div>
                                       </div>
                                     </div>
 
-                                    <div>
-                                      <h4 className="font-medium mb-2">Context Information</h4>
-                                      <div className="space-y-1 text-sm">
-                                        <p><strong>Contextual Name:</strong> {image.contextual_name || 'N/A'}</p>
-                                        <p><strong>Nearest Heading:</strong> {image.nearest_heading || 'N/A'}</p>
-                                        <p><strong>Heading Level:</strong> {image.heading_level || 'N/A'}</p>
-                                        <p><strong>Distance:</strong> {image.heading_distance || 'N/A'}</p>
+                                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                                      <h4 className="font-semibold mb-3 text-purple-900 dark:text-purple-100">Context Information</h4>
+                                      <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                          <span className="text-purple-700 dark:text-purple-300">Contextual Name:</span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.contextual_name || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-purple-700 dark:text-purple-300">Nearest Heading:</span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.nearest_heading || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-purple-700 dark:text-purple-300">Heading Level:</span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.heading_level || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-purple-700 dark:text-purple-300">Distance:</span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.heading_distance || 'N/A'}</span>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
 
                                   {image.ocr_extracted_text && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">OCR Extracted Text</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                                    <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                                      <h4 className="font-semibold mb-2 text-green-900 dark:text-green-100">OCR Extracted Text</h4>
+                                      <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
                                         {image.ocr_extracted_text}
                                       </div>
                                     </div>
@@ -1132,19 +1180,19 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                                   {/* IMPROVED: Show related chunks */}
                                   {image.chunk_id && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Related Chunk</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                                    <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                                      <h4 className="font-semibold mb-2 text-amber-900 dark:text-amber-100">Related Chunk</h4>
+                                      <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
                                         {chunks.find(c => c.id === image.chunk_id)?.content.substring(0, 300) || 'Chunk not found'}...
                                       </div>
                                     </div>
                                   )}
 
                                   {image.visual_features && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Visual Features</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm max-h-48 overflow-y-auto">
-                                        <pre className="whitespace-pre-wrap text-xs font-mono">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                                      <h4 className="font-semibold mb-2 text-indigo-900 dark:text-indigo-100">Visual Features</h4>
+                                      <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm max-h-48 overflow-y-auto border border-indigo-100 dark:border-indigo-800">
+                                        <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 dark:text-gray-300">
                                           {formatJsonForDisplay(image.visual_features)}
                                         </pre>
                                       </div>
@@ -1152,10 +1200,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   )}
 
                                   {image.image_analysis_results && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Analysis Results</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm max-h-48 overflow-y-auto">
-                                        <pre className="whitespace-pre-wrap text-xs font-mono">
+                                    <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-950 dark:to-cyan-900 rounded-lg p-4 border border-cyan-200 dark:border-cyan-800">
+                                      <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Analysis Results</h4>
+                                      <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm max-h-48 overflow-y-auto border border-cyan-100 dark:border-cyan-800">
+                                        <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 dark:text-gray-300">
                                           {formatJsonForDisplay(image.image_analysis_results)}
                                         </pre>
                                       </div>
@@ -1163,10 +1211,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   )}
 
                                   {image.metadata && (
-                                    <div>
-                                      <h4 className="font-medium mb-2">Metadata</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm max-h-48 overflow-y-auto">
-                                        <pre className="whitespace-pre-wrap text-xs font-mono">
+                                    <div className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-950 dark:to-rose-900 rounded-lg p-4 border border-rose-200 dark:border-rose-800">
+                                      <h4 className="font-semibold mb-2 text-rose-900 dark:text-rose-100">Metadata</h4>
+                                      <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm max-h-48 overflow-y-auto border border-rose-100 dark:border-rose-800">
+                                        <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 dark:text-gray-300">
                                           {formatJsonForDisplay(image.metadata)}
                                         </pre>
                                       </div>
