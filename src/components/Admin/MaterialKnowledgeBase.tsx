@@ -112,6 +112,32 @@ export const MaterialKnowledgeBase: React.FC = () => {
     try {
       // Don't set loading=true to keep UI responsive
       console.log('🚀 Starting background data load...');
+
+      // Get current user and their workspace
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ User not authenticated');
+        return;
+      }
+
+      // Get user's workspace
+      const { data: workspaceData, error: workspaceError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (workspaceError || !workspaceData) {
+        console.error('❌ Error getting workspace:', workspaceError);
+        return;
+      }
+
+      const workspaceId = workspaceData.workspace_id;
+      console.log(`✅ Using workspace: ${workspaceId}`);
+
       // Load ALL chunks with document information (no limit)
       console.log('📊 Loading chunks from database...');
       let allChunks: any[] = [];
@@ -134,6 +160,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
               created_at
             )
           `, { count: 'exact' })
+          .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -168,6 +195,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
           const { data: imagesData, error: imagesError, count: imagesCount } = await supabase
             .from('document_images')
             .select('*', { count: 'exact' })
+            .eq('workspace_id', workspaceId)
             .order('created_at', { ascending: false })
             .range(imagePage * pageSize, (imagePage + 1) * pageSize - 1);
 
@@ -202,6 +230,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
       const { data: vectorsData, error: vectorsError, count: vectorsCount } = await supabase
         .from('document_vectors')
         .select('*', { count: 'exact' })
+        .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
 
       if (!vectorsError && vectorsData && vectorsData.length > 0) {
@@ -218,6 +247,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
         const { data: embeddingsTableData, error: embeddingsError, count: embeddingsCount } = await supabase
           .from('embeddings')
           .select('*', { count: 'exact' })
+          .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false });
 
         if (embeddingsError) {
@@ -234,6 +264,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
+        .eq('workspace_id', workspaceId)
         .eq('created_from_type', 'pdf_processing')
         .order('created_at', { ascending: false });
 
