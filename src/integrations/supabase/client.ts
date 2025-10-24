@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Get environment variables from Vercel/GitHub Secrets
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Get environment variables from Vite (defined in vite.config.ts)
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your Vercel Environment Variables.');

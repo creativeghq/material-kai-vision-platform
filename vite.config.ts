@@ -20,10 +20,19 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
-      'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
-      'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
+      // Supabase environment variables (using NEXT_PUBLIC_ prefix as set in Vercel)
+      'process.env.SUPABASE_URL': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_URL),
+      'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      'process.env.NEXT_PUBLIC_SUPABASE_URL': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_URL),
+      'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      // MIVAA environment variables (without NEXT_PUBLIC_ prefix)
       'process.env.MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL),
       'process.env.MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
+      'process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL),
+      'process.env.NEXT_PUBLIC_MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
+      // WebSocket URL (without NEXT_PUBLIC_ prefix)
+      'process.env.WS_URL': JSON.stringify(env.WS_URL),
+      'process.env.NEXT_PUBLIC_WS_URL': JSON.stringify(env.WS_URL),
     },
     build: {
       rollupOptions: {
