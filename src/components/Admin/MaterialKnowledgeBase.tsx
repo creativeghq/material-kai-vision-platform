@@ -61,6 +61,10 @@ interface DocumentImage {
   nearest_heading?: string;
   heading_level?: number;
   heading_distance?: number;
+  related_chunks_count?: number;
+  extracted_metadata?: unknown;
+  material_properties?: unknown;
+  quality_score?: number;
 }
 
 interface Embedding {
@@ -74,6 +78,15 @@ interface Embedding {
   embedding_type?: string; // 'text', 'image', 'hybrid'
   generation_timestamp?: string;
   metadata?: unknown;
+}
+
+interface ImageChunkRelationship {
+  id: string;
+  image_id: string;
+  chunk_id: string;
+  similarity_score: number;
+  relationship_type: 'primary' | 'related' | 'context';
+  created_at: string;
 }
 
 interface KnowledgeBaseStats {
@@ -93,6 +106,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [stats, setStats] = useState<KnowledgeBaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [imageChunkRelationships, setImageChunkRelationships] = useState<ImageChunkRelationship[]>([]);
 
   // Pagination state for chunks
   const [currentPage, setCurrentPage] = useState(1);
@@ -278,6 +292,21 @@ export const MaterialKnowledgeBase: React.FC = () => {
         setProducts(productsData || []);
       }
 
+      // Load image chunk relationships
+      console.log('🔗 Loading image chunk relationships...');
+      const { data: relationshipsData, error: relationshipsError } = await supabase
+        .from('image_chunk_relationships')
+        .select('*')
+        .order('similarity_score', { ascending: false });
+
+      if (relationshipsError) {
+        console.warn('⚠️ Error loading image chunk relationships:', relationshipsError);
+        setImageChunkRelationships([]);
+      } else {
+        console.log(`✅ Loaded ${relationshipsData?.length || 0} image chunk relationships`);
+        setImageChunkRelationships(relationshipsData || []);
+      }
+
       // Calculate stats
       console.log('📈 Calculating statistics...');
       const uniqueDocuments = new Set(allChunks?.map((c: unknown) => (c as any).document_id) || []).size;
@@ -421,6 +450,13 @@ export const MaterialKnowledgeBase: React.FC = () => {
         Math.abs(c.chunk_index - chunk.chunk_index) <= 2,
       )
       .slice(0, limit);
+  };
+
+  // Get all related chunks for an image using semantic relationships
+  const getRelatedChunksForImage = (imageId: string): DocumentChunk[] => {
+    const relationships = imageChunkRelationships.filter(r => r.image_id === imageId);
+    const relatedChunkIds = relationships.map(r => r.chunk_id);
+    return chunks.filter(c => relatedChunkIds.includes(c.id));
   };
 
   // Pagination helpers
@@ -1178,12 +1214,79 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                     </div>
                                   )}
 
-                                  {/* IMPROVED: Show related chunks */}
-                                  {image.chunk_id && (
-                                    <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
-                                      <h4 className="font-semibold mb-2 text-amber-900 dark:text-amber-100">Related Chunk</h4>
-                                      <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
-                                        {chunks.find(c => c.id === image.chunk_id)?.content.substring(0, 300) || 'Chunk not found'}...
+                                  {/* IMPROVED: Show ALL related chunks */}
+                                  {(() => {
+                                    const relatedChunks = getRelatedChunksForImage(image.id);
+                                    return relatedChunks.length > 0 ? (
+                                      <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                                        <h4 className="font-semibold mb-3 text-amber-900 dark:text-amber-100">
+                                          Related Chunks ({relatedChunks.length})
+                                        </h4>
+                                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                                          {relatedChunks.map((chunk) => {
+                                            const relationship = imageChunkRelationships.find(
+                                              r => r.image_id === image.id && r.chunk_id === chunk.id
+                                            );
+                                            return (
+                                              <div key={chunk.id} className="bg-white dark:bg-gray-900 rounded p-3 border border-amber-100 dark:border-amber-800">
+                                                <div className="flex items-center justify-between mb-2">
+                                                  <Badge variant="outline" className="text-xs">
+                                                    Chunk {chunk.chunk_index}
+                                                  </Badge>
+                                                  {relationship && (
+                                                    <Badge variant="secondary" className="text-xs">
+                                                      {Math.round(relationship.similarity_score * 100)}% match
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                                <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-3">
+                                                  {chunk.content.substring(0, 200)}...
+                                                </p>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ) : image.chunk_id ? (
+                                      <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                                        <h4 className="font-semibold mb-2 text-amber-900 dark:text-amber-100">Related Chunk</h4>
+                                        <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
+                                          {chunks.find(c => c.id === image.chunk_id)?.content.substring(0, 300) || 'Chunk not found'}...
+                                        </div>
+                                      </div>
+                                    ) : null;
+                                  })()}
+
+                                  {/* Material Properties */}
+                                  {image.material_properties && Object.keys(image.material_properties as any).length > 0 && (
+                                    <div className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900 rounded-lg p-4 border border-teal-200 dark:border-teal-800">
+                                      <h4 className="font-semibold mb-3 text-teal-900 dark:text-teal-100">Material Properties</h4>
+                                      <div className="grid grid-cols-2 gap-3 text-sm">
+                                        {Object.entries(image.material_properties as any).map(([key, value]) => (
+                                          <div key={key} className="bg-white dark:bg-gray-900 rounded p-2 border border-teal-100 dark:border-teal-800">
+                                            <span className="font-medium text-teal-700 dark:text-teal-300">{key}:</span>
+                                            <p className="text-gray-700 dark:text-gray-300 text-xs mt-1">
+                                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Extracted Metadata */}
+                                  {image.extracted_metadata && Object.keys(image.extracted_metadata as any).length > 0 && (
+                                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                                      <h4 className="font-semibold mb-3 text-orange-900 dark:text-orange-100">Extracted Metadata</h4>
+                                      <div className="space-y-2 text-sm">
+                                        {Object.entries(image.extracted_metadata as any).map(([key, value]) => (
+                                          <div key={key} className="bg-white dark:bg-gray-900 rounded p-2 border border-orange-100 dark:border-orange-800">
+                                            <span className="font-medium text-orange-700 dark:text-orange-300">{key}:</span>
+                                            <p className="text-gray-700 dark:text-gray-300 text-xs mt-1">
+                                              {Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                            </p>
+                                          </div>
+                                        ))}
                                       </div>
                                     </div>
                                   )}
