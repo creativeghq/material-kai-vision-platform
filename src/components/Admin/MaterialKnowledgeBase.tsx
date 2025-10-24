@@ -114,7 +114,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
         .from('document_chunks')
         .select(`
           *,
-          documentsinner(
+          documents(
             id,
             filename,
             metadata,

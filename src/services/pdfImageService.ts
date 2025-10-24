@@ -310,7 +310,7 @@ class PDFImageService {
         .from('document_images')
         .select(`
           *,
-          documentsinner(
+          documents(
             id,
             title,
             filename
