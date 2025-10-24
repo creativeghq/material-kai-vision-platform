@@ -99,6 +99,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [itemsPerPage] = useState(20);
 
   const [activeTab, setActiveTab] = useState('overview');
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -311,6 +312,77 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }
   };
 
+  const deleteImage = async (imageId: string) => {
+    try {
+      setDeletingImageId(imageId);
+      console.log(`🗑️ Deleting image: ${imageId}`);
+
+      // Delete from all related tables first (cascade delete)
+      // 1. Delete from chunk_image_relationships
+      await supabase
+        .from('chunk_image_relationships')
+        .delete()
+        .eq('image_id', imageId);
+
+      // 2. Delete from image_product_associations
+      await supabase
+        .from('image_product_associations')
+        .delete()
+        .eq('image_id', imageId);
+
+      // 3. Delete from product_image_relationships
+      await supabase
+        .from('product_image_relationships')
+        .delete()
+        .eq('image_id', imageId);
+
+      // 4. Delete from image_metafield_values
+      await supabase
+        .from('image_metafield_values')
+        .delete()
+        .eq('image_id', imageId);
+
+      // 5. Delete from image_validations
+      await supabase
+        .from('image_validations')
+        .delete()
+        .eq('image_id', imageId);
+
+      // 6. Finally delete from document_images
+      const { error: deleteError } = await supabase
+        .from('document_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (deleteError) {
+        console.error('❌ Error deleting image:', deleteError);
+        toast({
+          title: 'Error',
+          description: 'Failed to delete image',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Remove from local state
+      setImages(images.filter(img => img.id !== imageId));
+      console.log(`✅ Image deleted successfully: ${imageId}`);
+      toast({
+        title: 'Success',
+        description: 'Image deleted successfully',
+      });
+    } catch (error) {
+      console.error('❌ Error deleting image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete image',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
   const filteredChunks = chunks.filter(chunk =>
     chunk.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (chunk.metadata as any)?.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -381,6 +453,26 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }
 
     return range;
+  };
+
+  const formatJsonForDisplay = (data: unknown): string => {
+    if (!data) return 'N/A';
+    try {
+      if (typeof data === 'string') {
+        return data;
+      }
+      return JSON.stringify(data, null, 2);
+    } catch {
+      return String(data);
+    }
+  };
+
+  const getImageDisplayName = (image: DocumentImage): string => {
+    // Priority: contextual_name > caption > nearest_heading > "Untitled Image"
+    if (image.contextual_name) return image.contextual_name;
+    if (image.caption) return image.caption;
+    if (image.nearest_heading) return `Near: ${image.nearest_heading}`;
+    return 'Untitled Image';
   };
 
   const getDocumentDisplayName = (chunk: DocumentChunk) => {
@@ -959,7 +1051,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           </div>
 
                           <h4 className="font-medium">
-                            {image.contextual_name || image.caption || 'Untitled Image'}
+                            {getImageDisplayName(image)}
                           </h4>
 
                           {image.alt_text && (
@@ -1051,9 +1143,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   {image.visual_features && (
                                     <div>
                                       <h4 className="font-medium mb-2">Visual Features</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                        <pre className="whitespace-pre-wrap">
-                                          {JSON.stringify(image.visual_features, null, 2)}
+                                      <div className="bg-muted/50 rounded-lg p-3 text-sm max-h-48 overflow-y-auto">
+                                        <pre className="whitespace-pre-wrap text-xs font-mono">
+                                          {formatJsonForDisplay(image.visual_features)}
                                         </pre>
                                       </div>
                                     </div>
@@ -1062,9 +1154,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   {image.image_analysis_results && (
                                     <div>
                                       <h4 className="font-medium mb-2">Analysis Results</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                        <pre className="whitespace-pre-wrap">
-                                          {JSON.stringify(image.image_analysis_results, null, 2)}
+                                      <div className="bg-muted/50 rounded-lg p-3 text-sm max-h-48 overflow-y-auto">
+                                        <pre className="whitespace-pre-wrap text-xs font-mono">
+                                          {formatJsonForDisplay(image.image_analysis_results)}
                                         </pre>
                                       </div>
                                     </div>
@@ -1073,9 +1165,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   {image.metadata && (
                                     <div>
                                       <h4 className="font-medium mb-2">Metadata</h4>
-                                      <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                        <pre className="whitespace-pre-wrap">
-                                          {JSON.stringify(image.metadata, null, 2)}
+                                      <div className="bg-muted/50 rounded-lg p-3 text-sm max-h-48 overflow-y-auto">
+                                        <pre className="whitespace-pre-wrap text-xs font-mono">
+                                          {formatJsonForDisplay(image.metadata)}
                                         </pre>
                                       </div>
                                     </div>
@@ -1083,6 +1175,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                 </div>
                               </DialogContent>
                             </Dialog>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteImage(image.id)}
+                              disabled={deletingImageId === image.id}
+                              className="flex-1"
+                            >
+                              {deletingImageId === image.id ? '🗑️ Deleting...' : '🗑️ Delete'}
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
