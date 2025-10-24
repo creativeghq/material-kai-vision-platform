@@ -361,6 +361,9 @@ serve(async (req) => {
       console.log('📤 Request body:', bodyPayload);
     }
 
+    console.log(`🔗 Fetching from: ${mivaaUrl}`);
+    console.log(`🔐 Authorization header: Bearer ${MIVAA_API_KEY ? MIVAA_API_KEY.substring(0, 10) + '...' : 'NOT SET'}`);
+
     const response = await fetch(mivaaUrl, fetchOptions);
 
     // Handle HTML responses for docs endpoints
@@ -370,6 +373,10 @@ serve(async (req) => {
     let responseData;
     let responseContentType = 'application/json';
     const responseText = await response.text();
+
+    console.log(`📥 MIVAA Response Status: ${response.status} ${response.statusText}`);
+    console.log(`📥 Response Content-Type: ${response.headers.get('content-type')}`);
+    console.log(`📥 Response Length: ${responseText.length} bytes`);
 
     if (isDocsEndpoint) {
       responseData = responseText;
@@ -395,6 +402,8 @@ serve(async (req) => {
     }
 
     if (!response.ok) {
+      console.error(`❌ MIVAA returned error status: ${response.status}`);
+      console.error(`❌ Response data:`, responseData);
       throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`);
     }
 

@@ -30,6 +30,8 @@ export default defineConfig(({ mode }) => {
       'process.env.MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
       'process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL': JSON.stringify(env.NEXT_PUBLIC_MIVAA_GATEWAY_URL),
       'process.env.NEXT_PUBLIC_MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
+      // OpenAI API key (for fallback embeddings)
+      'process.env.VITE_OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),
       // WebSocket URL (using NEXT_PUBLIC_ prefix for consistency)
       'process.env.WS_URL': JSON.stringify(env.NEXT_PUBLIC_WS_URL),
       'process.env.NEXT_PUBLIC_WS_URL': JSON.stringify(env.NEXT_PUBLIC_WS_URL),

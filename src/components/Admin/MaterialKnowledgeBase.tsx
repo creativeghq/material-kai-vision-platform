@@ -108,42 +108,82 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const loadKnowledgeBaseData = async () => {
     setLoading(true);
     try {
-      // Load chunks with document information
+      // Load ALL chunks with document information (no limit)
       console.log('📊 Loading chunks from database...');
-      const { data: chunksData, error: chunksError, count: chunksCount } = await supabase
-        .from('document_chunks')
-        .select(`
-          *,
-          documents(
-            id,
-            filename,
-            metadata,
-            processing_status,
-            created_at
-          )
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false });
+      let allChunks: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      let totalCount = 0;
 
-      if (chunksError) {
-        console.error('❌ Error loading chunks:', chunksError);
-        throw chunksError;
+      // Fetch chunks with pagination to handle large datasets
+      while (hasMore) {
+        const { data: chunksData, error: chunksError, count: chunksCount } = await supabase
+          .from('document_chunks')
+          .select(`
+            *,
+            documents(
+              id,
+              filename,
+              metadata,
+              processing_status,
+              created_at
+            )
+          `, { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (chunksError) {
+          console.error('❌ Error loading chunks:', chunksError);
+          throw chunksError;
+        }
+
+        if (!chunksData || chunksData.length === 0) {
+          hasMore = false;
+        } else {
+          allChunks = allChunks.concat(chunksData);
+          totalCount = chunksCount || 0;
+          console.log(`📖 Fetched page ${page + 1}: ${chunksData.length} chunks (total so far: ${allChunks.length}/${totalCount})`);
+          page++;
+          hasMore = chunksData.length === pageSize;
+        }
       }
-      console.log(`✅ Loaded ${chunksData?.length || 0} chunks (total count: ${chunksCount})`);
-      setChunks(chunksData || []);
 
-      // Load images
+      console.log(`✅ Loaded ${allChunks.length} chunks (total count: ${totalCount})`);
+      setChunks(allChunks || []);
+
+      // Load ALL images with pagination
       console.log('🖼️ Loading images from database...');
-      const { data: imagesData, error: imagesError, count: imagesCount } = await supabase
-        .from('document_images')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false });
+      let allImages: any[] = [];
+      let imagePage = 0;
+      let imagesTotalCount = 0;
+      let imagesHasMore = true;
 
-      if (imagesError) {
-        console.error('❌ Error loading images:', imagesError);
-        throw imagesError;
+      while (imagesHasMore) {
+        const { data: imagesData, error: imagesError, count: imagesCount } = await supabase
+          .from('document_images')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(imagePage * pageSize, (imagePage + 1) * pageSize - 1);
+
+        if (imagesError) {
+          console.error('❌ Error loading images:', imagesError);
+          throw imagesError;
+        }
+
+        if (!imagesData || imagesData.length === 0) {
+          imagesHasMore = false;
+        } else {
+          allImages = allImages.concat(imagesData);
+          imagesTotalCount = imagesCount || 0;
+          console.log(`📷 Fetched image page ${imagePage + 1}: ${imagesData.length} images (total so far: ${allImages.length}/${imagesTotalCount})`);
+          imagePage++;
+          imagesHasMore = imagesData.length === pageSize;
+        }
       }
-      console.log(`✅ Loaded ${imagesData?.length || 0} images (total count: ${imagesCount})`);
-      setImages(imagesData || []);
+
+      console.log(`✅ Loaded ${allImages.length} images (total count: ${imagesTotalCount})`);
+      setImages(allImages || []);
 
       // Load embeddings - query both embeddings and document_vectors tables
       // First try document_vectors (primary), then fall back to embeddings table
