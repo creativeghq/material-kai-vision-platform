@@ -91,7 +91,7 @@ export const PDFProcessingMonitor: React.FC = () => {
         <h3 className="font-bold text-red-900 mb-2">⚠️ Critical Issues</h3>
         {metrics.totalChunks > 0 && metrics.totalEmbeddings === 0 && (
           <p className="text-red-700">
-            ❌ No embeddings generated! {metrics.totalChunks} chunks exist but 0 embeddings.
+            ❌ No embeddings generated {metrics.totalChunks} chunks exist but 0 embeddings.
             <br />
             <span className="text-sm">
               This indicates OPENAI_API_KEY is not set in MIVAA deployment.
@@ -100,7 +100,7 @@ export const PDFProcessingMonitor: React.FC = () => {
         )}
         {metrics.totalDocuments > 0 && metrics.totalImages === 0 && (
           <p className="text-red-700">
-            ❌ No images extracted! {metrics.totalDocuments} documents processed but 0 images.
+            ❌ No images extracted {metrics.totalDocuments} documents processed but 0 images.
             <br />
             <span className="text-sm">
               Check MIVAA image extraction service and logs.

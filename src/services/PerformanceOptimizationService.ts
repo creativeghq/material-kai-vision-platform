@@ -36,7 +36,7 @@ export interface PerformanceReport {
 }
 
 class PerformanceOptimizationServiceImpl extends BaseService {
-  private qualityDashboardService: typeof QualityDashboardService;
+  private qualityDashboardService: any;
   private performanceCache: Map<string, PerformanceMetrics> = new Map();
 
   constructor() {
@@ -48,7 +48,7 @@ class PerformanceOptimizationServiceImpl extends BaseService {
       timeout: 30000,
     });
 
-    this.qualityDashboardService = QualityDashboardService.getInstance();
+    this.qualityDashboardService = (QualityDashboardService as any).getInstance();
   }
 
   /**

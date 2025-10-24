@@ -39,7 +39,7 @@ export function isNullish(value: any): value is null | undefined {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function isObject(value: any): value is Record<string, any> {
+export function isObject(value: any): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
@@ -77,7 +77,7 @@ export function isNumberArray(value: any): value is number[] {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function isRecord(value: any): value is Record<string, any> {
+export function isRecord(value: any): value is Record<string, unknown> {
   return isObject(value);
 }
 
@@ -176,7 +176,7 @@ export function isInvalidValidationResult(value: any): value is ValidationResult
 export interface BaseEvent {
   type: string;
   timestamp: string;
-  data?: any;
+  data?: unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,7 +194,7 @@ export function isBaseEvent(value: any): value is BaseEvent {
  */
 export interface BaseConfig {
   enabled: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -252,9 +252,9 @@ export function ensureArray<T>(value: any): T[] {
 
 export function filterValidItems<T>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  array: any[],
+  array: unknown[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  validator: (item: any) => item is T,
+  validator: (item: unknown) => item is T,
 ): T[] {
   return array.filter(validator);
 }
@@ -317,7 +317,7 @@ export function getArrayProperty<T>(
   obj: any,
   key: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  validator?: (item: any) => item is T,
+  validator?: (item: unknown) => item is T,
   defaultValue: T[] = [],
 ): T[] {
   if (!hasProperty(obj, key) || !isArray(obj[key])) {
@@ -349,7 +349,7 @@ export function assertIsNumber(value: any, message = 'Expected number'): asserts
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function assertIsObject(value: any, message = 'Expected object'): asserts value is Record<string, any> {
+export function assertIsObject(value: any, message = 'Expected object'): asserts value is Record<string, unknown> {
   if (!isObject(value)) {
     throw new TypeError(`${message}, got ${typeof value}`);
   }

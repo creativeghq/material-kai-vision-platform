@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface ChunkCoherenceMetrics {
@@ -170,7 +170,7 @@ function getQualityAssessment(score: number): string {
 function scoreChunk(
   chunkId: string,
   content: string,
-  metadata: Record<string, any>
+  metadata: Record<string, any>,
 ): ChunkQualityData {
   const semanticCompleteness = calculateSemanticCompleteness(content);
   const boundaryQuality = calculateBoundaryQuality(content);
@@ -195,10 +195,10 @@ function scoreChunk(
 
   // Generate recommendations based on weak areas
   const recommendations: string[] = [];
-  if (semanticCompleteness < 0.6) recommendations.push("Improve semantic completeness");
-  if (boundaryQuality < 0.6) recommendations.push("Check chunk boundaries");
-  if (structuralIntegrity < 0.6) recommendations.push("Adjust chunk size");
-  if (contextPreservation < 0.5) recommendations.push("Add contextual references");
+  if (semanticCompleteness < 0.6) recommendations.push('Improve semantic completeness');
+  if (boundaryQuality < 0.6) recommendations.push('Check chunk boundaries');
+  if (structuralIntegrity < 0.6) recommendations.push('Adjust chunk size');
+  if (contextPreservation < 0.5) recommendations.push('Add contextual references');
 
   return {
     chunk_id: chunkId,
@@ -238,7 +238,7 @@ function scoreProduct(
   description: string,
   longDescription: string,
   specifications: any,
-  metadata: any
+  metadata: any,
 ): ProductQualityData {
   // Name quality (0-1)
   const nameQuality = calculateProductNameQuality(name);
@@ -288,7 +288,7 @@ function calculateProductNameQuality(name: string): number {
   // Check for meaningful name (not just "Product" or "Untitled")
   const genericNames = ['product', 'untitled', 'item', 'material', 'unknown'];
   const isGeneric = genericNames.some(generic =>
-    name.toLowerCase().includes(generic.toLowerCase())
+    name.toLowerCase().includes(generic.toLowerCase()),
   );
 
   if (isGeneric) return 0.3;
@@ -327,7 +327,7 @@ function calculateProductMetadataRichness(metadata: any): number {
   const valueCount = keys.filter(key =>
     metadata[key] !== null &&
     metadata[key] !== undefined &&
-    metadata[key] !== ''
+    metadata[key] !== '',
   ).length;
 
   // Score based on number of meaningful metadata fields
@@ -341,7 +341,7 @@ function calculateProductSpecificationCompleteness(specifications: any): number 
   const availableSpecs = importantSpecs.filter(spec =>
     specifications[spec] !== null &&
     specifications[spec] !== undefined &&
-    specifications[spec] !== ''
+    specifications[spec] !== '',
   ).length;
 
   return availableSpecs / importantSpecs.length;
@@ -360,7 +360,7 @@ function calculateProductCompleteness(name: string, description: string, specifi
   const requiredFields = [
     name && name.length > 0,
     description && description.length > 0,
-    specifications && Object.keys(specifications).length > 0
+    specifications && Object.keys(specifications).length > 0,
   ];
 
   const completedFields = requiredFields.filter(Boolean).length;
@@ -368,8 +368,8 @@ function calculateProductCompleteness(name: string, description: string, specifi
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -377,23 +377,23 @@ serve(async (req) => {
       document_id,
       include_products = false,
       include_images = false,
-      comprehensive = false
+      comprehensive = false,
     } = await req.json();
 
     if (!document_id) {
       return new Response(
-        JSON.stringify({ error: "document_id is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'document_id is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
     console.log(`🎯 Enhanced quality scoring for document: ${document_id}`);
     console.log(`📋 Options: products=${include_products}, images=${include_images}, comprehensive=${comprehensive}`);
-    console.log(`📋 Request body received:`, JSON.stringify({ document_id, include_products, include_images, comprehensive }));
+    console.log('📋 Request body received:', JSON.stringify({ document_id, include_products, include_images, comprehensive }));
 
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") || "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
     );
 
     console.log(`🎯 Fetching chunks for document ${document_id}...`);
@@ -406,17 +406,17 @@ serve(async (req) => {
 
     while (hasMore) {
       const { data: chunks, error: fetchError } = await supabase
-        .from("document_chunks")
-        .select("*")
-        .eq("document_id", document_id)
-        .order("chunk_index")
+        .from('document_chunks')
+        .select('*')
+        .eq('document_id', document_id)
+        .order('chunk_index')
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (fetchError) {
-        console.error("Failed to fetch chunks:", fetchError);
+        console.error('Failed to fetch chunks:', fetchError);
         return new Response(
-          JSON.stringify({ error: "Failed to fetch chunks", details: fetchError }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
+          JSON.stringify({ error: 'Failed to fetch chunks', details: fetchError }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } },
         );
       }
 
@@ -432,8 +432,8 @@ serve(async (req) => {
 
     if (allChunks.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No chunks found", scored: 0 }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ message: 'No chunks found', scored: 0 }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
@@ -445,19 +445,19 @@ serve(async (req) => {
       try {
         const qualityData = scoreChunk(
           chunk.id,
-          chunk.content || "",
-          chunk.metadata || {}
+          chunk.content || '',
+          chunk.metadata || {},
         );
 
         const { error: updateError } = await supabase
-          .from("document_chunks")
+          .from('document_chunks')
           .update({
             coherence_score: qualityData.coherence_score,
             coherence_metrics: qualityData.coherence_metrics,
             quality_assessment: qualityData.quality_assessment,
             quality_recommendations: qualityData.quality_recommendations,
           })
-          .eq("id", chunk.id);
+          .eq('id', chunk.id);
 
         if (!updateError) {
           scoredCount++;
@@ -480,16 +480,16 @@ serve(async (req) => {
     let totalProducts = 0;
 
     if (include_products) {
-      console.log(`🏷️ Starting product quality scoring...`);
+      console.log('🏷️ Starting product quality scoring...');
 
       // Fetch all products for the document
       const { data: allProducts, error: productsError } = await supabase
-        .from("products")
-        .select("id, name, description, long_description, specifications, metadata")
-        .eq("source_document_id", document_id);
+        .from('products')
+        .select('id, name, description, long_description, specifications, metadata')
+        .eq('source_document_id', document_id);
 
       if (productsError) {
-        console.error("Error fetching products:", productsError);
+        console.error('Error fetching products:', productsError);
       } else if (allProducts && allProducts.length > 0) {
         console.log(`📊 Found ${allProducts.length} products to score`);
         totalProducts = allProducts.length;
@@ -499,15 +499,15 @@ serve(async (req) => {
           try {
             const productQualityData = scoreProduct(
               product.id,
-              product.name || "",
-              product.description || "",
-              product.long_description || "",
+              product.name || '',
+              product.description || '',
+              product.long_description || '',
               product.specifications || {},
-              product.metadata || {}
+              product.metadata || {},
             );
 
             const { error: updateError } = await supabase
-              .from("products")
+              .from('products')
               .update({
                 quality_score: productQualityData.quality_score,
                 confidence_score: productQualityData.confidence_score,
@@ -515,7 +515,7 @@ serve(async (req) => {
                 quality_metrics: productQualityData.quality_metrics,
                 quality_assessment: productQualityData.quality_assessment,
               })
-              .eq("id", product.id);
+              .eq('id', product.id);
 
             if (!updateError) {
               scoredProducts++;
@@ -539,10 +539,10 @@ serve(async (req) => {
     let documentQualityScore = 0;
     if (scoredCount > 0) {
       const { data: avgChunkQuality } = await supabase
-        .from("document_chunks")
-        .select("coherence_score")
-        .eq("document_id", document_id)
-        .not("coherence_score", "is", null);
+        .from('document_chunks')
+        .select('coherence_score')
+        .eq('document_id', document_id)
+        .not('coherence_score', 'is', null);
 
       if (avgChunkQuality && avgChunkQuality.length > 0) {
         const avgScore = avgChunkQuality.reduce((sum: number, chunk: any) =>
@@ -553,7 +553,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: "Enhanced quality scoring completed",
+        message: 'Enhanced quality scoring completed',
         document_id,
         total_chunks: allChunks.length,
         scored_chunks: scoredCount,
@@ -563,16 +563,16 @@ serve(async (req) => {
         options: {
           include_products,
           include_images,
-          comprehensive
-        }
+          comprehensive,
+        },
       }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }
 });

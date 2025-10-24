@@ -141,7 +141,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setMetadataVisible(!metadataVisible)}
+              onClick={() => setMetadataVisible(!metadataVisible)} onKeyDown={(e) => e.key === 'Enter' && setMetadataVisible(!metadataVisible)}
               className="flex items-center gap-2"
             >
               {metadataVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -153,7 +153,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(entry.metadata?.storage_info?.pdf_storage_url, '_blank')}
+              onClick={() => window.open(entry.metadata?.storage_info?.pdf_storage_url, '_blank')} onKeyDown={(e) => e.key === 'Enter' && window.open()}
               className="flex items-center gap-2"
             >
               <FileText className="h-4 w-4" />
@@ -176,8 +176,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                 <Info className="h-5 w-5" />
                 Content Overview
               </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+            </CardHeader><CardContent className="space-y-3">
               <p className="text-sm">{entry.content}</p>
 
               {entry.semantic_tags && entry.semantic_tags.length > 0 && (
@@ -212,9 +211,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                       }
                     </Button>
                   </CollapsibleTrigger>
-                </CardHeader>
-
-                <CollapsibleContent>
+                </CardHeader><CollapsibleContent>
                   <CardContent className="pt-0">
                     <div className="space-y-3">
                       {chunks.map((chunk) => (
@@ -223,7 +220,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                           className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/50 ${
                             selectedChunk?.id === chunk.id ? 'border-primary bg-primary/5' : ''
                           }`}
-                          onClick={() => handleChunkClick(chunk)}
+                          onClick={() => handleChunkClick(chunk)} onKeyDown={(e) => e.key === 'Enter' && handleChunkClick(chunk)}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1">
@@ -286,9 +283,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                     }
                   </Button>
                 </CollapsibleTrigger>
-              </CardHeader>
-
-              <CollapsibleContent>
+              </CardHeader><CollapsibleContent>
                 <CardContent className="pt-0">
                   <PDFImageGallery
                     documentId={entry.id}
@@ -314,8 +309,7 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                 <div className="text-sm text-muted-foreground">
                   Material properties extracted from this document
                 </div>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 {entry.metadata?.functional_metadata ? (
                   <EnhancedFunctionalMetadataCard
                     functionalMetadata={entry.metadata.functional_metadata}
@@ -385,6 +379,11 @@ export const KnowledgeBasePDFViewer: React.FC<KnowledgeBasePDFViewerProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => setSelectedChunk(null)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSelectedChunk(null);
+                  }
+                }}
               >
                 Close Details
               </Button>

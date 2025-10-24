@@ -91,10 +91,10 @@ const QualityStabilityMetricsPanel: React.FC = () => {
 
         if (qualityChunks && qualityChunks.length > 0) {
           const scores = qualityChunks
-            .map((c: any) => c.coherence_score)
-            .filter((s: any) => s !== null) as number[];
+            .map((c: unknown) => (c as any).coherence_score)
+            .filter((s: unknown) => s !== null) as number[];
 
-          const assessments = qualityChunks.map((c: any) => c.quality_assessment);
+          const assessments = qualityChunks.map((c: unknown) => (c as any).quality_assessment);
 
           const qualityMetrics: QualityMetrics = {
             total_chunks: qualityChunks.length,
@@ -102,12 +102,12 @@ const QualityStabilityMetricsPanel: React.FC = () => {
             average_score: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
             min_score: scores.length > 0 ? Math.min(...scores) : 0,
             max_score: scores.length > 0 ? Math.max(...scores) : 0,
-            excellent_count: assessments.filter((a: any) => a === 'Excellent').length,
-            very_good_count: assessments.filter((a: any) => a === 'Very Good').length,
-            good_count: assessments.filter((a: any) => a === 'Good').length,
-            fair_count: assessments.filter((a: any) => a === 'Fair').length,
-            acceptable_count: assessments.filter((a: any) => a === 'Acceptable').length,
-            poor_count: assessments.filter((a: any) => a === 'Poor').length,
+            excellent_count: assessments.filter((a: unknown) => a === 'Excellent').length,
+            very_good_count: assessments.filter((a: unknown) => a === 'Very Good').length,
+            good_count: assessments.filter((a: unknown) => a === 'Good').length,
+            fair_count: assessments.filter((a: unknown) => a === 'Fair').length,
+            acceptable_count: assessments.filter((a: unknown) => a === 'Acceptable').length,
+            poor_count: assessments.filter((a: unknown) => a === 'Poor').length,
           };
 
           let stabilityMetricsResult: StabilityMetrics = {
@@ -202,7 +202,7 @@ const QualityStabilityMetricsPanel: React.FC = () => {
         {/* Refresh Button */}
         <div className="flex justify-end">
           <Button
-            onClick={fetchMetrics}
+            onClick={fetchMetrics} onKeyDown={(e) => e.key === 'Enter' && fetchMetrics()}
             disabled={refreshing}
             className="gap-2"
           >

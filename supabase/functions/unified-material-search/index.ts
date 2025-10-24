@@ -1,16 +1,17 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
 import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 // MIVAA Gateway configuration
@@ -38,7 +39,7 @@ async function generateSearchEmbeddingViaMivaa(query: string): Promise<number[] 
         payload: {
           text: query,
           model: 'text-embedding-3-large',
-          dimensions: 1536
+          dimensions: 1536,
         },
       }),
     });
@@ -49,7 +50,7 @@ async function generateSearchEmbeddingViaMivaa(query: string): Promise<number[] 
     }
 
     const gatewayResponse = await response.json();
-    
+
     if (!gatewayResponse.success) {
       throw new Error(`MIVAA embedding failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
     }
@@ -64,7 +65,7 @@ async function generateSearchEmbeddingViaMivaa(query: string): Promise<number[] 
 // Generate embedding for search query using MIVAA-only approach
 async function generateSearchEmbedding(query: string): Promise<number[] | null> {
   console.log('Using MIVAA for search embedding generation');
-  
+
   try {
     return await generateSearchEmbeddingViaMivaa(query);
   } catch (error) {
@@ -78,7 +79,7 @@ async function performUnifiedSearch(
   query: string,
   searchType: 'text' | 'semantic' | 'hybrid' = 'hybrid',
   category?: string,
-  limit: number = 20
+  limit: number = 20,
 ) {
   const startTime = Date.now();
   const results: any[] = [];
@@ -112,10 +113,10 @@ async function performUnifiedSearch(
               id: img.id,
               url: img.image_url,
               type: img.image_type,
-              is_featured: img.is_featured
+              is_featured: img.is_featured,
             })),
           search_score: 0.8,
-          match_type: 'text'
+          match_type: 'text',
         })));
       }
     }
@@ -127,12 +128,12 @@ async function performUnifiedSearch(
         const { data: vectorResults, error } = await supabase.rpc('vector_similarity_search', {
           query_embedding: `[${embedding.join(',')}]`,
           match_threshold: 0.7,
-          match_count: Math.ceil(limit * 0.4)
+          match_count: Math.ceil(limit * 0.4),
         });
 
         if (!error && vectorResults) {
           const materialIds = vectorResults.map((r: any) => r.material_id).filter(Boolean);
-          
+
           if (materialIds.length > 0) {
             const { data: materials } = await supabase
               .from('materials_catalog')
@@ -158,10 +159,10 @@ async function performUnifiedSearch(
                     id: img.id,
                     url: img.image_url,
                     type: img.image_type,
-                    is_featured: img.is_featured
+                    is_featured: img.is_featured,
                   })),
                 search_score: scoresMap.get(material.id) || 0.7,
-                match_type: 'semantic'
+                match_type: 'semantic',
               })));
             }
           }
@@ -193,8 +194,8 @@ async function performUnifiedSearch(
         total_count: finalResults.length,
         processing_time_ms: Date.now() - startTime,
         search_type: searchType,
-        methods_used: searchType === 'hybrid' ? ['text', 'semantic'] : [searchType]
-      }
+        methods_used: searchType === 'hybrid' ? ['text', 'semantic'] : [searchType],
+      },
     };
 
   } catch (error) {
@@ -204,8 +205,8 @@ async function performUnifiedSearch(
       metadata: {
         total_count: 0,
         processing_time_ms: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Search failed'
-      }
+        error: error instanceof Error ? error.message : 'Search failed',
+      },
     };
   }
 }
@@ -232,10 +233,10 @@ async function handleSearch(request: Request): Promise<Response> {
       return new Response(JSON.stringify({
         success: false,
         error: 'Invalid JSON body',
-        metadata: { processing_time_ms: 0 }
+        metadata: { processing_time_ms: 0 },
       }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
   } else {
@@ -252,10 +253,10 @@ async function handleSearch(request: Request): Promise<Response> {
     return new Response(JSON.stringify({
       success: false,
       error: 'Search query is required',
-      metadata: { processing_time_ms: Date.now() - startTime }
+      metadata: { processing_time_ms: Date.now() - startTime },
     }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -264,7 +265,7 @@ async function handleSearch(request: Request): Promise<Response> {
       query.trim(),
       searchType,
       category,
-      limit
+      limit,
     );
 
     // Measure retrieval quality
@@ -285,7 +286,7 @@ async function handleSearch(request: Request): Promise<Response> {
         query.trim(),
         retrievedChunks,
         relevantChunkIds,
-        supabase
+        supabase,
       );
 
       console.log(`✅ Retrieval Quality: Precision=${(retrievalMetrics.precision * 100).toFixed(1)}%, Recall=${(retrievalMetrics.recall * 100).toFixed(1)}%, MRR=${retrievalMetrics.mrr.toFixed(3)}`);
@@ -334,10 +335,10 @@ async function handleSearch(request: Request): Promise<Response> {
       metadata: {
         ...metadata,
         query: query.substring(0, 100),
-        filters_applied: { category, limit }
-      }
+        filters_applied: { category, limit },
+      },
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
@@ -345,10 +346,10 @@ async function handleSearch(request: Request): Promise<Response> {
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : 'Search failed',
-      metadata: { processing_time_ms: Date.now() - startTime }
+      metadata: { processing_time_ms: Date.now() - startTime },
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 }
@@ -357,10 +358,10 @@ async function handleSearch(request: Request): Promise<Response> {
 async function handleSearchSuggestions(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const params = url.searchParams;
-  
+
   const partial = params.get('q') || params.get('partial') || '';
   const limit = Math.min(parseInt(params.get('limit') || '10'), 20);
-  
+
   const startTime = Date.now();
 
   if (partial.length < 2) {
@@ -369,10 +370,10 @@ async function handleSearchSuggestions(request: Request): Promise<Response> {
       data: [],
       metadata: {
         processing_time_ms: Date.now() - startTime,
-        message: 'Minimum 2 characters required for suggestions'
-      }
+        message: 'Minimum 2 characters required for suggestions',
+      },
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -387,7 +388,7 @@ async function handleSearchSuggestions(request: Request): Promise<Response> {
     const suggestions = (materialSuggestions || []).map((material: any) => ({
       text: material.name,
       type: 'material_name',
-      category: material.category
+      category: material.category,
     }));
 
     return new Response(JSON.stringify({
@@ -396,10 +397,10 @@ async function handleSearchSuggestions(request: Request): Promise<Response> {
       metadata: {
         total_count: suggestions.length,
         processing_time_ms: Date.now() - startTime,
-        partial_query: partial
-      }
+        partial_query: partial,
+      },
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
@@ -407,10 +408,10 @@ async function handleSearchSuggestions(request: Request): Promise<Response> {
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get suggestions',
-      metadata: { processing_time_ms: Date.now() - startTime }
+      metadata: { processing_time_ms: Date.now() - startTime },
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 }
@@ -443,20 +444,20 @@ Deno.serve(async (req: Request) => {
       default:
         return new Response(JSON.stringify({
           success: false,
-          error: 'Method not allowed. Use GET or POST.'
+          error: 'Method not allowed. Use GET or POST.',
         }), {
           status: 405,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
   } catch (error) {
     console.error('Unified Material Search API error:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: 'Internal server error'
+      error: 'Internal server error',
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

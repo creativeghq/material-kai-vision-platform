@@ -34,7 +34,7 @@ interface UnifiedAITestResponse {
     analysis?: string;
     recommendations?: string[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    materials?: any[];
+    materials?: unknown[];
     entities?: Array<{
       type: string;
       value: string;
@@ -48,7 +48,7 @@ interface UnifiedAITestResponse {
   error?: {
     message: string;
     code: string;
-    details?: any;
+    details?: unknown;
   };
   metadata?: {
     timestamp: string;
@@ -167,7 +167,7 @@ interface MultiModalTestResult {
     materials?: Array<{
       name: string;
       confidence: number;
-      properties?: Record<string, any>;
+      properties?: Record<string, unknown>;
     }>;
     analysis_summary?: string;
     confidence_score: number;
@@ -278,7 +278,7 @@ export const AITestingPanel: React.FC = () => {
         throw new Error(`Multi-modal analysis failed: ${standardizedResponse.error?.message || 'Unknown error'}`);
       }
 
-      const data = standardizedResponse.data!;
+      const data = standardizedResponse.data;
 
       // Create test result with standardized data
       const testResult: MultiModalTestResult = {
@@ -291,12 +291,12 @@ export const AITestingPanel: React.FC = () => {
         },
         results: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          entities: (data.entities || []).map((entity: any) => ({
-            type: entity.type || 'unknown',
-            text: entity.text || entity.value || 'unknown',
-            confidence: entity.confidence || 0.8,
+          entities: (data.entities || []).map((entity: unknown) => ({
+            type: (entity as any).type || 'unknown',
+            text: (entity as any).text || (entity as any).value || 'unknown',
+            confidence: (entity as any).confidence || 0.8,
           })),
-          materials: data.materials || [],
+          materials: (data.materials as any) || [],
           analysis_summary: data.response || data.analysis || 'Analysis completed successfully',
           confidence_score: data.confidence || 0.8,
         },
@@ -382,11 +382,11 @@ export const AITestingPanel: React.FC = () => {
         query_text: similarityQuery,
         similarity_threshold: similarityThreshold,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        results: (data.results || []).map((item: any) => ({
-          id: item.id || crypto.randomUUID(),
-          title: item.title || item.name || 'Untitled',
-          similarity_score: item.similarity_score || 0,
-          content_preview: (item.content || item.description || '').substring(0, 100) + '...',
+        results: (data.results || []).map((item: unknown) => ({
+          id: (item as any).id || crypto.randomUUID(),
+          title: (item as any).title || (item as any).name || 'Untitled',
+          similarity_score: (item as any).similarity_score || 0,
+          content_preview: ((item as any).content || (item as any).description || '').substring(0, 100) + '...',
         })),
         total_results: data.total_results || 0,
         processing_time_ms: data.processing_time_ms || 0,
@@ -562,6 +562,11 @@ export const AITestingPanel: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Button
                 onClick={() => navigate('/')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate('/');
+                  }
+                }}
                 className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
@@ -569,6 +574,11 @@ export const AITestingPanel: React.FC = () => {
               </Button>
               <Button
                 onClick={() => navigate('/admin')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate('/admin');
+                  }
+                }}
                 className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -606,8 +616,7 @@ export const AITestingPanel: React.FC = () => {
               <Brain className="h-5 w-5" />
               Material Analysis Test
             </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </CardHeader><CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium">Test Image URL</label>
               <Input
@@ -622,6 +631,11 @@ export const AITestingPanel: React.FC = () => {
                     key={i}
                     className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
                     onClick={() => setTestImageUrl(url)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setTestImageUrl(url);
+                      }
+                    }}
                   >
                     Sample {i + 1}
                   </Button>
@@ -631,6 +645,11 @@ export const AITestingPanel: React.FC = () => {
 
             <Button
               onClick={testMaterialAnalysis}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  testMaterialAnalysis();
+                }
+              }}
               disabled={testing || !testImageUrl}
               className="w-full"
             >
@@ -656,8 +675,7 @@ export const AITestingPanel: React.FC = () => {
               <Sparkles className="h-5 w-5" />
               3D Generation Test
             </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </CardHeader><CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium">Test Prompt</label>
               <Textarea
@@ -670,6 +688,11 @@ export const AITestingPanel: React.FC = () => {
 
             <Button
               onClick={test3DGeneration}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  test3DGeneration();
+                }
+              }}
               disabled={testing || !testPrompt}
               className="w-full"
             >
@@ -733,8 +756,7 @@ export const AITestingPanel: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Legacy Test Instructions</CardTitle>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 <div className="space-y-2 text-sm">
                   <p>• Use the <strong>Material Analysis Test</strong> to test hybrid OpenAI/Claude material recognition</p>
                   <p>• Use the <strong>3D Generation Test</strong> to test interior design generation with prompt parsing</p>
@@ -755,8 +777,7 @@ export const AITestingPanel: React.FC = () => {
                     <FileText className="h-5 w-5" />
                     Text Analysis
                   </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </CardHeader><CardContent className="space-y-4">
                   <div>
                     <label className="text-sm font-medium">Test Text</label>
                     <Textarea
@@ -768,6 +789,11 @@ export const AITestingPanel: React.FC = () => {
                   </div>
                   <Button
                     onClick={() => testMultiModalAnalysis('text_analysis')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        testMultiModalAnalysis('text_analysis');
+                      }
+                    }}
                     disabled={multiModalTesting || !multiModalTestText.trim()}
                     className="w-full"
                   >
@@ -793,8 +819,7 @@ export const AITestingPanel: React.FC = () => {
                     <Image className="h-5 w-5" />
                     Image Analysis
                   </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </CardHeader><CardContent className="space-y-4">
                   <div>
                     <label className="text-sm font-medium">Test Image URL</label>
                     <Input
@@ -809,6 +834,11 @@ export const AITestingPanel: React.FC = () => {
                           key={i}
                           className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
                           onClick={() => setMultiModalTestImage(url)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setMultiModalTestImage(url);
+                            }
+                          }}
                         >
                           Sample {i + 1}
                         </Button>
@@ -817,6 +847,11 @@ export const AITestingPanel: React.FC = () => {
                   </div>
                   <Button
                     onClick={() => testMultiModalAnalysis('image_analysis')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        testMultiModalAnalysis('image_analysis');
+                      }
+                    }}
                     disabled={multiModalTesting || !multiModalTestImage.trim()}
                     className="w-full"
                   >
@@ -842,13 +877,17 @@ export const AITestingPanel: React.FC = () => {
                     <Layers className="h-5 w-5" />
                     Combined Analysis
                   </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                </CardHeader><CardContent className="space-y-4">
                   <div className="text-sm text-muted-foreground">
                     Uses both text and image inputs for comprehensive multi-modal analysis.
                   </div>
                   <Button
                     onClick={() => testMultiModalAnalysis('combined_analysis')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        testMultiModalAnalysis('combined_analysis');
+                      }
+                    }}
                     disabled={multiModalTesting || !multiModalTestText.trim() || !multiModalTestImage.trim()}
                     className="w-full"
                   >
@@ -972,8 +1011,7 @@ export const AITestingPanel: React.FC = () => {
                   <Search className="h-5 w-5" />
                   Vector Similarity Search Test
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </CardHeader><CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium">Search Query</label>
                   <Input
@@ -1006,6 +1044,11 @@ export const AITestingPanel: React.FC = () => {
 
                 <Button
                   onClick={testSimilaritySearch}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      testSimilaritySearch();
+                    }
+                  }}
                   disabled={similarityTesting || !similarityQuery.trim()}
                   className="w-full"
                 >
@@ -1100,8 +1143,7 @@ export const AITestingPanel: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Legacy Test Results</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  </CardHeader><CardContent>
                     <div className="space-y-3">
                       {results.map((result, index) => (
                         <div key={index} className="flex items-center justify-between p-3 border rounded">
@@ -1140,8 +1182,7 @@ export const AITestingPanel: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Test Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
+                </CardHeader><CardContent>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="text-center p-4 border rounded">
                       <div className="text-2xl font-bold text-blue-600">{results.length}</div>

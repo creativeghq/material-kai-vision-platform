@@ -1,6 +1,7 @@
 import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
 import { performUnifiedVectorSearch, UnifiedSearchRequest } from '../_shared/unified-vector-search.ts';
 import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
 import { evaluateResponseQuality, type ResponseQualityMetrics } from '../_shared/response-quality.ts';
@@ -108,7 +109,7 @@ Provide a comprehensive answer that synthesizes this information and directly ad
           model: 'gpt-4',
           max_tokens: 1000,
           temperature: 0.3,
-        }
+        },
       }),
     });
 
@@ -118,8 +119,8 @@ Provide a comprehensive answer that synthesizes this information and directly ad
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || data.response || data.content || "Response generated successfully.";
-    
+    return data.choices?.[0]?.message?.content || data.response || data.content || 'Response generated successfully.';
+
   } catch (error) {
     console.error('MIVAA chat completion failed:', error);
     return "I found relevant materials but couldn't generate a detailed response. Please check MIVAA service availability.";
@@ -180,7 +181,7 @@ serve(async (req) => {
         requestBody.query,
         retrievedChunks,
         relevantChunkIds,
-        supabase
+        supabase,
       );
 
       console.log(`✅ Retrieval Quality Metrics: Precision=${(retrievalMetrics.precision * 100).toFixed(1)}%, Recall=${(retrievalMetrics.recall * 100).toFixed(1)}%, MRR=${retrievalMetrics.mrr.toFixed(3)}`);
@@ -208,7 +209,7 @@ serve(async (req) => {
           requestBody.query,
           context || '',
           sourceChunks,
-          supabase
+          supabase,
         );
 
         console.log(`✅ Response Quality: ${responseMetrics.quality_assessment} (${(responseMetrics.overall_quality_score * 100).toFixed(1)}%)`);

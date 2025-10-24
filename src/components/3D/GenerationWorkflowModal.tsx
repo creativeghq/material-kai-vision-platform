@@ -385,6 +385,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
               {!isPaused ? (
                 <Button
                   onClick={handlePauseWorkflow}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handlePauseWorkflow();
+                    }
+                  }}
                   className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
                 >
                   <Pause className="h-3 w-3" />
@@ -393,6 +398,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
               ) : (
                 <Button
                   onClick={handleResumeWorkflow}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleResumeWorkflow();
+                    }
+                  }}
                   className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
                 >
                   <Play className="h-3 w-3" />
@@ -401,6 +411,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
               )}
               <Button
                 onClick={handleRestartWorkflow}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRestartWorkflow();
+                  }
+                }}
                 className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
               >
                 <RotateCcw className="h-3 w-3" />
@@ -555,7 +570,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           {isComplete && (
             <div className="text-center p-4 bg-green-50 border border-green-200 rounded">
               <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-              <p className="font-medium text-green-700">Generation Complete!</p>
+              <p className="font-medium text-green-700">Generation Complete</p>
               <p className="text-sm text-green-600">You can now close this modal to view the generated images.</p>
             </div>
           )}

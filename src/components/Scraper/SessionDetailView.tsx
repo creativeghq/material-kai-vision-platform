@@ -169,7 +169,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       <div className="text-center p-8">
         <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold mb-2">Session not found</h3>
-        <Button onClick={onBack} className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+        <Button onClick={onBack} onKeyDown={(e) => e.key === 'Enter' && onBack()} className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
           Go Back
         </Button>
       </div>
@@ -198,7 +198,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={onBack}>
+        <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={onBack} onKeyDown={(e) => e.key === 'Enter' && onBack()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Sessions
         </Button>
@@ -211,13 +211,13 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
         </div>
         <div className="flex gap-2">
           {canStart && (
-            <Button onClick={startProcessing} disabled={processing}>
+            <Button onClick={startProcessing} onKeyDown={(e) => e.key === 'Enter' && startProcessing()} disabled={processing}>
               <Play className="h-4 w-4 mr-2" />
               {session.status === 'paused' ? 'Resume' : 'Start'}
             </Button>
           )}
           {canPause && (
-            <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={pauseProcessing} disabled={processing}>
+            <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={pauseProcessing} onKeyDown={(e) => e.key === 'Enter' && pauseProcessing()} disabled={processing}>
               <Pause className="h-4 w-4 mr-2" />
               Pause
             </Button>

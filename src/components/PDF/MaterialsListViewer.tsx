@@ -285,12 +285,22 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                       <>
                         <Button
                           onClick={() => setEditingMaterial(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setEditingMaterial(null);
+                            }
+                          }}
                         >
                           <Save className="h-4 w-4 mr-1" />
                           Save
                         </Button>
                         <Button
                           onClick={() => setEditingMaterial(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setEditingMaterial(null);
+                            }
+                          }}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -299,12 +309,22 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                       <>
                         <Button
                           onClick={() => setEditingMaterial(material.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setEditingMaterial(material.id);
+                            }
+                          }}
                         >
                           <Edit3 className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
                         <Button
                           onClick={() => saveMaterialToCatalog(material)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              saveMaterialToCatalog(material);
+                            }
+                          }}
                         >
                           <Plus className="h-4 w-4 mr-1" />
                           Add to Catalog

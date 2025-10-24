@@ -66,15 +66,15 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
       .limit(5);
 
     if (processingData) {
-      processingData.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      processingData.forEach((item: unknown) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         suggestions.push({
-          id: `processing_${item.id}`,
-          text: `${item.extraction_type} analysis`,
+          id: `processing_${(item as any).id}`,
+          text: `${(item as any).extraction_type} analysis`,
           type: 'semantic',
           confidence: 0.85 + Math.random() * 0.15,
           category: 'analysis',
           metadata: {
-            relatedTerms: [item.extraction_type, 'processing', 'analysis'],
+            relatedTerms: [(item as any).extraction_type, 'processing', 'analysis'],
             source: 'processing_results',
           },
         });
@@ -89,12 +89,12 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
       .limit(3);
 
     if (materialsData) {
-      materialsData.forEach((item: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      materialsData.forEach((item: unknown) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         suggestions.push({
-          id: `material_${item.id}`,
-          text: `${item.name} materials`,
+          id: `material_${(item as any).id}`,
+          text: `${(item as any).name} materials`,
           type: 'trending',
-          category: item.category || 'materials',
+          category: (item as any).category || 'materials',
           metadata: {
             popularity: 'high',
             source: 'materials_catalog',

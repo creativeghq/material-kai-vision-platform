@@ -445,7 +445,7 @@ export class DocumentChunkingService {
       filteredChunks.forEach(chunk => {
         chunk.metadata.headers = this.extractRelevantHeaders(
           chunk.content,
-          document.metadata.structure!.headers,
+          document.metadata.structure.headers,
         );
       });
     }

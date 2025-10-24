@@ -117,7 +117,7 @@ export class PDFContentService {
         const workflowService = new ConsolidatedPDFWorkflowService();
         const jobId = await workflowService.startPDFProcessing(file, consolidatedOptions);
 
-        toast.success('PDF processing started with MIVAA!');
+        toast.success('PDF processing started with MIVAA');
 
         return {
           success: true,
@@ -156,7 +156,7 @@ export class PDFContentService {
           throw new Error(`Processing failed: ${processingError.message}`);
         }
 
-        toast.success('PDF processed successfully!');
+        toast.success('PDF processed successfully');
         return processingData as PDFProcessingResult;
       }
 
@@ -193,14 +193,14 @@ export class PDFContentService {
         throw error;
       }
 
-      return (data || []).map((item: any) => ({
-        id: item.id,
-        originalFilename: (item.metadata as Record<string, unknown>)?.original_filename || 'Unknown',
-        processingStatus: item.status || 'unknown',
-        materialCategories: (item.metadata as Record<string, unknown>)?.material_categories || [],
-        materialsDetected: (item.metadata as Record<string, unknown>)?.materials_identified_count || 0,
-        confidence: (item.metadata as Record<string, unknown>)?.confidence_score_avg || 0,
-        createdAt: item.created_at || new Date().toISOString(),
+      return (data || []).map((item: unknown) => ({
+        id: (item as any).id,
+        originalFilename: ((item as any).metadata as Record<string, unknown>)?.original_filename || 'Unknown',
+        processingStatus: (item as any).status || 'unknown',
+        materialCategories: ((item as any).metadata as Record<string, unknown>)?.material_categories || [],
+        materialsDetected: ((item as any).metadata as Record<string, unknown>)?.materials_identified_count || 0,
+        confidence: ((item as any).metadata as Record<string, unknown>)?.confidence_score_avg || 0,
+        createdAt: (item as any).created_at || new Date().toISOString(),
       }));
 
     } catch (error) {

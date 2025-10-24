@@ -104,7 +104,7 @@ export const MaterialRecognition: React.FC = () => {
       setResults(recognitionResults);
       setProgress(100);
 
-      toast.success(`Successfully analyzed ${recognitionResults.length} materials with MIVAA!`);
+      toast.success(`Successfully analyzed ${recognitionResults.length} materials with MIVAA`);
 
     } catch (error) {
       console.error('❌ MIVAA recognition failed:', error);
@@ -137,8 +137,7 @@ export const MaterialRecognition: React.FC = () => {
               Hybrid AI
             </Badge>
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </CardHeader><CardContent className="space-y-4">
           {/* File Upload Area */}
           <div
             {...getRootProps()}
@@ -167,7 +166,14 @@ export const MaterialRecognition: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-medium">Selected Files ({files.length})</h3>
-                <Button className="hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={clearFiles}>
+                <Button
+                  className="hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                  onClick={clearFiles}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      clearFiles();
+                    }
+                  }}>
                   Clear All
                 </Button>
               </div>
@@ -185,6 +191,11 @@ export const MaterialRecognition: React.FC = () => {
                       <Button
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-3"
                         onClick={() => removeFile(index)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            removeFile(index);
+                          }
+                        }}
                       >
                         Remove
                       </Button>
@@ -203,6 +214,11 @@ export const MaterialRecognition: React.FC = () => {
             <div className="flex gap-3">
               <Button
                 onClick={startRecognition}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    startRecognition();
+                  }
+                }}
                 disabled={isProcessing}
                 className="flex-1"
               >
@@ -237,7 +253,7 @@ export const MaterialRecognition: React.FC = () => {
             <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 rounded-lg">
               <CheckCircle className="w-5 h-5 text-green-600" />
               <span className="text-green-800 dark:text-green-200">
-                Recognition completed! Found {results.length} material{results.length !== 1 ? 's' : ''}.
+                Recognition completed Found {results.length} material{results.length !== 1 ? 's' : ''}.
               </span>
             </div>
           )}

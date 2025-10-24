@@ -282,7 +282,7 @@ export const SystemPerformance: React.FC = () => {
       const errorRate = totalJobs > 0 ? (failedJobs.length / totalJobs) * 100 : 0;
 
       // AI model performance from analytics
-      const hybridEvents = analyticsData?.filter((e: any) => e.event_type.includes('hybrid')) || [];
+      const hybridEvents = analyticsData?.filter((e: unknown) => (e as any).event_type.includes('hybrid')) || [];
       let openaiCount = 0, claudeCount = 0, openaiTime = 0, claudeTime = 0;
 
       hybridEvents.forEach((event: any) => {
@@ -400,6 +400,11 @@ export const SystemPerformance: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Button
                 onClick={() => navigate('/')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate('/');
+                  }
+                }}
                 className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <Home className="h-4 w-4" />
@@ -407,6 +412,11 @@ export const SystemPerformance: React.FC = () => {
               </Button>
               <Button
                 onClick={() => navigate('/admin')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate('/admin');
+                  }
+                }}
                 className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -421,7 +431,15 @@ export const SystemPerformance: React.FC = () => {
               </p>
             </div>
           </div>
-          <Button onClick={fetchPerformanceData} disabled={loading}>
+          <Button
+            onClick={fetchPerformanceData}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                fetchPerformanceData();
+              }
+            }}
+            disabled={loading}
+          >
             <Activity className="h-4 w-4 mr-2" />
             Refresh Data
           </Button>
@@ -519,8 +537,7 @@ export const SystemPerformance: React.FC = () => {
                     <Activity className="h-4 w-4" />
                     Active Job Monitoring
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
+                </CardHeader><CardContent>
                   <div className="space-y-4">
                     {enhancedJobs.length > 0 ? (
                       enhancedJobs.slice(0, 5).map((job) => (
@@ -575,8 +592,7 @@ export const SystemPerformance: React.FC = () => {
                     <Layers className="h-4 w-4" />
                     Processing Stages
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
+                </CardHeader><CardContent>
                   {documentMetrics?.processing_stages && documentMetrics.processing_stages.length > 0 ? (
                     <div className="space-y-4">
                       {documentMetrics.processing_stages.map((stage, index) => (
@@ -626,8 +642,7 @@ export const SystemPerformance: React.FC = () => {
                     <TrendingUp className="h-4 w-4" />
                     Performance Trends (24h)
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
+                </CardHeader><CardContent>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="text-center p-4 border rounded">
                       <div className="text-2xl font-bold flex items-center justify-center gap-2">
@@ -709,7 +724,6 @@ export const SystemPerformance: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle>Model Efficiency</CardTitle>
@@ -741,7 +755,6 @@ export const SystemPerformance: React.FC = () => {
               </Card>
             </div>
           </TabsContent>
-
           <TabsContent value="processing-queue" className="space-y-4">
             <Card>
               <CardHeader>
@@ -841,9 +854,7 @@ export const SystemPerformance: React.FC = () => {
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="system-health" className="space-y-4">
+          </TabsContent><TabsContent value="system-health" className="space-y-4">
             <div className="grid md:grid-cols-3 gap-6">
               <Card>
                 <CardHeader>
@@ -878,7 +889,6 @@ export const SystemPerformance: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle>Response Times</CardTitle>
@@ -904,7 +914,6 @@ export const SystemPerformance: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle>Throughput</CardTitle>

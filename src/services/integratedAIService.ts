@@ -188,7 +188,7 @@ export class MaterialAgentOrchestratorAPI {
       console.log('DEBUG: ErrorContext interface requires these fields:');
       console.log('- operation: string');
       console.log('- service: string');
-      console.log('- metadata?: Record<string, any>');
+      console.log('- metadata?: Record<string, unknown>');
       console.log('- timestamp: string');
       console.log('DEBUG: Additional context like "endpoint" should go in metadata field');
       console.log('DEBUG: logDiagnostic functions are undefined and need to be removed');

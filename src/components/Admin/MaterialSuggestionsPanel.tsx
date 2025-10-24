@@ -319,13 +319,13 @@ export const MaterialSuggestionsPanel: React.FC = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={generateSuggestions} disabled={isGenerating}>
+            <Button onClick={generateSuggestions} onKeyDown={(e) => e.key === 'Enter' && generateSuggestions()} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
               Generate Suggestions
             </Button>
 
             {suggestions.length > 0 && (
-              <Button className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground" onClick={test3DIntegration} disabled={isGenerating}>
+              <Button className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground" onClick={test3DIntegration} onKeyDown={(e) => e.key === 'Enter' && test3DIntegration()} disabled={isGenerating}>
                 {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 Test 3D Integration
               </Button>
@@ -348,7 +348,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
             <CardContent>
               {suggestions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No suggestions generated yet. Configure settings and click &quot;Generate Suggestions&quot;.
+                  No suggestions generated yet. Configure settings and click "Generate Suggestions".
                 </div>
               ) : (
                 <div className="grid gap-3">
@@ -384,7 +384,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
             <CardContent>
               {testResults.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No integration tests run yet. Generate suggestions and click &quot;Test 3D Integration&quot;.
+                  No integration tests run yet. Generate suggestions and click "Test 3D Integration".
                 </div>
               ) : (
                 <div className="space-y-3">

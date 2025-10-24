@@ -1,13 +1,14 @@
 /**
  * Product Coverage Expansion Service
- * 
+ *
  * Removes artificial product limits and implements intelligent processing
  * to find ALL expected products from documents with smart quality filtering.
- * 
+ *
  * Target: 10/10 for HARMONY PDF (14+ products expected)
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService } from './base/BaseService';
 
 export interface ProductCoverageConfig {
@@ -15,17 +16,17 @@ export interface ProductCoverageConfig {
   enableUnlimitedProducts: boolean;
   intelligentChunkMapping: boolean;
   smartQualityFiltering: boolean;
-  
+
   // Quality thresholds
   minProductConfidence: number;
   minContentQuality: number;
   minSemanticCoherence: number;
-  
+
   // Processing settings
   maxProcessingTime: number;
   batchSize: number;
   enableParallelProcessing: boolean;
-  
+
   // Advanced features
   enableCrossChunkAnalysis: boolean;
   enableProductMerging: boolean;
@@ -41,7 +42,7 @@ export interface ProductCandidate {
   semanticCoherence: number;
   productName: string;
   productType: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   relatedChunks: string[];
   images: string[];
   pageNumber: number;
@@ -118,10 +119,10 @@ export class ProductCoverageExpansionService extends BaseService {
    */
   async expandProductCoverage(
     documentId: string,
-    workspaceId: string = "ffafc28b-1b8b-4b0d-b226-9f9a6154004e"
+    workspaceId: string = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
   ): Promise<CoverageExpansionResult> {
     const startTime = Date.now();
-    
+
     try {
       console.log(`🚀 Starting product coverage expansion for document ${documentId}`);
 
@@ -151,12 +152,12 @@ export class ProductCoverageExpansionService extends BaseService {
 
       // Step 7: Create products in database
       const creationResults = await this.createValidatedProducts(validatedProducts, documentId, workspaceId);
-      
+
       const processingTime = Date.now() - startTime;
-      
+
       // Step 8: Generate final analysis
       const finalAnalysis = await this.analyzeCurrentCoverage(documentId);
-      
+
       const result: CoverageExpansionResult = {
         success: true,
         totalCandidatesFound: candidates.length,
@@ -179,7 +180,7 @@ export class ProductCoverageExpansionService extends BaseService {
       return result;
 
     } catch (error) {
-      console.error(`❌ Product coverage expansion failed:`, error);
+      console.error('❌ Product coverage expansion failed:', error);
       throw error;
     }
   }
@@ -213,7 +214,7 @@ export class ProductCoverageExpansionService extends BaseService {
 
       // Estimate expected products based on document analysis
       const expectedProducts = await this.estimateExpectedProducts(documentId);
-      
+
       // Identify missing product types
       const expectedTypes = ['flooring', 'wall_covering', 'furniture', 'lighting', 'textile', 'accessory'];
       const missingProductTypes = expectedTypes.filter(type => !productTypes[type]);
@@ -226,7 +227,7 @@ export class ProductCoverageExpansionService extends BaseService {
       };
 
     } catch (error) {
-      console.error(`❌ Failed to analyze current coverage:`, error);
+      console.error('❌ Failed to analyze current coverage:', error);
       return {
         detectedProducts: 0,
         expectedProducts: 10, // Default estimate
@@ -245,7 +246,7 @@ export class ProductCoverageExpansionService extends BaseService {
         .from('document_vectors')
         .select(`
           *,
-          document_images!inner(*)
+          document_imagesinner(*)
         `)
         .eq('document_id', documentId)
         .order('chunk_index', { ascending: true });
@@ -257,7 +258,7 @@ export class ProductCoverageExpansionService extends BaseService {
       return chunks || [];
 
     } catch (error) {
-      console.error(`❌ Failed to get enhanced chunks:`, error);
+      console.error('❌ Failed to get enhanced chunks:', error);
       return [];
     }
   }
@@ -265,18 +266,18 @@ export class ProductCoverageExpansionService extends BaseService {
   /**
    * Perform intelligent chunk-to-product mapping
    */
-  private async performIntelligentMapping(chunks: any[], documentId: string): Promise<ProductCandidate[]> {
+  private async performIntelligentMapping(chunks: unknown[], documentId: string): Promise<ProductCandidate[]> {
     const candidates: ProductCandidate[] = [];
 
     try {
       // Process chunks in batches for better performance
       const batchSize = this.DEFAULT_CONFIG.batchSize;
-      
+
       for (let i = 0; i < chunks.length; i += batchSize) {
         const batch = chunks.slice(i, i + batchSize);
-        
+
         const batchCandidates = await Promise.all(
-          batch.map(chunk => this.analyzeChunkForProducts(chunk, documentId))
+          batch.map(chunk => this.analyzeChunkForProducts(chunk, documentId)),
         );
 
         // Flatten and filter valid candidates
@@ -285,14 +286,14 @@ export class ProductCoverageExpansionService extends BaseService {
           .filter(candidate => candidate !== null) as ProductCandidate[];
 
         candidates.push(...validCandidates);
-        
+
         console.log(`📦 Processed batch ${Math.floor(i / batchSize) + 1}: ${validCandidates.length} candidates found`);
       }
 
       return candidates;
 
     } catch (error) {
-      console.error(`❌ Failed to perform intelligent mapping:`, error);
+      console.error('❌ Failed to perform intelligent mapping:', error);
       return [];
     }
   }
@@ -312,7 +313,7 @@ export class ProductCoverageExpansionService extends BaseService {
 
       // Use AI to analyze chunk for product indicators
       const analysis = await this.analyzeChunkWithAI(content, chunk);
-      
+
       if (analysis.isProductCandidate) {
         const candidate: ProductCandidate = {
           id: crypto.randomUUID(),
@@ -328,8 +329,8 @@ export class ProductCoverageExpansionService extends BaseService {
             ...analysis.metadata,
           },
           relatedChunks: [],
-          images: chunk.document_images?.map((img: any) => img.id) || [],
-          pageNumber: chunk.metadata?.page_number || 1,
+          images: (chunk as any).document_images?.map((img: unknown) => (img as any).id) || [],
+          pageNumber: (chunk as any).metadata?.page_number || 1,
           boundingBox: chunk.metadata?.bbox,
         };
 
@@ -354,15 +355,15 @@ export class ProductCoverageExpansionService extends BaseService {
     semanticCoherence: number;
     productName: string;
     productType: string;
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
   }> {
     // This would integrate with the existing AI services
     // For now, implement heuristic-based analysis
-    
+
     const productIndicators = [
       'collection', 'series', 'design', 'material', 'finish', 'color',
       'dimension', 'size', 'specification', 'feature', 'application',
-      'installation', 'maintenance', 'warranty', 'certification'
+      'installation', 'maintenance', 'warranty', 'certification',
     ];
 
     const productTypeKeywords = {
@@ -371,22 +372,22 @@ export class ProductCoverageExpansionService extends BaseService {
       furniture: ['chair', 'table', 'desk', 'cabinet', 'shelf', 'sofa'],
       lighting: ['light', 'lamp', 'fixture', 'led', 'bulb', 'illumination'],
       textile: ['fabric', 'textile', 'upholstery', 'curtain', 'blind'],
-      accessory: ['accessory', 'hardware', 'handle', 'knob', 'trim']
-    };
+      accessory: ['accessory', 'hardware', 'handle', 'knob', 'trim'],
+  };
 
     const lowerContent = content.toLowerCase();
-    
+
     // Calculate confidence based on product indicators
-    const indicatorMatches = productIndicators.filter(indicator => 
-      lowerContent.includes(indicator)
+    const indicatorMatches = productIndicators.filter(indicator =>
+      lowerContent.includes(indicator),
     ).length;
-    
+
     const confidence = Math.min(indicatorMatches / productIndicators.length * 2, 1.0);
-    
+
     // Determine product type
     let productType = 'unknown';
     let maxTypeScore = 0;
-    
+
     for (const [type, keywords] of Object.entries(productTypeKeywords)) {
       const typeScore = keywords.filter(keyword => lowerContent.includes(keyword)).length;
       if (typeScore > maxTypeScore) {
@@ -453,7 +454,7 @@ export class ProductCoverageExpansionService extends BaseService {
       const similarCandidates = candidates.filter(other =>
         other.id !== candidate.id &&
         !processed.has(other.id) &&
-        this.areSimilarProducts(candidate, other)
+        this.areSimilarProducts(candidate, other),
       );
 
       if (similarCandidates.length > 0) {
@@ -480,7 +481,7 @@ export class ProductCoverageExpansionService extends BaseService {
     // Check product name similarity
     const nameSimilarity = this.calculateStringSimilarity(
       candidate1.productName.toLowerCase(),
-      candidate2.productName.toLowerCase()
+      candidate2.productName.toLowerCase(),
     );
 
     // Check product type match
@@ -500,7 +501,7 @@ export class ProductCoverageExpansionService extends BaseService {
 
     // Use the candidate with highest confidence as base
     const bestCandidate = allCandidates.reduce((best, current) =>
-      current.confidence > best.confidence ? current : best
+      current.confidence > best.confidence ? current : best,
     );
 
     return {
@@ -542,7 +543,7 @@ export class ProductCoverageExpansionService extends BaseService {
   private async createValidatedProducts(
     candidates: ProductCandidate[],
     documentId: string,
-    workspaceId: string
+    workspaceId: string,
   ): Promise<{ created: number; failed: number }> {
     let created = 0;
     let failed = 0;
@@ -612,7 +613,7 @@ export class ProductCoverageExpansionService extends BaseService {
         matrix[j][i] = Math.min(
           matrix[j][i - 1] + 1,
           matrix[j - 1][i] + 1,
-          matrix[j - 1][i - 1] + indicator
+          matrix[j - 1][i - 1] + indicator,
         );
       }
     }

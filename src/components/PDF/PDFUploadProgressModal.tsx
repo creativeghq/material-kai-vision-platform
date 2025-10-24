@@ -517,7 +517,16 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
             <div className="flex items-center gap-2">
               {isFailed && onRetry && (
-                <Button variant="outline" size="sm" onClick={onRetry}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRetry}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      onRetry();
+                    }
+                  }}
+                >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Retry
                 </Button>

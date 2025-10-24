@@ -32,7 +32,7 @@ const IMAGE_TO_IMAGE_MODELS = [
   'jschoormans/comfyui-interior-remodel',
   'julian-at/interiorly-gen1-dev',
   'jschoormans/interior-v2',
-  'rocketdigitalai/interior-design-sdxl'
+  'rocketdigitalai/interior-design-sdxl',
 ];
 
 // Text-to-image models that can work without reference images
@@ -41,21 +41,21 @@ const TEXT_TO_IMAGE_MODELS = [
   'davisbrown/designer-architecture',
   'stabilityai/stable-diffusion-xl-base-1.0',
   'black-forest-labs/FLUX.1-schnell',
-  'stabilityai/stable-diffusion-2-1'
+  'stabilityai/stable-diffusion-2-1',
 ];
 
 // Validation function for image requirements
 function validateImageRequirements(request: any): { isValid: boolean; errors: string[]; filteredModels?: string[] } {
   const errors: string[] = [];
   const hasReferenceImage = Boolean(request.reference_image_url && request.reference_image_url !== '[NO_IMAGE]');
-  
+
   // If no specific models requested, use all available models
   const requestedModels = request.models || [...TEXT_TO_IMAGE_MODELS, ...IMAGE_TO_IMAGE_MODELS];
-  
+
   // Filter models based on image availability
   const validModels: string[] = [];
   const skippedModels: string[] = [];
-  
+
   for (const model of requestedModels) {
     if (IMAGE_TO_IMAGE_MODELS.includes(model)) {
       if (hasReferenceImage) {
@@ -70,19 +70,19 @@ function validateImageRequirements(request: any): { isValid: boolean; errors: st
       errors.push(`Unknown model: ${model}`);
     }
   }
-  
+
   if (skippedModels.length > 0) {
     console.log(`📋 Skipped ${skippedModels.length} image-to-image models due to missing reference image:`, skippedModels);
   }
-  
+
   if (validModels.length === 0) {
     errors.push('No valid models available for processing. Image-to-image models require a reference image.');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
-    filteredModels: validModels
+    filteredModels: validModels,
   };
 }
 
@@ -103,7 +103,7 @@ async function storeGenerationResult(
   imageUrls: string[] | undefined,
   modelUsed: string | undefined,
   processingTimeMs: number,
-  errorMessage?: string
+  errorMessage?: string,
 ): Promise<string> {
   try {
     const { data, error } = await supabase
@@ -309,7 +309,7 @@ async function updateWorkflowStep(modelName: string, status: 'running' | 'succes
         errorMessage,
         processingTimeMs,
         timestamp: new Date().toISOString(),
-        step_data: step
+        step_data: step,
       };
 
       // Call the new helper function
@@ -318,7 +318,7 @@ async function updateWorkflowStep(modelName: string, status: 'running' | 'succes
         model_name: modelName,
         model_result: modelResult,
         model_error: modelError,
-        api_response: fullApiResponse
+        api_response: fullApiResponse,
       });
 
       console.log(`✅ Updated model progress: ${modelName} -> ${status}`);
@@ -331,28 +331,28 @@ async function updateWorkflowStep(modelName: string, status: 'running' | 'succes
 // Sequential model processing function
 async function processModelsSequentially(generationId: string, modelsQueue: any[], prompt: string, referenceImageUrl?: string): Promise<void> {
   console.log(`🔄 Starting sequential processing of ${modelsQueue.length} models for generation ${generationId}`);
-  
+
   for (let i = 0; i < modelsQueue.length; i++) {
     const model = modelsQueue[i];
     const startTime = Date.now();
-    
+
     try {
       console.log(`🎯 Processing model ${i + 1}/${modelsQueue.length}: ${model.name}`);
-      
+
       // Update status to processing
       await updateWorkflowStep(model.name, 'running');
-      
+
       // Update current step in database
       await supabase
         .from('generation_3d')
         .update({
           current_step: `Processing model ${model.name} (${i + 1}/${modelsQueue.length})`,
-          current_model_index: i
+          current_model_index: i,
         })
         .eq('id', generationId);
 
       let result: any;
-      
+
       // Process based on model type
       if (model.name.includes('huggingface') || model.name.includes('stabilityai') || model.name.includes('black-forest-labs')) {
         // Hugging Face model
@@ -361,32 +361,32 @@ async function processModelsSequentially(generationId: string, modelsQueue: any[
         // Replicate model
         result = await testReplicateModel(model.name, prompt, referenceImageUrl);
       }
-      
+
       const processingTime = Date.now() - startTime;
-      
+
       // Mark as successful
       await updateWorkflowStep(model.name, 'success', result.url || result.predictionId, undefined, processingTime);
-      
+
       console.log(`✅ Model ${model.name} completed successfully in ${processingTime}ms`);
-      
+
       // Add delay between models to prevent rate limiting
       if (i < modelsQueue.length - 1) {
-        console.log(`⏳ Waiting 2 seconds before next model...`);
+        console.log('⏳ Waiting 2 seconds before next model...');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
-      
+
     } catch (error: any) {
       const processingTime = Date.now() - startTime;
       console.error(`❌ Model ${model.name} failed:`, error.message);
-      
+
       // Mark as failed with detailed error
       await updateWorkflowStep(model.name, 'failed', undefined, error.message, processingTime);
-      
+
       // Continue to next model rather than stopping entire workflow
       console.log(`⏭️ Continuing to next model despite failure of ${model.name}`);
     }
   }
-  
+
   // Mark workflow as completed
   await supabase
     .from('generation_3d')
@@ -395,10 +395,10 @@ async function processModelsSequentially(generationId: string, modelsQueue: any[
       generation_status: 'completed',
       current_step: 'All models processed',
       completed_at: new Date().toISOString(),
-      total_processing_time_ms: Date.now() - parseInt(generationId.split('_')[1] || '0')
+      total_processing_time_ms: Date.now() - parseInt(generationId.split('_')[1] || '0'),
     })
     .eq('id', generationId);
-    
+
   console.log(`🏁 Sequential processing completed for generation ${generationId}`);
 }
 
@@ -498,7 +498,7 @@ function validateParseResult(result: any): { score: number } {
 async function parseWithMIVAA(prompt: string) {
   const mivaaApiKey = Deno.env.get('MIVAA_API_KEY');
   const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
-  
+
   if (!mivaaApiKey) {
     throw new Error('MIVAA API key not configured');
   }
@@ -2602,12 +2602,12 @@ serve(async (req) => {
     // Use the new helper function to initialize generation workflow
     const hasReferenceImage = Boolean(request.reference_image_url && request.reference_image_url !== '[NO_IMAGE]');
     const requestType = hasReferenceImage ? 'image_to_image' : 'text_to_image';
-    
+
     // Build models queue from validated models
     const modelsQueue = (validation.filteredModels || TEXT_TO_IMAGE_MODELS.slice(0, 3)).map(model => ({
       name: model,
       type: IMAGE_TO_IMAGE_MODELS.includes(model) ? 'image_to_image' : 'text_to_image',
-      status: 'pending'
+      status: 'pending',
     }));
 
     console.log('Initializing generation workflow with:', JSON.stringify({
@@ -2616,7 +2616,7 @@ serve(async (req) => {
       prompt: request.prompt.substring(0, 50) + '...',
       request_type: requestType,
       models_count: modelsQueue.length,
-      testMode: request.testMode
+      testMode: request.testMode,
     }, null, 2));
 
     // Use the new helper function via raw SQL to initialize workflow
@@ -2629,9 +2629,9 @@ serve(async (req) => {
       p_style_preferences: {
         room_type: request.room_type || request.roomType,
         style: request.style,
-        specific_materials: request.specific_materials || []
+        specific_materials: request.specific_materials || [],
       },
-      p_input_images: hasReferenceImage ? [request.reference_image_url] : []
+      p_input_images: hasReferenceImage ? [request.reference_image_url] : [],
     });
 
     if (createError) {
@@ -2737,7 +2737,7 @@ serve(async (req) => {
         recordData,
         modelsQueue,
         request.prompt,
-        hasReferenceImage ? inputImages[0] : undefined
+        hasReferenceImage ? inputImages[0] : undefined,
       ).catch((error: any) => {
         console.error('❌ Sequential processing failed:', error);
         // Update database with error
@@ -2746,7 +2746,7 @@ serve(async (req) => {
           .update({
             workflow_status: 'failed',
             generation_status: 'failed',
-            error_message: error.message
+            error_message: error.message,
           })
           .eq('id', recordData);
       });
@@ -2759,7 +2759,7 @@ serve(async (req) => {
           generationId: recordData,
           status: 'processing',
           models_count: modelsQueue.length,
-          processing_type: 'sequential'
+          processing_type: 'sequential',
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

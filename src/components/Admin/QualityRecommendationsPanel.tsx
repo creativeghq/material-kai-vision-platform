@@ -54,7 +54,7 @@ export const QualityRecommendationsPanel: React.FC<QualityRecommendationsPanelPr
                 }`}
               >
                 <button
-                  onClick={() => toggleCompleted(index)}
+                  onClick={() => toggleCompleted(index)} onKeyDown={(e) => e.key === 'Enter' && toggleCompleted(index)}
                   className="mt-1 flex-shrink-0"
                 >
                   <CheckCircle

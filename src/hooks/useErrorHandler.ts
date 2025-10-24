@@ -49,7 +49,7 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
   const handleError = useCallback((
     error: Error | string,
     action?: string,
-    additionalInfo?: Record<string, any>,
+    additionalInfo?: Record<string, unknown>,
   ) => {
     const errorMessage = typeof error === 'string' ? error : error.message;
     const errorStack = typeof error === 'string' ? undefined : error.stack;
@@ -100,7 +100,7 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
     setLastError(null);
   }, []);
 
-  const wrapFunction = useCallback(<T extends (...args: any[]) => any>(
+  const wrapFunction = useCallback(<T extends (...args: unknown[]) => any>(
     fn: T,
     action?: string,
   ): T => {

@@ -1,6 +1,6 @@
 /**
  * Advanced Multi-Vector Search Service
- * 
+ *
  * Implements weighted multi-vector similarity search with configurable weights
  * and hybrid query capabilities across all 6 embedding types:
  * 1. Text (1536D) - Semantic text understanding
@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { MultiVectorGenerationService } from './multiVectorGenerationService';
 
 // Search query interfaces
@@ -78,10 +79,10 @@ export interface MultiVectorSearchResult {
   similarity_score?: number;
   quality_score?: number;
   confidence_score?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   embeddings?: Record<string, number[]>;
   tags?: string[];
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
 }
 
 export interface SearchResponse {
@@ -133,7 +134,7 @@ export class MultiVectorSearchService {
 
       // Generate query embeddings
       const queryEmbeddings = await this.generateQueryEmbeddings(query);
-      
+
       if (!queryEmbeddings || Object.keys(queryEmbeddings).length === 0) {
         throw new Error('Failed to generate query embeddings');
       }
@@ -144,7 +145,7 @@ export class MultiVectorSearchService {
 
       // Perform search based on type
       let results: MultiVectorSearchResult[] = [];
-      
+
       if (options.searchType === 'products' || options.searchType === 'all') {
         const productResults = await this.searchProducts(queryEmbeddings, weights, filters, options);
         results.push(...productResults);
@@ -202,7 +203,7 @@ export class MultiVectorSearchService {
    * Generate embeddings for the search query
    */
   private static async generateQueryEmbeddings(
-    query: MultiVectorSearchQuery
+    query: MultiVectorSearchQuery,
   ): Promise<Record<string, number[]>> {
     const embeddings: Record<string, number[]> = {};
 
@@ -216,7 +217,7 @@ export class MultiVectorSearchService {
 
     // Generate visual embedding
     if (query.imageData || query.imageUrl) {
-      const imageSource = query.imageData || query.imageUrl!;
+      const imageSource = query.imageData || query.imageUrl;
       const visualEmbedding = await this.generateVisualEmbedding(imageSource);
       if (visualEmbedding) {
         embeddings.visual = visualEmbedding;
@@ -260,10 +261,10 @@ export class MultiVectorSearchService {
    */
   private static determineSearchStrategy(
     queryEmbeddings: Record<string, number[]>,
-    options: SearchOptions
+    options: SearchOptions,
   ): string {
     const embeddingTypes = Object.keys(queryEmbeddings);
-    
+
     if (embeddingTypes.length === 1) {
       return `single-vector-${embeddingTypes[0]}`;
     } else if (embeddingTypes.includes('multimodal')) {
@@ -282,7 +283,7 @@ export class MultiVectorSearchService {
     queryEmbeddings: Record<string, number[]>,
     weights: EmbeddingWeights,
     filters: SearchFilters,
-    options: SearchOptions
+    options: SearchOptions,
   ): Promise<MultiVectorSearchResult[]> {
     try {
       // Build the SQL query for multi-vector similarity search
@@ -290,38 +291,38 @@ export class MultiVectorSearchService {
       const embeddingTypes = Object.keys(queryEmbeddings);
 
       // Add similarity calculations for each embedding type
-      if (queryEmbeddings.text && weights.text! > 0) {
+      if (queryEmbeddings.text && weights.text > 0) {
         const textVector = `[${queryEmbeddings.text.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (text_embedding_1536 <=> '${textVector}'::vector)) * ${weights.text} as text_similarity`
+          `(1 - (text_embedding_1536 <=> '${textVector}'::vector)) * ${weights.text} as text_similarity`,
         );
       }
 
-      if (queryEmbeddings.visual && weights.visual! > 0) {
+      if (queryEmbeddings.visual && weights.visual > 0) {
         const visualVector = `[${queryEmbeddings.visual.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (visual_clip_embedding_512 <=> '${visualVector}'::vector)) * ${weights.visual} as visual_similarity`
+          `(1 - (visual_clip_embedding_512 <=> '${visualVector}'::vector)) * ${weights.visual} as visual_similarity`,
         );
       }
 
-      if (queryEmbeddings.color && weights.color! > 0) {
+      if (queryEmbeddings.color && weights.color > 0) {
         const colorVector = `[${queryEmbeddings.color.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (color_embedding_256 <=> '${colorVector}'::vector)) * ${weights.color} as color_similarity`
+          `(1 - (color_embedding_256 <=> '${colorVector}'::vector)) * ${weights.color} as color_similarity`,
         );
       }
 
-      if (queryEmbeddings.texture && weights.texture! > 0) {
+      if (queryEmbeddings.texture && weights.texture > 0) {
         const textureVector = `[${queryEmbeddings.texture.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (texture_embedding_256 <=> '${textureVector}'::vector)) * ${weights.texture} as texture_similarity`
+          `(1 - (texture_embedding_256 <=> '${textureVector}'::vector)) * ${weights.texture} as texture_similarity`,
         );
       }
 
-      if (queryEmbeddings.application && weights.application! > 0) {
+      if (queryEmbeddings.application && weights.application > 0) {
         const applicationVector = `[${queryEmbeddings.application.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (application_embedding_512 <=> '${applicationVector}'::vector)) * ${weights.application} as application_similarity`
+          `(1 - (application_embedding_512 <=> '${applicationVector}'::vector)) * ${weights.application} as application_similarity`,
         );
       }
 
@@ -334,12 +335,12 @@ export class MultiVectorSearchService {
       const overallSimilarity = `(${similarityCalculation}) as overall_similarity`;
 
       let whereConditions = ['1=1'];
-      
+
       // Add filters
       if (filters.categories && filters.categories.length > 0) {
         whereConditions.push(`category_id IN ('${filters.categories.join("','")}')`);
       }
-      
+
       if (filters.sourceDocuments && filters.sourceDocuments.length > 0) {
         whereConditions.push(`source_document_id IN ('${filters.sourceDocuments.join("','")}')`);
       }
@@ -413,22 +414,22 @@ export class MultiVectorSearchService {
     queryEmbeddings: Record<string, number[]>,
     weights: EmbeddingWeights,
     filters: SearchFilters,
-    options: SearchOptions
+    options: SearchOptions,
   ): Promise<MultiVectorSearchResult[]> {
     try {
       const embeddingComparisons: string[] = [];
 
-      if (queryEmbeddings.text && weights.text! > 0) {
+      if (queryEmbeddings.text && weights.text > 0) {
         const textVector = `[${queryEmbeddings.text.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (text_embedding_1536 <=> '${textVector}'::vector)) * ${weights.text} as text_similarity`
+          `(1 - (text_embedding_1536 <=> '${textVector}'::vector)) * ${weights.text} as text_similarity`,
         );
       }
 
-      if (queryEmbeddings.visual && weights.visual! > 0) {
+      if (queryEmbeddings.visual && weights.visual > 0) {
         const visualVector = `[${queryEmbeddings.visual.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (visual_clip_embedding_512 <=> '${visualVector}'::vector)) * ${weights.visual} as visual_similarity`
+          `(1 - (visual_clip_embedding_512 <=> '${visualVector}'::vector)) * ${weights.visual} as visual_similarity`,
         );
       }
 
@@ -471,19 +472,19 @@ export class MultiVectorSearchService {
         return [];
       }
 
-      return (chunks || []).map((chunk: any) => ({
-        id: chunk.id,
+      return (chunks || []).map((chunk: unknown) => ({
+        id: (chunk as any).id,
         type: 'chunk' as const,
-        content: chunk.content,
+        content: (chunk as any).content,
         similarity: {
-          overall: chunk.overall_similarity || 0,
-          text: chunk.text_similarity || undefined,
-          visual: chunk.visual_similarity || undefined,
+          overall: (chunk as any).overall_similarity || 0,
+          text: (chunk as any).text_similarity || undefined,
+          visual: (chunk as any).visual_similarity || undefined,
         },
-        confidence: chunk.overall_similarity || 0,
+        confidence: (chunk as any).overall_similarity || 0,
         metadata: {
-          document_id: chunk.document_id,
-          ...chunk.metadata,
+          document_id: (chunk as any).document_id,
+          ...(chunk as any).metadata,
         },
       }));
 
@@ -500,29 +501,29 @@ export class MultiVectorSearchService {
     queryEmbeddings: Record<string, number[]>,
     weights: EmbeddingWeights,
     filters: SearchFilters,
-    options: SearchOptions
+    options: SearchOptions,
   ): Promise<MultiVectorSearchResult[]> {
     try {
       const embeddingComparisons: string[] = [];
 
-      if (queryEmbeddings.visual && weights.visual! > 0) {
+      if (queryEmbeddings.visual && weights.visual > 0) {
         const visualVector = `[${queryEmbeddings.visual.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (visual_clip_embedding_512 <=> '${visualVector}'::vector)) * ${weights.visual} as visual_similarity`
+          `(1 - (visual_clip_embedding_512 <=> '${visualVector}'::vector)) * ${weights.visual} as visual_similarity`,
         );
       }
 
-      if (queryEmbeddings.color && weights.color! > 0) {
+      if (queryEmbeddings.color && weights.color > 0) {
         const colorVector = `[${queryEmbeddings.color.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (color_embedding_256 <=> '${colorVector}'::vector)) * ${weights.color} as color_similarity`
+          `(1 - (color_embedding_256 <=> '${colorVector}'::vector)) * ${weights.color} as color_similarity`,
         );
       }
 
-      if (queryEmbeddings.texture && weights.texture! > 0) {
+      if (queryEmbeddings.texture && weights.texture > 0) {
         const textureVector = `[${queryEmbeddings.texture.join(',')}]`;
         embeddingComparisons.push(
-          `(1 - (texture_embedding_256 <=> '${textureVector}'::vector)) * ${weights.texture} as texture_similarity`
+          `(1 - (texture_embedding_256 <=> '${textureVector}'::vector)) * ${weights.texture} as texture_similarity`,
         );
       }
 
@@ -599,7 +600,7 @@ export class MultiVectorSearchService {
    */
   private static sortAndLimitResults(
     results: MultiVectorSearchResult[],
-    options: SearchOptions
+    options: SearchOptions,
   ): MultiVectorSearchResult[] {
     // Sort by the specified criteria
     switch (options.sortBy) {
@@ -624,7 +625,7 @@ export class MultiVectorSearchService {
 
     // Apply similarity threshold
     if (options.similarityThreshold) {
-      results = results.filter(result => result.similarity.overall >= options.similarityThreshold!);
+      results = results.filter(result => result.similarity.overall >= options.similarityThreshold);
     }
 
     // Limit results

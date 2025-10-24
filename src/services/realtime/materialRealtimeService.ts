@@ -27,7 +27,7 @@ export interface MaterialSubscriptionCallbacks {
 }
 
 export class MaterialRealtimeService {
-  private supabase: ReturnType<typeof createClient>;
+  private supabase: any;
   private channels: Map<string, any> = new Map();
   private isConnected: boolean = false;
   private callbacks: MaterialSubscriptionCallbacks = {};
@@ -36,7 +36,7 @@ export class MaterialRealtimeService {
   private reconnectDelay: number = 1000;
 
   constructor(config: MaterialRealtimeConfig) {
-    this.supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    this.supabase = (createClient as any)(config.supabaseUrl, config.supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,

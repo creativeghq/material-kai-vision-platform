@@ -148,7 +148,7 @@ class RAGKnowledgeService {
         return [];
       }
 
-      return analytics?.map((a: any) => a.query_text) || [];
+      return analytics?.map((a: unknown) => (a as any).query_text) || [];
 
     } catch (error) {
       console.error('Error getting search suggestions:', error);

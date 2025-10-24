@@ -172,7 +172,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                 </div>
               ) : moodboards.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
-                  No moodboards found. Create your first one below!
+                  No moodboards found. Create your first one below
                 </div>
               ) : (
                 <>
@@ -200,7 +200,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                     className="w-full"
                   >
                     {adding ? (
-                      <>Adding...</>
+                      'Adding...'
                     ) : (
                       <>
                         <Check className="h-4 w-4 mr-2" />

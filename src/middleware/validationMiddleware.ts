@@ -219,7 +219,7 @@ function createValidationMiddleware<T>(
 /**
  * Utility function to get nested value from object
  */
-function getNestedValue(obj: Record<string, any>, path: (string | number)[]): any {
+function getNestedValue(obj: Record<string, unknown>, path: (string | number)[]): any {
   return path.reduce((current: any, key) => {
     return current && typeof current === 'object' ? current[key] : undefined;
   }, obj);

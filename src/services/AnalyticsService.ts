@@ -148,7 +148,7 @@ class AnalyticsServiceImpl extends BaseService {
    */
   async getReport(workspaceId: string, days: number = 30): Promise<AnalyticsReport> {
     return this.executeOperation(async () => {
-      const metrics = await this.getMetrics(workspaceId, days);
+      const metrics = await this.getAnalyticsMetrics(workspaceId, days);
       const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
       // Get events for trends
@@ -167,20 +167,20 @@ class AnalyticsServiceImpl extends BaseService {
       const trends = this.calculateTrends(events || []);
 
       // Calculate top events
-      const topEvents = Object.entries(metrics.events_by_type)
+      const topEvents = Object.entries((metrics as any).events_by_type || {})
         .map(([eventType, count]) => ({
           event_type: eventType,
           count,
-          percentage: (count / metrics.total_events) * 100,
+          percentage: ((count as any) / ((metrics as any).total_events || 1)) * 100,
         }))
-        .sort((a, b) => b.count - a.count)
+        .sort((a, b) => (b.count as any) - (a.count as any))
         .slice(0, 10);
 
       return {
         period: `Last ${days} days`,
         metrics,
         trends,
-        top_events: topEvents,
+        top_events: topEvents as any,
       };
     }, 'getReport');
   }
@@ -235,17 +235,17 @@ class AnalyticsServiceImpl extends BaseService {
    * Private helper methods
    */
 
-  private calculateAverageResponseTime(events: any[]): number {
+  private calculateAverageResponseTime(events: unknown[]): number {
     const responseTimes = events
-      .filter(e => e.metadata?.response_time)
-      .map(e => e.metadata.response_time as number);
+      .filter(e => (e as any).metadata?.response_time)
+      .map(e => (e as any).metadata.response_time as number);
 
     if (responseTimes.length === 0) return 0;
 
     return responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
   }
 
-  private calculateTrends(events: any[]): Array<{
+  private calculateTrends(events: unknown[]): Array<{
     date: string;
     event_count: number;
     error_count: number;
@@ -253,11 +253,11 @@ class AnalyticsServiceImpl extends BaseService {
     const trendsByDate = new Map<string, { events: number; errors: number }>();
 
     events.forEach(event => {
-      const date = new Date(event.created_at).toLocaleDateString();
+      const date = new Date((event as any).created_at).toLocaleDateString();
       const current = trendsByDate.get(date) || { events: 0, errors: 0 };
 
       current.events++;
-      if (event.metadata?.error) {
+      if ((event as any).metadata?.error) {
         current.errors++;
       }
 

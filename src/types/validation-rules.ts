@@ -36,7 +36,7 @@ export type ValidationSeverity = 'info' | 'warning' | 'error' | 'critical';
 export interface ValidationRuleDefinition {
   field: string;
   operator: ValidationOperator;
-  value: any;
+  value: unknown;
   threshold?: number;
   message?: string;
 }
@@ -104,7 +104,7 @@ export interface ValidationResult {
   passed: boolean;
   severity: ValidationSeverity;
   message?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   issues?: Array<{
     type: string;
     description: string;
@@ -125,7 +125,7 @@ export interface ValidationResultInsert {
   passed: boolean;
   severity: ValidationSeverity;
   message?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   issues?: Array<{
     type: string;
     description: string;
@@ -141,7 +141,7 @@ export interface ValidationResultUpdate {
   passed?: boolean;
   severity?: ValidationSeverity;
   message?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   issues?: Array<{
     type: string;
     description: string;
@@ -157,7 +157,7 @@ export interface ValidationRequest {
   chunk_id: string;
   workspace_id: string;
   rule_ids?: string[]; // If not provided, apply all active rules
-  chunk_data?: Record<string, any>;
+  chunk_data?: Record<string, unknown>;
 }
 
 /**

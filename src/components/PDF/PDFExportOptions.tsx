@@ -181,12 +181,12 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Button onClick={exportToCSV} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+          <Button onClick={exportToCSV} onKeyDown={(e) => e.key === 'Enter' && exportToCSV()} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
             <FileSpreadsheet className="h-4 w-4" />
             Export CSV
           </Button>
 
-          <Button onClick={exportToJSON} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+          <Button onClick={exportToJSON} onKeyDown={(e) => e.key === 'Enter' && exportToJSON()} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
             <FileJson className="h-4 w-4" />
             Export JSON
           </Button>

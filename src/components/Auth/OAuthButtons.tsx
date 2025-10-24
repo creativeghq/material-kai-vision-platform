@@ -54,6 +54,11 @@ export const OAuthButtons: React.FC = () => {
         <Button
           variant="outline"
           onClick={() => handleOAuthSignIn('google')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleOAuthSignIn('google');
+            }
+          }}
           disabled={loading !== null}
           className="w-full"
         >

@@ -86,7 +86,7 @@ export async function debugCORSIssue() {
     console.log('  Error Message:', errorMessage);
 
     if (errorMessage.includes('CORS')) {
-      console.log('  🚨 CORS Error Detected!');
+      console.log('  🚨 CORS Error Detected');
       console.log('  This suggests the browser is blocking the request');
       console.log('  Even though our tests show the server has proper CORS headers');
     }

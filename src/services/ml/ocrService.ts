@@ -99,14 +99,14 @@ export class OCRService extends BaseService<OCRServiceConfig> {
         const textDetector = new ((window as any).TextDetector)();
         const textResults = await (textDetector as any).detect(imageBitmap);
 
-        const blocks: TextBlock[] = (textResults as any[]).map((result: any) => ({
-          text: result.rawValue as string,
-          confidence: (result.confidence as number) || 0.8,
-          bbox: result.boundingBox ? {
-            x: (result.boundingBox as any).x,
-            y: (result.boundingBox as any).y,
-            width: (result.boundingBox as any).width,
-            height: (result.boundingBox as any).height,
+        const blocks: TextBlock[] = (textResults as any[]).map((result: unknown) => ({
+          text: (result as any).rawValue as string,
+          confidence: ((result as any).confidence as number) || 0.8,
+          bbox: (result as any).boundingBox ? {
+            x: ((result as any).boundingBox as any).x,
+            y: ((result as any).boundingBox as any).y,
+            width: ((result as any).boundingBox as any).width,
+            height: ((result as any).boundingBox as any).height,
           } : undefined,
         }));
 

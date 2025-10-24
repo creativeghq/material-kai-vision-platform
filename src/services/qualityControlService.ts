@@ -1,9 +1,9 @@
 /**
  * Quality Control Service with Human-in-the-Loop
- * 
+ *
  * Comprehensive quality validation system with automated scoring, AI confidence assessment,
  * completeness checks, and human review triggers for products below quality thresholds.
- * 
+ *
  * Features:
  * - Automated quality assessment using existing scoring systems
  * - Human review triggers based on configurable thresholds
@@ -19,17 +19,17 @@ export interface QualityThresholds {
   minProductQualityScore: number;
   minProductConfidenceScore: number;
   minProductCompletenessScore: number;
-  
+
   // Chunk quality thresholds
   minChunkCoherenceScore: number;
   minChunkBoundaryQuality: number;
   minChunkSemanticCompleteness: number;
-  
+
   // Image quality thresholds
   minImageQualityScore: number;
   minImageRelevanceScore: number;
   minImageOcrConfidence: number;
-  
+
   // Multi-vector embedding thresholds
   minEmbeddingCoverage: number;
   minEmbeddingConfidence: number;
@@ -88,17 +88,17 @@ export class QualityControlService {
     minProductQualityScore: 0.7,
     minProductConfidenceScore: 0.6,
     minProductCompletenessScore: 0.8,
-    
+
     // Chunk quality thresholds (based on existing scoring)
     minChunkCoherenceScore: 0.65,
     minChunkBoundaryQuality: 0.6,
     minChunkSemanticCompleteness: 0.7,
-    
+
     // Image quality thresholds (based on existing validation)
     minImageQualityScore: 0.6,
     minImageRelevanceScore: 0.5,
     minImageOcrConfidence: 0.5,
-    
+
     // Multi-vector embedding thresholds
     minEmbeddingCoverage: 0.8, // 80% of embedding types should be present
     minEmbeddingConfidence: 0.7,
@@ -118,10 +118,10 @@ export class QualityControlService {
    */
   static async assessProductQuality(
     productId: string,
-    config: Partial<QualityControlConfig> = {}
+    config: Partial<QualityControlConfig> = {},
   ): Promise<QualityAssessment> {
     const finalConfig = { ...this.defaultConfig, ...config };
-    
+
     try {
       console.log(`🔍 Assessing product quality for ${productId}...`);
 
@@ -193,7 +193,7 @@ export class QualityControlService {
       return assessment;
 
     } catch (error) {
-      console.error(`❌ Product quality assessment failed:`, error);
+      console.error('❌ Product quality assessment failed:', error);
       throw error;
     }
   }
@@ -203,10 +203,10 @@ export class QualityControlService {
    */
   static async assessChunkQuality(
     chunkId: string,
-    config: Partial<QualityControlConfig> = {}
+    config: Partial<QualityControlConfig> = {},
   ): Promise<QualityAssessment> {
     const finalConfig = { ...this.defaultConfig, ...config };
-    
+
     try {
       console.log(`🔍 Assessing chunk quality for ${chunkId}...`);
 
@@ -274,7 +274,7 @@ export class QualityControlService {
       return assessment;
 
     } catch (error) {
-      console.error(`❌ Chunk quality assessment failed:`, error);
+      console.error('❌ Chunk quality assessment failed:', error);
       throw error;
     }
   }
@@ -284,10 +284,10 @@ export class QualityControlService {
    */
   static async assessImageQuality(
     imageId: string,
-    config: Partial<QualityControlConfig> = {}
+    config: Partial<QualityControlConfig> = {},
   ): Promise<QualityAssessment> {
     const finalConfig = { ...this.defaultConfig, ...config };
-    
+
     try {
       console.log(`🔍 Assessing image quality for ${imageId}...`);
 
@@ -365,7 +365,7 @@ export class QualityControlService {
       return assessment;
 
     } catch (error) {
-      console.error(`❌ Image quality assessment failed:`, error);
+      console.error('❌ Image quality assessment failed:', error);
       throw error;
     }
   }
@@ -375,7 +375,7 @@ export class QualityControlService {
    */
   static async batchAssessQuality(
     entities: Array<{ id: string; type: 'product' | 'chunk' | 'image' }>,
-    config: Partial<QualityControlConfig> = {}
+    config: Partial<QualityControlConfig> = {},
   ): Promise<{
     assessments: QualityAssessment[];
     summary: {
@@ -386,7 +386,7 @@ export class QualityControlService {
     };
   }> {
     const finalConfig = { ...this.defaultConfig, ...config };
-    
+
     if (!finalConfig.batchProcessingEnabled) {
       throw new Error('Batch processing is disabled');
     }
@@ -402,11 +402,11 @@ export class QualityControlService {
     const batchSize = 10;
     for (let i = 0; i < entities.length; i += batchSize) {
       const batch = entities.slice(i, i + batchSize);
-      
+
       const batchPromises = batch.map(async (entity) => {
         try {
           let assessment: QualityAssessment;
-          
+
           switch (entity.type) {
             case 'product':
               assessment = await this.assessProductQuality(entity.id, config);
@@ -511,7 +511,7 @@ export class QualityControlService {
    */
   private static identifyQualityIssues(
     qualityMetrics: Record<string, number>,
-    thresholds: QualityThresholds
+    thresholds: QualityThresholds,
   ): QualityIssue[] {
     const issues: QualityIssue[] = [];
 
@@ -588,7 +588,7 @@ export class QualityControlService {
    */
   private static identifyChunkQualityIssues(
     qualityMetrics: Record<string, number>,
-    thresholds: QualityThresholds
+    thresholds: QualityThresholds,
   ): QualityIssue[] {
     const issues: QualityIssue[] = [];
 
@@ -639,7 +639,7 @@ export class QualityControlService {
    */
   private static identifyImageQualityIssues(
     qualityMetrics: Record<string, number>,
-    thresholds: QualityThresholds
+    thresholds: QualityThresholds,
   ): QualityIssue[] {
     const issues: QualityIssue[] = [];
 
@@ -690,7 +690,7 @@ export class QualityControlService {
    */
   private static generateRecommendations(
     issues: QualityIssue[],
-    qualityMetrics: Record<string, number>
+    qualityMetrics: Record<string, number>,
   ): string[] {
     const recommendations: string[] = [];
 
@@ -735,7 +735,7 @@ export class QualityControlService {
    */
   private static generateChunkRecommendations(
     issues: QualityIssue[],
-    qualityMetrics: Record<string, number>
+    qualityMetrics: Record<string, number>,
   ): string[] {
     const recommendations: string[] = [];
 
@@ -765,7 +765,7 @@ export class QualityControlService {
    */
   private static generateImageRecommendations(
     issues: QualityIssue[],
-    qualityMetrics: Record<string, number>
+    qualityMetrics: Record<string, number>,
   ): string[] {
     const recommendations: string[] = [];
 
@@ -810,11 +810,11 @@ export class QualityControlService {
         }]);
 
       if (error) {
-        console.error(`❌ Failed to store quality assessment:`, error);
+        console.error('❌ Failed to store quality assessment:', error);
         // Don't throw error - assessment can continue without storage
       }
     } catch (error) {
-      console.error(`❌ Failed to store quality assessment:`, error);
+      console.error('❌ Failed to store quality assessment:', error);
     }
   }
 
@@ -823,7 +823,7 @@ export class QualityControlService {
    */
   static async createHumanReviewTask(
     assessment: QualityAssessment,
-    config: QualityControlConfig
+    config: QualityControlConfig,
   ): Promise<HumanReviewTask> {
     try {
       // Determine priority based on issues severity
@@ -888,7 +888,7 @@ export class QualityControlService {
       return reviewTask;
 
     } catch (error) {
-      console.error(`❌ Failed to create human review task:`, error);
+      console.error('❌ Failed to create human review task:', error);
       throw error;
     }
   }
@@ -903,7 +903,7 @@ export class QualityControlService {
       reviewType?: string;
       assignedTo?: string;
       limit?: number;
-    } = {}
+    } = {},
   ): Promise<HumanReviewTask[]> {
     try {
       let query = supabase
@@ -952,7 +952,7 @@ export class QualityControlService {
       }));
 
     } catch (error) {
-      console.error(`❌ Failed to get pending review tasks:`, error);
+      console.error('❌ Failed to get pending review tasks:', error);
       throw error;
     }
   }
@@ -964,7 +964,7 @@ export class QualityControlService {
     taskId: string,
     decision: 'approve' | 'reject' | 'needs_improvement' | 'escalate',
     reviewNotes: string,
-    reviewerId: string
+    reviewerId: string,
   ): Promise<void> {
     try {
       const now = new Date().toISOString();
@@ -988,7 +988,7 @@ export class QualityControlService {
       console.log(`✅ Completed review task ${taskId} with decision: ${decision}`);
 
     } catch (error) {
-      console.error(`❌ Failed to complete review task:`, error);
+      console.error('❌ Failed to complete review task:', error);
       throw error;
     }
   }
@@ -997,7 +997,7 @@ export class QualityControlService {
    * Get quality control statistics
    */
   static async getQualityControlStats(
-    timeRange: '24h' | '7d' | '30d' = '7d'
+    timeRange: '24h' | '7d' | '30d' = '7d',
   ): Promise<{
     assessments: {
       total: number;
@@ -1060,7 +1060,7 @@ export class QualityControlService {
       };
 
     } catch (error) {
-      console.error(`❌ Failed to get quality control stats:`, error);
+      console.error('❌ Failed to get quality control stats:', error);
       throw error;
     }
   }
@@ -1087,9 +1087,9 @@ export class QualityControlService {
     return timeFilter.toISOString();
   }
 
-  private static calculateAvgCompletionTime(reviewTasks: any[]): number {
+  private static calculateAvgCompletionTime(reviewTasks: unknown[]): number {
     const completedTasks = reviewTasks.filter(task =>
-      task.status === 'completed' && task.created_at && task.completed_at
+      (task as any).status === 'completed' && (task as any).created_at && (task as any).completed_at,
     );
 
     if (completedTasks.length === 0) {
@@ -1097,35 +1097,35 @@ export class QualityControlService {
     }
 
     const totalTime = completedTasks.reduce((sum, task) => {
-      const created = new Date(task.created_at).getTime();
-      const completed = new Date(task.completed_at).getTime();
-      return sum + (completed - created);
+      const created = new Date((task as any).created_at).getTime();
+      const completed = new Date((task as any).completed_at).getTime();
+      return (sum as any) + (completed - created);
     }, 0);
 
     // Return average time in minutes
-    return Math.round(totalTime / completedTasks.length / (1000 * 60));
+    return Math.round((totalTime as any) / completedTasks.length / (1000 * 60));
   }
 
-  private static calculateAvgQualityScore(assessments: any[]): number {
+  private static calculateAvgQualityScore(assessments: unknown[]): number {
     if (assessments.length === 0) {
       return 0;
     }
 
-    const totalScore = assessments.reduce((sum, assessment) => sum + assessment.overall_score, 0);
-    return Math.round((totalScore / assessments.length) * 100) / 100;
+    const totalScore = assessments.reduce((sum, assessment) => (sum as any) + (((assessment as any).overall_score || 0) as any), 0);
+    return Math.round(((totalScore as any) / assessments.length) * 100) / 100;
   }
 
-  private static calculateImprovementRate(assessments: any[]): number {
+  private static calculateImprovementRate(assessments: unknown[]): number {
     // TODO: Implement improvement rate calculation
     return 0;
   }
 
-  private static aggregateIssueTypes(assessments: any[]): Record<string, number> {
+  private static aggregateIssueTypes(assessments: unknown[]): Record<string, number> {
     const issueTypes: Record<string, number> = {};
 
     assessments.forEach(assessment => {
-      if (assessment.issues && Array.isArray(assessment.issues)) {
-        assessment.issues.forEach((issue: any) => {
+      if ((assessment as any).issues && Array.isArray((assessment as any).issues)) {
+        ((assessment as any).issues as any[]).forEach((issue: any) => {
           issueTypes[issue.type] = (issueTypes[issue.type] || 0) + 1;
         });
       }

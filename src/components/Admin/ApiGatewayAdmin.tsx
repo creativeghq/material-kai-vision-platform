@@ -386,7 +386,7 @@ export const ApiGatewayAdmin: React.FC = () => {
                     <Settings className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-semibold">No API Endpoints Found</h3>
                     <p className="text-muted-foreground mb-4">
-                      Click &quot;Seed Default Endpoints&quot; to populate with default API endpoints
+                      Click "Seed Default Endpoints" to populate with default API endpoints
                     </p>
                     <Button onClick={seedDefaultEndpoints} className="border border-gray-300 px-4 py-2">
                       <Plus className="mr-2 h-4 w-4" />

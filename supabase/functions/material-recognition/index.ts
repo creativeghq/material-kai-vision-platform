@@ -1,5 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 // Import standardized Edge Function response types
 import {
@@ -108,7 +108,7 @@ interface MaterialRecognitionRequest {
 async function analyzeWithMIVAA(
   imageUrl: string,
   analysisType: string,
-  confidenceThreshold: number
+  confidenceThreshold: number,
 ): Promise<{ materials: RecognizedMaterial[]; visualAnalysis?: VisualAnalysisData; method: string }> {
   if (!MIVAA_API_KEY) {
     throw new Error('MIVAA API key not configured');
@@ -247,19 +247,19 @@ Analysis precision: ${analysisType}. Minimum confidence threshold: ${confidenceT
       } else {
         parsedAnalysis = result.data.analysis;
       }
-      
+
       // Convert to our format
       const materials: RecognizedMaterial[] = parsedAnalysis.materials || [];
       const visualAnalysis: VisualAnalysisData = {
         visual_features: parsedAnalysis.visual_features,
         material_segmentation: parsedAnalysis.material_segmentation,
-        material_categorization: parsedAnalysis.material_categorization
+        material_categorization: parsedAnalysis.material_categorization,
       };
 
       return {
         materials: materials.filter(m => m.confidence >= confidenceThreshold),
         visualAnalysis,
-        method: 'mivaa_vision'
+        method: 'mivaa_vision',
       };
     } catch (parseError) {
       console.error('Failed to parse MIVAA material analysis response:', parseError);
@@ -371,7 +371,7 @@ Deno.serve(async (req: Request) => {
         {
           provided_fields: Object.keys(body),
           required_fields: ['image_url', 'image_data'],
-        }
+        },
       );
       return createJSONResponse(errorResponse, 400);
     }
@@ -384,7 +384,7 @@ Deno.serve(async (req: Request) => {
           const errorResponse = createErrorResponse(
             'INVALID_IMAGE_URL',
             'Image URL must use HTTP or HTTPS protocol',
-            { provided_url: body.image_url }
+            { provided_url: body.image_url },
           );
           return createJSONResponse(errorResponse, 400);
         }
@@ -392,7 +392,7 @@ Deno.serve(async (req: Request) => {
         const errorResponse = createErrorResponse(
           'MALFORMED_IMAGE_URL',
           'Invalid image URL format',
-          { provided_url: body.image_url, error: String(urlError) }
+          { provided_url: body.image_url, error: String(urlError) },
         );
         return createJSONResponse(errorResponse, 400);
       }
@@ -403,7 +403,7 @@ Deno.serve(async (req: Request) => {
       const errorResponse = createErrorResponse(
         'INVALID_CONFIDENCE_THRESHOLD',
         'Confidence threshold must be between 0 and 1',
-        { provided_threshold: body.confidence_threshold }
+        { provided_threshold: body.confidence_threshold },
       );
       return createJSONResponse(errorResponse, 400);
     }
@@ -412,7 +412,7 @@ Deno.serve(async (req: Request) => {
       const errorResponse = createErrorResponse(
         'INVALID_ANALYSIS_TYPE',
         'Analysis type must be one of: basic, detailed, comprehensive',
-        { provided_type: body.analysis_type }
+        { provided_type: body.analysis_type },
       );
       return createJSONResponse(errorResponse, 400);
     }
@@ -451,19 +451,19 @@ Deno.serve(async (req: Request) => {
           console.log('Starting MIVAA Vision analysis...');
           console.log(`MIVAA Gateway URL: ${MIVAA_GATEWAY_URL}`);
           console.log(`MIVAA API Key present: ${!!MIVAA_API_KEY}`);
-          
+
           const mivaaResult = await analyzeWithMIVAA(
             body.image_url,
             analysisType,
-            confidenceThreshold
+            confidenceThreshold,
           );
-          
+
           recognizedMaterials = mivaaResult.materials;
           visualAnalysis = mivaaResult.visualAnalysis;
           processingMethod = mivaaResult.method;
-          
+
           console.log(`MIVAA Vision analysis completed. Found ${recognizedMaterials.length} materials with method: ${processingMethod}`);
-          
+
           // Store visual analysis data if enabled
           if (body.enable_visual_analysis && visualAnalysis && recognitionRecord) {
             const { error: visualAnalysisError } = await supabase
@@ -477,14 +477,14 @@ Deno.serve(async (req: Request) => {
                 analysis_type: analysisType,
                 confidence_threshold: confidenceThreshold,
                 processing_time_ms: Date.now() - startTime,
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
               });
-              
+
             if (visualAnalysisError) {
               console.error('Failed to store visual analysis:', visualAnalysisError);
             }
           }
-          
+
         } catch (mivaaError) {
           console.error('MIVAA Vision analysis failed, using enhanced MIVAA error handling:', mivaaError);
           processingMethod = 'mivaa_failed';
@@ -506,7 +506,7 @@ Deno.serve(async (req: Request) => {
         if (!catalogError && catalogMaterials && catalogMaterials.length > 0) {
           console.log(`Found ${catalogMaterials.length} catalog materials as fallback`);
           processingMethod = processingMethod === 'unknown' ? 'catalog_fallback' : processingMethod + '_catalog_fallback';
-          
+
           recognizedMaterials = catalogMaterials.map((material: MaterialsCatalogItem): RecognizedMaterial => ({
             name: material.name || 'Unknown Material',
             confidence: 0.3, // Much lower confidence for catalog fallback to indicate it's not AI-based
@@ -639,7 +639,7 @@ Deno.serve(async (req: Request) => {
         sustainability: {                                   // ✅ Added: frontend expects this
           rating: material.properties.sustainability || 'unknown',
           certifications: [],
-          environmental_impact: 'unknown'
+          environmental_impact: 'unknown',
         },
         processingTime: processingTime,                     // ✅ Fixed: matches frontend expectation
         boundingBox: material.bounding_box,
@@ -670,7 +670,7 @@ Deno.serve(async (req: Request) => {
       error instanceof Error ? error.message : 'Unknown error occurred',
       {
         timestamp: new Date().toISOString(),
-      }
+      },
     );
 
     return createJSONResponse(response, 500);

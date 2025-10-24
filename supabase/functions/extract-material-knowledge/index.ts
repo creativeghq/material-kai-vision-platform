@@ -130,7 +130,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
     if (mivaaResponse.ok) {
       const mivaaData = await mivaaResponse.json();
       const extractionText = mivaaData.analysis_result || mivaaData.result;
-      
+
       try {
         return JSON.parse(extractionText);
       } catch (parseError) {
@@ -148,7 +148,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
 
   // Enhanced MIVAA-only approach with robust error handling
   console.log('🔄 Attempting enhanced MIVAA semantic analysis for text content');
-  
+
   const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
     method: 'POST',
     headers: {
@@ -165,9 +165,9 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
           response_format: 'json',
           max_tokens: 3000,
           temperature: 0.1,
-          include_confidence_scores: true
-        }
-      }
+          include_confidence_scores: true,
+        },
+      },
     }),
   });
 
@@ -178,7 +178,7 @@ async function extractFromText(text: string, focus: string): Promise<MaterialKno
 
   const mivaaData = await response.json();
   const analysisResult = mivaaData.analysis_result || mivaaData.result || mivaaData.data;
-  
+
   if (!analysisResult) {
     throw new Error('No analysis result in MIVAA response');
   }
@@ -241,7 +241,7 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
     if (mivaaResponse.ok) {
       const mivaaData = await mivaaResponse.json();
       const extractionText = mivaaData.analysis_result || mivaaData.result;
-      
+
       try {
         return JSON.parse(extractionText);
       } catch (parseError) {
@@ -259,7 +259,7 @@ async function extractFromImage(imageUrl: string, focus: string): Promise<Materi
 
   // MIVAA-only approach - OpenAI integration removed for centralized AI management
   console.error('❌ All MIVAA methods failed for knowledge extraction');
-  throw new Error(`Material knowledge extraction failed - MIVAA service required. OpenAI direct integration removed as part of centralized AI architecture. Please check MIVAA service availability.`);
+  throw new Error('Material knowledge extraction failed - MIVAA service required. OpenAI direct integration removed as part of centralized AI architecture. Please check MIVAA service availability.');
 }
 
 async function extractFromDocument(fileId: string, focus: string): Promise<MaterialKnowledge> {

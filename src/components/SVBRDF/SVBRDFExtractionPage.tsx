@@ -91,7 +91,7 @@ export const SVBRDFExtractionPage: React.FC = () => {
         setExtraction(extractionRecord);
 
         toast({
-          title: 'Extraction completed!',
+          title: 'Extraction completed',
           description: `Material properties extracted with ${(result.confidence_score || 0 * 100).toFixed(1)}% confidence`,
         });
 
@@ -227,6 +227,11 @@ export const SVBRDFExtractionPage: React.FC = () => {
                     className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"
 
                     onClick={() => setUploadedFile(null)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setUploadedFile(null);
+                      }
+                    }}
                   >
                     ×
                   </Button>
@@ -248,7 +253,7 @@ export const SVBRDFExtractionPage: React.FC = () => {
                 <Alert>
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Ready for SVBRDF extraction! This will generate all material maps.
+                    Ready for SVBRDF extraction This will generate all material maps.
                   </AlertDescription>
                 </Alert>
               </div>
@@ -256,6 +261,11 @@ export const SVBRDFExtractionPage: React.FC = () => {
 
             <Button
               onClick={handleStartExtraction}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleStartExtraction();
+                }
+              }}
               disabled={!uploadedFile || isProcessing}
               className="w-full"
             >
@@ -407,6 +417,11 @@ export const SVBRDFExtractionPage: React.FC = () => {
                       className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 rounded-md px-3"
 
                       onClick={() => setExtraction(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setExtraction(item);
+                        }
+                      }}
                     >
                       <Eye className="w-4 h-4" />
                     </Button>

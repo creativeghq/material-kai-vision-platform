@@ -147,7 +147,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
 
       toast({
         title: 'Feedback Submitted',
-        description: 'Thank you for your feedback!',
+        description: 'Thank you for your feedback',
       });
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -180,8 +180,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
             Enhanced RAG Knowledge Search
             <span className="ml-auto inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">AI-Powered</span>
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </CardHeader><CardContent className="space-y-4">
           {/* Main Search Input */}
           <div className="flex gap-2">
             <Input
@@ -191,7 +190,15 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               className="flex-1"
             />
-            <Button onClick={handleSearch} disabled={isSearching}>
+            <Button
+              onClick={handleSearch}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch();
+                }
+              }}
+              disabled={isSearching}
+            >
               {isSearching ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -251,8 +258,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
           {/* Context Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="space-y-2">
-              <Label htmlFor="roomType">Room Context</Label>
-              <Input
+              <Label htmlFor="roomType">Room Context</Label><Input
                 id="roomType"
                 placeholder="e.g., kitchen, bathroom"
                 value={context.roomType}
@@ -286,6 +292,14 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                       ...prev,
                       stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
                     }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setContext(prev => ({
+                          ...prev,
+                          stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
+                        }));
+                      }
+                    }}
                   >
                     {style} ×
                   </Badge>
@@ -294,8 +308,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
             </div>
 
             <div className="space-y-2">
-              <Label>Material Categories</Label>
-              <Input
+              <Label>Material Categories</Label><Input
                 placeholder="e.g., flooring, countertops"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
@@ -319,6 +332,14 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                       ...prev,
                       materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
                     }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setContext(prev => ({
+                          ...prev,
+                          materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
+                        }));
+                      }
+                    }}
                   >
                     {category} ×
                   </Badge>
@@ -383,6 +404,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                       key={i}
                       className="h-6 px-2 text-xs"
                       onClick={() => setQuery(suggestion)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setQuery(suggestion);
+                        }
+                      }}
                     >
                       {suggestion}
                     </Button>
@@ -390,9 +416,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                 </div>
               )}
             </div>
-          </CardHeader>
-
-          <CardContent>
+          </CardHeader><CardContent>
             <Tabs defaultValue="knowledge" className="w-full">
               <TabsList className="grid grid-cols-4 w-full">
                 <TabsTrigger value="knowledge" className="flex items-center gap-2">
@@ -460,6 +484,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                             <Button
                               className="flex items-center gap-1"
                               onClick={() => window.open(result.pdfUrl, '_blank')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  window.open(result.pdfUrl, '_blank');
+                                }
+                              }}
                             >
                               <ExternalLink className="h-3 w-3" />
                               View PDF Details
@@ -471,6 +500,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                             <Button
                               className="flex items-center gap-1"
                               onClick={() => window.open(result.sourceUrl, '_blank')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  window.open(result.sourceUrl, '_blank');
+                                }
+                              }}
                             >
                               <ExternalLink className="h-3 w-3" />
                               View Source
@@ -579,6 +613,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                                 key={i}
                                 className="h-auto p-2 text-left justify-start"
                                 onClick={() => setQuery(question)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    setQuery(question);
+                                  }
+                                }}
                               >
                                 {question}
                               </Button>
@@ -599,12 +638,22 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() => handleFeedback(5)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleFeedback(5);
+                    }
+                  }}
                   className="text-green-600 hover:text-green-700"
                 >
                   <ThumbsUp className="h-4 w-4" />
                 </Button>
                 <Button
                   onClick={() => handleFeedback(2)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleFeedback(2);
+                    }
+                  }}
                   className="text-red-600 hover:text-red-700"
                 >
                   <ThumbsDown className="h-4 w-4" />

@@ -111,7 +111,7 @@ export function useFunctionalMetadata(
 
     const checkAvailability = async () => {
       try {
-        const result = await apiServiceRef.current!.checkFunctionalMetadataAvailability(documentId);
+        const result = await apiServiceRef.current.checkFunctionalMetadataAvailability(documentId);
         if (!isCancelled) {
           setState(prev => ({
             ...prev,
@@ -463,7 +463,7 @@ export function useBatchFunctionalMetadata(
           if (result.status === 'success' && result.data.functionalMetadata) {
             setBatchState(prev => ({
               ...prev,
-              completed: new Map(prev.completed).set(doc.id, result.data.functionalMetadata!),
+              completed: new Map(prev.completed).set(doc.id, result.data.functionalMetadata),
               processing: new Map([...prev.processing].filter(([id]) => id !== doc.id)),
             }));
 

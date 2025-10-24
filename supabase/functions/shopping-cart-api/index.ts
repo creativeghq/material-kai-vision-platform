@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+
 import { corsHeaders } from '../_shared/cors.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: corsHeaders }
+        { status: 401, headers: corsHeaders },
       );
     }
 
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders }
+        { status: 401, headers: corsHeaders },
       );
     }
 
@@ -60,13 +61,13 @@ Deno.serve(async (req) => {
       if (error) {
         return new Response(
           JSON.stringify({ error: error.message }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
 
       return new Response(
         JSON.stringify({ data: cart }),
-        { status: 201, headers: corsHeaders }
+        { status: 201, headers: corsHeaders },
       );
     }
 
@@ -84,7 +85,7 @@ Deno.serve(async (req) => {
       if (cartError) {
         return new Response(
           JSON.stringify({ error: 'Cart not found' }),
-          { status: 404, headers: corsHeaders }
+          { status: 404, headers: corsHeaders },
         );
       }
 
@@ -97,13 +98,13 @@ Deno.serve(async (req) => {
       if (itemsError) {
         return new Response(
           JSON.stringify({ error: itemsError.message }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
 
       return new Response(
         JSON.stringify({ data: { ...cart, items } }),
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
@@ -124,7 +125,7 @@ Deno.serve(async (req) => {
       if (cartError) {
         return new Response(
           JSON.stringify({ error: 'Cart not found' }),
-          { status: 404, headers: corsHeaders }
+          { status: 404, headers: corsHeaders },
         );
       }
 
@@ -144,7 +145,7 @@ Deno.serve(async (req) => {
       if (itemError) {
         return new Response(
           JSON.stringify({ error: itemError.message }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
 
@@ -161,7 +162,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ data: item }),
-        { status: 201, headers: corsHeaders }
+        { status: 201, headers: corsHeaders },
       );
     }
 
@@ -181,7 +182,7 @@ Deno.serve(async (req) => {
       if (!cart) {
         return new Response(
           JSON.stringify({ error: 'Cart not found' }),
-          { status: 404, headers: corsHeaders }
+          { status: 404, headers: corsHeaders },
         );
       }
 
@@ -201,7 +202,7 @@ Deno.serve(async (req) => {
       if (deleteError) {
         return new Response(
           JSON.stringify({ error: deleteError.message }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
 
@@ -216,7 +217,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: true }),
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
@@ -240,24 +241,24 @@ Deno.serve(async (req) => {
       if (error) {
         return new Response(
           JSON.stringify({ error: error.message }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
 
       return new Response(
         JSON.stringify({ data: cart }),
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
     return new Response(
       JSON.stringify({ error: 'Not found' }),
-      { status: 404, headers: corsHeaders }
+      { status: 404, headers: corsHeaders },
     );
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: corsHeaders },
     );
   }
 });

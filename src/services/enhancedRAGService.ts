@@ -176,19 +176,19 @@ export class EnhancedRAGService {
         throw error;
       }
 
-      return data.map((item: any) => ({
-        id: item.id,
-        materialId: item.material_id,
-        extractionType: item.extraction_type,
-        extractedKnowledge: item.extracted_knowledge,
-        confidence: item.confidence_score,
-        extractionContext: (item.extraction_context as Record<string, unknown>) || {},
-        sourceFields: item.source_fields || [],
-        validationStatus: item.validation_status,
-        validatedBy: item.validated_by,
-        validationNotes: item.validation_notes,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
+      return data.map((item: unknown) => ({
+        id: (item as any).id,
+        materialId: (item as any).material_id,
+        extractionType: (item as any).extraction_type,
+        extractedKnowledge: (item as any).extracted_knowledge,
+        confidence: (item as any).confidence_score,
+        extractionContext: ((item as any).extraction_context as Record<string, unknown>) || {},
+        sourceFields: (item as any).source_fields || [],
+        validationStatus: (item as any).validation_status,
+        validatedBy: (item as any).validated_by,
+        validationNotes: (item as any).validation_notes,
+        createdAt: (item as any).created_at,
+        updatedAt: (item as any).updated_at,
       }));
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
@@ -288,20 +288,20 @@ export class EnhancedRAGService {
         throw error;
       }
 
-      return data.map((item: any) => ({
-        id: item.id,
-        sourceId: item.source_id,
-        targetId: item.target_id,
-        relationshipType: item.relationship_type,
-        confidence: item.confidence_score,
-        relationshipStrength: item.relationship_strength,
-        relationshipContext: item.relationship_context,
-        bidirectional: item.bidirectional,
-        sourceType: item.source_type,
-        validationStatus: item.validation_status,
-        validatedBy: item.validated_by,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
+      return data.map((item: unknown) => ({
+        id: (item as any).id,
+        sourceId: (item as any).source_id,
+        targetId: (item as any).target_id,
+        relationshipType: (item as any).relationship_type,
+        confidence: (item as any).confidence_score,
+        relationshipStrength: (item as any).relationship_strength,
+        relationshipContext: (item as any).relationship_context,
+        bidirectional: (item as any).bidirectional,
+        sourceType: (item as any).source_type,
+        validationStatus: (item as any).validation_status,
+        validatedBy: (item as any).validated_by,
+        createdAt: (item as any).created_at,
+        updatedAt: (item as any).updated_at,
       }));
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
@@ -333,21 +333,21 @@ export class EnhancedRAGService {
         throw error;
       }
 
-      return data.map((item: any) => ({
-        id: item.id,
-        userId: item.user_id,
-        originalQuery: item.original_query,
-        processedQuery: item.processed_query,
-        queryIntent: item.query_intent,
-        queryType: item.query_type,
-        entitiesDetected: (item.entities_detected as Record<string, unknown>) || {},
-        userContext: (item.user_context as Record<string, unknown>) || {},
-        sessionContext: (item.session_context as Record<string, unknown>) || {},
-        projectContext: (item.project_context as Record<string, unknown>) || {},
-        resultsReturned: item.results_returned,
-        userSatisfaction: item.user_satisfaction,
-        clickedResults: item.clicked_results || [],
-        createdAt: item.created_at,
+      return data.map((item: unknown) => ({
+        id: (item as any).id,
+        userId: (item as any).user_id,
+        originalQuery: (item as any).original_query,
+        processedQuery: (item as any).processed_query,
+        queryIntent: (item as any).query_intent,
+        queryType: (item as any).query_type,
+        entitiesDetected: ((item as any).entities_detected as Record<string, unknown>) || {},
+        userContext: ((item as any).user_context as Record<string, unknown>) || {},
+        sessionContext: ((item as any).session_context as Record<string, unknown>) || {},
+        projectContext: ((item as any).project_context as Record<string, unknown>) || {},
+        resultsReturned: (item as any).results_returned,
+        userSatisfaction: (item as any).user_satisfaction,
+        clickedResults: (item as any).clicked_results || [],
+        createdAt: (item as any).created_at,
       }));
     } catch (error) {
       const ragError = ErrorHandler.handleError(error, {
@@ -434,16 +434,16 @@ export class EnhancedRAGService {
       // Calculate insights
       const totalSearches = data.length;
       const avgSatisfaction = data
-        .filter((s: any) => s.satisfaction_rating)
-        .reduce((sum: number, s: any) => sum + s.satisfaction_rating, 0) /
-        data.filter((s: any) => s.satisfaction_rating).length || 0;
+        .filter((s: unknown) => (s as any).satisfaction_rating)
+        .reduce((sum: number, s: any) => sum + (s as any).satisfaction_rating, 0) /
+        data.filter((s: unknown) => (s as any).satisfaction_rating).length || 0;
 
       const avgResponseTime = data
-        .reduce((sum: number, s: any) => sum + (s.response_time_ms || 0), 0) / data.length || 0;
+        .reduce((sum: number, s: any) => sum + ((s as any).response_time_ms || 0), 0) / data.length || 0;
 
       const topQueries = data
         .reduce((acc: any, search: any) => {
-          acc[search.query_text] = (acc[search.query_text] || 0) + 1;
+          acc[(search as any).query_text] = (acc[(search as any).query_text] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
 

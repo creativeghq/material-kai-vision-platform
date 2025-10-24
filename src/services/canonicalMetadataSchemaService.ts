@@ -1,6 +1,6 @@
 /**
  * Canonical Metadata Schema Service
- * 
+ *
  * Implements comprehensive metadata extraction for products including:
  * - Core Identity (name, collection, designer, brand)
  * - Physical Properties (dimensions, material, weight)
@@ -8,11 +8,12 @@
  * - Technical Specifications (performance, ratings, certifications)
  * - Commercial Information (pricing, availability, warranty)
  * - Sustainability & Compliance (certifications, environmental impact)
- * 
+ *
  * Organizes existing 120+ metafields into logical categories for intelligent extraction.
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { MetafieldService } from './metafieldService';
 
 export interface CanonicalMetadataSchema {
@@ -31,18 +32,18 @@ export interface CoreIdentityMetadata {
   productCode?: string;
   sku?: string;
   model?: string;
-  
+
   // Brand & manufacturer
   manufacturer?: string;
   brand?: string;
   factory?: string;
   groupOfCompanies?: string;
-  
+
   // Collection & design
   collection?: string;
   designer?: string;
   year?: number;
-  
+
   // Origin
   countryOfOrigin?: string;
   quarryName?: string; // For stone products
@@ -54,22 +55,22 @@ export interface PhysicalPropertiesMetadata {
   width?: number;
   thickness?: number;
   dimensionUnit?: 'mm' | 'cm' | 'm' | 'in' | 'ft';
-  
+
   // Weight
   weightValue?: number;
   weightUnit?: 'g' | 'kg' | 'lb' | 'oz';
-  
+
   // Shape & form
   shape?: 'rectangular' | 'square' | 'hexagonal' | 'round' | 'irregular' | 'custom';
   edgeType?: 'straight' | 'beveled' | 'rounded' | 'chamfered';
   rectified?: boolean;
-  
+
   // Material composition
   materialCategory?: 'ceramic' | 'stone' | 'wood' | 'metal' | 'composite' | 'glass' | 'fabric';
   materialType?: string;
   woodSpecies?: string; // For wood products
   stoneType?: 'marble' | 'granite' | 'limestone' | 'travertine' | 'slate' | 'quartzite';
-  
+
   // Physical characteristics
   density?: number;
   porosity?: number;
@@ -82,18 +83,18 @@ export interface VisualPropertiesMetadata {
   secondaryColor?: string;
   colorFamily?: 'neutral' | 'warm' | 'cool' | 'earth' | 'bold' | 'pastel';
   colorVariation?: 'none' | 'low' | 'medium' | 'high' | 'dramatic';
-  
+
   // Surface characteristics
   surfaceFinish?: 'matte' | 'satin' | 'gloss' | 'high-gloss' | 'textured' | 'natural';
   surfacePattern?: string;
   surfaceTexture?: string;
   surfaceTreatment?: 'polished' | 'honed' | 'brushed' | 'sandblasted' | 'flamed' | 'tumbled';
-  
+
   // Visual patterns
   grainPattern?: string; // For wood
   veiningPattern?: 'none' | 'light' | 'medium' | 'heavy' | 'dramatic'; // For stone
   movementPattern?: 'linear' | 'circular' | 'random' | 'bookmatched';
-  
+
   // Shade variation
   vRating?: 'V1' | 'V2' | 'V3' | 'V4'; // Shade variation rating
 }
@@ -104,12 +105,12 @@ export interface TechnicalSpecificationsMetadata {
   modulusOfRupture?: number;
   compressiveStrength?: number;
   flexuralStrength?: number;
-  
+
   // Hardness
   mohsHardness?: '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10';
   jankaHardness?: number; // For wood
   stoneHardness?: number;
-  
+
   // Resistance properties
   waterAbsorption?: 'very-low' | 'low' | 'medium' | 'high';
   slipResistance?: 'R9' | 'R10' | 'R11' | 'R12' | 'R13';
@@ -120,17 +121,17 @@ export interface TechnicalSpecificationsMetadata {
   fadeResistance?: 'excellent' | 'good' | 'fair' | 'poor';
   abrasionResistance?: number;
   wearResistance?: 'excellent' | 'good' | 'fair' | 'poor';
-  
+
   // Performance ratings
   peiRating?: 'PEI-0' | 'PEI-1' | 'PEI-2' | 'PEI-3' | 'PEI-4' | 'PEI-5';
   trafficRating?: 'light' | 'moderate' | 'heavy' | 'commercial';
   fireRating?: 'A1' | 'A2' | 'B' | 'C' | 'D' | 'E' | 'F';
-  
+
   // Thermal properties
   thermalExpansion?: number;
   thermalConductivity?: number;
   thermalShock?: boolean;
-  
+
   // Other properties
   antimicrobial?: boolean;
   soundInsulation?: string;
@@ -142,16 +143,16 @@ export interface CommercialInformationMetadata {
   priceRange?: 'budget' | 'mid-range' | 'premium' | 'luxury';
   priceCurrency?: 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD';
   priceUnit?: 'per-sqft' | 'per-sqm' | 'per-piece' | 'per-box' | 'per-linear-ft';
-  
+
   // Availability
   stockStatus?: 'in-stock' | 'limited' | 'out-of-stock' | 'discontinued' | 'special-order';
   leadTimeDays?: number;
   minimumOrder?: number;
-  
+
   // Warranty & support
   warranty?: string;
   certifications?: string[];
-  
+
   // Application areas
   applicationArea?: ('indoor' | 'outdoor' | 'bathroom' | 'kitchen' | 'commercial' | 'residential' | 'industrial')[];
   usageType?: string[];
@@ -166,10 +167,10 @@ export interface SustainabilityComplianceMetadata {
   vocLevel?: 'zero' | 'low' | 'medium' | 'high';
   energyEfficiency?: string;
   carbonFootprint?: string;
-  
+
   // Certifications
   certifications?: string[];
-  
+
   // Health & safety
   antimicrobial?: boolean;
 }
@@ -183,12 +184,12 @@ export interface InstallationMaintenanceMetadata {
   toolsRequired?: string[];
   preparationNeeded?: string;
   installationTime?: string;
-  
+
   // Subfloor & underlayment
   subfloorRequirements?: string;
   underlaymentRequired?: boolean;
   jointWidth?: number;
-  
+
   // Maintenance
   cleaningMethod?: string[];
   sealingRequired?: boolean;
@@ -231,7 +232,7 @@ export class CanonicalMetadataSchemaService {
     ['factory', 'coreIdentity'],
     ['groupOfCompanies', 'coreIdentity'],
     ['quarryName', 'coreIdentity'],
-    
+
     // Physical Properties mappings
     ['length', 'physicalProperties'],
     ['width', 'physicalProperties'],
@@ -249,7 +250,7 @@ export class CanonicalMetadataSchemaService {
     ['stoneDensity', 'physicalProperties'],
     ['porosity', 'physicalProperties'],
     ['moistureContent', 'physicalProperties'],
-    
+
     // Visual Properties mappings
     ['primaryColor', 'visualProperties'],
     ['secondaryColor', 'visualProperties'],
@@ -263,7 +264,7 @@ export class CanonicalMetadataSchemaService {
     ['veiningPattern', 'visualProperties'],
     ['movementPattern', 'visualProperties'],
     ['vRating', 'visualProperties'],
-    
+
     // Technical Specifications mappings
     ['breakingStrength', 'technicalSpecifications'],
     ['modulusOfRupture', 'technicalSpecifications'],
@@ -290,7 +291,7 @@ export class CanonicalMetadataSchemaService {
     ['antimicrobial', 'technicalSpecifications'],
     ['soundInsulation', 'technicalSpecifications'],
     ['dimensionalStability', 'technicalSpecifications'],
-    
+
     // Commercial Information mappings
     ['priceRange', 'commercialInformation'],
     ['priceCurrency', 'commercialInformation'],
@@ -303,7 +304,7 @@ export class CanonicalMetadataSchemaService {
     ['applicationArea', 'commercialInformation'],
     ['usageType', 'commercialInformation'],
     ['environments', 'commercialInformation'],
-    
+
     // Sustainability & Compliance mappings
     ['sustainability', 'sustainabilityCompliance'],
     ['recycledContentPercent', 'sustainabilityCompliance'],
@@ -311,7 +312,7 @@ export class CanonicalMetadataSchemaService {
     ['vocLevel', 'sustainabilityCompliance'],
     ['energyEfficiency', 'sustainabilityCompliance'],
     ['carbonFootprint', 'sustainabilityCompliance'],
-    
+
     // Installation & Maintenance mappings
     ['installationMethod', 'installationMaintenance'],
     ['installationFormat', 'installationMaintenance'],
@@ -338,9 +339,9 @@ export class CanonicalMetadataSchemaService {
     options: MetadataExtractionOptions = {},
   ): Promise<MetadataExtractionResult> {
     const startTime = Date.now();
-    
+
     console.log('🔍 Extracting canonical metadata using comprehensive schema...');
-    
+
     try {
       // Get all metafield definitions
       const { data: metafieldDefs, error } = await supabase
@@ -353,13 +354,13 @@ export class CanonicalMetadataSchemaService {
       // Extract metadata using AI
       const extractedMetadata = await MetafieldService.extractMetafieldsFromText(
         content,
-        metafieldDefs || []
+        metafieldDefs || [],
       );
 
       // Organize into canonical schema
       const canonicalMetadata = this.organizeIntoCanonicalSchema(
         extractedMetadata,
-        options.includeCategories
+        options.includeCategories,
       );
 
       // Calculate metrics
@@ -396,17 +397,15 @@ export class CanonicalMetadataSchemaService {
    */
   private static organizeIntoCanonicalSchema(
     extractedMetadata: Record<string, unknown>,
-    includeCategories?: (keyof CanonicalMetadataSchema)[]
+    includeCategories?: (keyof CanonicalMetadataSchema)[],
   ): Partial<CanonicalMetadataSchema> {
     const canonicalMetadata: Partial<CanonicalMetadataSchema> = {
       coreIdentity: {
         name: String(extractedMetadata.name || extractedMetadata.title || 'Unknown Material'),
-        subcategory: String(extractedMetadata.subcategory || ''),
         brand: String(extractedMetadata.brand || ''),
         model: String(extractedMetadata.model || ''),
-        version: String(extractedMetadata.version || ''),
-        description: String(extractedMetadata.description || ''),
-        tags: Array.isArray(extractedMetadata.tags) ? extractedMetadata.tags : [],
+        designer: String((extractedMetadata as any).designer || ''),
+        collection: String((extractedMetadata as any).collection || ''),
       },
       physicalProperties: {},
       visualProperties: {},
@@ -451,7 +450,7 @@ export class CanonicalMetadataSchemaService {
   private static calculateOverallConfidence(
     extractedMetadata: Record<string, unknown>,
     extractedFields: number,
-    totalFields: number
+    totalFields: number,
   ): number {
     // Base confidence from extraction coverage
     const coverageScore = totalFields > 0 ? extractedFields / totalFields : 0;
@@ -463,7 +462,7 @@ export class CanonicalMetadataSchemaService {
 
     // Quality bonus for non-empty values
     const nonEmptyValues = Object.values(extractedMetadata).filter(value =>
-      value !== null && value !== undefined && value !== ''
+      value !== null && value !== undefined && value !== '',
     ).length;
     const qualityBonus = extractedFields > 0 ? (nonEmptyValues / extractedFields) * 0.1 : 0;
 
@@ -476,7 +475,7 @@ export class CanonicalMetadataSchemaService {
   private static async saveCanonicalMetadata(
     productId: string,
     canonicalMetadata: Partial<CanonicalMetadataSchema>,
-    rawMetadata: Record<string, unknown>
+    rawMetadata: Record<string, unknown>,
   ): Promise<void> {
     try {
       // Update product with canonical metadata in properties field
@@ -502,14 +501,14 @@ export class CanonicalMetadataSchemaService {
 
       if (metafieldDefs) {
         const fieldDefinitions = new Map(
-          metafieldDefs.map(def => [String(def.field_name), def as any])
+          metafieldDefs.map(def => [String(def.field_name), def as any]),
         );
 
         await MetafieldService.saveProductMetafields(
           productId,
           rawMetadata,
           fieldDefinitions as any,
-          'canonical_schema_extraction'
+          'canonical_schema_extraction',
         );
       }
 
@@ -551,7 +550,7 @@ export class CanonicalMetadataSchemaService {
    */
   static async searchProductsByCanonicalMetadata(
     criteria: Partial<CanonicalMetadataSchema>,
-    limit: number = 50
+    limit: number = 50,
   ): Promise<Array<{ id: string; name: string; metadata: Partial<CanonicalMetadataSchema> }>> {
     try {
       // Build search conditions for each category

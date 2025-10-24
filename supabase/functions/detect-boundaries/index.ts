@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 interface Chunk {
   id: string;
@@ -42,7 +42,7 @@ const calculateBoundaryScore = (text: string): number => {
   }
 
   // Section/heading boundary
-  const lastLine = trimmed.split("\n").pop() || "";
+  const lastLine = trimmed.split('\n').pop() || '';
   if (/^#+\s+/.test(lastLine) || /^[A-Z][A-Z\s]+$/.test(lastLine)) {
     score += 0.15;
   }
@@ -58,20 +58,20 @@ const calculateBoundaryScore = (text: string): number => {
 const determineBoundaryType = (
   text: string,
   boundaryScore: number,
-  semanticSimilarity: number
+  semanticSimilarity: number,
 ): string => {
-  if (boundaryScore < 0.3) return "weak";
-  if (/^#+\s+/.test(text.trim())) return "section";
-  if (/\n\s*$/.test(text)) return "paragraph";
-  if (/[.!?]\s*$/.test(text.trim())) return "sentence";
-  if (semanticSimilarity < 0.5) return "semantic";
-  return "weak";
+  if (boundaryScore < 0.3) return 'weak';
+  if (/^#+\s+/.test(text.trim())) return 'section';
+  if (/\n\s*$/.test(text)) return 'paragraph';
+  if (/[.!?]\s*$/.test(text.trim())) return 'sentence';
+  if (semanticSimilarity < 0.5) return 'semantic';
+  return 'weak';
 };
 
 const isProductBoundary = (
   text: string,
   boundaryScore: number,
-  semanticSimilarity: number
+  semanticSimilarity: number,
 ): boolean => {
   return boundaryScore > 0.6 && semanticSimilarity < 0.6;
 };
@@ -79,25 +79,25 @@ const isProductBoundary = (
 const generateReasoning = (
   boundaryScore: number,
   boundaryType: string,
-  semanticSimilarity: number
+  semanticSimilarity: number,
 ): string => {
   const parts: string[] = [];
 
   if (boundaryScore > 0.7) {
-    parts.push("Strong boundary marker");
+    parts.push('Strong boundary marker');
   } else if (boundaryScore > 0.4) {
-    parts.push("Moderate boundary marker");
+    parts.push('Moderate boundary marker');
   } else {
-    parts.push("Weak boundary marker");
+    parts.push('Weak boundary marker');
   }
 
   if (semanticSimilarity < 0.5) {
-    parts.push("Low semantic similarity to next chunk");
+    parts.push('Low semantic similarity to next chunk');
   } else if (semanticSimilarity > 0.8) {
-    parts.push("High semantic similarity to next chunk");
+    parts.push('High semantic similarity to next chunk');
   }
 
-  return parts.join("; ");
+  return parts.join('; ');
 };
 
 const cosineSimilarity = (a: number[], b: number[]): number => {
@@ -119,12 +119,12 @@ const cosineSimilarity = (a: number[], b: number[]): number => {
 
 serve(async (req: Request) => {
   // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response("ok", {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
       headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
   }
@@ -135,11 +135,11 @@ serve(async (req: Request) => {
 
     if (!request.chunks || request.chunks.length === 0) {
       return new Response(
-        JSON.stringify({ error: "chunks array is required and cannot be empty" }),
+        JSON.stringify({ error: 'chunks array is required and cannot be empty' }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
+          headers: { 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -160,11 +160,11 @@ serve(async (req: Request) => {
         const nextChunk = request.chunks[i + 1];
         const lengthRatio = Math.min(
           chunk.text.length,
-          nextChunk.text.length
+          nextChunk.text.length,
         ) / Math.max(chunk.text.length, nextChunk.text.length);
         // Similarity based on length and first word match
         const firstWordMatch =
-          chunk.text.split(" ")[0] === nextChunk.text.split(" ")[0] ? 0.3 : 0;
+          chunk.text.split(' ')[0] === nextChunk.text.split(' ')[0] ? 0.3 : 0;
         semanticSimilarity = lengthRatio * 0.7 + firstWordMatch;
       }
 
@@ -172,21 +172,21 @@ serve(async (req: Request) => {
       const boundaryType = determineBoundaryType(
         chunk.text,
         boundaryScore,
-        semanticSimilarity
+        semanticSimilarity,
       );
 
       // Determine if this is a product boundary
       const isProduct = isProductBoundary(
         chunk.text,
         boundaryScore,
-        semanticSimilarity
+        semanticSimilarity,
       );
 
       // Generate reasoning
       const reasoning = generateReasoning(
         boundaryScore,
         boundaryType,
-        semanticSimilarity
+        semanticSimilarity,
       );
 
       results.push({
@@ -215,23 +215,23 @@ serve(async (req: Request) => {
 
     return new Response(JSON.stringify(response), {
       headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
       },
     });
   } catch (error) {
-    console.error("Boundary detection error:", error);
+    console.error('Boundary detection error:', error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : 'Unknown error',
       }),
       {
         status: 500,
         headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
         },
-      }
+      },
     );
   }
 });

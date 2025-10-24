@@ -74,7 +74,7 @@ const EmbeddingGenerationPanel: React.FC = () => {
       // Set embedding stats for the UI
       setEmbeddingStats(Object.entries(modelCounts).map(([model_name, count]) => ({
         model_name,
-        count
+        count,
       })));
 
       // Process embedding types - simulate different embedding types for materials
@@ -171,12 +171,12 @@ const EmbeddingGenerationPanel: React.FC = () => {
           <p className="text-muted-foreground">Monitor and manage vector embeddings for materials and knowledge</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchEmbeddingStats} className="border border-gray-300 text-sm px-3 py-1">
+          <Button onClick={fetchEmbeddingStats} onKeyDown={(e) => e.key === 'Enter' && fetchEmbeddingStats()} className="border border-gray-300 text-sm px-3 py-1">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           <Button
-            onClick={handleRegenerateEmbeddings}
+            onClick={handleRegenerateEmbeddings} onKeyDown={(e) => e.key === 'Enter' && handleRegenerateEmbeddings()}
             className="bg-blue-600 text-white text-sm px-3 py-1"
             disabled={regenerating}
           >

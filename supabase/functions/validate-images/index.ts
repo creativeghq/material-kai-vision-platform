@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -109,7 +110,7 @@ Deno.serve(async (req) => {
     console.error('Error in validate-images function:', error);
     return createErrorResponse(
       `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      500
+      500,
     );
   }
 });
@@ -259,7 +260,7 @@ function validateImage(image: any, rules: any) {
     issues.push({
       type: 'file_too_large',
       severity: 'medium',
-      description: `File size exceeds maximum`,
+      description: 'File size exceeds maximum',
     });
     qualityScore -= 0.15;
   }

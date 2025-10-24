@@ -306,6 +306,11 @@ const PDFProcessing = () => {
                 />
                 <Button
                   onClick={processUrlPdf}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      processUrlPdf();
+                    }
+                  }}
                   disabled={isProcessingUrl || !pdfUrl.trim()}
                   className="flex items-center gap-2"
                 >

@@ -271,7 +271,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
     return (
       <Alert>
         <AlertDescription>
-          Processing result not found or you don&apos;t have permission to view it.
+          Processing result not found or you don't have permission to view it.
         </AlertDescription>
       </Alert>
     );
@@ -290,7 +290,15 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
           <p className="text-muted-foreground">{result.original_filename}</p>
         </div>
         {onClose && (
-          <Button onClick={onClose} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+          <Button
+            onClick={onClose}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                onClose();
+              }
+            }}
+            className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
             Close
           </Button>
         )}
@@ -308,9 +316,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
               </div>
             </div>
           </CardContent>
-        </Card>
-
-        <Card>
+        </Card><Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <Grid3X3 className="h-5 w-5 text-blue-500" />
@@ -332,9 +338,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
               </div>
             </div>
           </CardContent>
-        </Card>
-
-        <Card>
+        </Card><Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <BarChart3 className="h-5 w-5 text-orange-500" />
@@ -391,9 +395,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
             viewMode="grid"
             className="w-full"
           />
-        </TabsContent>
-
-        <TabsContent value="tiles" className="space-y-4">
+        </TabsContent><TabsContent value="tiles" className="space-y-4">
           {/* Page Navigation */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -406,6 +408,11 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                     : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                   }
                   onClick={() => setSelectedPage(page)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSelectedPage(page);
+                    }
+                  }}
                 >
                   {page}
                 </Button>
@@ -434,6 +441,11 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
                 key={tile.id}
                 className={`cursor-pointer transition-colors ${tile.material_detected ? 'border-green-200' : 'border-gray-200'} ${selectedTile?.id === tile.id ? 'ring-2 ring-primary' : ''}`}
                 onClick={() => setSelectedTile(tile)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSelectedTile(tile);
+                  }
+                }}
               >
                 <CardContent className="p-4">
                   {/* Tile Header */}
@@ -518,10 +530,7 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
               </AlertDescription>
             </Alert>
           )}
-        </TabsContent>
-
-
-        <TabsContent value="review" className="space-y-4">
+        </TabsContent><TabsContent value="review" className="space-y-4">
           <PDFReviewWorkflow
             processingId={processingId}
             tiles={tiles as any}
@@ -585,12 +594,19 @@ export const PDFResultsViewer: React.FC<PDFResultsViewerProps> = ({ processingId
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Tile Details - Page {selectedTile.page_number}, Tile {selectedTile.tile_index + 1}</span>
-              <Button onClick={() => setSelectedTile(null)} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-3 py-1 text-sm">
+              <Button
+                onClick={() => setSelectedTile(null)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSelectedTile(null);
+                  }
+                }}
+                className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-3 py-1 text-sm"
+              >
                 Close
               </Button>
             </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </CardHeader><CardContent className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="font-medium">Position</p>

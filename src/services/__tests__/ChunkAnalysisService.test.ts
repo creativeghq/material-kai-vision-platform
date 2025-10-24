@@ -195,8 +195,8 @@ describe('ChunkAnalysisService', () => {
 
       expect(data.issues).toHaveLength(1);
       expect(data.recommendations).toHaveLength(1);
-      expect(data.issues![0].severity).toBe('high');
-      expect(data.recommendations![0].priority).toBe('high');
+      expect(data.issues[0].severity).toBe('high');
+      expect(data.recommendations[0].priority).toBe('high');
     });
   });
 

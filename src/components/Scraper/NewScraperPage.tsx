@@ -286,7 +286,15 @@ Return a list of materials found on the page.`);
       <div className="p-6">
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="flex items-center gap-4 mb-6">
-            <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground" onClick={() => setViewMode('sessions')}>
+            <Button
+              className="border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setViewMode('sessions')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setViewMode('sessions');
+                }
+              }}
+            >
               ← Back to Sessions
             </Button>
             <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
@@ -299,8 +307,7 @@ Return a list of materials found on the page.`);
             <Settings className="h-5 w-5" />
             Scraping Mode
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </CardHeader><CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {(['single-page', 'sitemap', 'crawl', 'search', 'map'] as ScrapingMode[]).map((mode) => {
               const Icon = getModeIcon(mode);
@@ -313,6 +320,11 @@ Return a list of materials found on the page.`);
                       : 'border-muted hover:border-muted-foreground/50'
                   }`}
                   onClick={() => setScrapingMode(mode)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setScrapingMode(mode);
+                    }
+                  }}
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <Icon className="h-5 w-5" />
@@ -339,8 +351,7 @@ Return a list of materials found on the page.`);
             {scrapingMode === 'search' && 'Search Query'}
             {scrapingMode === 'map' && 'Website to Map'}
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </CardHeader><CardContent className="space-y-4">
           {/* Single Page Input */}
           {scrapingMode === 'single-page' && (
             <div>
@@ -363,8 +374,7 @@ Return a list of materials found on the page.`);
           {scrapingMode === 'sitemap' && (
             <>
               <div>
-                <Label htmlFor="sitemap-url">Sitemap URL</Label>
-                <Input
+                <Label htmlFor="sitemap-url">Sitemap URL</Label><Input
                   id="sitemap-url"
                   type="url"
                   value={sitemapUrl}
@@ -390,8 +400,7 @@ Return a list of materials found on the page.`);
                   />
                 </div>
                 <div>
-                  <Label htmlFor="concurrent-pages">Concurrent Pages</Label>
-                  <Input
+                  <Label htmlFor="concurrent-pages">Concurrent Pages</Label><Input
                     id="concurrent-pages"
                     type="number"
                     value={concurrentPages}
@@ -423,8 +432,7 @@ Return a list of materials found on the page.`);
                 </p>
               </div>
               <div>
-                <Label htmlFor="crawl-limit">Page Limit</Label>
-                <Input
+                <Label htmlFor="crawl-limit">Page Limit</Label><Input
                   id="crawl-limit"
                   type="number"
                   value={maxPages}
@@ -460,8 +468,7 @@ Return a list of materials found on the page.`);
           {/* Map Input */}
           {scrapingMode === 'map' && (
             <div>
-              <Label htmlFor="map-url">Website URL</Label>
-              <Input
+              <Label htmlFor="map-url">Website URL</Label><Input
                 id="map-url"
                 type="url"
                 value={url}
@@ -499,15 +506,13 @@ Return a list of materials found on the page.`);
             <Settings className="h-5 w-5" />
             API Configuration
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </CardHeader><CardContent className="space-y-4">
           <div>
             <Label>Scraping Service</Label>
             <Select value={selectedService} onValueChange={(value: 'firecrawl' | 'jina') => setSelectedService(value)}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select service" />
-              </SelectTrigger>
-              <SelectContent>
+              </SelectTrigger><SelectContent>
                 <SelectItem value="firecrawl">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4" />
@@ -526,8 +531,7 @@ Return a list of materials found on the page.`);
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="timeout">Timeout (ms)</Label>
-              <Input
+              <Label htmlFor="timeout">Timeout (ms)</Label><Input
                 id="timeout"
                 type="number"
                 value={timeout}
@@ -610,8 +614,7 @@ Return a list of materials found on the page.`);
             </div>
 
             <div>
-              <Label htmlFor="excludeTags">Exclude HTML Tags (comma separated)</Label>
-              <Input
+              <Label htmlFor="excludeTags">Exclude HTML Tags (comma separated)</Label><Input
                 id="excludeTags"
                 value={firecrawlOptions.excludeTags.join(', ')}
                 onChange={(e) => setFirecrawlOptions(prev => ({
@@ -640,8 +643,7 @@ Return a list of materials found on the page.`);
             </div>
 
             <div>
-              <Label>Extractor Mode</Label>
-              <Select
+              <Label>Extractor Mode</Label><Select
                 value={firecrawlOptions.extractorMode}
                 onValueChange={(value: 'llm-extraction' | 'css-extraction') =>
                   setFirecrawlOptions(prev => ({ ...prev, extractorMode: value }))
@@ -716,8 +718,7 @@ Return a list of materials found on the page.`);
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="maxAge">Cache Max Age (seconds)</Label>
-                <Input
+                <Label htmlFor="maxAge">Cache Max Age (seconds)</Label><Input
                   id="maxAge"
                   type="number"
                   value={firecrawlOptions.maxAge}
@@ -760,8 +761,7 @@ Return a list of materials found on the page.`);
               <Brain className="h-5 w-5" />
               Jina AI Options
             </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </CardHeader><CardContent className="space-y-4">
             <div>
               <Label>Return Format</Label>
               <Select
@@ -804,8 +804,7 @@ Return a list of materials found on the page.`);
             </div>
 
             <div>
-              <Label htmlFor="maxLength">Max Content Length</Label>
-              <Input
+              <Label htmlFor="maxLength">Max Content Length</Label><Input
                 id="maxLength"
                 type="number"
                 value={jinaOptions.maxLength}
@@ -864,6 +863,11 @@ Return a list of materials found on the page.`);
 
       <Button
         onClick={createNewSession}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            createNewSession();
+          }
+        }}
         disabled={creating || !getSourceUrl().trim()}
         className="w-full h-11 px-8"
       >

@@ -94,7 +94,7 @@ export const CORS_HEADERS = {
  */
 export function createSuccessResponse<T>(
   data: T,
-  metadata: Partial<EdgeFunctionResponse['metadata']> = {}
+  metadata: Partial<EdgeFunctionResponse['metadata']> = {},
 ): EdgeFunctionResponse<T> {
   return {
     success: true,
@@ -114,13 +114,13 @@ export function createErrorResponse(
   code: string,
   message: string,
   details?: Record<string, any>,
-  metadata: Partial<EdgeFunctionResponse['metadata']> = {}
+  metadata: Partial<EdgeFunctionResponse['metadata']> = {},
 ): EdgeFunctionResponse {
   const error: { code: string; message: string; details?: Record<string, any> } = {
     code,
     message,
   };
-  
+
   if (details) {
     error.details = details;
   }
@@ -141,7 +141,7 @@ export function createErrorResponse(
  */
 export function createJSONResponse(
   body: EdgeFunctionResponse,
-  status: number = 200
+  status: number = 200,
 ): Response {
   return new Response(JSON.stringify(body), {
     status,

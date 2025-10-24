@@ -145,7 +145,7 @@ export const AIStudioPage: React.FC = () => {
       setActiveTab('results');
 
       toast({
-        title: 'AI Studio Complete!',
+        title: 'AI Studio Complete',
         description: 'All AI systems have analyzed your space and generated recommendations.',
       });
 
@@ -244,8 +244,7 @@ export const AIStudioPage: React.FC = () => {
                 <Layers className="w-5 h-5" />
                 3D Reconstruction & Layout
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               <ThreeJsViewer
                 imageUrl={uploadedFiles[0] ? URL.createObjectURL(uploadedFiles[0]) : undefined}
                 modelUrl={nerfReconstruction?.model_file_url}
@@ -276,8 +275,7 @@ export const AIStudioPage: React.FC = () => {
                 <Palette className="w-5 h-5" />
                 Material Analysis
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               {svbrdfExtractions.length > 0 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-2">
@@ -324,8 +322,7 @@ export const AIStudioPage: React.FC = () => {
                 <Users className="w-5 h-5" />
                 AI Agent Insights
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Overall Confidence</span>
@@ -372,8 +369,7 @@ export const AIStudioPage: React.FC = () => {
                 <Target className="w-5 h-5" />
                 Spatial Intelligence Report
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center">
@@ -416,7 +412,15 @@ export const AIStudioPage: React.FC = () => {
         )}
 
         <div className="flex gap-4 justify-center">
-          <Button onClick={() => setActiveTab('upload')} className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
+          <Button
+            onClick={() => setActiveTab('upload')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setActiveTab('upload');
+              }
+            }}
+            className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+          >
             Start New Analysis
           </Button>
           <Button>
@@ -458,7 +462,6 @@ export const AIStudioPage: React.FC = () => {
             Results
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value="upload" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upload Section */}
@@ -501,6 +504,11 @@ export const AIStudioPage: React.FC = () => {
                           <Button
                             className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                             onClick={() => removeFile(index)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                removeFile(index);
+                              }
+                            }}
                           >
                             ×
                           </Button>
@@ -519,8 +527,7 @@ export const AIStudioPage: React.FC = () => {
                   <Home className="w-5 h-5" />
                   Room Configuration
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </CardHeader><CardContent className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Room Type</label>
                   <Select value={roomType} onValueChange={setRoomType}>
@@ -553,6 +560,17 @@ export const AIStudioPage: React.FC = () => {
                             },
                           }));
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setUserPreferences((prev: UserPreferences) => ({
+                              ...prev,
+                              priorities: {
+                                ...prev.priorities,
+                                [priority.toLowerCase()]: !prev.priorities?.[priority.toLowerCase()],
+                              },
+                            }));
+                          }
+                        }}
                       >
                         {priority}
                       </Button>
@@ -564,7 +582,7 @@ export const AIStudioPage: React.FC = () => {
                   <Alert>
                     <Lightbulb className="h-4 w-4" />
                     <AlertDescription>
-                      Ready for AI Studio analysis! Our systems will coordinate to provide
+                      Ready for AI Studio analysis Our systems will coordinate to provide
                       comprehensive design insights.
                     </AlertDescription>
                   </Alert>
@@ -572,6 +590,11 @@ export const AIStudioPage: React.FC = () => {
 
                 <Button
                   onClick={handleCompleteDesign}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCompleteDesign();
+                    }
+                  }}
                   disabled={uploadedFiles.length === 0 || !roomType || isProcessing}
                   className="w-full h-11 px-8"
                 >
@@ -582,7 +605,6 @@ export const AIStudioPage: React.FC = () => {
             </Card>
           </div>
         </TabsContent>
-
         <TabsContent value="processing">
           {renderProcessingStatus()}
         </TabsContent>

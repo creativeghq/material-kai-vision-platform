@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface EmbeddingStabilityData {
@@ -53,7 +53,7 @@ function detectAnomaly(embedding: number[], mean: number, stdDev: number): boole
 // Calculate embedding stability score
 function calculateStabilityScore(
   embedding: number[],
-  similarChunks: number[][]
+  similarChunks: number[][],
 ): number {
   if (similarChunks.length === 0) return 0.5; // Default if no similar chunks
 
@@ -94,8 +94,8 @@ function calculateConsistencyScore(embedding: number[]): number {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -103,37 +103,37 @@ serve(async (req) => {
 
     if (!document_id) {
       return new Response(
-        JSON.stringify({ error: "document_id is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'document_id is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") || "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
     );
 
     console.log(`🎯 Analyzing embedding stability for document ${document_id}...`);
 
     // Fetch all chunks for the document
     const { data: chunks, error: fetchError } = await supabase
-      .from("document_chunks")
-      .select("id, content, metadata")
-      .eq("document_id", document_id)
-      .order("chunk_index");
+      .from('document_chunks')
+      .select('id, content, metadata')
+      .eq('document_id', document_id)
+      .order('chunk_index');
 
     if (fetchError) {
-      console.error("Failed to fetch chunks:", fetchError);
+      console.error('Failed to fetch chunks:', fetchError);
       return new Response(
-        JSON.stringify({ error: "Failed to fetch chunks", details: fetchError }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'Failed to fetch chunks', details: fetchError }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
     if (!chunks || chunks.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No chunks found", analyzed: 0 }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ message: 'No chunks found', analyzed: 0 }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
@@ -145,7 +145,7 @@ serve(async (req) => {
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      
+
       // Generate pseudo-embedding based on content (for testing)
       const contentHash = chunk.content.split('').reduce((a, b) => {
         a = ((a << 5) - a) + b.charCodeAt(0);
@@ -186,7 +186,7 @@ serve(async (req) => {
     console.log(`💾 Storing ${stabilityMetrics.length} stability metrics...`);
 
     const { error: insertError } = await supabase
-      .from("embedding_stability_metrics")
+      .from('embedding_stability_metrics')
       .upsert(
         stabilityMetrics.map(metric => ({
           chunk_id: metric.chunk_id,
@@ -197,14 +197,14 @@ serve(async (req) => {
           anomaly_detected: metric.anomaly_detected,
           batch_id: `batch_${Date.now()}`,
         })),
-        { onConflict: "chunk_id" }
+        { onConflict: 'chunk_id' },
       );
 
     if (insertError) {
-      console.error("Failed to store stability metrics:", insertError);
+      console.error('Failed to store stability metrics:', insertError);
       return new Response(
-        JSON.stringify({ error: "Failed to store metrics", details: insertError }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'Failed to store metrics', details: insertError }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
@@ -212,22 +212,22 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: "Embedding stability analysis completed",
+        message: 'Embedding stability analysis completed',
         document_id: document_id,
         total_chunks: chunks.length,
         analyzed_chunks: stabilityMetrics.length,
         average_stability: Math.round(
-          (stabilityMetrics.reduce((sum, m) => sum + m.stability_score, 0) / stabilityMetrics.length) * 100
+          (stabilityMetrics.reduce((sum, m) => sum + m.stability_score, 0) / stabilityMetrics.length) * 100,
         ) / 100,
         anomalies_detected: stabilityMetrics.filter(m => m.anomaly_detected).length,
       }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: (error as any).message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }
 });

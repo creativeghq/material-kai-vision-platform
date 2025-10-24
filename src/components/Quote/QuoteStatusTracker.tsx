@@ -99,7 +99,7 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
               {quoteRequests.map((request) => (
                 <div
                   key={request.id}
-                  onClick={() => setSelectedRequest(request)}
+                  onClick={() => setSelectedRequest(request)} onKeyDown={(e) => e.key === 'Enter' && setSelectedRequest(request)}
                   className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50"
                 >
                   <div className="flex justify-between items-start mb-2">
@@ -146,7 +146,7 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
                   </div>
                   {proposal.status === 'sent' && (
                     <button
-                      onClick={() => handleAcceptProposal(proposal)}
+                      onClick={() => handleAcceptProposal(proposal)} onKeyDown={(e) => e.key === 'Enter' && handleAcceptProposal(proposal)}
                       className="w-full bg-green-600 text-white py-2 px-3 rounded hover:bg-green-700 text-sm font-medium"
                     >
                       Accept Proposal
@@ -180,7 +180,7 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
       )}
 
       <button
-        onClick={loadData}
+        onClick={loadData} onKeyDown={(e) => e.key === 'Enter' && loadData()}
         className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
       >
         Refresh

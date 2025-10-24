@@ -29,11 +29,13 @@ const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => {
 };
 
 const ImageTexturedCube: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
-  const texture = useLoader(TextureLoader, imageUrl);
+  const texture = (useLoader as any)(TextureLoader, imageUrl);
 
-  return React.createElement('mesh', { position: [0, 0, 0] },
-    React.createElement('boxGeometry', { args: [2, 2, 2] }),
-    React.createElement('meshStandardMaterial', { map: texture }),
+  return (
+    <mesh position={[0, 0, 0]}>
+      <boxGeometry args={[2, 2, 2]} />
+      <meshStandardMaterial map={texture} />
+    </mesh>
   );
 };
 

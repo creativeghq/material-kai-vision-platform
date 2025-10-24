@@ -8,7 +8,7 @@
 export interface WorkflowError {
   code: string;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   retryable?: boolean;
   context?: string;
   timestamp?: string;
@@ -297,7 +297,7 @@ export class WorkflowErrorHandler {
    */
   static createSuccessResponse<T>(
     data: T,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): WorkflowResponse<T> {
     return {
       success: true,

@@ -47,13 +47,13 @@ interface VisualSearchQueryRequest {
   query_vector?: number[]; // Direct vector input
   query_text?: string; // Text description for semantic search
   analysis_id?: string; // Use existing analysis as query
-  
+
   // Search parameters
   search_type: 'color' | 'texture' | 'material' | 'combined' | 'semantic';
   similarity_threshold?: number;
   max_results?: number;
   distance_metric?: 'cosine' | 'euclidean' | 'inner_product';
-  
+
   // Filtering options
   material_categories?: string[];
   color_filters?: {
@@ -71,7 +71,7 @@ interface VisualSearchQueryRequest {
     sustainability?: string[];
     applications?: string[];
   };
-  
+
   // Context and user info
   user_id?: string;
   workspace_id?: string;
@@ -102,13 +102,13 @@ interface VisualSearchQueryResult {
 }
 
 async function generateQueryVector(
-  queryInput: VisualSearchQueryRequest
+  queryInput: VisualSearchQueryRequest,
 ): Promise<{ vector: number[]; method: string }> {
   // If direct vector provided, use it
   if (queryInput.query_vector && queryInput.query_vector.length > 0) {
     return {
       vector: queryInput.query_vector,
-      method: 'direct_vector'
+      method: 'direct_vector',
     };
   }
 
@@ -123,7 +123,7 @@ async function generateQueryVector(
     if (!error && data?.embedding_vector) {
       return {
         vector: data.embedding_vector,
-        method: 'existing_analysis'
+        method: 'existing_analysis',
       };
     }
   }
@@ -136,7 +136,7 @@ async function generateQueryVector(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
       },
       body: JSON.stringify({
         image_url: queryInput.query_image_url,
@@ -144,18 +144,18 @@ async function generateQueryVector(
         analysis_depth: 'standard',
         focus_areas: ['color', 'texture', 'material', 'spatial'],
         user_id: queryInput.user_id,
-        workspace_id: queryInput.workspace_id
-      })
+        workspace_id: queryInput.workspace_id,
+      }),
     });
 
     if (analyzeResponse.ok) {
       const analyzeData = await analyzeResponse.json();
       const combinedVector = analyzeData.data?.analysis_result?.similarity_vectors?.combined_vector;
-      
+
       if (combinedVector && combinedVector.length > 0) {
         return {
           vector: combinedVector,
-          method: 'image_analysis'
+          method: 'image_analysis',
         };
       }
     }
@@ -181,7 +181,7 @@ async function generateQueryVector(
         const textVector = embeddingData.data[0].embedding;
         return {
           vector: textVector,
-          method: 'text_embedding'
+          method: 'text_embedding',
         };
       }
     } catch (error) {
@@ -192,7 +192,7 @@ async function generateQueryVector(
     const fallbackVector = new Array(1536).fill(0);
     return {
       vector: fallbackVector,
-      method: 'text_embedding_fallback'
+      method: 'text_embedding_fallback',
     };
   }
 
@@ -201,7 +201,7 @@ async function generateQueryVector(
 
 async function performVectorSimilaritySearch(
   queryVector: number[],
-  searchParams: VisualSearchQueryRequest
+  searchParams: VisualSearchQueryRequest,
 ): Promise<VisualSearchMatch[]> {
   const similarity_threshold = searchParams.similarity_threshold || 0.7;
   const max_results = Math.min(searchParams.max_results || 20, 100); // Cap at 100
@@ -258,7 +258,7 @@ async function performVectorSimilaritySearch(
       // Calculate euclidean distance (convert to similarity)
       else if (distance_metric === 'euclidean') {
         const distance = Math.sqrt(
-          queryVector.reduce((sum, val, i) => sum + Math.pow(val - storedVector[i], 2), 0)
+          queryVector.reduce((sum, val, i) => sum + Math.pow(val - storedVector[i], 2), 0),
         );
         similarityScore = 1 / (1 + distance); // Convert distance to similarity
       }
@@ -281,14 +281,14 @@ async function performVectorSimilaritySearch(
       visual_features: {
         dominant_colors: analysisData?.color_analysis?.dominant_palette?.dominant_colors || [],
         texture_description: analysisData?.texture_analysis?.primary_texture?.roughness?.toString() || '',
-        material_classification: analysisData?.material_classification?.[0]?.material_type || 'unknown'
+        material_classification: analysisData?.material_classification?.[0]?.material_type || 'unknown',
       },
       confidence_breakdown: {
         color_match: confidenceScores.color_accuracy || 0,
         texture_match: confidenceScores.texture_accuracy || 0,
         material_match: confidenceScores.material_accuracy || 0,
-        spatial_match: confidenceScores.overall || 0
-      }
+        spatial_match: confidenceScores.overall || 0,
+      },
     };
   });
 
@@ -301,7 +301,7 @@ async function performVectorSimilaritySearch(
 
 async function applyContentFilters(
   matches: VisualSearchMatch[],
-  filters: VisualSearchQueryRequest
+  filters: VisualSearchQueryRequest,
 ): Promise<VisualSearchMatch[]> {
   let filteredMatches = [...matches];
 
@@ -309,8 +309,8 @@ async function applyContentFilters(
   if (filters.color_filters?.dominant_colors) {
     filteredMatches = filteredMatches.filter(match => {
       const matchColors = match.visual_features?.dominant_colors?.map(c => c.color.toLowerCase()) || [];
-      return filters.color_filters!.dominant_colors!.some(filterColor => 
-        matchColors.includes(filterColor.toLowerCase())
+      return filters.color_filters!.dominant_colors!.some(filterColor =>
+        matchColors.includes(filterColor.toLowerCase()),
       );
     });
   }
@@ -319,8 +319,8 @@ async function applyContentFilters(
   if (filters.material_categories && filters.material_categories.length > 0) {
     filteredMatches = filteredMatches.filter(match => {
       const materialType = match.visual_features?.material_classification?.toLowerCase() || '';
-      return filters.material_categories!.some(category => 
-        materialType.includes(category.toLowerCase())
+      return filters.material_categories!.some(category =>
+        materialType.includes(category.toLowerCase()),
       );
     });
   }
@@ -345,7 +345,7 @@ Deno.serve(async (req: Request) => {
     const response = createErrorResponse(
       'METHOD_NOT_ALLOWED',
       'Only POST and GET methods are allowed for visual search queries',
-      { allowed_methods: ['POST', 'GET'] }
+      { allowed_methods: ['POST', 'GET'] },
     );
     return createJSONResponse(response, 405);
   }
@@ -400,7 +400,7 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'INVALID_SEARCH_TYPE',
         `Search type must be one of: ${validSearchTypes.join(', ')}`,
-        { valid_types: validSearchTypes, provided: body.search_type }
+        { valid_types: validSearchTypes, provided: body.search_type },
       );
       return createJSONResponse(response, 400);
     }
@@ -410,7 +410,7 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'MISSING_QUERY_INPUT',
         'At least one query input is required: image_url, image_data, query_vector, query_text, or analysis_id',
-        { required_fields: ['query_image_url', 'query_image_data', 'query_vector', 'query_text', 'analysis_id'] }
+        { required_fields: ['query_image_url', 'query_image_data', 'query_vector', 'query_text', 'analysis_id'] },
       );
       return createJSONResponse(response, 400);
     }
@@ -430,7 +430,7 @@ Deno.serve(async (req: Request) => {
 
     // Step 4: Enhance matches with additional material data
     const enhancedMatches: VisualSearchMatch[] = [];
-    
+
     for (const match of filteredMatches) {
       // Try to find corresponding material in catalog
       const { data: materialData } = await supabase
@@ -447,10 +447,10 @@ Deno.serve(async (req: Request) => {
           name: materialData.name,
           category: materialData.category,
           properties: materialData.properties || {},
-          description: materialData.description || ''
+          description: materialData.description || '',
         };
       }
-      
+
       enhancedMatches.push(enhancedMatch);
     }
 
@@ -460,18 +460,18 @@ Deno.serve(async (req: Request) => {
     const searchStats = {
       total_candidates: rawMatches.length,
       matches_found: enhancedMatches.length,
-      average_similarity: enhancedMatches.length > 0 
-        ? enhancedMatches.reduce((sum, match) => sum + match.similarity_score, 0) / enhancedMatches.length 
+      average_similarity: enhancedMatches.length > 0
+        ? enhancedMatches.reduce((sum, match) => sum + match.similarity_score, 0) / enhancedMatches.length
         : 0,
       search_time_ms: searchTime,
-      vector_dimension: queryVector.length
+      vector_dimension: queryVector.length,
     };
 
     // Generate recommendations based on search results
     const recommendations = {
       related_searches: generateRelatedSearches(enhancedMatches, body.search_type),
       filter_suggestions: generateFilterSuggestions(enhancedMatches),
-      quality_insights: generateQualityInsights(enhancedMatches, searchStats)
+      quality_insights: generateQualityInsights(enhancedMatches, searchStats),
     };
 
     // Store search query for analytics
@@ -494,9 +494,9 @@ Deno.serve(async (req: Request) => {
             material_categories: body.material_categories,
             color_filters: body.color_filters,
             texture_filters: body.texture_filters,
-            property_filters: body.property_filters
+            property_filters: body.property_filters,
           },
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         });
     } catch (analyticsError) {
       console.error('Failed to store search analytics:', analyticsError);
@@ -517,17 +517,17 @@ Deno.serve(async (req: Request) => {
           ...(body.material_categories ? ['material_categories'] : []),
           ...(body.color_filters ? ['color_filters'] : []),
           ...(body.texture_filters ? ['texture_filters'] : []),
-          ...(body.property_filters ? ['property_filters'] : [])
-        ]
+          ...(body.property_filters ? ['property_filters'] : []),
+        ],
       },
       matches: enhancedMatches,
       search_statistics: searchStats,
-      recommendations
+      recommendations,
     };
 
     const response = createSuccessResponse(resultData, {
       processingTime: searchTime,
-      version: '1.0.0'
+      version: '1.0.0',
     });
 
     return createJSONResponse(response);
@@ -540,8 +540,8 @@ Deno.serve(async (req: Request) => {
       error instanceof Error ? error.message : 'Unknown error occurred during visual search',
       {
         timestamp: new Date().toISOString(),
-        error_type: error instanceof Error ? error.constructor.name : 'UnknownError'
-      }
+        error_type: error instanceof Error ? error.constructor.name : 'UnknownError',
+      },
     );
 
     return createJSONResponse(response, 500);
@@ -551,7 +551,7 @@ Deno.serve(async (req: Request) => {
 // Helper functions for recommendations
 function generateRelatedSearches(matches: VisualSearchMatch[], searchType: string): string[] {
   const suggestions = new Set<string>();
-  
+
   // Add search type variations
   const searchTypes = ['color', 'texture', 'material', 'combined'];
   searchTypes.filter(type => type !== searchType).forEach(type => {
@@ -578,7 +578,7 @@ function generateFilterSuggestions(matches: VisualSearchMatch[]): string[] {
   }
 
   const colorVariety = new Set(
-    matches.flatMap(m => m.visual_features?.dominant_colors?.map(c => c.name) || [])
+    matches.flatMap(m => m.visual_features?.dominant_colors?.map(c => c.name) || []),
   );
   if (colorVariety.size > 5) {
     suggestions.add('Apply color_filters to focus on specific colors');

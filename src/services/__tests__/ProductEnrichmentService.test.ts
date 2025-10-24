@@ -52,7 +52,7 @@ jest.mock('@/integrations/supabase/client', () => {
     // Make chainable awaitable for batch queries
     Object.defineProperty(chainable, Symbol.toStringTag, { value: 'Promise' });
     chainable.then = (onFulfilled: any, onRejected?: any) => {
-      let result: any;
+      let result: unknown;
       if (table === 'document_chunks') {
         result = {
           data: [

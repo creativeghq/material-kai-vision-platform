@@ -43,8 +43,8 @@ export type Database = {
           model_versions?: Json
           processing_time_ms?: number | null
         }
-        Relationships: []
-      }
+        Relationships: [],
+  }
       agent_tasks: {
         Row: {
           id: string
@@ -130,22 +130,22 @@ export type Database = {
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            referencedColumns: ['id'],
+  },
           {
             foreignKeyName: 'agent_tasks_workspace_id_fkey'
             columns: ['workspace_id']
             isOneToOne: false
             referencedRelation: 'workspaces'
-            referencedColumns: ['id']
-          },
+            referencedColumns: ['id'],
+  },
           {
             foreignKeyName: 'agent_tasks_parent_task_id_fkey'
             columns: ['parent_task_id']
             isOneToOne: false
             referencedRelation: 'agent_tasks'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       analytics_events: {
@@ -194,8 +194,8 @@ export type Database = {
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'users'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       api_keys: {
@@ -241,8 +241,8 @@ export type Database = {
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'users'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       api_usage_logs: {
@@ -294,8 +294,8 @@ export type Database = {
             columns: ['api_key_id']
             isOneToOne: false
             referencedRelation: 'api_keys'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       generation_3d: {
@@ -383,15 +383,15 @@ export type Database = {
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+            referencedColumns: ['id'],
+  },
           {
             foreignKeyName: 'generation_3d_workspace_id_fkey'
             columns: ['workspace_id']
             isOneToOne: false
             referencedRelation: 'workspaces'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       scraped_materials_temp: {
@@ -455,8 +455,8 @@ export type Database = {
             columns: ['session_id']
             isOneToOne: false
             referencedRelation: 'scraping_sessions'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       scraping_sessions: {
@@ -473,8 +473,8 @@ export type Database = {
           failed_pages: number | null
           materials_processed: number | null
           created_at: string
-          updated_at: string
-        }
+          updated_at: string,
+  }
         Insert: {
           id?: string
           session_id: string
@@ -505,8 +505,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
-      }
+        Relationships: [],
+  }
       scraping_pages: {
         Row: {
           id: string
@@ -520,8 +520,8 @@ export type Database = {
           started_at: string | null
           completed_at: string | null
           created_at: string
-          updated_at: string
-        }
+          updated_at: string,
+  }
         Insert: {
           id?: string
           session_id: string
@@ -556,8 +556,8 @@ export type Database = {
             columns: ['session_id']
             isOneToOne: false
             referencedRelation: 'scraping_sessions'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       materials_catalog: {
@@ -621,8 +621,8 @@ export type Database = {
           visual_embedding_1536?: string | null
           visual_embedding_512?: string | null
         }
-        Relationships: []
-      }
+        Relationships: [],
+  }
       material_visual_analysis: {
         Row: {
           analysis_confidence: number | null
@@ -716,8 +716,8 @@ export type Database = {
             foreignKeyName: 'material_visual_analysis_material_id_fkey'
             columns: ['material_id']
             referencedRelation: 'materials_catalog'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       visual_analysis_queue: {
@@ -780,14 +780,14 @@ export type Database = {
             foreignKeyName: 'visual_analysis_queue_material_id_fkey'
             columns: ['material_id']
             referencedRelation: 'materials_catalog'
-            referencedColumns: ['id']
-          },
+            referencedColumns: ['id'],
+  },
           {
             foreignKeyName: 'visual_analysis_queue_result_analysis_id_fkey'
             columns: ['result_analysis_id']
             referencedRelation: 'material_visual_analysis'
-            referencedColumns: ['id']
-          }
+            referencedColumns: ['id'],
+  }
         ]
       }
       visual_search_history: {
@@ -848,8 +848,8 @@ export type Database = {
           top_similarity_score?: number | null
           user_id?: string | null
         }
-        Relationships: []
-      }
+        Relationships: [],
+  }
       processing_results: {
         Row: {
           batch_id: string | null
@@ -911,8 +911,8 @@ export type Database = {
           user_id?: string | null
           workspace_id?: string | null
         }
-        Relationships: []
-      }
+        Relationships: [],
+  }
       workspaces: {
         Row: {
           created_at: string | null
@@ -938,8 +938,8 @@ export type Database = {
           settings?: Json | null
           updated_at?: string | null
         }
-        Relationships: []
-      }
+        Relationships: [],
+  }
     }
     Views: {
       [_ in never]: never
@@ -952,7 +952,7 @@ export type Database = {
     }
     CompositeTypes: {
       [_ in never]: never
-    }
+    },
   }
 }
 

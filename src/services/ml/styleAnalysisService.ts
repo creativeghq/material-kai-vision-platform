@@ -203,11 +203,11 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
       const img = new Image();
 
       img.onload = () => {
-        this.canvas!.width = Math.min(img.width, 512);
-        this.canvas!.height = Math.min(img.height, 512);
+        this.canvas.width = Math.min(img.width, 512);
+        this.canvas.height = Math.min(img.height, 512);
 
-        this.ctx!.drawImage(img, 0, 0, this.canvas!.width, this.canvas!.height);
-        const imageData = this.ctx!.getImageData(0, 0, this.canvas!.width, this.canvas!.height);
+        this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         resolve(imageData);
       };
 

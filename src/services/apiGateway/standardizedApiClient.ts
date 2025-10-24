@@ -32,13 +32,13 @@ export interface StandardizedApiResponse<T = any> {
 export interface StandardizedError {
   code: string;
   message: string;
-  details?: Record<string, any>; // Preserves API-specific error details
+  details?: Record<string, unknown>; // Preserves API-specific error details
   originalError?: Error | any; // Keeps the raw error for debugging
   retryable: boolean;
   apiSpecific?: {
     statusCode?: number;
     headers?: Record<string, string>;
-    body?: Record<string, any>;
+    body?: Record<string, unknown>;
   };
 }
 

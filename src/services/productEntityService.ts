@@ -27,7 +27,7 @@ export interface ProductEntityGraph {
   product: Product;
   sourceChunks: DocumentChunk[];
   images: DocumentImage[];
-  embeddings: any[];
+  embeddings: unknown[];
   metafields: EntityMetafieldValue[];
 }
 
@@ -485,9 +485,9 @@ export class ProductEntityService {
     products: ProductEntityGraph[];
     chunks: DocumentChunk[];
     images: DocumentImage[];
-    embeddings: any[];
-    productEmbeddings: any[];
-    materials: any[];
+    embeddings: unknown[];
+    productEmbeddings: unknown[];
+    materials: unknown[];
     metafields: {
       products: EntityMetafieldValue[];
       chunks: EntityMetafieldValue[];

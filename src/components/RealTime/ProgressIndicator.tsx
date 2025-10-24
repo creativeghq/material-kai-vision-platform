@@ -297,6 +297,11 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                 <Button
                   className="px-3 py-1.5 text-sm"
                   onClick={() => handleControl('start')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleControl('start');
+                    }
+                  }}
                   disabled={!isConnected}
                 >
                   <Play className="h-4 w-4 mr-1" />
@@ -307,6 +312,11 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                 <Button
                   className="px-3 py-1.5 text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                   onClick={() => handleControl('pause')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleControl('pause');
+                    }
+                  }}
                   disabled={!isConnected}
                 >
                   <Pause className="h-4 w-4 mr-1" />
@@ -317,6 +327,11 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                 <Button
                   className="px-3 py-1.5 text-sm"
                   onClick={() => handleControl('resume')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleControl('resume');
+                    }
+                  }}
                   disabled={!isConnected}
                 >
                   <Play className="h-4 w-4 mr-1" />
@@ -327,6 +342,11 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                 <Button
                   className="px-3 py-1.5 text-sm bg-red-600 text-white hover:bg-red-700"
                   onClick={() => handleControl('cancel')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleControl('cancel');
+                    }
+                  }}
                   disabled={!isConnected}
                 >
                   <Square className="h-4 w-4 mr-1" />
@@ -336,9 +356,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
             </div>
           )}
         </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
+      </CardHeader><CardContent className="space-y-4">
         {/* Overall Progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">

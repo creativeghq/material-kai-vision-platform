@@ -7,6 +7,16 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Simple types for Express-like interfaces
+interface Request {
+  url?: string;
+}
+
+interface ExpressResponse {
+  status: (code: number) => ExpressResponse;
+  json: (data: any) => void;
+}
+
 export interface HealthStatus {
   status: 'healthy' | 'unhealthy' | 'degraded';
   timestamp: string;
@@ -169,7 +179,7 @@ export async function readinessCheck(): Promise<ReadinessStatus> {
  * Express.js compatible health endpoint
  */
 export function createHealthEndpoint() {
-  return async (_req: any, res: any) => {
+  return async (_req: Request, res: ExpressResponse) => {
     try {
       const health = await healthCheck();
       const statusCode = health.status === 'healthy' ? 200 :
@@ -190,7 +200,7 @@ export function createHealthEndpoint() {
  * Express.js compatible readiness endpoint
  */
 export function createReadinessEndpoint() {
-  return async (_req: any, res: any) => {
+  return async (_req: Request, res: ExpressResponse) => {
     try {
       const readiness = await readinessCheck();
       const statusCode = readiness.ready ? 200 : 503;

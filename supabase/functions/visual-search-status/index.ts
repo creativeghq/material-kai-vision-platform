@@ -75,12 +75,12 @@ async function checkMIVAAGatewayHealth(): Promise<ComponentStatus> {
   const startTime = Date.now();
   const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'http://localhost:3000';
   const mivaaApiKey = Deno.env.get('MIVAA_API_KEY');
-  
+
   if (!mivaaApiKey) {
     return {
       status: 'down',
       last_check: new Date().toISOString(),
-      error_message: 'MIVAA API key not configured'
+      error_message: 'MIVAA API key not configured',
     };
   }
 
@@ -104,15 +104,15 @@ async function checkMIVAAGatewayHealth(): Promise<ComponentStatus> {
         response_time_ms: responseTime,
         metrics: {
           gateway_status: healthData.status || 'unknown',
-          ai_backend_healthy: healthData.ai_backend_status === 'healthy' ? 1 : 0
-        }
+          ai_backend_healthy: healthData.ai_backend_status === 'healthy' ? 1 : 0,
+        },
       };
     } else {
       return {
         status: 'degraded',
         last_check: new Date().toISOString(),
         response_time_ms: responseTime,
-        error_message: `MIVAA Gateway HTTP ${response.status}`
+        error_message: `MIVAA Gateway HTTP ${response.status}`,
       };
     }
   } catch (error) {
@@ -120,14 +120,14 @@ async function checkMIVAAGatewayHealth(): Promise<ComponentStatus> {
       status: 'down',
       last_check: new Date().toISOString(),
       response_time_ms: Date.now() - startTime,
-      error_message: error instanceof Error ? error.message : 'MIVAA Gateway connection failed'
+      error_message: error instanceof Error ? error.message : 'MIVAA Gateway connection failed',
     };
   }
 }
 
 async function checkDatabaseHealth(): Promise<ComponentStatus> {
   const startTime = Date.now();
-  
+
   try {
     const { error } = await supabase
       .from('visual_search_analysis')
@@ -141,28 +141,28 @@ async function checkDatabaseHealth(): Promise<ComponentStatus> {
         status: 'down',
         last_check: new Date().toISOString(),
         response_time_ms: responseTime,
-        error_message: error.message
+        error_message: error.message,
       };
     }
 
     return {
       status: responseTime > 2000 ? 'degraded' : 'healthy',
       last_check: new Date().toISOString(),
-      response_time_ms: responseTime
+      response_time_ms: responseTime,
     };
   } catch (error) {
     return {
       status: 'down',
       last_check: new Date().toISOString(),
       response_time_ms: Date.now() - startTime,
-      error_message: error instanceof Error ? error.message : 'Database connection failed'
+      error_message: error instanceof Error ? error.message : 'Database connection failed',
     };
   }
 }
 
 async function checkStorageHealth(): Promise<ComponentStatus> {
   const startTime = Date.now();
-  
+
   try {
     const { error } = await supabase.storage
       .from('material-images')
@@ -175,21 +175,21 @@ async function checkStorageHealth(): Promise<ComponentStatus> {
         status: 'down',
         last_check: new Date().toISOString(),
         response_time_ms: responseTime,
-        error_message: error.message
+        error_message: error.message,
       };
     }
 
     return {
       status: responseTime > 3000 ? 'degraded' : 'healthy',
       last_check: new Date().toISOString(),
-      response_time_ms: responseTime
+      response_time_ms: responseTime,
     };
   } catch (error) {
     return {
       status: 'down',
       last_check: new Date().toISOString(),
       response_time_ms: Date.now() - startTime,
-      error_message: error instanceof Error ? error.message : 'Storage connection failed'
+      error_message: error instanceof Error ? error.message : 'Storage connection failed',
     };
   }
 }
@@ -198,14 +198,14 @@ async function getSystemStatus(): Promise<SystemStatus> {
   const [mivaaHealth, dbHealth, storageHealth] = await Promise.all([
     checkMIVAAGatewayHealth(),
     checkDatabaseHealth(),
-    checkStorageHealth()
+    checkStorageHealth(),
   ]);
 
   // Check vector search health (placeholder)
   const vectorHealth: ComponentStatus = {
     status: 'healthy',
     last_check: new Date().toISOString(),
-    response_time_ms: 50
+    response_time_ms: 50,
   };
 
   // Calculate overall system status
@@ -221,7 +221,7 @@ async function getSystemStatus(): Promise<SystemStatus> {
     .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .limit(100);
 
-  const avgConfidence = recentAnalyses?.length 
+  const avgConfidence = recentAnalyses?.length
     ? recentAnalyses.reduce((sum: number, analysis: any) => sum + (analysis.confidence_scores?.overall || 0), 0) / recentAnalyses.length
     : 0;
 
@@ -245,20 +245,20 @@ async function getSystemStatus(): Promise<SystemStatus> {
       mivaa_gateway: mivaaHealth,
       database: dbHealth,
       storage: storageHealth,
-      vector_search: vectorHealth
+      vector_search: vectorHealth,
     },
     performance_metrics: {
       avg_analysis_time_ms: 5000, // Placeholder
       avg_search_time_ms: 500,    // Placeholder
       cache_hit_rate: 0.85,       // Placeholder
-      error_rate_percent: 2.5     // Placeholder
+      error_rate_percent: 2.5,     // Placeholder
     },
     capacity_metrics: {
       active_analyses: activeJobs?.length || 0,
       queue_depth: queuedJobs?.length || 0,
       storage_usage_mb: 1024,     // Placeholder
-      vector_index_size: 50000    // Placeholder
-    }
+      vector_index_size: 50000,    // Placeholder
+    },
   };
 }
 
@@ -293,16 +293,16 @@ async function getUserJobs(userId: string, limit: number = 20): Promise<JobProgr
         updated_at: job.created_at,
         user_id: userId,
         metadata: {
-          confidence: job.confidence_scores?.overall || 0
-        }
+          confidence: job.confidence_scores?.overall || 0,
+        },
       });
     });
 
     // Convert batch jobs
     batchJobs?.forEach((job: any) => {
-      const progressPercent = job.status === 'completed' ? 100 
-        : job.status === 'processing' ? 50 
-        : job.status === 'failed' ? 0 
+      const progressPercent = job.status === 'completed' ? 100
+        : job.status === 'processing' ? 50
+        : job.status === 'failed' ? 0
         : 0;
 
       jobs.push({
@@ -314,8 +314,8 @@ async function getUserJobs(userId: string, limit: number = 20): Promise<JobProgr
         updated_at: job.completed_at || job.started_at || job.created_at,
         user_id: userId,
         metadata: {
-          total_items: job.total_items
-        }
+          total_items: job.total_items,
+        },
       });
     });
 
@@ -330,7 +330,7 @@ async function getUserActivitySummary(userId: string, period: '24h' | '7d' | '30
   const periodMs = {
     '24h': 24 * 60 * 60 * 1000,
     '7d': 7 * 24 * 60 * 60 * 1000,
-    '30d': 30 * 24 * 60 * 60 * 1000
+    '30d': 30 * 24 * 60 * 60 * 1000,
   };
 
   const since = new Date(Date.now() - periodMs[period]).toISOString();
@@ -343,7 +343,7 @@ async function getUserActivitySummary(userId: string, period: '24h' | '7d' | '30
       .eq('user_id', userId)
       .gte('created_at', since);
 
-    // Get search count  
+    // Get search count
     const { count: searchCount } = await supabase
       .from('visual_search_queries')
       .select('*', { count: 'exact' })
@@ -358,7 +358,7 @@ async function getUserActivitySummary(userId: string, period: '24h' | '7d' | '30
       .gte('created_at', since);
 
     // Calculate average confidence
-    const avgConfidence = analyses?.length 
+    const avgConfidence = analyses?.length
       ? analyses.reduce((sum: number, analysis: any) => sum + (analysis.confidence_scores?.overall || 0), 0) / analyses.length
       : 0;
 
@@ -385,7 +385,7 @@ async function getUserActivitySummary(userId: string, period: '24h' | '7d' | '30
       batch_jobs: batchCount || 0,
       avg_confidence_score: avgConfidence,
       most_analyzed_categories: mostAnalyzedCategories,
-      storage_usage_mb: 0 // Placeholder - would need storage API integration
+      storage_usage_mb: 0, // Placeholder - would need storage API integration
     };
   } catch (error) {
     console.error('Failed to get user activity summary:', error);
@@ -397,7 +397,7 @@ async function getUserActivitySummary(userId: string, period: '24h' | '7d' | '30
       batch_jobs: 0,
       avg_confidence_score: 0,
       most_analyzed_categories: [],
-      storage_usage_mb: 0
+      storage_usage_mb: 0,
     };
   }
 }
@@ -419,7 +419,7 @@ Deno.serve(async (req: Request) => {
     const response = createErrorResponse(
       'METHOD_NOT_ALLOWED',
       'Only GET method is allowed for status endpoints',
-      { allowed_methods: ['GET'] }
+      { allowed_methods: ['GET'] },
     );
     return createJSONResponse(response, 405);
   }
@@ -427,7 +427,7 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const pathSegments = url.pathname.split('/').filter(Boolean);
-    
+
     // Handle different status endpoints:
     // GET /visual-search-status - System status
     // GET /visual-search-status/jobs/{user_id} - User job history
@@ -438,10 +438,10 @@ Deno.serve(async (req: Request) => {
       // System status
       console.log('Fetching system status...');
       const systemStatus = await getSystemStatus();
-      
+
       const response = createSuccessResponse(systemStatus, {
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.0',
       });
 
       return createJSONResponse(response);
@@ -456,7 +456,7 @@ Deno.serve(async (req: Request) => {
         const response = createErrorResponse(
           'INVALID_LIMIT',
           'Limit cannot exceed 100',
-          { max_limit: 100, requested: limit }
+          { max_limit: 100, requested: limit },
         );
         return createJSONResponse(response, 400);
       }
@@ -467,7 +467,7 @@ Deno.serve(async (req: Request) => {
       const response = createSuccessResponse({
         user_id: userId,
         jobs: userJobs,
-        total_returned: userJobs.length
+        total_returned: userJobs.length,
       });
 
       return createJSONResponse(response);
@@ -481,7 +481,7 @@ Deno.serve(async (req: Request) => {
         const response = createErrorResponse(
           'INVALID_PERIOD',
           'Period must be one of: 24h, 7d, 30d',
-          { valid_periods: ['24h', '7d', '30d'], provided: period }
+          { valid_periods: ['24h', '7d', '30d'], provided: period },
         );
         return createJSONResponse(response, 400);
       }
@@ -525,8 +525,8 @@ Deno.serve(async (req: Request) => {
           metadata: {
             total_items: totalItems,
             completed_items: completedItems,
-            failed_items: batchItems?.filter((item: any) => item.status === 'failed').length || 0
-          }
+            failed_items: batchItems?.filter((item: any) => item.status === 'failed').length || 0,
+          },
         };
 
         // Only add current_step if we have a meaningful value
@@ -556,8 +556,8 @@ Deno.serve(async (req: Request) => {
           user_id: analysisJob.user_id,
           metadata: {
             confidence: analysisJob.confidence_scores?.overall || 0,
-            analysis_depth: analysisJob.analysis_depth
-          }
+            analysis_depth: analysisJob.analysis_depth,
+          },
         };
 
         const response = createSuccessResponse(jobProgress);
@@ -568,7 +568,7 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'JOB_NOT_FOUND',
         `Job ${jobId} not found`,
-        { job_id: jobId }
+        { job_id: jobId },
       );
       return createJSONResponse(response, 404);
 
@@ -576,14 +576,14 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'INVALID_ENDPOINT',
         'Invalid status endpoint path',
-        { 
+        {
           available_endpoints: [
             '/visual-search-status',
             '/visual-search-status/jobs/{user_id}',
             '/visual-search-status/activity/{user_id}',
-            '/visual-search-status/job/{job_id}'
-          ]
-        }
+            '/visual-search-status/job/{job_id}',
+          ],
+        },
       );
       return createJSONResponse(response, 404);
     }
@@ -596,8 +596,8 @@ Deno.serve(async (req: Request) => {
       error instanceof Error ? error.message : 'Unknown error occurred during status check',
       {
         timestamp: new Date().toISOString(),
-        error_type: error instanceof Error ? error.constructor.name : 'UnknownError'
-      }
+        error_type: error instanceof Error ? error.constructor.name : 'UnknownError',
+      },
     );
 
     return createJSONResponse(response, 500);

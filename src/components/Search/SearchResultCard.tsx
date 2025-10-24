@@ -131,7 +131,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
           'flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors',
           className,
         )}
-        onClick={handleView}
+        onClick={handleView} onKeyDown={(e) => e.key === 'Enter' && handleView()}
       >
         <div className="flex-shrink-0">
           <TypeIcon className="h-4 w-4 text-gray-500" />
@@ -169,7 +169,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
           'flex gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors',
           className,
         )}
-        onClick={handleView}
+        onClick={handleView} onKeyDown={(e) => e.key === 'Enter' && handleView()}
       >
         {/* Thumbnail or Icon */}
         <div className="flex-shrink-0">
@@ -224,7 +224,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     <Badge
                       key={tag}
                       className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer"
-                      onClick={(e) => handleTagClick(e, tag)}
+                      onClick={(e) => handleTagClick(e, tag)} onKeyDown={(e) => e.key === 'Enter' && handleTagClick(e as any, tag)}
                     >
                       <Hash className="h-3 w-3 mr-1" />
                       {tag}
@@ -301,7 +301,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     <TooltipTrigger asChild>
                       <Button
                         className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                        onClick={handleFavorite}
+                        onClick={handleFavorite} onKeyDown={(e) => e.key === 'Enter' && handleFavorite(e as any)}
 
                       >
                         <Star className={cn(
@@ -322,7 +322,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                       <TooltipTrigger asChild>
                         <Button
                           className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                          onClick={handleDownload}
+                          onClick={handleDownload} onKeyDown={(e) => e.key === 'Enter' && handleDownload(e as any)}
 
                         >
                           <Download className="h-4 w-4 text-gray-400" />
@@ -344,6 +344,12 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             window.open(result.url, '_blank');
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.stopPropagation();
+                              window.open(result.url, '_blank');
+                            }
                           }}
 
                         >
@@ -371,7 +377,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
         'cursor-pointer hover:shadow-md transition-shadow',
         className,
       )}
-      onClick={handleView}
+      onClick={handleView} onKeyDown={(e) => e.key === 'Enter' && handleView()}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
@@ -420,8 +426,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     <Badge variant={getQualityBadgeVariant(result.qualityMetrics.precision)} className="text-xs">
                       Quality: {formatScore(result.qualityMetrics.precision)}%
                     </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
+                  </TooltipTrigger><TooltipContent>
                     <div className="text-xs space-y-1">
                       <p>Precision: {formatScore(result.qualityMetrics.precision)}%</p>
                       {result.qualityMetrics.recall && <p>Recall: {formatScore(result.qualityMetrics.recall)}%</p>}
@@ -458,7 +463,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
               <Badge
                 key={tag}
                 className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer"
-                onClick={(e) => handleTagClick(e, tag)}
+                onClick={(e) => handleTagClick(e, tag)} onKeyDown={(e) => e.key === 'Enter' && handleTagClick(e as any, tag)}
               >
                 <Hash className="h-3 w-3 mr-1" />
                 {tag}
@@ -494,7 +499,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                 <TooltipTrigger asChild>
                   <Button
                     className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                    onClick={handleFavorite}
+                    onClick={handleFavorite} onKeyDown={(e) => e.key === 'Enter' && handleFavorite(e as any)}
 
                   >
                     <Star className={cn(
@@ -515,7 +520,7 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                   <TooltipTrigger asChild>
                     <Button
                       className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3"
-                      onClick={handleDownload}
+                      onClick={handleDownload} onKeyDown={(e) => e.key === 'Enter' && handleDownload(e as any)}
 
                     >
                       <Download className="h-4 w-4 text-gray-400" />
@@ -537,6 +542,12 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                       onClick={(e) => {
                         e.stopPropagation();
                         window.open(result.url, '_blank');
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.stopPropagation();
+                          window.open(result.url, '_blank');
+                        }
                       }}
 
                     >

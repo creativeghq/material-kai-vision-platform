@@ -218,7 +218,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
 
           {hasActiveFilters && (
             <Button
-              onClick={clearFilters}
+              onClick={clearFilters} onKeyDown={(e) => e.key === 'Enter' && clearFilters()}
               className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3 text-gray-500 hover:text-gray-700"
             >
               <X className="h-4 w-4 mr-1" />
@@ -233,9 +233,8 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
             <>
               <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 mr-2">
                 {selectedResults.size} selected
-              </Badge>
-              <Button
-                onClick={handleBulkDownload}
+              </Badge><Button
+                onClick={handleBulkDownload} onKeyDown={(e) => e.key === 'Enter' && handleBulkDownload()}
                 className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 mr-2"
               >
                 <Download className="h-4 w-4 mr-1" />
@@ -252,7 +251,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
               return (
                 <Button
                   key={option.value}
-                  onClick={() => setViewMode(option.value as ViewMode)}
+                  onClick={() => setViewMode(option.value as ViewMode)} onKeyDown={(e) => e.key === 'Enter' && setViewMode(option.value as ViewMode)}
                   className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 rounded-none first:rounded-l-lg last:rounded-r-lg ${
                     viewMode === option.value
                       ? 'bg-primary text-primary-foreground hover:bg-primary/90'
@@ -286,8 +285,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
             <SelectTrigger className="w-40">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+            </SelectTrigger><SelectContent>
               {filterOptions.map((option) => {
                 const Icon = option.icon;
                 return (
@@ -325,7 +323,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           </Select>
 
           <Button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} onKeyDown={(e) => e.key === 'Enter' && setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
             className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
           >
             {sortOrder === 'asc' ? (
@@ -439,7 +437,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
 
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => onPageChange?.(currentPage - 1)}
+                  onClick={() => onPageChange?.(currentPage - 1)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
                 >
@@ -452,7 +450,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     return (
                       <Button
                         key={page}
-                        onClick={() => onPageChange?.(page)}
+                        onClick={() => onPageChange?.(page)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(page)}
                         className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 w-8 h-8 p-0 ${
                           currentPage === page
                             ? 'bg-primary text-primary-foreground hover:bg-primary/90'
@@ -468,7 +466,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     <>
                       <span className="text-gray-400">...</span>
                       <Button
-                        onClick={() => onPageChange?.(totalPages)}
+                        onClick={() => onPageChange?.(totalPages)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(totalPages)}
                         className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 w-8 h-8 p-0 ${
                           currentPage === totalPages
                             ? 'bg-primary text-primary-foreground hover:bg-primary/90'
@@ -482,7 +480,7 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                 </div>
 
                 <Button
-                  onClick={() => onPageChange?.(currentPage + 1)}
+                  onClick={() => onPageChange?.(currentPage + 1)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(currentPage + 1)}
                   disabled={currentPage === totalPages}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
                 >

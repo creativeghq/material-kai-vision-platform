@@ -76,7 +76,7 @@ export const MivaaDocsViewer: React.FC = () => {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: 'Copied!',
+      title: 'Copied',
       description: `${label} copied to clipboard`,
     });
   };
@@ -118,7 +118,7 @@ export const MivaaDocsViewer: React.FC = () => {
                   Test API endpoints directly in the browser with request/response examples.
                 </p>
                 <Button
-                  onClick={() => openDocsInNewTab('docs', 'Swagger UI')}
+                  onClick={() => openDocsInNewTab('docs', 'Swagger UI')} onKeyDown={(e) => e.key === 'Enter' && openDocsInNewTab('docs', 'Swagger UI')}
                   disabled={loading === 'docs'}
                   className="w-full"
                 >
@@ -149,7 +149,7 @@ export const MivaaDocsViewer: React.FC = () => {
                   Beautiful, responsive documentation with detailed endpoint descriptions.
                 </p>
                 <Button
-                  onClick={() => openDocsInNewTab('redoc', 'ReDoc')}
+                  onClick={() => openDocsInNewTab('redoc', 'ReDoc')} onKeyDown={(e) => e.key === 'Enter' && openDocsInNewTab('redoc', 'ReDoc')}
                   disabled={loading === 'redoc'}
                   className="w-full"
                   variant="outline"
@@ -181,7 +181,7 @@ export const MivaaDocsViewer: React.FC = () => {
                   Download the OpenAPI specification for code generation and tooling.
                 </p>
                 <Button
-                  onClick={() => openDocsInNewTab('openapi_json', 'OpenAPI JSON')}
+                  onClick={() => openDocsInNewTab('openapi_json', 'OpenAPI JSON')} onKeyDown={(e) => e.key === 'Enter' && openDocsInNewTab('openapi_json', 'OpenAPI JSON')}
                   disabled={loading === 'openapi_json'}
                   className="w-full"
                   variant="outline"
@@ -197,7 +197,6 @@ export const MivaaDocsViewer: React.FC = () => {
             </Card>
           </div>
         </TabsContent>
-
         <TabsContent value="endpoints" className="space-y-4">
           <Card>
             <CardHeader>
@@ -215,6 +214,7 @@ export const MivaaDocsViewer: React.FC = () => {
                       size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard('{"action": "docs", "payload": {}}', 'Swagger UI payload')}
+                      onKeyDown={(e) => e.key === 'Enter' && copyToClipboard('{"action": "docs", "payload": {}}', 'Swagger UI payload')}
                     >
                       Copy
                     </Button>
@@ -229,6 +229,7 @@ export const MivaaDocsViewer: React.FC = () => {
                       size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard('{"action": "redoc", "payload": {}}', 'ReDoc payload')}
+                      onKeyDown={(e) => e.key === 'Enter' && copyToClipboard('{"action": "redoc", "payload": {}}', 'ReDoc payload')}
                     >
                       Copy
                     </Button>
@@ -243,6 +244,7 @@ export const MivaaDocsViewer: React.FC = () => {
                       size="sm"
                       variant="outline"
                       onClick={() => copyToClipboard('{"action": "openapi_json", "payload": {}}', 'OpenAPI JSON payload')}
+                      onKeyDown={(e) => e.key === 'Enter' && copyToClipboard('{"action": "openapi_json", "payload": {}}', 'OpenAPI JSON payload')}
                     >
                       Copy
                     </Button>

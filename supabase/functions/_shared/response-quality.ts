@@ -1,6 +1,6 @@
 /**
  * Response Quality Measurement Utility for Edge Functions
- * 
+ *
  * Measures and stores response quality metrics:
  * - Coherence (25% weight)
  * - Hallucination detection (35% weight)
@@ -32,7 +32,7 @@ export async function evaluateResponseQuality(
   query: string,
   responseText: string,
   sourceChunks: string[],
-  supabaseClient: ReturnType<typeof createClient>
+  supabaseClient: ReturnType<typeof createClient>,
 ): Promise<ResponseQualityMetrics> {
   try {
     console.log(`🔍 Evaluating response quality for ${responseId}...`);
@@ -149,7 +149,7 @@ function detectHallucinations(responseText: string, sourceChunks: string[]): num
   }
 
   const coverageRatio = responseWords.size > 0 ? coverage / responseWords.size : 0;
-  
+
   // Hallucination score: 1 - coverage (higher = more hallucinations)
   return 1 - coverageRatio;
 }
@@ -191,16 +191,16 @@ function checkFactualConsistency(responseText: string, sourceChunks: string[]): 
 
   // Extract sentences from response
   const responseSentences = responseText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-  
+
   // Check how many response sentences have supporting content in sources
   let consistentSentences = 0;
-  
+
   for (const sentence of responseSentences) {
     const sentenceWords = sentence.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    
+
     for (const chunk of sourceChunks) {
       const chunkWords = chunk.toLowerCase().split(/\s+/);
-      
+
       // Check if at least 50% of sentence words appear in chunk
       const matchingWords = sentenceWords.filter(w => chunkWords.includes(w));
       if (matchingWords.length / sentenceWords.length >= 0.5) {
@@ -218,7 +218,7 @@ function checkFactualConsistency(responseText: string, sourceChunks: string[]): 
  */
 async function storeResponseMetrics(
   metrics: ResponseQualityMetrics,
-  supabaseClient: ReturnType<typeof createClient>
+  supabaseClient: ReturnType<typeof createClient>,
 ): Promise<void> {
   try {
     const { error } = await supabaseClient

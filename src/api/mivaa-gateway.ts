@@ -1,6 +1,19 @@
 // Minimal MIVAA Gateway controller and types to satisfy routing and service imports
 // NOTE: This is a lightweight stub to keep TypeScript stable while the real gateway is integrated
 
+// Simple types for Express-like interfaces
+interface Request {
+  body?: any;
+  params?: any;
+  query?: any;
+  url?: string;
+}
+
+interface Response {
+  status: (code: number) => Response;
+  json: (data: any) => void;
+}
+
 export interface GatewayRequest {
   action: string;
   endpoint?: string;
@@ -30,7 +43,7 @@ export interface GatewayResponse {
 
 export class MivaaGatewayController {
   // Process incoming gateway request
-  public processRequest = async (req: any, res: any): Promise<void> => {
+  public processRequest = async (req: Request, res: Response): Promise<void> => {
     try {
       // This is a placeholder implementation. Replace with real gateway logic.
       const start = Date.now();
@@ -67,7 +80,7 @@ export class MivaaGatewayController {
   };
 
   // Simple health check
-  public healthCheck = (_req: any, res: any): void => {
+  public healthCheck = (_req: Request, res: Response): void => {
     const response: GatewayResponse = {
       success: true,
       data: { status: 'healthy' },
@@ -76,8 +89,8 @@ export class MivaaGatewayController {
         timestamp: new Date().toISOString(),
         processingTime: 0,
         version: '1.0.0',
-      }
-    };
+      },
+  };
 
     if (typeof res?.status === 'function' && typeof res?.json === 'function') {
       res.status(200).json(response);

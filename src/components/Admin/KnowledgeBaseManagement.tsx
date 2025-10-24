@@ -179,8 +179,8 @@ const KnowledgeBaseManagement: React.FC = () => {
         setExtractedEntities(response.data.entities);
 
         // Auto-populate metadata fields based on extracted entities
-        const materialEntities = response.data.entities.filter((e: any) => e.type === 'MATERIAL');
-        const tags = materialEntities.map((e: any) => e.text);
+        const materialEntities = response.data.entities.filter((e: unknown) => (e as any).type === 'MATERIAL');
+        const tags = materialEntities.map((e: unknown) => (e as any).text);
 
         await supabase
           .from('enhanced_knowledge_base')
@@ -427,6 +427,11 @@ const KnowledgeBaseManagement: React.FC = () => {
               <Button
                 className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
                 onClick={() => navigate('/')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate('/');
+                  }
+                }}
               >
                 <Search className="h-4 w-4" />
                 Back to Main
@@ -434,6 +439,11 @@ const KnowledgeBaseManagement: React.FC = () => {
               <Button
                 className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
                 onClick={() => navigate('/admin')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate('/admin');
+                  }
+                }}
               >
                 <Filter className="h-4 w-4" />
                 Back to Admin
@@ -448,11 +458,18 @@ const KnowledgeBaseManagement: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={fetchEntries} className="border border-border bg-background text-foreground h-8 px-3 text-sm">
+            <Button
+              onClick={fetchEntries}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  fetchEntries();
+                }
+              }}
+              className="border border-border bg-background text-foreground h-8 px-3 text-sm"
+            >
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
-            </Button>
-            <Button className="bg-primary text-primary-foreground h-8 px-3 text-sm">
+            </Button><Button className="bg-primary text-primary-foreground h-8 px-3 text-sm">
               <Plus className="h-4 w-4 mr-2" />
               Add Entry
             </Button>
@@ -472,7 +489,6 @@ const KnowledgeBaseManagement: React.FC = () => {
             <TabsTrigger value="images">🖼️ Images</TabsTrigger>
             <TabsTrigger value="embeddings">🧠 Embeddings</TabsTrigger>
           </TabsList>
-
           <TabsContent value="entries" className="space-y-4">
             {/* Metadata Toggle Control */}
             <Card>
@@ -486,6 +502,11 @@ const KnowledgeBaseManagement: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowFunctionalMetadata(!showFunctionalMetadata)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setShowFunctionalMetadata(!showFunctionalMetadata);
+                      }
+                    }}
                     className="flex items-center gap-2"
                   >
                     {showFunctionalMetadata ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -502,8 +523,7 @@ const KnowledgeBaseManagement: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Search & Filters</CardTitle>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -544,8 +564,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                     <Button className="border border-border bg-background text-foreground h-8 px-3 text-sm">
                       <Download className="h-4 w-4 mr-2" />
                       Export
-                    </Button>
-                    <Button className="border border-border bg-background text-foreground h-8 px-3 text-sm">
+                    </Button><Button className="border border-border bg-background text-foreground h-8 px-3 text-sm">
                       <Upload className="h-4 w-4 mr-2" />
                       Import
                     </Button>
@@ -566,6 +585,11 @@ const KnowledgeBaseManagement: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowFunctionalSearch(!showFunctionalSearch)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setShowFunctionalSearch(!showFunctionalSearch);
+                      }
+                    }}
                     className="flex items-center gap-2"
                   >
                     {showFunctionalSearch ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -595,8 +619,7 @@ const KnowledgeBaseManagement: React.FC = () => {
             {/* Entries Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Knowledge Entries ({filteredEntries.length})</CardTitle>
-                <CardDescription>
+                <CardTitle>Knowledge Entries ({filteredEntries.length})</CardTitle><CardDescription>
                   Manage and view all knowledge base entries with functional metadata integration
                 </CardDescription>
               </CardHeader>
@@ -634,8 +657,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                           <Badge className={getStatusColor(entry.status)}>
                             {entry.status}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
+                        </TableCell><TableCell>
                           {(entry.metadata as Record<string, unknown>)?.functional_metadata ? (
                             <Badge className="bg-amber-100 text-amber-800 border-amber-200">
                               <Sparkles className="h-3 w-3 mr-1" />
@@ -656,6 +678,12 @@ const KnowledgeBaseManagement: React.FC = () => {
                                 setSelectedEntry(entry);
                                 setIsViewerDialogOpen(true);
                               }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setSelectedEntry(entry);
+                                  setIsViewerDialogOpen(true);
+                                }
+                              }}
                               title="View with Functional Metadata"
                             >
                               <Eye className="h-4 w-4" />
@@ -665,6 +693,12 @@ const KnowledgeBaseManagement: React.FC = () => {
                               onClick={() => {
                                 setSelectedEntry(entry);
                                 setIsEditDialogOpen(true);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setSelectedEntry(entry);
+                                  setIsEditDialogOpen(true);
+                                }
                               }}
                             >
                               <Edit className="h-4 w-4" />
@@ -677,6 +711,14 @@ const KnowledgeBaseManagement: React.FC = () => {
                                 fetchRelatedDocuments(entry.id);
                                 extractDocumentEntities(entry.id);
                               }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setSelectedEntry(entry);
+                                  // Fetch related documents and entities when selecting
+                                  fetchRelatedDocuments(entry.id);
+                                  extractDocumentEntities(entry.id);
+                                }
+                              }}
                               title="Analyze with MIVAA"
                             >
                               <Sparkles className="h-4 w-4" />
@@ -684,6 +726,11 @@ const KnowledgeBaseManagement: React.FC = () => {
                             <Button
                               className="border border-border bg-background text-foreground h-8 px-3 text-sm"
                               onClick={() => handleDeleteEntry(entry.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleDeleteEntry(entry.id);
+                                }
+                              }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -695,9 +742,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="analysis" className="space-y-4">
+          </TabsContent><TabsContent value="analysis" className="space-y-4">
             {selectedEntry ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Related Documents Panel */}
@@ -710,8 +755,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                     <CardDescription>
                       Documents similar to "{selectedEntry.title}"
                     </CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                  </CardHeader><CardContent>
                     {loadingRelated ? (
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -719,22 +763,31 @@ const KnowledgeBaseManagement: React.FC = () => {
                       </div>
                     ) : relatedDocs.length > 0 ? (
                       <div className="space-y-2">
-                        {relatedDocs.map((doc: any) => (
-                          <div key={doc.document_id} className="flex items-center justify-between p-2 border rounded">
+                        {relatedDocs.map((doc: unknown) => (
+                          <div key={(doc as any).document_id} className="flex items-center justify-between p-2 border rounded">
                             <div>
-                              <p className="font-medium">{doc.document_name || `Document ${doc.document_id}`}</p>
+                              <p className="font-medium">{(doc as any).document_name || `Document ${(doc as any).document_id}`}</p>
                               <p className="text-sm text-muted-foreground">
-                                Similarity: {(doc.similarity_score * 100).toFixed(1)}%
+                                Similarity: {((doc as any).similarity_score * 100).toFixed(1)}%
                               </p>
                             </div>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                const relatedEntry = entries.find(e => e.id === doc.document_id);
+                                const relatedEntry = entries.find(e => e.id === (doc as any).document_id);
                                 if (relatedEntry) {
                                   setSelectedEntry(relatedEntry);
                                   fetchRelatedDocuments(relatedEntry.id);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const relatedEntry = entries.find(e => e.id === (doc as any).document_id);
+                                  if (relatedEntry) {
+                                    setSelectedEntry(relatedEntry);
+                                    fetchRelatedDocuments(relatedEntry.id);
+                                  }
                                 }
                               }}
                             >
@@ -764,6 +817,11 @@ const KnowledgeBaseManagement: React.FC = () => {
                     <div className="space-y-4">
                       <Button
                         onClick={() => generateDocumentSummary(selectedEntry.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            generateDocumentSummary(selectedEntry.id);
+                          }
+                        }}
                         disabled={generatingSummary}
                         className="w-full"
                       >
@@ -801,15 +859,22 @@ const KnowledgeBaseManagement: React.FC = () => {
                         fetchRelatedDocuments(firstEntry.id);
                       }
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const firstEntry = filteredEntries[0];
+                        if (firstEntry) {
+                          setSelectedEntry(firstEntry);
+                          fetchRelatedDocuments(firstEntry.id);
+                        }
+                      }
+                    }}
                   >
                     Analyze First Document
                   </Button>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="comparison" className="space-y-4">
+          </TabsContent><TabsContent value="comparison" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -819,8 +884,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 <CardDescription>
                   Compare multiple documents to identify similarities and differences
                 </CardDescription>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 <div className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Select documents to compare:</Label>
@@ -850,6 +914,11 @@ const KnowledgeBaseManagement: React.FC = () => {
 
                   <Button
                     onClick={compareDocuments}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        compareDocuments();
+                      }
+                    }}
                     disabled={comparingDocs || selectedDocsForComparison.length < 2}
                     className="w-full"
                   >
@@ -905,9 +974,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="entities" className="space-y-4">
+          </TabsContent><TabsContent value="entities" className="space-y-4">
             {selectedEntry ? (
               <Card>
                 <CardHeader>
@@ -918,11 +985,15 @@ const KnowledgeBaseManagement: React.FC = () => {
                   <CardDescription>
                     Named entities extracted from "{selectedEntry.title}"
                   </CardDescription>
-                </CardHeader>
-                <CardContent>
+                </CardHeader><CardContent>
                   <div className="space-y-4">
                     <Button
                       onClick={() => extractDocumentEntities(selectedEntry.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          extractDocumentEntities(selectedEntry.id);
+                        }
+                      }}
                       disabled={extractingEntities}
                       className="w-full"
                     >
@@ -939,7 +1010,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                     {extractedEntities.length > 0 && (
                       <div className="space-y-4">
                         {['MATERIAL', 'PERSON', 'ORG', 'LOCATION', 'DATE'].map(type => {
-                          const typeEntities = extractedEntities.filter((e: any) => e.type === type);
+                          const typeEntities = extractedEntities.filter((e: unknown) => (e as any).type === type);
                           if (typeEntities.length === 0) return null;
 
                           return (
@@ -949,16 +1020,16 @@ const KnowledgeBaseManagement: React.FC = () => {
                                 <span className="text-muted-foreground">({typeEntities.length})</span>
                               </h5>
                               <div className="flex flex-wrap gap-2">
-                                {typeEntities.map((entity: any) => (
+                                {typeEntities.map((entity: unknown) => (
                                   <Badge
-                                    key={entity.id || `${entity.text}-${entity.start}`}
+                                    key={(entity as any).id || `${(entity as any).text}-${(entity as any).start}`}
                                     variant="secondary"
                                     className="cursor-pointer hover:bg-secondary/80"
-                                    title={`Confidence: ${(entity.confidence * 100).toFixed(0)}%`}
+                                    title={`Confidence: ${((entity as any).confidence * 100).toFixed(0)}%`}
                                   >
-                                    {entity.text}
+                                    {(entity as any).text}
                                     <span className="ml-1 text-xs opacity-70">
-                                      {(entity.confidence * 100).toFixed(0)}%
+                                      {((entity as any).confidence * 100).toFixed(0)}%
                                     </span>
                                   </Badge>
                                 ))}
@@ -994,15 +1065,22 @@ const KnowledgeBaseManagement: React.FC = () => {
                         extractDocumentEntities(firstEntry.id);
                       }
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const firstEntry = filteredEntries[0];
+                        if (firstEntry) {
+                          setSelectedEntry(firstEntry);
+                          extractDocumentEntities(firstEntry.id);
+                        }
+                      }
+                    }}
                   >
                     Extract from First Document
                   </Button>
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="viewer" className="space-y-4">
+          </TabsContent><TabsContent value="viewer" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1012,8 +1090,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                 <CardDescription>
                   Select an entry below to view it with integrated functional metadata display
                 </CardDescription>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 {selectedEntry ? (
                   <KnowledgeBasePDFViewer
                     entry={selectedEntry}
@@ -1035,7 +1112,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                   <div className="text-center py-12">
                     <Eye className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-4">
-                      Click &quot;View&quot; on any entry above to see the enhanced PDF viewer with functional metadata
+                      Click "View" on any entry above to see the enhanced PDF viewer with functional metadata
                     </p>
                     <Button
                       variant="outline"
@@ -1043,6 +1120,14 @@ const KnowledgeBaseManagement: React.FC = () => {
                         const firstEntry = filteredEntries[0];
                         if (firstEntry) {
                           setSelectedEntry(firstEntry);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const firstEntry = filteredEntries[0];
+                          if (firstEntry) {
+                            setSelectedEntry(firstEntry);
+                          }
                         }
                       }}
                     >
@@ -1061,8 +1146,7 @@ const KnowledgeBaseManagement: React.FC = () => {
                   <ImageIcon className="w-5 h-5" />
                   Extracted Images
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 <p className="text-muted-foreground mb-4">
                   Process some PDF documents first to see extracted images here.
                 </p>
@@ -1084,8 +1168,7 @@ const KnowledgeBaseManagement: React.FC = () => {
             {selectedEntry && (
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="title">Title</Label>
-                  <Input
+                  <Label htmlFor="title">Title</Label><Input
                     id="title"
                     defaultValue={selectedEntry.title}
                     onChange={(e) => setSelectedEntry({...selectedEntry, title: e.target.value})}
@@ -1101,10 +1184,25 @@ const KnowledgeBaseManagement: React.FC = () => {
                   />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditDialogOpen(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setIsEditDialogOpen(false);
+                      }
+                    }}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={() => handleUpdateEntry(selectedEntry)}>
+                  <Button
+                    onClick={() => handleUpdateEntry(selectedEntry)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleUpdateEntry(selectedEntry);
+                      }
+                    }}
+                  >
                     Save Changes
                   </Button>
                 </div>

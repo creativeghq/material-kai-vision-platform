@@ -396,8 +396,8 @@ export class ImageTextMapper {
       // Look for explicit captions
       if (image.caption) {
         const captionBlocks = textBlocks.filter(block =>
-          block.text.toLowerCase().includes(image.caption!.toLowerCase()) ||
-          this.calculateTextSimilarity(block.text, image.caption!) > 0.8,
+          block.text.toLowerCase().includes(image.caption.toLowerCase()) ||
+          this.calculateTextSimilarity(block.text, image.caption) > 0.8,
         );
 
         if (captionBlocks.length > 0) {
@@ -609,7 +609,7 @@ export class ImageTextMapper {
 
       // Check for term matches
       for (const term of searchTerms) {
-        if (blockText.includes(term!.toLowerCase())) {
+        if (blockText.includes(term.toLowerCase())) {
           score += 0.3;
         }
       }

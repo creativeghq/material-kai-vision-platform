@@ -93,7 +93,7 @@ export class ChunkQualityService {
   /**
    * Calculate metadata richness score
    */
-  private calculateMetadataRichness(metadata: Record<string, any>): number {
+  private calculateMetadataRichness(metadata: Record<string, unknown>): number {
     if (!metadata || Object.keys(metadata).length === 0) return 0;
 
     const requiredFields = ['document_name', 'page_number', 'chunk_index', 'source_document'];
@@ -127,7 +127,7 @@ export class ChunkQualityService {
   scoreChunk(
     chunkId: string,
     content: string,
-    metadata: Record<string, any>,
+    metadata: Record<string, unknown>,
   ): ChunkQualityData {
     console.log(`🎯 scoreChunk called for ${chunkId}`);
     const semanticCompleteness = this.calculateSemanticCompleteness(content);
@@ -291,8 +291,8 @@ export class ChunkQualityService {
 
     // Calculate aggregated metrics
     const coherenceScores = chunks
-      .map((c: any) => c.coherence_score)
-      .filter((s: any) => s !== null) as number[];
+      .map((c: unknown) => (c as any).coherence_score)
+      .filter((s: unknown) => s !== null) as number[];
 
     const averageCoherence = coherenceScores.length > 0
       ? Math.round((coherenceScores.reduce((a, b) => a + b, 0) / coherenceScores.length) * 100) / 100

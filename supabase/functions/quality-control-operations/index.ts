@@ -1,6 +1,6 @@
 /**
  * Quality Control Operations Edge Function
- * 
+ *
  * Handles quality control operations including:
  * - Automated quality assessment
  * - Human review task management
@@ -128,7 +128,7 @@ serve(async (req) => {
  */
 async function assessEntityQuality(supabase: any, request: QualityControlRequest) {
   const { entityId, entityType, config = {} } = request;
-  
+
   if (!entityId || !entityType) {
     throw new Error('entityId and entityType are required');
   }
@@ -545,7 +545,7 @@ function calculateEmbeddingCoverage(product: any): number {
   ];
 
   const presentEmbeddings = embeddingTypes.filter(type =>
-    product[type] && Array.isArray(product[type]) && product[type].length > 0
+    product[type] && Array.isArray(product[type]) && product[type].length > 0,
   );
 
   return presentEmbeddings.length / embeddingTypes.length;
@@ -578,7 +578,7 @@ function calculateImageEmbeddingCoverage(image: any): number {
   ];
 
   const presentEmbeddings = embeddingTypes.filter(type =>
-    image[type] && Array.isArray(image[type]) && image[type].length > 0
+    image[type] && Array.isArray(image[type]) && image[type].length > 0,
   );
 
   return presentEmbeddings.length / embeddingTypes.length;
@@ -884,7 +884,7 @@ function getTimeFilter(timeRange: string): string {
  */
 function calculateAvgCompletionTime(reviewTasks: any[]): number {
   const completedTasks = reviewTasks.filter(task =>
-    task.status === 'completed' && task.created_at && task.completed_at
+    task.status === 'completed' && task.created_at && task.completed_at,
   );
 
   if (completedTasks.length === 0) {

@@ -131,8 +131,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
+            <Label htmlFor="title">Title *</Label><Input
               id="title"
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
@@ -156,8 +155,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
 
           {/* Content Type */}
           <div className="space-y-2">
-            <Label htmlFor="contentType">Content Type</Label>
-            <Select value={formData.contentType} onValueChange={(value: string) => handleInputChange('contentType', value)}>
+            <Label htmlFor="contentType">Content Type</Label><Select value={formData.contentType} onValueChange={(value: string) => handleInputChange('contentType', value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -179,8 +177,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
               <Label htmlFor="pdfUrl" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 PDF URL (Supabase)
-              </Label>
-              <Input
+              </Label><Input
                 id="pdfUrl"
                 value={formData.pdfUrl}
                 onChange={(e) => handleInputChange('pdfUrl', e.target.value)}
@@ -212,8 +209,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
 
           {/* Material Categories */}
           <div className="space-y-2">
-            <Label>Material Categories</Label>
-            <Input
+            <Label>Material Categories</Label><Input
               placeholder="Add material category (press Enter)"
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
@@ -229,7 +225,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
                 <span
                   key={i}
                   className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 cursor-pointer hover:bg-red-100"
-                  onClick={() => removeTag('materialCategories', i)}
+                  onClick={() => removeTag('materialCategories', i)} onKeyDown={(e) => e.key === 'Enter' && removeTag('materialCategories', i)}
                 >
                   {category} ×
                 </span>
@@ -256,7 +252,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
                 <span
                   key={i}
                   className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300 cursor-pointer hover:bg-red-100"
-                  onClick={() => removeTag('semanticTags', i)}
+                  onClick={() => removeTag('semanticTags', i)} onKeyDown={(e) => e.key === 'Enter' && removeTag('semanticTags', i)}
                 >
                   {tag} ×
                 </span>
@@ -267,8 +263,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
           {/* Complexity Settings */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="language">Language</Label>
-              <Select value={formData.language} onValueChange={(value: string) => handleInputChange('language', value)}>
+              <Label htmlFor="language">Language</Label><Select value={formData.language} onValueChange={(value: string) => handleInputChange('language', value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -283,8 +278,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="readingLevel">Reading Level (1-5)</Label>
-              <Select
+              <Label htmlFor="readingLevel">Reading Level (1-5)</Label><Select
                 value={formData.readingLevel.toString()}
                 onValueChange={(value: string) => handleInputChange('readingLevel', parseInt(value))}
               >
@@ -302,8 +296,7 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({ onEntryAdd
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="technicalComplexity">Technical Complexity (1-5)</Label>
-              <Select
+              <Label htmlFor="technicalComplexity">Technical Complexity (1-5)</Label><Select
                 value={formData.technicalComplexity.toString()}
                 onValueChange={(value: string) => handleInputChange('technicalComplexity', parseInt(value))}
               >

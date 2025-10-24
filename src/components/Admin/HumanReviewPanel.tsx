@@ -1,47 +1,46 @@
 /**
  * Human Review Panel Component
- * 
+ *
  * Admin interface for managing human-in-the-loop quality control tasks.
  * Provides workflow management for reviewing AI-generated content that
  * falls below quality thresholds.
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  AlertTriangle, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  User, 
+import {
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Clock,
+  User,
   Eye,
   ThumbsUp,
   ThumbsDown,
   AlertCircle,
-  ArrowUp
+  ArrowUp,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-
 import { QualityControlService, HumanReviewTask, QualityAssessment } from '@/services/qualityControlService';
 
 interface HumanReviewPanelProps {
@@ -102,7 +101,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
 
   // Handle review decision
   const handleReviewDecision = async (
-    decision: 'approve' | 'reject' | 'needs_improvement' | 'escalate'
+    decision: 'approve' | 'reject' | 'needs_improvement' | 'escalate',
   ) => {
     if (!selectedTask) return;
 
@@ -112,7 +111,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
         selectedTask.id,
         decision,
         reviewNotes,
-        'current-user' // TODO: Get actual user ID
+        'current-user', // TODO: Get actual user ID
       );
 
       toast({
@@ -179,7 +178,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
 
   useEffect(() => {
     loadReviewTasks();
-    
+
     // Set up auto-refresh
     const interval = setInterval(loadReviewTasks, refreshInterval);
     return () => clearInterval(interval);
@@ -195,7 +194,15 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
             Review AI-generated content that requires human validation
           </p>
         </div>
-        <Button onClick={loadReviewTasks} disabled={loading}>
+        <Button
+          onClick={loadReviewTasks}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              loadReviewTasks();
+            }
+          }}
+          disabled={loading}
+        >
           {loading ? 'Loading...' : 'Refresh'}
         </Button>
       </div>
@@ -208,8 +215,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <Clock className="h-4 w-4" />
               Pending
             </CardTitle>
-          </CardHeader>
-          <CardContent>
+          </CardHeader><CardContent>
             <div className="text-2xl font-bold">{stats.pending}</div>
             <p className="text-xs text-muted-foreground">Tasks awaiting review</p>
           </CardContent>
@@ -221,8 +227,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <CheckCircle className="h-4 w-4" />
               Completed
             </CardTitle>
-          </CardHeader>
-          <CardContent>
+          </CardHeader><CardContent>
             <div className="text-2xl font-bold">{stats.completed}</div>
             <p className="text-xs text-muted-foreground">Tasks completed today</p>
           </CardContent>
@@ -234,8 +239,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <AlertTriangle className="h-4 w-4" />
               Escalated
             </CardTitle>
-          </CardHeader>
-          <CardContent>
+          </CardHeader><CardContent>
             <div className="text-2xl font-bold">{stats.escalated}</div>
             <p className="text-xs text-muted-foreground">Tasks requiring attention</p>
           </CardContent>
@@ -247,8 +251,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <User className="h-4 w-4" />
               Avg Time
             </CardTitle>
-          </CardHeader>
-          <CardContent>
+          </CardHeader><CardContent>
             <div className="text-2xl font-bold">{stats.avgCompletionTime}m</div>
             <p className="text-xs text-muted-foreground">Average completion time</p>
           </CardContent>
@@ -259,8 +262,7 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
       <Card>
         <CardHeader>
           <CardTitle>Review Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
+        </CardHeader><CardContent>
           {loading ? (
             <div className="text-center py-8">Loading review tasks...</div>
           ) : reviewTasks.length === 0 ? (
@@ -314,22 +316,26 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                     <TableCell>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => setSelectedTask(task)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setSelectedTask(task);
+                              }
+                            }}
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             Review
                           </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        </DialogTrigger><DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>
                               Review {task.entityType} - {task.reviewType}
                             </DialogTitle>
                           </DialogHeader>
-                          
+
                           {selectedTask && (
                             <div className="space-y-6">
                               {/* Quality Assessment */}
@@ -402,6 +408,11 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                                 <Button
                                   variant="outline"
                                   onClick={() => handleReviewDecision('escalate')}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleReviewDecision('escalate');
+                                    }
+                                  }}
                                   disabled={submitting}
                                 >
                                   <ArrowUp className="h-4 w-4 mr-1" />
@@ -410,6 +421,11 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                                 <Button
                                   variant="destructive"
                                   onClick={() => handleReviewDecision('reject')}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleReviewDecision('reject');
+                                    }
+                                  }}
                                   disabled={submitting}
                                 >
                                   <XCircle className="h-4 w-4 mr-1" />
@@ -418,6 +434,11 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                                 <Button
                                   variant="secondary"
                                   onClick={() => handleReviewDecision('needs_improvement')}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleReviewDecision('needs_improvement');
+                                    }
+                                  }}
                                   disabled={submitting}
                                 >
                                   <ThumbsDown className="h-4 w-4 mr-1" />
@@ -425,6 +446,11 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                                 </Button>
                                 <Button
                                   onClick={() => handleReviewDecision('approve')}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleReviewDecision('approve');
+                                    }
+                                  }}
                                   disabled={submitting}
                                 >
                                   <ThumbsUp className="h-4 w-4 mr-1" />

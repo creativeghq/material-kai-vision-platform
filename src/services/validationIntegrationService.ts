@@ -252,7 +252,7 @@ export class ValidationIntegrationService {
         this.recordPerformanceMetric('partial_transformation_config_validation', processingTime);
       }
 
-      return result.data!;
+      return result.data;
     } catch (error) {
       if (error instanceof ValidationError) {
         throw error;

@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -110,7 +111,7 @@ Deno.serve(async (req) => {
     console.error('Error in enrich-products function:', error);
     return createErrorResponse(
       `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      500
+      500,
     );
   }
 });
@@ -233,7 +234,7 @@ function enrichChunk(chunk: any, workspaceId: string, rules: any) {
     productName,
     productDescription,
     metadata,
-    specifications
+    specifications,
   );
 
   // Determine enrichment status
@@ -356,7 +357,7 @@ function calculateEnrichmentScore(
   productName: string | undefined,
   description: string | undefined,
   metadata: any,
-  specifications: any
+  specifications: any,
 ): number {
   let score = 0;
   let maxScore = 0;

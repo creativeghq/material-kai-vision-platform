@@ -105,17 +105,17 @@ async function transcribeAudio(audioData: Uint8Array, format: string, language?:
 
   try {
     console.log('Using MIVAA gateway for audio transcription');
-    
+
     // Convert audio data to base64 for MIVAA transport
     const base64Audio = btoa(String.fromCharCode.apply(null, Array.from(audioData)));
-    
+
     const payload = {
       audio_data: base64Audio,
       audio_format: format,
       language: language,
       transcription_model: 'whisper-1',
       response_format: 'verbose_json',
-      timestamp_granularities: ['segment']
+      timestamp_granularities: ['segment'],
     };
 
     const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
@@ -136,7 +136,7 @@ async function transcribeAudio(audioData: Uint8Array, format: string, language?:
     }
 
     const gatewayResponse = await response.json();
-    
+
     if (!gatewayResponse.success) {
       throw new Error(`MIVAA transcription failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
     }

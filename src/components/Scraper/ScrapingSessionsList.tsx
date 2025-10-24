@@ -161,7 +161,7 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Scraping Sessions</h2>
-        <Button onClick={onCreateNew} className="flex items-center gap-2">
+        <Button onClick={onCreateNew} onKeyDown={(e) => e.key === 'Enter' && onCreateNew()} className="flex items-center gap-2">
           <Play className="h-4 w-4" />
           New Session
         </Button>
@@ -175,7 +175,7 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
             <p className="text-muted-foreground mb-4">
               Create your first scraping session to start extracting materials from websites.
             </p>
-            <Button onClick={onCreateNew}>
+            <Button onClick={onCreateNew} onKeyDown={(e) => e.key === 'Enter' && onCreateNew()}>
               Create New Session
             </Button>
           </CardContent>
@@ -203,12 +203,22 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
                   <div className="flex items-center gap-2">
                     <Button
                       onClick={() => onSelectSession(session.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onSelectSession(session.id);
+                        }
+                      }}
                       className="h-9 rounded-md px-3 border border-input bg-background hover:bg-accent hover:text-accent-foreground"
                     >
                       View Details
                     </Button>
                     <Button
                       onClick={() => deleteSession(session.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          deleteSession(session.id);
+                        }
+                      }}
                       className="h-9 rounded-md px-3 border border-input bg-background hover:bg-accent hover:text-accent-foreground text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />

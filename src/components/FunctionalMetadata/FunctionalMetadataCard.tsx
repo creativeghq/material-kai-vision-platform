@@ -259,6 +259,11 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
                       key={propKey}
                       className="flex justify-between items-start p-2 rounded-md hover:bg-white/50 cursor-pointer transition-colors border border-transparent hover:border-gray-200"
                       onClick={() => onPropertyClick?.(categoryKey, propKey, propValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onPropertyClick?.(categoryKey, propKey, propValue);
+                        }
+                      }}
                     >
                       <div className="flex-1">
                         <div className="text-xs font-medium text-muted-foreground mb-1">
@@ -363,6 +368,11 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
                   variant="secondary"
                   className="justify-center p-2 text-xs bg-white/80 text-blue-800 border-blue-200 hover:bg-white cursor-pointer transition-colors"
                   onClick={() => onPropertyClick?.('applications', 'suggested_application', app)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      onPropertyClick?.('applications', 'suggested_application', app);
+                    }
+                  }}
                 >
                   {app}
                 </Badge>

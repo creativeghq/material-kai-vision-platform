@@ -225,6 +225,11 @@ export const OCRProcessor: React.FC = () => {
           {/* Process Button */}
           <Button
             onClick={processOCR}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                processOCR();
+              }
+            }}
             disabled={!selectedFile || isProcessing}
             className="w-full"
           >

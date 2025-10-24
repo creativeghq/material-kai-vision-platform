@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
 interface StandardApiResponse<T> {
@@ -51,21 +51,21 @@ interface MaterialImage {
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
 // GET /material-images-api - Get images for material(s)
 async function handleGetMaterialImages(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const params = url.searchParams;
-  
+
   const material_id = params.get('material_id');
   const image_type = params.get('image_type');
   const is_featured = params.get('is_featured');
   const limit = Math.min(parseInt(params.get('limit') || '50'), 100);
-  
+
   const startTime = Date.now();
-  
+
   try {
     let query = supabase
       .from('material_images')
@@ -73,28 +73,28 @@ async function handleGetMaterialImages(request: Request): Promise<Response> {
         *,
         material:materials_catalog(name, category)
       `);
-    
+
     // Apply filters
     if (material_id) {
       query = query.eq('material_id', material_id);
     }
-    
+
     if (image_type) {
       query = query.eq('image_type', image_type);
     }
-    
+
     if (is_featured) {
       query = query.eq('is_featured', is_featured === 'true');
     }
-    
+
     query = query.limit(limit).order('display_order').order('created_at', { ascending: false });
-    
+
     const { data: images, error, count } = await query;
-    
+
     if (error) {
       throw new Error(`Failed to fetch material images: ${error.message}`);
     }
-    
+
     const formattedImages: MaterialImage[] = (images || []).map(img => ({
       id: img.id,
       material_id: img.material_id,
@@ -122,14 +122,14 @@ async function handleGetMaterialImages(request: Request): Promise<Response> {
       verified_at: img.verified_at,
       created_at: img.created_at,
       updated_at: img.updated_at,
-      created_by: img.created_by
+      created_by: img.created_by,
     }));
-    
+
     // Store search results
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       );
 
       const { error: storageError } = await supabase
@@ -171,28 +171,28 @@ async function handleGetMaterialImages(request: Request): Promise<Response> {
         filters: {
           material_id,
           image_type,
-          is_featured
-        }
-      }
+          is_featured,
+        },
+      },
     };
 
     return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-    
+
   } catch (error) {
     console.error('Error fetching material images:', error);
     const response: StandardApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch material images',
       metadata: {
-        processing_time_ms: Date.now() - startTime
-      }
+        processing_time_ms: Date.now() - startTime,
+      },
     };
-    
+
     return new Response(JSON.stringify(response), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 }
@@ -200,59 +200,59 @@ async function handleGetMaterialImages(request: Request): Promise<Response> {
 // POST /material-images-api - Upload and associate new image
 async function handleUploadMaterialImage(request: Request): Promise<Response> {
   const startTime = Date.now();
-  
+
   try {
     const body = await request.json();
-    
+
     // Validate required fields
     if (!body.material_id || (!body.image_data && !body.image_url)) {
       const response: StandardApiResponse<never> = {
         success: false,
         error: 'material_id and either image_data or image_url are required',
         metadata: {
-          processing_time_ms: Date.now() - startTime
-        }
+          processing_time_ms: Date.now() - startTime,
+        },
       };
-      
+
       return new Response(JSON.stringify(response), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    
+
     // Get user from auth header
     const authHeader = request.headers.get('authorization');
     let userId = null;
     if (authHeader) {
       const { data: { user } } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
+        authHeader.replace('Bearer ', ''),
       );
       userId = user?.id;
     }
-    
+
     // Validate material exists
     const { data: material } = await supabase
       .from('materials_catalog')
       .select('id, name')
       .eq('id', body.material_id)
       .single();
-    
+
     if (!material) {
       return new Response(JSON.stringify({
         success: false,
-        error: 'Material not found'
+        error: 'Material not found',
       }), {
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    
+
     let imageUrl = body.image_url;
     let storagePath = null;
     let fileSize = null;
     let mimeType = null;
     let fileName = body.file_name;
-    
+
     // Handle image upload if image_data is provided
     if (body.image_data) {
       try {
@@ -261,57 +261,57 @@ async function handleUploadMaterialImage(request: Request): Promise<Response> {
         if (!matches) {
           throw new Error('Invalid image data format');
         }
-        
+
         mimeType = matches[1];
         const base64Data = matches[2];
         const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
         fileSize = imageBuffer.length;
-        
+
         // Generate file name if not provided
         if (!fileName) {
           const extension = mimeType.split('/')[1] || 'jpg';
           fileName = `material-${body.material_id}-${Date.now()}.${extension}`;
         }
-        
+
         // Generate storage path
         storagePath = `materials/${body.material_id}/${fileName}`;
-        
+
         // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('material-images')
           .upload(storagePath, imageBuffer, {
             contentType: mimeType,
-            upsert: false
+            upsert: false,
           });
-        
+
         if (uploadError) {
           throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
-        
+
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('material-images')
           .getPublicUrl(storagePath);
-        
+
         imageUrl = publicUrl;
-        
+
       } catch (uploadError) {
         console.error('Image upload error:', uploadError);
         const response: StandardApiResponse<never> = {
           success: false,
           error: `Image upload failed: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`,
           metadata: {
-            processing_time_ms: Date.now() - startTime
-          }
+            processing_time_ms: Date.now() - startTime,
+          },
         };
-        
+
         return new Response(JSON.stringify(response), {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     }
-    
+
     // Create image record
     const imageData = {
       material_id: body.material_id,
@@ -335,15 +335,15 @@ async function handleUploadMaterialImage(request: Request): Promise<Response> {
       tags: body.tags || [],
       color_palette: body.color_palette || {},
       source_url: body.source_url,
-      created_by: userId
+      created_by: userId,
     };
-    
+
     const { data: savedImage, error: saveError } = await supabase
       .from('material_images')
       .insert(imageData)
       .select()
       .single();
-    
+
     if (saveError) {
       // If image was uploaded but database insert failed, clean up
       if (storagePath) {
@@ -351,7 +351,7 @@ async function handleUploadMaterialImage(request: Request): Promise<Response> {
       }
       throw new Error(`Failed to save image record: ${saveError.message}`);
     }
-    
+
     const response: StandardApiResponse<MaterialImage> = {
       success: true,
       data: {
@@ -381,32 +381,32 @@ async function handleUploadMaterialImage(request: Request): Promise<Response> {
         verified_at: savedImage.verified_at,
         created_at: savedImage.created_at,
         updated_at: savedImage.updated_at,
-        created_by: savedImage.created_by
+        created_by: savedImage.created_by,
       },
       message: 'Material image uploaded and associated successfully',
       metadata: {
         processing_time_ms: Date.now() - startTime,
-        upload_method: body.image_data ? 'base64_upload' : 'url_association'
-      }
+        upload_method: body.image_data ? 'base64_upload' : 'url_association',
+      },
     };
-    
+
     return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-    
+
   } catch (error) {
     console.error('Error uploading material image:', error);
     const response: StandardApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to upload material image',
       metadata: {
-        processing_time_ms: Date.now() - startTime
-      }
+        processing_time_ms: Date.now() - startTime,
+      },
     };
-    
+
     return new Response(JSON.stringify(response), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 }
@@ -414,37 +414,37 @@ async function handleUploadMaterialImage(request: Request): Promise<Response> {
 // PUT /material-images-api/:id - Update image metadata
 async function handleUpdateMaterialImage(request: Request, imageId: string): Promise<Response> {
   const startTime = Date.now();
-  
+
   try {
     const body = await request.json();
-    
+
     // Prepare update data
     const updateData: any = {
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
-    
+
     const allowedFields = [
       'title', 'description', 'alt_text', 'image_type', 'display_order',
-      'is_featured', 'metadata', 'variants', 'analysis_data', 'tags', 'color_palette'
+      'is_featured', 'metadata', 'variants', 'analysis_data', 'tags', 'color_palette',
     ];
-    
+
     allowedFields.forEach(field => {
       if (body[field] !== undefined) {
         updateData[field] = body[field];
       }
     });
-    
+
     const { data: updatedImage, error: updateError } = await supabase
       .from('material_images')
       .update(updateData)
       .eq('id', imageId)
       .select()
       .single();
-    
+
     if (updateError) {
       throw new Error(`Failed to update image: ${updateError.message}`);
     }
-    
+
     const response: StandardApiResponse<MaterialImage> = {
       success: true,
       data: {
@@ -474,31 +474,31 @@ async function handleUpdateMaterialImage(request: Request, imageId: string): Pro
         verified_at: updatedImage.verified_at,
         created_at: updatedImage.created_at,
         updated_at: updatedImage.updated_at,
-        created_by: updatedImage.created_by
+        created_by: updatedImage.created_by,
       },
       message: 'Material image updated successfully',
       metadata: {
-        processing_time_ms: Date.now() - startTime
-      }
+        processing_time_ms: Date.now() - startTime,
+      },
     };
-    
+
     return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-    
+
   } catch (error) {
     console.error('Error updating material image:', error);
     const response: StandardApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update material image',
       metadata: {
-        processing_time_ms: Date.now() - startTime
-      }
+        processing_time_ms: Date.now() - startTime,
+      },
     };
-    
+
     return new Response(JSON.stringify(response), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 }
@@ -506,7 +506,7 @@ async function handleUpdateMaterialImage(request: Request, imageId: string): Pro
 // DELETE /material-images-api/:id - Delete material image
 async function handleDeleteMaterialImage(request: Request, imageId: string): Promise<Response> {
   const startTime = Date.now();
-  
+
   try {
     // Get image details before deletion
     const { data: image, error: fetchError } = await supabase
@@ -514,59 +514,59 @@ async function handleDeleteMaterialImage(request: Request, imageId: string): Pro
       .select('storage_path, storage_bucket')
       .eq('id', imageId)
       .single();
-    
+
     if (fetchError) {
       throw new Error(`Failed to fetch image for deletion: ${fetchError.message}`);
     }
-    
+
     // Delete from database
     const { error: deleteError } = await supabase
       .from('material_images')
       .delete()
       .eq('id', imageId);
-    
+
     if (deleteError) {
       throw new Error(`Failed to delete image record: ${deleteError.message}`);
     }
-    
+
     // Delete from storage if it exists
     if (image?.storage_path && image?.storage_bucket) {
       const { error: storageDeleteError } = await supabase.storage
         .from(image.storage_bucket)
         .remove([image.storage_path]);
-      
+
       if (storageDeleteError) {
         console.warn(`Failed to delete image from storage: ${storageDeleteError.message}`);
         // Don't fail the operation if storage deletion fails
       }
     }
-    
+
     const response: StandardApiResponse<{ deleted: boolean }> = {
       success: true,
       data: { deleted: true },
       message: 'Material image deleted successfully',
       metadata: {
-        processing_time_ms: Date.now() - startTime
-      }
+        processing_time_ms: Date.now() - startTime,
+      },
     };
-    
+
     return new Response(JSON.stringify(response), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-    
+
   } catch (error) {
     console.error('Error deleting material image:', error);
     const response: StandardApiResponse<never> = {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete material image',
       metadata: {
-        processing_time_ms: Date.now() - startTime
-      }
+        processing_time_ms: Date.now() - startTime,
+      },
     };
-    
+
     return new Response(JSON.stringify(response), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 }
@@ -576,63 +576,63 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
     const url = new URL(req.url);
     const pathSegments = url.pathname.split('/').filter(Boolean);
-    
+
     // Extract image ID if present
     const imageId = pathSegments[1];
-    
+
     switch (req.method) {
       case 'GET':
         return await handleGetMaterialImages(req);
-      
+
       case 'POST':
         return await handleUploadMaterialImage(req);
-      
+
       case 'PUT':
         if (!imageId) {
           return new Response(JSON.stringify({
             success: false,
-            error: 'Image ID is required for updates'
+            error: 'Image ID is required for updates',
           }), {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         return await handleUpdateMaterialImage(req, imageId);
-      
+
       case 'DELETE':
         if (!imageId) {
           return new Response(JSON.stringify({
             success: false,
-            error: 'Image ID is required for deletion'
+            error: 'Image ID is required for deletion',
           }), {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         return await handleDeleteMaterialImage(req, imageId);
-      
+
       default:
         return new Response(JSON.stringify({
           success: false,
-          error: 'Method not allowed'
+          error: 'Method not allowed',
         }), {
           status: 405,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     }
-    
+
   } catch (error) {
     console.error('Material Images API error:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: 'Internal server error'
+      error: 'Internal server error',
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

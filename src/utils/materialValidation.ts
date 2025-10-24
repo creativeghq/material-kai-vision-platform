@@ -35,7 +35,7 @@ interface MaterialMetadata {
   size?: string;
   installationMethod?: string;
   application?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -855,8 +855,8 @@ export function createMaterialFromExtractedData(
     name: string;
     createdBy?: string;
     imageUrl?: string;
-  }
-): Partial<Material> {
+  },
+  ): Partial<Material> {
   const { sanitized } = sanitizeExtractedData(extractedData);
   const now = new Date().toISOString();
 
@@ -876,8 +876,8 @@ export function createMaterialFromExtractedData(
         extractionMethod: (sanitized.processing_metadata as any)?.method,
         extractionConfidence: (sanitized.processing_metadata as any)?.confidence,
         modelVersion: (sanitized.processing_metadata as any)?.model_version,
-      }
-    }
+      },
+  },
   };
 
   // Add optional properties separately to handle undefined properly

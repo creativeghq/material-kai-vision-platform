@@ -9,21 +9,21 @@ async function fetchMaterialCategories() {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
+
     // Call the get-material-categories edge function for legacy format
     const response = await fetch(`${supabaseUrl}/functions/v1/get-material-categories/legacy-format`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
-        'apikey': supabaseKey
-      }
+        'apikey': supabaseKey,
+      },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     const result = await response.json();
     if (result.success) {
       MATERIAL_CATEGORIES = result.data;
@@ -39,7 +39,7 @@ async function fetchMaterialCategories() {
       porcelain: { name: 'porcelain', metaFields: ['r11_rating', 'finish', 'size', 'installation_method', 'application'] },
       natural_stone: { name: 'natural_stone', metaFields: ['r11_rating', 'finish', 'size', 'installation_method', 'application'] },
       metal: { name: 'metal', metaFields: ['metal_type', 'finish', 'size', 'installation_method', 'application'] },
-      other: { name: 'other', metaFields: ['finish', 'size', 'installation_method', 'application'] }
+      other: { name: 'other', metaFields: ['finish', 'size', 'installation_method', 'application'] },
     };
   }
 }
@@ -92,7 +92,7 @@ function validateResult(result: any): { score: number; issues: string[] } {
   const genericTerms = ['unknown', 'generic', 'standard', 'typical', 'unspecified', 'unclear'];
   const responseText = JSON.stringify(result).toLowerCase();
   const genericCount = genericTerms.filter(term => responseText.includes(term)).length;
-  
+
   if (genericCount > 2) {
     score -= 0.1;
     issues.push('Contains too many generic terms');
@@ -104,9 +104,9 @@ function validateResult(result: any): { score: number; issues: string[] } {
     issues.push('Material name indicates uncertainty');
   }
 
-  return { 
+  return {
     score: Math.max(0, Math.min(1, score)),
-    issues 
+    issues,
   };
 }
 
@@ -117,7 +117,7 @@ function getAnalysisPrompts(analysisType: AnalysisType, availableCategories: str
   properties_only: string;
 } {
   const categoryList = availableCategories.join(', ');
-  
+
   return {
     comprehensive: `Analyze this material image comprehensively. You are an expert materials scientist with extensive knowledge.
 
@@ -153,7 +153,7 @@ RESPONSE FORMAT: Valid JSON only. Be specific, avoid generic terms.`,
 4. Safety ratings
 5. Technical specifications
 
-RESPONSE FORMAT: Valid JSON only. Include specific measurements and ratings.`
+RESPONSE FORMAT: Valid JSON only. Include specific measurements and ratings.`,
   };
 }
 
@@ -476,7 +476,7 @@ Provide detailed analysis in JSON format with all extracted meta fields included
   // Try MIVAA first
   try {
     console.log('🔍 Attempting MIVAA semantic analysis for visual material analysis');
-    
+
     const mivaaResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
       method: 'POST',
       headers: {
@@ -500,7 +500,7 @@ Provide detailed analysis in JSON format with all extracted meta fields included
     if (mivaaResponse.ok) {
       const mivaaData = await mivaaResponse.json();
       console.log('✅ MIVAA semantic analysis successful');
-      
+
       // Parse MIVAA response using proven pattern
       const mivaaResult = mivaaData.analysis_result || mivaaData.result;
       if (mivaaResult) {
@@ -515,11 +515,11 @@ Provide detailed analysis in JSON format with all extracted meta fields included
     }
   } catch (mivaaError) {
     console.log(`⚠️ MIVAA semantic analysis failed: ${(mivaaError as Error).message}, trying parallel MIVAA approach`);
-    
+
     // Enhanced fallback: Use parallel MIVAA actions for better performance and reliability
     try {
       console.log('🔄 Attempting parallel MIVAA analysis (LLaMA vision + CLIP embeddings)');
-      
+
       // Prepare parallel MIVAA requests
       const llamaRequest = {
         action: 'llama_vision_analysis',
@@ -531,9 +531,9 @@ Provide detailed analysis in JSON format with all extracted meta fields included
             response_format: 'json',
             max_tokens: 2000,
             temperature: 0.1,
-            include_confidence_scores: true
-          }
-        }
+            include_confidence_scores: true,
+          },
+        },
       };
 
       const clipRequest = {
@@ -543,9 +543,9 @@ Provide detailed analysis in JSON format with all extracted meta fields included
           embedding_type: 'visual_similarity',
           options: {
             normalize: true,
-            dimensions: 512
-          }
-        }
+            dimensions: 512,
+          },
+        },
       };
 
       // Execute both MIVAA requests in parallel
@@ -565,18 +565,18 @@ Provide detailed analysis in JSON format with all extracted meta fields included
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(clipRequest),
-        })
+        }),
       ]);
 
       // Process LLaMA vision result
       if (llamaResponse.ok) {
         const llamaData = await llamaResponse.json();
         const llamaResult = llamaData.analysis_result || llamaData.result || llamaData.data;
-        
+
         if (llamaResult) {
           processedResult = typeof llamaResult === 'string' ? JSON.parse(llamaResult) : llamaResult;
           usedMethod = 'mivaa-llama-vision-parallel';
-          
+
           // Optionally enhance with CLIP embeddings if successful
           if (clipResponse.ok) {
             const clipData = await clipResponse.json();
@@ -584,12 +584,12 @@ Provide detailed analysis in JSON format with all extracted meta fields included
               processedResult.visual_embeddings = {
                 clip_embedding: clipData.embedding || clipData.visual_embedding,
                 embedding_type: 'clip_512d',
-                model_used: clipData.model_used || 'clip-vit-base-patch32'
+                model_used: clipData.model_used || 'clip-vit-base-patch32',
               };
               usedMethod = 'mivaa-parallel-llama-clip';
             }
           }
-          
+
           console.log('✅ Parallel MIVAA analysis successful');
         } else {
           throw new Error('No analysis result in parallel MIVAA response');
@@ -598,7 +598,7 @@ Provide detailed analysis in JSON format with all extracted meta fields included
         const llamaError = await llamaResponse.json();
         throw new Error(`Parallel MIVAA LLaMA analysis failed: ${llamaError.error || 'Unknown error'}`);
       }
-      
+
     } catch (parallelError) {
       console.error('❌ All MIVAA methods failed:', (parallelError as Error).message);
       throw new Error(`Material analysis failed: ${(parallelError as Error).message}. Please check MIVAA service availability.`);
@@ -615,7 +615,7 @@ try {
   // Extract functional metadata fields from the analysis
   const metadata = analysis.metadata || {};
   const functionalMetadata = analysis.functional_metadata || {};
-  
+
   const extractedMeta = {
       // Legacy fields (maintain compatibility)
       finish: metadata.finish || analysis.finish,
@@ -624,56 +624,56 @@ try {
       application: metadata.application || analysis.application,
       r11: metadata.r11 || analysis.r11,
       metal_types: metadata.metal_types || analysis.metal_types,
-      
+
       // Slip and Safety Ratings
       slip_resistance_r_value: functionalMetadata.slip_resistance_r_value || metadata.slip_resistance_r_value,
       barefoot_ramp_rating: functionalMetadata.barefoot_ramp_rating || metadata.barefoot_ramp_rating,
       pendulum_test_value: functionalMetadata.pendulum_test_value || metadata.pendulum_test_value,
       dcof_rating: functionalMetadata.dcof_rating || metadata.dcof_rating,
       slip_resistance_general: functionalMetadata.slip_resistance_general || metadata.slip_resistance_general,
-      
+
       // Surface Gloss/Reflectivity
       surface_gloss_level: functionalMetadata.surface_gloss_level || metadata.surface_gloss_level,
       gloss_measurement: functionalMetadata.gloss_measurement || metadata.gloss_measurement,
-      
+
       // Mechanical Properties
       mohs_hardness: functionalMetadata.mohs_hardness || metadata.mohs_hardness,
       pei_rating: functionalMetadata.pei_rating || metadata.pei_rating,
       breaking_strength: functionalMetadata.breaking_strength || metadata.breaking_strength,
       impact_resistance: functionalMetadata.impact_resistance || metadata.impact_resistance,
-      
+
       // Thermal Properties
       thermal_conductivity: functionalMetadata.thermal_conductivity || metadata.thermal_conductivity,
       thermal_expansion: functionalMetadata.thermal_expansion || metadata.thermal_expansion,
       heat_resistance: functionalMetadata.heat_resistance || metadata.heat_resistance,
       radiant_heating_compatible: functionalMetadata.radiant_heating_compatible || metadata.radiant_heating_compatible,
-      
+
       // Water and Moisture Resistance
       water_absorption: functionalMetadata.water_absorption || metadata.water_absorption,
       frost_resistance: functionalMetadata.frost_resistance || metadata.frost_resistance,
       hydrophobic_treatment: functionalMetadata.hydrophobic_treatment || metadata.hydrophobic_treatment,
       mold_mildew_resistant: functionalMetadata.mold_mildew_resistant || metadata.mold_mildew_resistant,
-      
+
       // Chemical and Hygiene Resistance
       chemical_resistance: functionalMetadata.chemical_resistance || metadata.chemical_resistance,
       stain_resistance: functionalMetadata.stain_resistance || metadata.stain_resistance,
       antibacterial_surface: functionalMetadata.antibacterial_surface || metadata.antibacterial_surface,
       acid_alkali_resistance: functionalMetadata.acid_alkali_resistance || metadata.acid_alkali_resistance,
       food_safe_certification: functionalMetadata.food_safe_certification || metadata.food_safe_certification,
-      
+
       // Acoustic and Electrical Properties
       sound_absorption: functionalMetadata.sound_absorption || metadata.sound_absorption,
       impact_insulation: functionalMetadata.impact_insulation || metadata.impact_insulation,
       antistatic_properties: functionalMetadata.antistatic_properties || metadata.antistatic_properties,
       electrical_conductivity: functionalMetadata.electrical_conductivity || metadata.electrical_conductivity,
-      
+
       // Environmental and Sustainability
       voc_emissions: functionalMetadata.voc_emissions || metadata.voc_emissions,
       recycled_content: functionalMetadata.recycled_content || metadata.recycled_content,
       eco_certifications: functionalMetadata.eco_certifications || metadata.eco_certifications,
       carbon_footprint: functionalMetadata.carbon_footprint || metadata.carbon_footprint,
       recyclability: functionalMetadata.recyclability || metadata.recyclability,
-      
+
       // Dimensional and Aesthetic
       edge_type: functionalMetadata.edge_type || metadata.edge_type,
       calibration_grade: functionalMetadata.calibration_grade || metadata.calibration_grade,

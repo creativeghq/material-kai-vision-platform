@@ -114,7 +114,7 @@ export class MivaaSearchAgent {
         .limit(10);
 
       const categoryContext = categories
-        ? `Available categories: ${categories.map((c: any) => c.name).join(', ')}`
+        ? `Available categories: ${categories.map((c: unknown) => (c as any).name).join(', ')}`
         : '';
 
       return categoryContext;

@@ -101,6 +101,11 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                     <td className="text-center p-3">
                       <button
                         onClick={() => handleRemoveItem(item.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleRemoveItem(item.id);
+                          }
+                        }}
                         className="text-red-600 hover:text-red-800 font-medium"
                       >
                         Remove
@@ -126,12 +131,22 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
           <div className="flex gap-4">
             <button
               onClick={handleRequestQuote}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleRequestQuote();
+                }
+              }}
               className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-medium"
             >
               Request Quote
             </button>
             <button
               onClick={loadCart}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  loadCart();
+                }
+              }}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
             >
               Refresh

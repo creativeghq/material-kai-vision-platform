@@ -41,7 +41,7 @@ export interface PDFImage {
   image_type: string;
   caption?: string;
   alt_text?: string;
-  bbox?: any;
+  bbox?: unknown;
   page_number: number;
   proximity_score?: number;
   confidence: number;
@@ -54,17 +54,17 @@ export interface PDFImage {
     extraction_method?: string;
     associated_chunks?: string[];
     nearest_heading?: string;
-    layout_context?: any;
+    layout_context?: unknown;
   };
   created_at: string;
   workspace_id?: string;
   ocr_extracted_text?: string;
   ocr_confidence_score?: number;
-  image_analysis_results?: any;
-  image_embedding?: any;
-  visual_features?: any;
+  image_analysis_results?: unknown;
+  image_embedding?: unknown;
+  visual_features?: unknown;
   processing_status: string;
-  multimodal_metadata?: any;
+  multimodal_metadata?: unknown;
   contextual_name?: string;
   nearest_heading?: string;
   heading_level?: number;
@@ -239,6 +239,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
           isGridMode ? 'h-fit' : 'flex flex-row h-32',
         )}
         onClick={() => handleImageClick(image, index)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            handleImageClick(image, index);
+          }
+        }}
       >
         {/* Image */}
         <div className={cn(
@@ -289,6 +294,12 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDownload(image);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.stopPropagation();
+                    handleDownload(image);
+                  }
                 }}
               >
                 <Download className="h-3 w-3" />
@@ -354,7 +365,7 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={loadImages} variant="outline" size="sm">
+              <Button onClick={loadImages} onKeyDown={(e) => e.key === 'Enter' && loadImages()} variant="outline" size="sm">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry
               </Button>
@@ -391,6 +402,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                   size="sm"
                   variant={viewMode === 'grid' ? 'default' : 'outline'}
                   onClick={() => setViewMode('grid')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setViewMode('grid');
+                    }
+                  }}
                 >
                   <Grid className="h-4 w-4" />
                 </Button>
@@ -398,6 +414,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                   size="sm"
                   variant={viewMode === 'list' ? 'default' : 'outline'}
                   onClick={() => setViewMode('list')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setViewMode('list');
+                    }
+                  }}
                 >
                   <List className="h-4 w-4" />
                 </Button>
@@ -433,7 +454,6 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                   ))}
                 </SelectContent>
               </Select>
-
               <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Sort by" />
@@ -444,11 +464,15 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                   <SelectItem value="created">Date Created</SelectItem>
                 </SelectContent>
               </Select>
-
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                  }
+                }}
               >
                 {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
               </Button>
@@ -499,10 +523,24 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={() => handleDownload(selectedImage)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleDownload(selectedImage);
+                      }
+                    }}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setIsModalOpen(false)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setIsModalOpen(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setIsModalOpen(false);
+                      }
+                    }}
+                  >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
@@ -526,6 +564,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                       variant="outline"
                       className="absolute left-4 top-1/2 transform -translate-y-1/2"
                       onClick={() => handleModalNavigate('prev')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleModalNavigate('prev');
+                        }
+                      }}
                       disabled={currentImageIndex === 0}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -535,6 +578,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                       variant="outline"
                       className="absolute right-4 top-1/2 transform -translate-y-1/2"
                       onClick={() => handleModalNavigate('next')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleModalNavigate('next');
+                        }
+                      }}
                       disabled={currentImageIndex === filteredAndSortedImages.length - 1}
                     >
                       <ChevronRight className="h-4 w-4" />

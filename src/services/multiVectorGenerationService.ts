@@ -1,6 +1,6 @@
 /**
  * Multi-Vector Generation Service
- * 
+ *
  * Generates all 6 embedding types for comprehensive multi-modal search:
  * 1. Text (1536D) - OpenAI text-embedding-3-small
  * 2. Visual CLIP (512D) - CLIP visual embeddings
@@ -71,7 +71,7 @@ export class MultiVectorGenerationService {
    */
   static async generateProductEmbeddings(
     productId: string,
-    options: EmbeddingGenerationOptions = {}
+    options: EmbeddingGenerationOptions = {},
   ): Promise<EmbeddingGenerationResult> {
     const startTime = Date.now();
     console.log(`🔄 Generating multi-vector embeddings for product ${productId}`);
@@ -148,7 +148,7 @@ export class MultiVectorGenerationService {
       if (embeddingTypes.includes('multimodal') && embeddings.text_embedding_1536 && embeddings.visual_clip_embedding_512) {
         const fusionEmbedding = this.generateMultimodalFusionEmbedding(
           embeddings.text_embedding_1536,
-          embeddings.visual_clip_embedding_512
+          embeddings.visual_clip_embedding_512,
         );
         embeddings.multimodal_fusion_embedding_2048 = fusionEmbedding;
         embeddingsGenerated.push('multimodal_fusion_2048');
@@ -321,7 +321,7 @@ export class MultiVectorGenerationService {
    */
   private static generateMultimodalFusionEmbedding(
     textEmbedding: number[],
-    visualEmbedding: number[]
+    visualEmbedding: number[],
   ): number[] {
     // Simple concatenation approach for 2048D fusion embedding
     // Alternative approaches: weighted average, learned fusion, etc.
@@ -446,7 +446,7 @@ export class MultiVectorGenerationService {
     const applicationKeywords = [
       'bathroom', 'kitchen', 'outdoor', 'indoor', 'commercial', 'residential',
       'floor', 'wall', 'ceiling', 'countertop', 'backsplash', 'shower',
-      'wet area', 'high traffic', 'decorative', 'structural'
+      'wet area', 'high traffic', 'decorative', 'structural',
     ];
 
     applicationKeywords.forEach(keyword => {
@@ -504,7 +504,7 @@ export class MultiVectorGenerationService {
    */
   private static async storeProductEmbeddings(
     productId: string,
-    embeddings: MultiVectorEmbeddings
+    embeddings: MultiVectorEmbeddings,
   ): Promise<void> {
     const updateData: any = {
       embedding_metadata: embeddings.metadata,
@@ -545,7 +545,7 @@ export class MultiVectorGenerationService {
    */
   static async generateChunkEmbeddings(
     chunkId: string,
-    options: EmbeddingGenerationOptions = {}
+    options: EmbeddingGenerationOptions = {},
   ): Promise<EmbeddingGenerationResult> {
     const startTime = Date.now();
     console.log(`🔄 Generating multi-vector embeddings for chunk ${chunkId}`);
@@ -617,7 +617,7 @@ export class MultiVectorGenerationService {
    */
   private static async storeChunkEmbeddings(
     chunkId: string,
-    embeddings: MultiVectorEmbeddings
+    embeddings: MultiVectorEmbeddings,
   ): Promise<void> {
     const updateData: any = {
       embedding_metadata: embeddings.metadata,
@@ -648,7 +648,7 @@ export class MultiVectorGenerationService {
    */
   static async batchGenerateProductEmbeddings(
     productIds: string[],
-    options: EmbeddingGenerationOptions = {}
+    options: EmbeddingGenerationOptions = {},
   ): Promise<{
     successful: number;
     failed: number;
@@ -667,7 +667,7 @@ export class MultiVectorGenerationService {
     for (let i = 0; i < productIds.length; i += batchSize) {
       const batch = productIds.slice(i, i + batchSize);
       const batchPromises = batch.map(productId =>
-        this.generateProductEmbeddings(productId, options)
+        this.generateProductEmbeddings(productId, options),
       );
 
       const batchResults = await Promise.allSettled(batchPromises);

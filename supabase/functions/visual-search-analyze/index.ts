@@ -80,9 +80,9 @@ interface VisualSearchAnalysisResult {
   spatial_features: {
     edges: Array<{ start: [number, number]; end: [number, number]; strength: number }>;
     corners: Array<{ position: [number, number]; strength: number }>;
-    regions: Array<{ 
-      id: string; 
-      area: number; 
+    regions: Array<{
+      id: string;
+      area: number;
       centroid: [number, number];
       material_consistency: number;
     }>;
@@ -114,7 +114,7 @@ interface VisualSearchAnalysisRequest {
 async function performVisualAnalysis(
   imageUrl: string,
   analysisDepth: string,
-  focusAreas: string[]
+  focusAreas: string[],
 ): Promise<VisualSearchAnalysisResult> {
   if (!MIVAA_API_KEY) {
     throw new Error('MIVAA API key not configured');
@@ -259,10 +259,10 @@ Analyze the image comprehensively for visual search matching capabilities.`,
       } else {
         parsedAnalysis = result.data.analysis;
       }
-      
+
       // Ensure analysis_id is set
       parsedAnalysis.analysis_id = analysisId;
-      
+
       return parsedAnalysis as VisualSearchAnalysisResult;
     } catch (parseError) {
       console.error('Failed to parse MIVAA visual analysis response:', parseError);
@@ -276,7 +276,7 @@ Analyze the image comprehensively for visual search matching capabilities.`,
 
 async function storeAnalysisResult(
   analysisResult: VisualSearchAnalysisResult,
-  request: VisualSearchAnalysisRequest
+  request: VisualSearchAnalysisRequest,
 ): Promise<string> {
   try {
     const { data, error } = await supabase
@@ -288,7 +288,7 @@ async function storeAnalysisResult(
         image_url: request.image_url,
         analysis_depth: request.analysis_depth,
         focus_areas: request.focus_areas,
-        
+
         // Store analysis results as JSONB
         color_analysis: analysisResult.color_analysis,
         texture_analysis: analysisResult.texture_analysis,
@@ -296,7 +296,7 @@ async function storeAnalysisResult(
         spatial_features: analysisResult.spatial_features,
         similarity_vectors: analysisResult.similarity_vectors,
         confidence_scores: analysisResult.confidence_scores,
-        
+
         created_at: new Date().toISOString(),
       })
       .select('id')
@@ -331,7 +331,7 @@ Deno.serve(async (req: Request) => {
     const response = createErrorResponse(
       'METHOD_NOT_ALLOWED',
       'Only POST method is allowed for visual search analysis',
-      { allowed_methods: ['POST'] }
+      { allowed_methods: ['POST'] },
     );
     return createJSONResponse(response, 405);
   }
@@ -345,7 +345,7 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'MISSING_IMAGE_INPUT',
         'Either image_url or image_data is required',
-        { required_fields: ['image_url', 'image_data'] }
+        { required_fields: ['image_url', 'image_data'] },
       );
       return createJSONResponse(response, 400);
     }
@@ -361,7 +361,7 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'INVALID_ANALYSIS_DEPTH',
         `Analysis depth must be one of: ${validDepths.join(', ')}`,
-        { valid_values: validDepths, provided: analysisDepth }
+        { valid_values: validDepths, provided: analysisDepth },
       );
       return createJSONResponse(response, 400);
     }
@@ -373,7 +373,7 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'INVALID_FOCUS_AREAS',
         `Invalid focus areas: ${invalidAreas.join(', ')}`,
-        { valid_areas: validFocusAreas, invalid_areas: invalidAreas }
+        { valid_areas: validFocusAreas, invalid_areas: invalidAreas },
       );
       return createJSONResponse(response, 400);
     }
@@ -382,18 +382,18 @@ Deno.serve(async (req: Request) => {
 
     // Perform visual analysis
     let imageUrl = body.image_url;
-    
+
     // Handle base64 image data by uploading to storage
     if (!imageUrl && body.image_data) {
       try {
         const imageBuffer = Uint8Array.from(atob(body.image_data), c => c.charCodeAt(0));
         const fileName = `visual-search-${Date.now()}.jpg`;
-        
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('material-images')
           .upload(`analysis/${fileName}`, imageBuffer, {
             contentType: 'image/jpeg',
-            upsert: false
+            upsert: false,
           });
 
         if (uploadError) {
@@ -403,13 +403,13 @@ Deno.serve(async (req: Request) => {
         const { data: { publicUrl } } = supabase.storage
           .from('material-images')
           .getPublicUrl(uploadData.path);
-        
+
         imageUrl = publicUrl;
       } catch (uploadError) {
         const response = createErrorResponse(
           'IMAGE_UPLOAD_FAILED',
           'Failed to process base64 image data',
-          { error: uploadError instanceof Error ? uploadError.message : 'Unknown upload error' }
+          { error: uploadError instanceof Error ? uploadError.message : 'Unknown upload error' },
         );
         return createJSONResponse(response, 500);
       }
@@ -419,22 +419,22 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'NO_IMAGE_URL',
         'Could not obtain a valid image URL for analysis',
-        {}
+        {},
       );
       return createJSONResponse(response, 400);
     }
 
     // Perform the visual analysis
     const analysisResult = await performVisualAnalysis(imageUrl, analysisDepth, focusAreas);
-    
+
     // Store the analysis result in database
     const recordId = await storeAnalysisResult(analysisResult, body);
-    
+
     const processingTime = Date.now() - startTime;
 
     // Generate similarity search vectors for future matching
     const combinedVector = analysisResult.similarity_vectors.combined_vector;
-    
+
     // Store embeddings for vector similarity search
     if (combinedVector && combinedVector.length > 0) {
       try {
@@ -447,9 +447,9 @@ Deno.serve(async (req: Request) => {
             analysis_metadata: {
               depth: analysisDepth,
               focus_areas: focusAreas,
-              confidence: analysisResult.confidence_scores.overall
+              confidence: analysisResult.confidence_scores.overall,
             },
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
           });
       } catch (embeddingError) {
         console.error('Failed to store embedding vector:', embeddingError);
@@ -464,19 +464,19 @@ Deno.serve(async (req: Request) => {
       analysis_result: analysisResult,
       storage: {
         record_id: recordId,
-        embedding_stored: combinedVector && combinedVector.length > 0
+        embedding_stored: combinedVector && combinedVector.length > 0,
       },
       processing_metadata: {
         processing_time_ms: processingTime,
         analysis_depth: analysisDepth,
         focus_areas: focusAreas,
-        image_url: imageUrl
-      }
+        image_url: imageUrl,
+      },
     };
 
     const response = createSuccessResponse(responseData, {
       processingTime,
-      version: '1.0.0'
+      version: '1.0.0',
     });
 
     return createJSONResponse(response);
@@ -489,8 +489,8 @@ Deno.serve(async (req: Request) => {
       error instanceof Error ? error.message : 'Unknown error occurred during visual analysis',
       {
         timestamp: new Date().toISOString(),
-        error_type: error instanceof Error ? error.constructor.name : 'UnknownError'
-      }
+        error_type: error instanceof Error ? error.constructor.name : 'UnknownError',
+      },
     );
 
     return createJSONResponse(response, 500);

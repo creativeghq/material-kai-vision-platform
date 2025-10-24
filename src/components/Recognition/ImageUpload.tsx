@@ -72,6 +72,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           onDragOver={handleDrag}
           onDrop={handleDrop}
           onClick={() => document.getElementById('file-input')?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              document.getElementById('file-input')?.click();
+            }
+          }}
         >
           {isProcessing ? (
             <div className="flex flex-col items-center">
@@ -122,6 +127,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       removeFile(index);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation();
+                        removeFile(index);
+                      }
                     }}
                   >
                     <X className="w-3 h-3" />

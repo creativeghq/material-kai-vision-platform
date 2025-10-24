@@ -793,8 +793,8 @@ export interface FormField<TValue = unknown> {
  * ```
  */
 export type Validator<TInput, TOutput = TInput> = (
-  input: TInput
-) => ValidationResult<TOutput>;
+  input: TInput,
+  ) => ValidationResult<TOutput>;
 
 /**
  * Validation schema for complex objects with multiple fields.

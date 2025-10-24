@@ -1,7 +1,7 @@
 /**
  * Chunk-Aware Search Edge Function
  * Performs search with chunk analysis filters and scoring
- * 
+ *
  * Integrates:
  * - Content classification (product, specification, etc.)
  * - Boundary detection (sentence, paragraph, semantic, etc.)
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     if (!query || !workspace_id) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: query, workspace_id' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     if (!supabaseUrl || !supabaseKey) {
       return new Response(
         JSON.stringify({ error: 'Missing Supabase configuration' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
           content_quality_score
         )
       `,
-        { count: 'exact' }
+        { count: 'exact' },
       )
       .eq('workspace_id', workspace_id)
       .textSearch('content', query);
@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
       console.error('Search error:', error);
       return new Response(
         JSON.stringify({ error: `Search failed: ${error.message}` }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
@@ -205,13 +205,13 @@ Deno.serve(async (req) => {
       {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      }
+      },
     );
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: `Unexpected error: ${error.message}` }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }
 });

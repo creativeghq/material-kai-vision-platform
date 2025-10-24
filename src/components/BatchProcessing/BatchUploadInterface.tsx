@@ -371,7 +371,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
               <Button
                 className="border border-border bg-background text-foreground"
 
-                onClick={() => setShowConfig(!showConfig)}
+                onClick={() => setShowConfig(!showConfig)} onKeyDown={(e) => e.key === 'Enter' && setShowConfig(!showConfig)}
               >
                 <Settings className="h-4 w-4 mr-1" />
                 Configure
@@ -380,7 +380,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                 <Button
                   className="border border-border bg-background text-foreground"
 
-                  onClick={clearAll}
+                  onClick={clearAll} onKeyDown={(e) => e.key === 'Enter' && clearAll()}
                   disabled={isProcessing}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
@@ -389,8 +389,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
               )}
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </CardHeader><CardContent className="space-y-4">
           {/* Configuration Panel */}
           {showConfig && (
             <div className="p-4 border rounded-lg bg-gray-50 space-y-4">
@@ -418,8 +417,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                 </div>
 
                 <div>
-                  <Label htmlFor="output-format">Output Format</Label>
-                  <Select
+                  <Label htmlFor="output-format">Output Format</Label><Select
                     value={config.options.outputFormat || 'json'}
                     onValueChange={(value: 'json' | 'markdown' | 'text') =>
                       setConfig(prev => ({
@@ -486,8 +484,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
 
               {config.processingType === 'custom' && (
                 <div>
-                  <Label htmlFor="custom-prompt">Custom Processing Prompt</Label>
-                  <Textarea
+                  <Label htmlFor="custom-prompt">Custom Processing Prompt</Label><Textarea
                     id="custom-prompt"
                     placeholder="Describe what you want to extract or analyze..."
                     value={config.options.customPrompt || ''}
@@ -523,7 +520,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                 Drop files here or{' '}
                 <button
                   className="text-blue-600 hover:text-blue-700 underline"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => fileInputRef.current?.click()} onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
                 >
                   browse
                 </button>
@@ -549,7 +546,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                 <h4 className="font-medium">Files ({files.length})</h4>
                 {!isProcessing && (
                   <Button
-                    onClick={startProcessing}
+                    onClick={startProcessing} onKeyDown={(e) => e.key === 'Enter' && startProcessing()}
                     disabled={!isConnected || files.length === 0}
                   >
                     <Play className="h-4 w-4 mr-1" />
@@ -630,7 +627,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                         <Button
                           className="bg-transparent hover:bg-accent hover:text-accent-foreground"
 
-                          onClick={() => removeFile(file.id)}
+                          onClick={() => removeFile(file.id)} onKeyDown={(e) => e.key === 'Enter' && removeFile(file.id)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -645,7 +642,7 @@ export const BatchUploadInterface: React.FC<BatchUploadInterfaceProps> = ({
                 <div className="flex justify-end">
                   <Button
                     className="border border-border bg-background text-foreground"
-                    onClick={downloadResults}
+                    onClick={downloadResults} onKeyDown={(e) => e.key === 'Enter' && downloadResults()}
                   >
                     <Download className="h-4 w-4 mr-1" />
                     Download Results ({completedCount})

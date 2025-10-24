@@ -416,7 +416,7 @@ export const Designer3DPage: React.FC = () => {
           setIsUploading(false);
 
           toast({
-            title: 'Generation Complete!',
+            title: 'Generation Complete',
             description: `Generated ${pollingData.image_urls?.length || 0} interior designs successfully.`,
           });
           return;
@@ -574,6 +574,11 @@ export const Designer3DPage: React.FC = () => {
                   />
                   <Button
                     onClick={removeImage}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        removeImage();
+                      }
+                    }}
                     className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white text-sm px-2 py-1"
                   >
                     <X className="h-3 w-3" />
@@ -619,6 +624,11 @@ export const Designer3DPage: React.FC = () => {
 
           <Button
             onClick={handleGenerate}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleGenerate();
+              }
+            }}
             disabled={isGenerating || isUploading || !prompt.trim()}
             className="w-full px-6 py-3 text-lg"
           >
@@ -638,7 +648,7 @@ export const Designer3DPage: React.FC = () => {
       </Card>
 
       {/* Results Grid */}
-      {(generatedImages.length > 0 ? (
+      {generatedImages.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Generated Interior Designs</CardTitle>
@@ -653,6 +663,11 @@ export const Designer3DPage: React.FC = () => {
                     <div
                       className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                       onClick={() => handleImageClick(index)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleImageClick(index);
+                        }
+                      }}
                     >
                       <img
                         src={image.url}
@@ -682,6 +697,11 @@ export const Designer3DPage: React.FC = () => {
                     </p>
                     <Button
                       onClick={() => handleDownload(index)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleDownload(index);
+                        }
+                      }}
                       className="w-full text-xs border border-gray-300 hover:bg-gray-50 px-3 py-1"
                     >
                       <Download className="h-3 w-3 mr-1" />
@@ -693,7 +713,7 @@ export const Designer3DPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      ) : null) as any}
+      ) : null}
 
       {/* 3D Viewer */}
       {generatedImages.length > 0 && (
@@ -819,7 +839,7 @@ export const Designer3DPage: React.FC = () => {
             setGeneratedImages(imagesWithModels);
             setShowWorkflowModal(false);
             toast({
-              title: 'Generation Complete!',
+              title: 'Generation Complete',
               description: `Generated ${images.length} interior designs successfully.`,
             });
           }}

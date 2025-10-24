@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { evaluateResponseQuality } from '../_shared/response-quality.ts';;
+
+import { evaluateResponseQuality } from '../_shared/response-quality.ts';
+
+;
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.5';
 
 const corsHeaders = {
@@ -526,7 +529,7 @@ class SpaceFormerProcessor {
             model: 'claude-sonnet-4-20250514',
             max_tokens: 4000,
             temperature: 0.3,
-          }
+          },
         }),
       });
 
@@ -536,12 +539,12 @@ class SpaceFormerProcessor {
       }
 
       const gatewayResponse = await response.json();
-      
+
       if (!gatewayResponse.success) {
         throw new Error(`MIVAA chat completion failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
       }
 
-      return gatewayResponse.data.choices?.[0]?.message?.content || gatewayResponse.data.response || gatewayResponse.data.content || "Spatial analysis completed successfully.";
+      return gatewayResponse.data.choices?.[0]?.message?.content || gatewayResponse.data.response || gatewayResponse.data.content || 'Spatial analysis completed successfully.';
     } catch (error) {
       console.error('Error calling MIVAA for spatial analysis:', error);
       throw new Error('Spatial analysis failed - MIVAA service required. Direct AI integration removed as part of centralized AI architecture. Please check MIVAA service availability.');

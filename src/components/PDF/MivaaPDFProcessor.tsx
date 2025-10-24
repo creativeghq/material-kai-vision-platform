@@ -126,7 +126,7 @@ export const MivaaPDFProcessor: React.FC = () => {
       setResults(processingResults);
       setProgress(100);
 
-      toast.success(`Successfully processed ${processingResults.length} PDF files with MIVAA!`);
+      toast.success(`Successfully processed ${processingResults.length} PDF files with MIVAA`);
 
     } catch (error) {
       console.error('❌ MIVAA PDF processing failed:', error);
@@ -200,7 +200,7 @@ export const MivaaPDFProcessor: React.FC = () => {
                 </h3>
                 <div className="space-x-2">
                   <Button
-                    onClick={startProcessing}
+                    onClick={startProcessing} onKeyDown={(e) => e.key === 'Enter' && startProcessing()}
                     disabled={isProcessing}
                     className="bg-primary hover:bg-primary/90"
                   >
@@ -216,7 +216,15 @@ export const MivaaPDFProcessor: React.FC = () => {
                       </>
                     )}
                   </Button>
-                  <Button variant="outline" onClick={clearFiles}>
+                  <Button
+                    variant="outline"
+                    onClick={clearFiles}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        clearFiles();
+                      }
+                    }}
+                  >
                     Clear All
                   </Button>
                 </div>
@@ -241,6 +249,11 @@ export const MivaaPDFProcessor: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeFile(index)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          removeFile(index);
+                        }
+                      }}
                     >
                       Remove
                     </Button>
@@ -288,6 +301,11 @@ export const MivaaPDFProcessor: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => downloadMarkdown(result)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            downloadMarkdown(result);
+                          }
+                        }}
                       >
                         <Download className="w-4 h-4 mr-2" />
                         Download MD
@@ -305,7 +323,6 @@ export const MivaaPDFProcessor: React.FC = () => {
                         Tables ({result.extractedTables.length})
                       </TabsTrigger>
                     </TabsList>
-
                     <TabsContent value="content" className="mt-4">
                       <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
                         <pre className="whitespace-pre-wrap text-sm">
@@ -333,7 +350,6 @@ export const MivaaPDFProcessor: React.FC = () => {
                         ))}
                       </div>
                     </TabsContent>
-
                     <TabsContent value="tables" className="mt-4">
                       <div className="space-y-4">
                         {result.extractedTables.map((table) => (

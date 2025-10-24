@@ -37,33 +37,33 @@ export interface ChunkTypeMetadata {
   materials?: string[];
   dimensions?: string;
   colors?: string[];
-  
+
   // Technical Specs metadata
   specifications?: Record<string, string>;
   measurements?: Record<string, string>;
   technicalDetails?: string[];
   certifications?: string[];
-  
+
   // Visual Showcase metadata
   imageReferences?: string[];
   visualElements?: string[];
   styleDescription?: string;
   moodboardElements?: string[];
-  
+
   // Designer Story metadata
   designerName?: string;
   studioName?: string;
   designPhilosophy?: string;
   inspirationSources?: string[];
   designProcess?: string[];
-  
+
   // Collection Overview metadata
   collectionName?: string;
   collectionTheme?: string;
   productCount?: number;
   collectionDescription?: string;
   seasonYear?: string;
-  
+
   // Supporting Content metadata
   contentType?: 'introduction' | 'conclusion' | 'navigation' | 'legal' | 'contact';
   purpose?: string;
@@ -72,7 +72,7 @@ export interface ChunkTypeMetadata {
 
 /**
  * Chunk Type Classification Service
- * 
+ *
  * Provides intelligent semantic classification of document chunks into predefined types
  * with structured metadata extraction for each type. Uses pattern recognition and
  * content analysis to determine the most appropriate classification.
@@ -81,9 +81,9 @@ export class ChunkTypeClassificationService {
   private supabase;
 
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    this.supabase = (createClient as any)(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     );
   }
 
@@ -92,30 +92,30 @@ export class ChunkTypeClassificationService {
    */
   async classifyChunk(chunkId: string, content: string): Promise<ChunkClassificationResult> {
     console.log(`🎯 Classifying chunk: ${chunkId}`);
-    
+
     try {
       // Analyze content patterns and structure
       const classification = this.analyzeContentPatterns(content);
-      
+
       // Extract structured metadata based on classification
       const metadata = await this.extractStructuredMetadata(content, classification.chunkType);
-      
+
       // Store classification in database
       await this.storeClassification(chunkId, classification.chunkType, classification.confidence, metadata);
-      
+
       return {
         ...classification,
-        metadata
+        metadata,
       };
     } catch (error) {
       console.error(`❌ Failed to classify chunk ${chunkId}:`, error);
-      
+
       // Return default classification on error
       return {
         chunkType: ChunkType.UNCLASSIFIED,
         confidence: 0.0,
         metadata: {},
-        reasoning: `Classification failed: ${error}`
+        reasoning: `Classification failed: ${error}`,
       };
     }
   }
@@ -125,27 +125,27 @@ export class ChunkTypeClassificationService {
    */
   async classifyChunksBatch(chunks: Array<{id: string, content: string}>): Promise<ChunkClassificationResult[]> {
     console.log(`🎯 Batch classifying ${chunks.length} chunks`);
-    
+
     const results: ChunkClassificationResult[] = [];
-    
+
     // Process chunks in parallel batches of 10
     const batchSize = 10;
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize);
-      
-      const batchPromises = batch.map(chunk => 
-        this.classifyChunk(chunk.id, chunk.content)
+
+      const batchPromises = batch.map(chunk =>
+        this.classifyChunk(chunk.id, chunk.content),
       );
-      
+
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
-      
+
       // Small delay between batches to avoid overwhelming the system
       if (i + batchSize < chunks.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-    
+
     console.log(`✅ Completed batch classification of ${chunks.length} chunks`);
     return results;
   }
@@ -156,93 +156,93 @@ export class ChunkTypeClassificationService {
   private analyzeContentPatterns(content: string): { chunkType: ChunkType; confidence: number; reasoning: string } {
     const contentLower = content.toLowerCase();
     const contentLength = content.length;
-    
+
     // Product Description patterns
     if (this.isProductDescription(content)) {
       return {
         chunkType: ChunkType.PRODUCT_DESCRIPTION,
         confidence: 0.85,
-        reasoning: 'Contains product name, description, and key features'
+        reasoning: 'Contains product name, description, and key features',
       };
     }
-    
+
     // Technical Specs patterns
     if (this.isTechnicalSpecs(content)) {
       return {
         chunkType: ChunkType.TECHNICAL_SPECS,
         confidence: 0.90,
-        reasoning: 'Contains technical specifications, measurements, or detailed properties'
+        reasoning: 'Contains technical specifications, measurements, or detailed properties',
       };
     }
-    
+
     // Visual Showcase patterns
     if (this.isVisualShowcase(content)) {
       return {
         chunkType: ChunkType.VISUAL_SHOWCASE,
         confidence: 0.80,
-        reasoning: 'Contains visual descriptions, image references, or style elements'
+        reasoning: 'Contains visual descriptions, image references, or style elements',
       };
     }
-    
+
     // Designer Story patterns
     if (this.isDesignerStory(content)) {
       return {
         chunkType: ChunkType.DESIGNER_STORY,
         confidence: 0.85,
-        reasoning: 'Contains designer information, philosophy, or creative process'
+        reasoning: 'Contains designer information, philosophy, or creative process',
       };
     }
-    
+
     // Collection Overview patterns
     if (this.isCollectionOverview(content)) {
       return {
         chunkType: ChunkType.COLLECTION_OVERVIEW,
         confidence: 0.80,
-        reasoning: 'Contains collection information, themes, or overview content'
+        reasoning: 'Contains collection information, themes, or overview content',
       };
     }
-    
+
     // Index Content patterns
     if (this.isIndexContent(content)) {
       return {
         chunkType: ChunkType.INDEX_CONTENT,
         confidence: 0.95,
-        reasoning: 'Contains table of contents, index, or navigation elements'
+        reasoning: 'Contains table of contents, index, or navigation elements',
       };
     }
-    
+
     // Sustainability Info patterns
     if (this.isSustainabilityInfo(content)) {
       return {
         chunkType: ChunkType.SUSTAINABILITY_INFO,
         confidence: 0.90,
-        reasoning: 'Contains sustainability, environmental, or eco-friendly information'
+        reasoning: 'Contains sustainability, environmental, or eco-friendly information',
       };
     }
-    
+
     // Certification Info patterns
     if (this.isCertificationInfo(content)) {
       return {
         chunkType: ChunkType.CERTIFICATION_INFO,
         confidence: 0.90,
-        reasoning: 'Contains certification, compliance, or quality assurance information'
+        reasoning: 'Contains certification, compliance, or quality assurance information',
       };
     }
-    
+
     // Supporting Content (default for other content)
     if (contentLength > 50) {
       return {
         chunkType: ChunkType.SUPPORTING_CONTENT,
         confidence: 0.60,
-        reasoning: 'General content that supports the document but doesn\'t fit specific categories'
+        reasoning: 'General content that supports the document but doesn\'t fit specific categories',
       };
     }
-    
+
     // Unclassified (very short or unclear content)
     return {
       chunkType: ChunkType.UNCLASSIFIED,
       confidence: 0.30,
-      reasoning: 'Content too short or unclear for classification'
+      reasoning: 'Content too short or unclear for classification',
     };
   }
 
@@ -251,24 +251,24 @@ export class ChunkTypeClassificationService {
    */
   private isProductDescription(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Product name patterns (UPPERCASE words)
     const hasProductName = /\b[A-Z]{2,}\b/.test(content);
-    
+
     // Product description keywords
     const productKeywords = [
       'product', 'design', 'collection', 'series', 'line',
       'available in', 'comes in', 'features', 'includes',
-      'material', 'finish', 'color', 'size', 'dimension'
+      'material', 'finish', 'color', 'size', 'dimension',
     ];
-    
-    const keywordMatches = productKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = productKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     // Dimension patterns (e.g., "15×38", "20×40")
     const hasDimensions = /\d+\s*[×x]\s*\d+/.test(content);
-    
+
     return hasProductName && (keywordMatches >= 2 || hasDimensions);
   }
 
@@ -277,25 +277,25 @@ export class ChunkTypeClassificationService {
    */
   private isTechnicalSpecs(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Technical specification keywords
     const techKeywords = [
       'specification', 'specs', 'technical', 'properties',
       'dimensions', 'weight', 'capacity', 'performance',
       'material composition', 'thickness', 'density',
-      'resistance', 'durability', 'compliance'
+      'resistance', 'durability', 'compliance',
     ];
-    
-    const keywordMatches = techKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = techKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     // Measurement patterns
     const hasMeasurements = /\d+\s*(mm|cm|m|kg|g|%|°C|°F)/.test(content);
-    
+
     // Technical formatting (lists, specifications)
     const hasListFormat = content.includes('•') || content.includes('-') || content.includes(':');
-    
+
     return keywordMatches >= 2 || (hasMeasurements && hasListFormat);
   }
 
@@ -304,22 +304,22 @@ export class ChunkTypeClassificationService {
    */
   private isVisualShowcase(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Visual keywords
     const visualKeywords = [
       'image', 'photo', 'visual', 'showcase', 'gallery',
       'moodboard', 'style', 'aesthetic', 'look', 'appearance',
-      'color palette', 'texture', 'pattern', 'finish'
+      'color palette', 'texture', 'pattern', 'finish',
     ];
-    
-    const keywordMatches = visualKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = visualKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     // Image references
-    const hasImageRefs = content.includes('![') || content.includes('<img') || 
+    const hasImageRefs = content.includes('![') || content.includes('<img') ||
                         contentLower.includes('see image') || contentLower.includes('shown in');
-    
+
     return keywordMatches >= 2 || hasImageRefs;
   }
 
@@ -328,23 +328,23 @@ export class ChunkTypeClassificationService {
    */
   private isDesignerStory(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Designer keywords
     const designerKeywords = [
       'designer', 'design', 'studio', 'architect', 'creative',
       'inspiration', 'philosophy', 'vision', 'concept',
-      'process', 'approach', 'methodology', 'story'
+      'process', 'approach', 'methodology', 'story',
     ];
-    
-    const keywordMatches = designerKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = designerKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     // Designer name patterns (often in caps or with studio)
     const hasDesignerName = /\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(content) ||
                            contentLower.includes('studio') ||
                            contentLower.includes('design by');
-    
+
     return keywordMatches >= 3 || (keywordMatches >= 2 && hasDesignerName);
   }
 
@@ -353,22 +353,22 @@ export class ChunkTypeClassificationService {
    */
   private isCollectionOverview(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Collection keywords
     const collectionKeywords = [
       'collection', 'series', 'line', 'range', 'family',
       'overview', 'introduction', 'presents', 'featuring',
-      'includes', 'comprises', 'consists of'
+      'includes', 'comprises', 'consists of',
     ];
-    
-    const keywordMatches = collectionKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = collectionKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     // Collection structure indicators
     const hasStructure = content.includes('•') || content.includes('-') ||
                         /\d+\s+(products|items|pieces)/.test(contentLower);
-    
+
     return keywordMatches >= 2 || (keywordMatches >= 1 && hasStructure);
   }
 
@@ -377,23 +377,23 @@ export class ChunkTypeClassificationService {
    */
   private isIndexContent(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Index keywords
     const indexKeywords = [
       'table of contents', 'index', 'contents', 'navigation',
-      'page', 'section', 'chapter', 'part'
+      'page', 'section', 'chapter', 'part',
     ];
-    
-    const keywordMatches = indexKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = indexKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     // Page number patterns
     const hasPageNumbers = /\.\.\.\s*\d+/.test(content) || /page\s+\d+/i.test(content);
-    
+
     // List structure with numbers
     const hasNumberedList = /^\d+\./.test(content.trim()) || content.includes('...');
-    
+
     return keywordMatches >= 1 || hasPageNumbers || hasNumberedList;
   }
 
@@ -402,19 +402,19 @@ export class ChunkTypeClassificationService {
    */
   private isSustainabilityInfo(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Sustainability keywords
     const sustainabilityKeywords = [
       'sustainability', 'sustainable', 'eco', 'environmental',
       'green', 'renewable', 'recycled', 'recyclable',
       'carbon footprint', 'eco-friendly', 'biodegradable',
-      'energy efficient', 'responsible sourcing'
+      'energy efficient', 'responsible sourcing',
     ];
-    
-    const keywordMatches = sustainabilityKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = sustainabilityKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     return keywordMatches >= 2;
   }
 
@@ -423,21 +423,21 @@ export class ChunkTypeClassificationService {
    */
   private isCertificationInfo(content: string): boolean {
     const contentLower = content.toLowerCase();
-    
+
     // Certification keywords
     const certificationKeywords = [
       'certification', 'certified', 'standard', 'compliance',
       'iso', 'ce mark', 'quality assurance', 'tested',
-      'approved', 'meets standards', 'conforms to'
+      'approved', 'meets standards', 'conforms to',
     ];
-    
-    const keywordMatches = certificationKeywords.filter(keyword => 
-      contentLower.includes(keyword)
+
+    const keywordMatches = certificationKeywords.filter(keyword =>
+      contentLower.includes(keyword),
     ).length;
-    
+
     // Certification codes (ISO, CE, etc.)
     const hasCertCodes = /\b(ISO|CE|EN|ASTM|ANSI)\s*\d+/.test(content);
-    
+
     return keywordMatches >= 2 || hasCertCodes;
   }
 
@@ -489,7 +489,7 @@ export class ChunkTypeClassificationService {
     // Extract materials
     const materialKeywords = ['wood', 'metal', 'glass', 'ceramic', 'fabric', 'leather', 'plastic', 'stone', 'concrete'];
     const foundMaterials = materialKeywords.filter(material =>
-      content.toLowerCase().includes(material)
+      content.toLowerCase().includes(material),
     );
     if (foundMaterials.length > 0) {
       metadata.materials = foundMaterials;
@@ -498,7 +498,7 @@ export class ChunkTypeClassificationService {
     // Extract colors
     const colorKeywords = ['white', 'black', 'red', 'blue', 'green', 'yellow', 'brown', 'gray', 'grey', 'beige', 'natural'];
     const foundColors = colorKeywords.filter(color =>
-      content.toLowerCase().includes(color)
+      content.toLowerCase().includes(color),
     );
     if (foundColors.length > 0) {
       metadata.colors = foundColors;
@@ -577,7 +577,7 @@ export class ChunkTypeClassificationService {
     // Extract visual elements
     const visualKeywords = ['color', 'texture', 'pattern', 'finish', 'style', 'aesthetic'];
     const foundElements = visualKeywords.filter(element =>
-      content.toLowerCase().includes(element)
+      content.toLowerCase().includes(element),
     );
     if (foundElements.length > 0) {
       metadata.visualElements = foundElements;
@@ -693,7 +693,7 @@ export class ChunkTypeClassificationService {
     chunkId: string,
     chunkType: ChunkType,
     confidence: number,
-    metadata: ChunkTypeMetadata
+    metadata: ChunkTypeMetadata,
   ): Promise<void> {
     try {
       const { error } = await this.supabase
@@ -701,8 +701,8 @@ export class ChunkTypeClassificationService {
         .update({
           chunk_type: chunkType,
           chunk_type_confidence: confidence,
-          chunk_type_metadata: metadata
-        })
+          chunk_type_metadata: metadata,
+  })
         .eq('id', chunkId);
 
       if (error) {

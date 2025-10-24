@@ -32,7 +32,7 @@ interface DocumentChunk {
   document_id: string;
   content: string;
   chunk_index: number;
-  metadata: any;
+  metadata: unknown;
   created_at: string;
   workspace_id?: string;
 }
@@ -45,18 +45,18 @@ interface DocumentImage {
   image_type?: string;
   caption?: string;
   alt_text?: string;
-  bbox?: any;
+  bbox?: unknown;
   page_number?: number;
   proximity_score?: number;
   confidence?: number;
-  metadata?: any;
+  metadata?: unknown;
   created_at: string;
   ocr_extracted_text?: string;
   ocr_confidence_score?: number;
-  image_analysis_results?: any;
-  visual_features?: any;
+  image_analysis_results?: unknown;
+  visual_features?: unknown;
   processing_status?: string;
-  multimodal_metadata?: any;
+  multimodal_metadata?: unknown;
   contextual_name?: string;
   nearest_heading?: string;
   heading_level?: number;
@@ -73,7 +73,7 @@ interface Embedding {
   created_at: string;
   embedding_type?: string; // 'text', 'image', 'hybrid'
   generation_timestamp?: string;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 interface KnowledgeBaseStats {
@@ -114,7 +114,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
         .from('document_chunks')
         .select(`
           *,
-          documents!inner(
+          documentsinner(
             id,
             filename,
             metadata,
@@ -148,7 +148,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
       // Load embeddings - query both embeddings and document_vectors tables
       // First try document_vectors (primary), then fall back to embeddings table
       console.log('🔢 Loading embeddings from database...');
-      let embeddingsData: any[] = [];
+      let embeddingsData: unknown[] = [];
 
       const { data: vectorsData, error: vectorsError, count: vectorsCount } = await supabase
         .from('document_vectors')
@@ -179,7 +179,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
         }
       }
 
-      setEmbeddings(embeddingsData || []);
+      setEmbeddings((embeddingsData || []) as Embedding[]);
 
       // Load products created from PDF chunks
       const { data: productsData, error: productsError } = await supabase
@@ -197,7 +197,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       // Calculate stats
       console.log('📈 Calculating statistics...');
-      const uniqueDocuments = new Set(chunksData?.map((c: any) => c.document_id) || []).size;
+      const uniqueDocuments = new Set(chunksData?.map((c: unknown) => (c as any).document_id) || []).size;
       const avgChunkSize = chunksData?.length ?
         chunksData.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / chunksData.length : 0;
       const avgConfidence = imagesData?.length ?
@@ -233,8 +233,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
   const filteredChunks = chunks.filter(chunk =>
     chunk.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chunk.metadata?.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chunk.metadata?.title?.toLowerCase().includes(searchQuery.toLowerCase()),
+    (chunk.metadata as any)?.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (chunk.metadata as any)?.title?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const filteredImages = images.filter(image =>
@@ -307,8 +307,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
     if (!chunk) return 'Unknown Document';
 
     // First, check chunk metadata for document_name (newly added field)
-    if (chunk.metadata?.document_name) {
-      return chunk.metadata.document_name;
+    if ((chunk.metadata as any)?.document_name) {
+      return (chunk.metadata as any).document_name;
     }
 
     // Try to get document info from the joined data
@@ -334,12 +334,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }
 
     // Fallback to chunk metadata
-    if (chunk.metadata?.filename) {
+    if ((chunk.metadata as any)?.filename) {
       // Remove extension from filename
-      return chunk.metadata.filename.replace(/\.[^/.]+$/, '');
+      return (chunk.metadata as any).filename.replace(/\.[^/.]+$/, '');
     }
-    if (chunk.metadata?.title) return chunk.metadata.title;
-    if (chunk.metadata?.source) return `${chunk.metadata.source} Document`;
+    if ((chunk.metadata as any)?.title) return (chunk.metadata as any).title;
+    if ((chunk.metadata as any)?.source) return `${(chunk.metadata as any).source} Document`;
 
     return 'Unknown Document';
   };
@@ -371,7 +371,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button onClick={loadKnowledgeBaseData} variant="outline">
+        <Button onClick={loadKnowledgeBaseData} onKeyDown={(e) => e.key === 'Enter' && loadKnowledgeBaseData()} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -390,9 +390,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 </div>
               </div>
             </CardContent>
-          </Card>
-
-          <Card>
+          </Card><Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Layers className="h-4 w-4 text-green-500" />
@@ -438,9 +436,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 </div>
               </div>
             </CardContent>
-          </Card>
-
-          <Card>
+          </Card><Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Brain className="h-4 w-4 text-yellow-500" />
@@ -645,7 +641,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                     <span className="font-medium">Size:</span> {chunk.content.length} chars
                                   </div>
                                   <div>
-                                    <span className="font-medium">Quality:</span> {chunk.metadata?.quality_score ? `${Math.round(chunk.metadata.quality_score * 100)}%` : 'N/A'}
+                                    <span className="font-medium">Quality:</span> {(chunk.metadata as any)?.quality_score ? `${Math.round((chunk.metadata as any).quality_score * 100)}%` : 'N/A'}
                                   </div>
                                   <div>
                                     <span className="font-medium">Date:</span> {new Date(chunk.created_at).toLocaleDateString()}
@@ -786,7 +782,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(1)}
+                        onClick={() => setCurrentPage(1)} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(1)}
                         disabled={currentPage === 1}
                         className="px-3"
                       >
@@ -795,7 +791,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(Math.max(1, currentPage - 1))}
                         disabled={currentPage === 1}
                         className="px-3"
                       >
@@ -815,6 +811,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                               variant={currentPage === page ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setCurrentPage(page as number)}
+                              onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(page as number)}
                               className="w-8 h-8 p-0"
                             >
                               {page}
@@ -826,7 +823,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
+                        onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
                         disabled={currentPage === getTotalPages()}
                         className="px-3"
                       >
@@ -835,7 +832,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(getTotalPages())}
+                        onClick={() => setCurrentPage(getTotalPages())} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(getTotalPages())}
                         disabled={currentPage === getTotalPages()}
                         className="px-3"
                       >
@@ -1015,9 +1012,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="embeddings" className="space-y-4">
+        </TabsContent><TabsContent value="embeddings" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Generated Embeddings</CardTitle>

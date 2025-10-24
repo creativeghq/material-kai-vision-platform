@@ -278,6 +278,11 @@ export const CRMManagement: React.FC = () => {
                                 onClick={() => {
                                   // TODO: Open edit modal
                                 }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    // TODO: Open edit modal
+                                  }
+                                }}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -285,6 +290,11 @@ export const CRMManagement: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteUser(user.user_id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleDeleteUser(user.user_id);
+                                  }
+                                }}
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
@@ -385,6 +395,11 @@ export const CRMManagement: React.FC = () => {
                                 onClick={() => {
                                   // TODO: Open edit modal
                                 }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    // TODO: Open edit modal
+                                  }
+                                }}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -392,6 +407,11 @@ export const CRMManagement: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteContact(contact.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleDeleteContact(contact.id);
+                                  }
+                                }}
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>

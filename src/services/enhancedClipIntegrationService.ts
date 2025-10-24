@@ -1,9 +1,9 @@
 /**
  * Enhanced CLIP Integration Service
- * 
+ *
  * Leverages existing CLIP embeddings from VisualFeatureExtractionService and MaterialVisualSearchService
  * to improve product-image associations and enable advanced visual similarity search capabilities.
- * 
+ *
  * Features:
  * - Real CLIP embedding-based product-image matching
  * - Advanced visual similarity search with multi-modal queries
@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { VisualFeatureExtractionService } from './visualFeatureExtractionService';
 // import { MaterialVisualSearchService } from './materialVisualSearchService'; // TODO: Add when available
 
@@ -62,7 +63,7 @@ export interface VisualSearchResult {
   imageUrl?: string;
   similarity: number;
   confidence: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface ProductRecommendation {
@@ -246,7 +247,7 @@ export class EnhancedClipIntegrationService {
   static async calculateRealClipScore(
     imageId: string,
     productId: string,
-  ): Promise<{ score: number; confidence: number; metadata: Record<string, any> }> {
+  ): Promise<{ score: number; confidence: number; metadata: Record<string, unknown> }> {
     try {
       console.log(`🔍 Calculating real CLIP score for image ${imageId} and product ${productId}`);
 
@@ -296,7 +297,7 @@ export class EnhancedClipIntegrationService {
       };
 
     } catch (error) {
-      console.error(`❌ Error calculating real CLIP score:`, error);
+      console.error('❌ Error calculating real CLIP score:', error);
       return { score: 0.5, confidence: 0.1, metadata: { error: error.message } };
     }
   }
@@ -306,13 +307,13 @@ export class EnhancedClipIntegrationService {
    */
   static async performVisualSimilaritySearch(
     query: VisualSearchQuery,
-  ): Promise<{ results: VisualSearchResult[]; metadata: Record<string, any> }> {
+  ): Promise<{ results: VisualSearchResult[]; metadata: Record<string, unknown> }> {
     try {
       console.log(`🔍 Performing visual similarity search: ${query.type}`);
       const startTime = Date.now();
 
       let queryEmbedding: number[] | null = null;
-      let searchMetadata: Record<string, any> = {
+      let searchMetadata: Record<string, unknown> = {
         queryType: query.type,
         similarityThreshold: query.similarityThreshold || this.SIMILARITY_THRESHOLD,
         maxResults: query.maxResults || 20,
@@ -371,7 +372,7 @@ export class EnhancedClipIntegrationService {
       return { results, metadata: searchMetadata };
 
     } catch (error) {
-      console.error(`❌ Error performing visual similarity search:`, error);
+      console.error('❌ Error performing visual similarity search:', error);
       return { results: [], metadata: { error: error.message } };
     }
   }
@@ -527,7 +528,7 @@ export class EnhancedClipIntegrationService {
           material_id,
           clip_embedding,
           clip_model_version,
-          images!inner(id, filename, url, caption, alt_text)
+          imagesinner(id, filename, url, caption, alt_text)
         `)
         .not('clip_embedding', 'is', null)
         .limit(query.maxResults ? query.maxResults * 2 : 100);
@@ -593,17 +594,17 @@ export class EnhancedClipIntegrationService {
 
       // Price range filter (for products)
       if (filters.priceRange && result.type === 'product') {
-        const price = result.metadata?.price;
-        if (price && (price < filters.priceRange[0] || price > filters.priceRange[1])) {
+        const price = (result.metadata as any)?.price;
+        if (price && ((price as any) < filters.priceRange[0] || (price as any) > filters.priceRange[1])) {
           return false;
         }
       }
 
       // Categories filter
       if (filters.categories && filters.categories.length > 0) {
-        const resultCategories = result.metadata?.categories || [];
+        const resultCategories = (result.metadata as any)?.categories || [];
         const hasMatchingCategory = filters.categories.some(cat =>
-          resultCategories.includes(cat)
+          (resultCategories as any).includes(cat),
         );
         if (!hasMatchingCategory) {
           return false;
@@ -706,7 +707,7 @@ export class EnhancedClipIntegrationService {
             const embedding = await this.generateProductClipEmbeddings(
               product.id,
               product.text,
-              { forceRegenerate: options.forceRegenerate }
+              { forceRegenerate: options.forceRegenerate },
             );
 
             if (embedding) {

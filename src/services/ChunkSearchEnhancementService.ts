@@ -142,7 +142,7 @@ export class ChunkSearchEnhancementService extends BaseService {
       }
 
       // Step 5: Enhance results with analysis data
-      const enhancedResults = (data || []).map((chunk: any) => this.enhanceChunkResult(chunk, request.filters));
+      const enhancedResults = (data || []).map((chunk: unknown) => this.enhanceChunkResult(chunk, request.filters));
 
       // Step 6: Sort by overall quality
       enhancedResults.sort((a, b) => b.overallQuality - a.overallQuality);
@@ -197,7 +197,7 @@ export class ChunkSearchEnhancementService extends BaseService {
 
       if (error) throw error;
 
-      return (data || []).map((item: any) => this.enhanceChunkResult(item.document_chunks, {}));
+      return (data || []).map((item: unknown) => this.enhanceChunkResult((item as any).document_chunks, {}));
     } catch (error) {
       this.logger.error(`Failed to get chunks by content type: ${error}`);
       throw error;
@@ -256,7 +256,7 @@ export class ChunkSearchEnhancementService extends BaseService {
 
       if (error) throw error;
 
-      return (data || []).map((item: any) => this.enhanceChunkResult(item.document_chunks, {}));
+      return (data || []).map((item: unknown) => this.enhanceChunkResult((item as any).document_chunks, {}));
     } catch (error) {
       this.logger.error(`Failed to get chunks needing review: ${error}`);
       throw error;

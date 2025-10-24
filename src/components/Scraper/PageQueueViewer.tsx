@@ -229,7 +229,15 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Page Queue ({pages.length} total)</CardTitle>
-          <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm" onClick={loadPages}>
+          <Button
+            className="border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
+            onClick={loadPages}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                loadPages();
+              }
+            }}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -342,7 +350,7 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
                   {page.status === 'failed' && (
                     <Button
                       className="border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
-                      onClick={() => retryPage(page.id)}
+                      onClick={() => retryPage(page.id)} onKeyDown={(e) => e.key === 'Enter' && retryPage(page.id)}
                     >
                       Retry
                     </Button>

@@ -284,7 +284,7 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
       }
     }
 
-    this.handleApiError(lastError!, `${modelId} after ${retries + 1} attempts`);
+    this.handleApiError(lastError, `${modelId} after ${retries + 1} attempts`);
   }
 
   /**
@@ -374,7 +374,7 @@ export class SupabaseApiService extends ApiService<SupabaseApiConfig> {
       }
     }
 
-    this.handleApiError(lastError!, `${functionName} after ${retries + 1} attempts`);
+    this.handleApiError(lastError, `${functionName} after ${retries + 1} attempts`);
   }
 }
 

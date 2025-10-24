@@ -263,7 +263,7 @@ export function EnhancedPDFProcessor() {
       setSearchResults(transformedResults);
 
       toast({
-        title: 'Search Complete!',
+        title: 'Search Complete',
         description: `Found ${transformedResults.length} results for "${searchQuery}".`,
       });
     } catch (error) {
@@ -430,7 +430,7 @@ export function EnhancedPDFProcessor() {
       ));
 
       toast({
-        title: 'PDF Processing Complete!',
+        title: 'PDF Processing Complete',
         description: `${file.name} has been processed and added to your knowledge base. You can now search through it or view the processing results in the Results tab.`,
         duration: 5000,
       });
@@ -700,7 +700,11 @@ export function EnhancedPDFProcessor() {
                   placeholder="Search for concepts, topics, or specific content..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearch();
+                    }
+                  }}
                 />
                 <Button onClick={handleSearch} disabled={!searchQuery.trim()}>
                   <Search className="h-4 w-4 mr-2" />
@@ -784,7 +788,7 @@ export function EnhancedPDFProcessor() {
                 <div className="text-center py-8">
                   <BarChart3 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">
-                    No results selected. Complete a processing job and click &quot;View Results&quot; to see detailed analysis.
+                    No results selected. Complete a processing job and click "View Results" to see detailed analysis.
                   </p>
                 </div>
               )}
@@ -855,7 +859,7 @@ export function EnhancedPDFProcessor() {
               <Alert>
                 <Brain className="h-4 w-4" />
                 <AlertDescription>
-                  These settings will be applied to future processing jobs. Existing jobs won&apos;t be affected.
+                  These settings will be applied to future processing jobs. Existing jobs won't be affected.
                 </AlertDescription>
               </Alert>
             </CardContent>

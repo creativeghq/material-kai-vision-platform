@@ -101,7 +101,7 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
             </DialogTitle>
             <div className="flex gap-2">
               <Button
-                onClick={openInNewTab}
+                onClick={openInNewTab} onKeyDown={(e) => e.key === 'Enter' && openInNewTab()}
                 disabled={!htmlContent || loading}
                 className="text-xs"
               >
@@ -109,7 +109,7 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
                 Open in New Tab
               </Button>
               <Button
-                onClick={downloadHTML}
+                onClick={downloadHTML} onKeyDown={(e) => e.key === 'Enter' && downloadHTML()}
                 disabled={!htmlContent || loading}
                 className="text-xs"
               >
@@ -134,7 +134,7 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
                 <p className="text-red-600 font-medium">Error loading document</p>
                 <p className="text-gray-500 text-sm mt-1">{error}</p>
                 <Button
-                  onClick={fetchHTMLContent}
+                  onClick={fetchHTMLContent} onKeyDown={(e) => e.key === 'Enter' && fetchHTMLContent()}
                   className="mt-3"
                 >
                   Try Again

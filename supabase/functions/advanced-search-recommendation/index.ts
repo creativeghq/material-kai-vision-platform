@@ -1,6 +1,6 @@
 /**
  * Advanced Search & Recommendation Engine Edge Function
- * 
+ *
  * Provides serverless endpoints for:
  * - Multi-modal search (text + visual + metadata)
  * - Personalized recommendations
@@ -29,19 +29,19 @@ interface AdvancedSearchRequest {
   sessionId?: string;
   limit?: number;
   offset?: number;
-  
+
   // Recommendation specific
   context?: 'search' | 'browse' | 'product_view' | 'purchase';
   currentProductId?: string;
   currentCategory?: string;
   diversityFactor?: number;
-  
+
   // Interaction tracking
   eventType?: string;
   eventData?: any;
   targetId?: string;
   targetType?: string;
-  
+
   // Preferences
   preferences?: any;
 }
@@ -55,7 +55,7 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
     const requestBody: AdvancedSearchRequest = await req.json();
@@ -69,23 +69,23 @@ serve(async (req) => {
       case 'search':
         result = await performAdvancedSearch(supabase, requestBody);
         break;
-      
+
       case 'recommend':
         result = await generateRecommendations(supabase, requestBody);
         break;
-      
+
       case 'track_interaction':
         result = await trackUserInteraction(supabase, requestBody);
         break;
-      
+
       case 'update_preferences':
         result = await updateUserPreferences(supabase, requestBody);
         break;
-      
+
       case 'get_behavior_profile':
         result = await getUserBehaviorProfile(supabase, requestBody);
         break;
-      
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -97,15 +97,15 @@ serve(async (req) => {
   } catch (error) {
     console.error('Advanced Search & Recommendation error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
+      JSON.stringify({
+        success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
     );
   }
 });
@@ -116,32 +116,32 @@ serve(async (req) => {
 async function performAdvancedSearch(supabase: any, request: AdvancedSearchRequest) {
   const startTime = Date.now();
   const searchId = `search-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     // Step 1: Analyze query intent
     const queryAnalysis = analyzeQuery(request.query || '');
-    
+
     // Step 2: Get user context if available
-    const userContext = request.userId ? 
+    const userContext = request.userId ?
       await getUserContext(supabase, request.userId, request.workspaceId) : null;
-    
+
     // Step 3: Perform multi-modal search
     const searchResults = await executeMultiModalSearch(supabase, request, queryAnalysis);
-    
+
     // Step 4: Apply personalization if user context available
-    const personalizedResults = userContext ? 
+    const personalizedResults = userContext ?
       await personalizeSearchResults(searchResults, userContext, queryAnalysis) : searchResults;
-    
+
     // Step 5: Generate related recommendations
     const relatedRecommendations = await generateQuickRecommendations(
-      supabase, request, personalizedResults
+      supabase, request, personalizedResults,
     );
-    
+
     // Step 6: Track search analytics
     await trackSearchAnalytics(supabase, request, personalizedResults, searchId, Date.now() - startTime);
-    
+
     const searchTime = Date.now() - startTime;
-    
+
     return {
       success: true,
       searchId,
@@ -177,26 +177,26 @@ async function performAdvancedSearch(supabase: any, request: AdvancedSearchReque
 async function generateRecommendations(supabase: any, request: AdvancedSearchRequest) {
   const startTime = Date.now();
   const recommendationId = `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   try {
     // Get user behavior profile
     const userProfile = await getUserBehaviorProfile(supabase, request);
-    
+
     // Generate recommendations using multiple algorithms
     const recommendations = await generateMultiAlgorithmRecommendations(
-      supabase, request, userProfile.profile
+      supabase, request, userProfile.profile,
     );
-    
+
     // Apply diversity and ranking
     const rankedRecommendations = applyDiversityRanking(
-      recommendations, request.diversityFactor || 0.3
+      recommendations, request.diversityFactor || 0.3,
     );
-    
+
     // Track recommendation analytics
     await trackRecommendationAnalytics(supabase, request, rankedRecommendations, recommendationId);
-    
+
     const generationTime = Date.now() - startTime;
-    
+
     return {
       success: true,
       recommendationId,
@@ -789,7 +789,7 @@ function generateQuickRecommendations(supabase: any, request: AdvancedSearchRequ
     recommendationScore: 0.6 - (index * 0.1),
     confidenceScore: 0.7,
     diversityScore: 0.8,
-    reason: `Related to your search`,
+    reason: 'Related to your search',
     reasonType: 'similar_products',
     explanation: 'Based on your current search results',
     metadata: {},

@@ -92,7 +92,7 @@ export const AuthCallbackPage: React.FC = () => {
         }
 
         toast({
-          title: 'Welcome!',
+          title: 'Welcome',
           description: `Signed in as ${user.email}`,
         });
 

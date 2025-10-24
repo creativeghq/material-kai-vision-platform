@@ -33,7 +33,7 @@ export interface ErrorEvent {
   stack?: string;
   level: 'error' | 'warning' | 'info' | 'debug';
   tags?: Record<string, string>;
-  extra?: Record<string, any>;
+  extra?: Record<string, unknown>;
   user?: {
     id?: string;
     email?: string;
@@ -62,7 +62,7 @@ export interface UserEvent {
   category: string;
   label?: string;
   value?: number;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -124,7 +124,7 @@ class MonitoringService {
     // In a real implementation:
     // import * as Sentry from '@sentry/react';
     // Sentry.init({
-    //   dsn: this.config.providers.sentry!.dsn,
+    //   dsn: this.config.providers.sentry.dsn,
     //   environment: this.config.environment,
     //   release: this.config.version,
     // });
@@ -137,7 +137,7 @@ class MonitoringService {
     console.log('LogRocket monitoring initialized (placeholder)');
     // In a real implementation:
     // import LogRocket from 'logrocket';
-    // LogRocket.init(this.config.providers.logRocket!.appId);
+    // LogRocket.init(this.config.providers.logRocket.appId);
   }
 
   /**

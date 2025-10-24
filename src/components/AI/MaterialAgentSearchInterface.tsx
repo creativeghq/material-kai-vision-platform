@@ -246,7 +246,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
     setMessages([{
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: "👋 Hello! I'm your AI material research assistant powered by Material Agent Orchestrator. I can help you:\n\n• Search and analyze materials from our PDF knowledge base\n• Find materials based on specific properties or applications\n• Generate design suggestions and 3D concepts\n• Cross-reference materials with projects and mood boards\n\nWhat would you like to explore today?",
+      content: "👋 Hello I'm your AI material research assistant powered by Material Agent Orchestrator. I can help you:\n\n• Search and analyze materials from our PDF knowledge base\n• Find materials based on specific properties or applications\n• Generate design suggestions and 3D concepts\n• Cross-reference materials with projects and mood boards\n\nWhat would you like to explore today?",
       timestamp: new Date(),
       suggestions: [
         'Find sustainable materials for modern interiors',
@@ -475,14 +475,14 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                 if (matches.length > 0) {
                   visualSearchResults = {
                     searchId: searchId,
-                    matches: matches.map((result: any) => ({
-                      id: result.material_id || result.id || crypto.randomUUID(),
-                      name: result.material_name || result.name || 'Unknown Material',
-                      description: result.description || result.material_data?.description || 'No description available',
-                      similarity_score: result.similarity_score || 0.8,
-                      llama_analysis: result.llama_analysis || {},
-                      visual_features: result.visual_features || {},
-                      thumbnail_url: result.thumbnail_url || result.image_url || '',
+                    matches: matches.map((result: unknown) => ({
+                      id: (result as any).material_id || (result as any).id || crypto.randomUUID(),
+                      name: (result as any).material_name || (result as any).name || 'Unknown Material',
+                      description: (result as any).description || (result as any).material_data?.description || 'No description available',
+                      similarity_score: (result as any).similarity_score || 0.8,
+                      llama_analysis: (result as any).llama_analysis || {},
+                      visual_features: (result as any).visual_features || {},
+                      thumbnail_url: (result as any).thumbnail_url || (result as any).image_url || '',
                     })),
                     search_execution_time_ms: executionTime,
                     total_results: matches.length,
@@ -527,14 +527,14 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           if (similarityResponse.success && similarityResponse.data?.results) {
             similaritySearchResults = {
               searchId: crypto.randomUUID(),
-              results: similarityResponse.data.results.map((result: any) => ({
-                id: result.id || crypto.randomUUID(),
-                title: result.title || result.name || 'Untitled',
-                content: result.content || result.description || '',
-                similarity_score: result.similarity_score || 0,
-                metadata: result.metadata || {},
-                document_type: result.document_type || 'material',
-                source: result.source || 'vector_search',
+              results: similarityResponse.data.results.map((result: unknown) => ({
+                id: (result as any).id || crypto.randomUUID(),
+                title: (result as any).title || (result as any).name || 'Untitled',
+                content: (result as any).content || (result as any).description || '',
+                similarity_score: (result as any).similarity_score || 0,
+                metadata: (result as any).metadata || {},
+                document_type: (result as any).document_type || 'material',
+                source: (result as any).source || 'vector_search',
               })),
               processing_time_ms: similarityResponse.data.processing_time_ms || 0,
               total_results: similarityResponse.data.results.length,

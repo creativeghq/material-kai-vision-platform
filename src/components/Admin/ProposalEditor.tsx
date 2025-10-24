@@ -65,11 +65,11 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
 
       // Create proposal items from quote request items
       // @ts-expect-error - items property exists at runtime
-      const items: ProposalItem[] = (quoteRequest.items || []).map((item: any) => ({
-        product_id: item.product_id,
-        quantity: item.quantity || 1,
-        unit_price: item.unit_price || 0,
-        total: (item.unit_price || 0) * (item.quantity || 1),
+      const items: ProposalItem[] = (quoteRequest.items || []).map((item: unknown) => ({
+        product_id: (item as any).product_id,
+        quantity: (item as any).quantity || 1,
+        unit_price: (item as any).unit_price || 0,
+        total: ((item as any).unit_price || 0) * ((item as any).quantity || 1),
       }));
 
       const proposal = await proposalService.createProposal(
@@ -111,7 +111,7 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
 
       {success && (
         <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-lg">
-          ✅ Proposal created successfully!
+          ✅ Proposal created successfully
         </div>
       )}
 
@@ -207,6 +207,14 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
               setTax(0);
               setDiscount(0);
               setNotes('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setSubtotal(quoteRequest.total_estimated || 0);
+                setTax(0);
+                setDiscount(0);
+                setNotes('');
+              }
             }}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
           >

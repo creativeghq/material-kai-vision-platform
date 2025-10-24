@@ -292,7 +292,7 @@ const PackagesPanel: React.FC = () => {
       <div className="p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center justify-end">
-            <Button onClick={checkPackageStatus} disabled={isChecking}>
+            <Button onClick={checkPackageStatus} onKeyDown={(e) => e.key === 'Enter' && checkPackageStatus()} disabled={isChecking}>
               <RefreshCw className={`mr-2 h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
               {isChecking ? 'Checking...' : 'Refresh Status'}
             </Button>

@@ -571,7 +571,7 @@ export class EmbeddingGenerationService extends EventEmitter {
       }
     }
 
-    throw lastError!;
+    throw lastError;
   }
 
   /**

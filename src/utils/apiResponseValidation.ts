@@ -16,7 +16,7 @@ export interface ValidationResult<T = any> {
 }
 
 // ✅ Material Recognition Response Validator
-export const validateMaterialRecognitionResponse = (response: any): ValidationResult<RecognitionResult[]> => {
+export const validateMaterialRecognitionResponse = (response: unknown): ValidationResult<RecognitionResult[]> => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -25,68 +25,68 @@ export const validateMaterialRecognitionResponse = (response: any): ValidationRe
     return { isValid: false, errors, warnings };
   }
 
-  if (!response.success) {
-    errors.push(`API call failed: ${response.error?.message || 'Unknown error'}`);
+  if (!(response as any).success) {
+    errors.push(`API call failed: ${(response as any).error?.message || 'Unknown error'}`);
     return { isValid: false, errors, warnings };
   }
 
-  if (!response.data) {
+  if (!(response as any).data) {
     errors.push('Response data is missing');
     return { isValid: false, errors, warnings };
   }
 
-  const data = response.data;
+  const data = (response as any).data;
 
   // Validate materials array
-  if (!data.materials || !Array.isArray(data.materials)) {
+  if (!(data as any).materials || !Array.isArray((data as any).materials)) {
     errors.push('Materials array is missing or invalid');
     return { isValid: false, errors, warnings };
   }
 
   const validatedMaterials: RecognitionResult[] = [];
 
-  data.materials.forEach((material: any, index: number) => {
+  (data as any).materials.forEach((material: any, index: number) => {
     const materialErrors: string[] = [];
 
     // Required fields validation
-    if (!material.id && !material.fileName) {
+    if (!(material as any).id && !(material as any).fileName) {
       materialErrors.push(`Material ${index}: Missing id or fileName`);
     }
-    if (typeof material.confidence !== 'number' || material.confidence < 0 || material.confidence > 1) {
+    if (typeof (material as any).confidence !== 'number' || (material as any).confidence < 0 || (material as any).confidence > 1) {
       materialErrors.push(`Material ${index}: Invalid confidence value (should be 0-1)`);
     }
-    if (!material.materialType || typeof material.materialType !== 'string') {
+    if (!(material as any).materialType || typeof (material as any).materialType !== 'string') {
       materialErrors.push(`Material ${index}: Missing or invalid materialType`);
     }
-    if (typeof material.processingTime !== 'number' || material.processingTime < 0) {
+    if (typeof (material as any).processingTime !== 'number' || (material as any).processingTime < 0) {
       materialErrors.push(`Material ${index}: Invalid processingTime`);
     }
 
     // Optional fields validation
-    if (material.properties && typeof material.properties !== 'object') {
+    if ((material as any).properties && typeof (material as any).properties !== 'object') {
       warnings.push(`Material ${index}: Properties should be an object`);
     }
-    if (material.composition && typeof material.composition !== 'object') {
+    if ((material as any).composition && typeof (material as any).composition !== 'object') {
       warnings.push(`Material ${index}: Composition should be an object`);
     }
-    if (material.sustainability && typeof material.sustainability !== 'object') {
+    if ((material as any).sustainability && typeof (material as any).sustainability !== 'object') {
       warnings.push(`Material ${index}: Sustainability should be an object`);
     }
 
     if (materialErrors.length === 0) {
       validatedMaterials.push({
-        id: material.id || `generated_${Date.now()}_${index}`,
-        fileName: material.fileName || 'unknown',
-        materialId: material.id || 'unknown',
-        confidence: material.confidence,
-        materialType: material.materialType,
-        properties: material.properties || {},
-        composition: material.composition || {},
-        sustainability: material.sustainability || {},
-        imageUrl: material.imageUrl || '',
-        processingTime: material.processingTime,
-        matchedMaterial: material.matchedMaterial,
-        extractedProperties: material.extractedProperties,
+        id: (material as any).id || `generated_${Date.now()}_${index}`,
+        fileName: (material as any).fileName || 'unknown',
+        materialId: (material as any).id || 'unknown',
+        confidence: (material as any).confidence,
+        materialType: (material as any).materialType,
+        properties: (material as any).properties || {},
+        composition: (material as any).composition || {},
+        sustainability: (material as any).sustainability || {},
+        imageUrl: (material as any).imageUrl || '',
+        processingTime: (material as any).processingTime,
+        matchedMaterial: (material as any).matchedMaterial,
+        extractedProperties: (material as any).extractedProperties,
       });
     } else {
       errors.push(...materialErrors);
@@ -102,7 +102,7 @@ export const validateMaterialRecognitionResponse = (response: any): ValidationRe
 };
 
 // ✅ AI Test Response Validator
-export const validateAITestResponse = (response: any): ValidationResult => {
+export const validateAITestResponse = (response: unknown): ValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -111,41 +111,41 @@ export const validateAITestResponse = (response: any): ValidationResult => {
     return { isValid: false, errors, warnings };
   }
 
-  if (!response.success) {
-    errors.push(`AI test failed: ${response.error?.message || 'Unknown error'}`);
+  if (!(response as any).success) {
+    errors.push(`AI test failed: ${(response as any).error?.message || 'Unknown error'}`);
     return { isValid: false, errors, warnings };
   }
 
-  if (!response.data) {
+  if (!(response as any).data) {
     errors.push('Response data is missing');
     return { isValid: false, errors, warnings };
   }
 
-  const data = response.data;
+  const data = (response as any).data;
 
   // Validate required fields
-  if (!data.response || typeof data.response !== 'string') {
+  if (!(data as any).response || typeof (data as any).response !== 'string') {
     errors.push('Missing or invalid response text');
   }
 
-  if (typeof data.processingTime !== 'number' || data.processingTime < 0) {
+  if (typeof (data as any).processingTime !== 'number' || (data as any).processingTime < 0) {
     warnings.push('Invalid or missing processingTime');
   }
 
-  if (typeof data.confidence !== 'number' || data.confidence < 0 || data.confidence > 1) {
+  if (typeof (data as any).confidence !== 'number' || (data as any).confidence < 0 || (data as any).confidence > 1) {
     warnings.push('Invalid confidence value (should be 0-1)');
   }
 
   // Validate optional arrays
-  if (data.recommendations && !Array.isArray(data.recommendations)) {
+  if ((data as any).recommendations && !Array.isArray((data as any).recommendations)) {
     warnings.push('Recommendations should be an array');
   }
 
-  if (data.materials && !Array.isArray(data.materials)) {
+  if ((data as any).materials && !Array.isArray((data as any).materials)) {
     warnings.push('Materials should be an array');
   }
 
-  if (data.entities && !Array.isArray(data.entities)) {
+  if ((data as any).entities && !Array.isArray((data as any).entities)) {
     warnings.push('Entities should be an array');
   }
 
@@ -158,7 +158,7 @@ export const validateAITestResponse = (response: any): ValidationResult => {
 };
 
 // ✅ Visual Search Response Validator
-export const validateVisualSearchResponse = (response: any): ValidationResult => {
+export const validateVisualSearchResponse = (response: unknown): ValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -167,45 +167,45 @@ export const validateVisualSearchResponse = (response: any): ValidationResult =>
     return { isValid: false, errors, warnings };
   }
 
-  if (!response.success) {
-    errors.push(`Visual search failed: ${response.error?.message || 'Unknown error'}`);
+  if (!(response as any).success) {
+    errors.push(`Visual search failed: ${(response as any).error?.message || 'Unknown error'}`);
     return { isValid: false, errors, warnings };
   }
 
-  if (!response.data) {
+  if (!(response as any).data) {
     errors.push('Response data is missing');
     return { isValid: false, errors, warnings };
   }
 
-  const data = response.data;
+  const data = (response as any).data;
 
   // Validate matches array
-  const matches = data.matches || data.results || [];
+  const matches = (data as any).matches || (data as any).results || [];
   if (!Array.isArray(matches)) {
     errors.push('Matches/results should be an array');
     return { isValid: false, errors, warnings };
   }
 
   // Validate search metadata
-  if (!data.query_id && !data.search_id) {
+  if (!(data as any).query_id && !(data as any).search_id) {
     warnings.push('Missing search/query ID');
   }
 
   // Validate execution time
-  const executionTime = data.search_statistics?.search_time_ms || data.search_execution_time_ms;
+  const executionTime = (data as any).search_statistics?.search_time_ms || (data as any).search_execution_time_ms;
   if (typeof executionTime !== 'number' || executionTime < 0) {
     warnings.push('Invalid or missing execution time');
   }
 
   // Validate individual matches
   matches.forEach((match: any, index: number) => {
-    if (!match.id && !match.material_id) {
+    if (!(match as any).id && !(match as any).material_id) {
       warnings.push(`Match ${index}: Missing ID`);
     }
-    if (!match.name && !match.material_name) {
+    if (!(match as any).name && !(match as any).material_name) {
       warnings.push(`Match ${index}: Missing name`);
     }
-    if (typeof match.similarity_score !== 'number' || match.similarity_score < 0 || match.similarity_score > 1) {
+    if (typeof (match as any).similarity_score !== 'number' || (match as any).similarity_score < 0 || (match as any).similarity_score > 1) {
       warnings.push(`Match ${index}: Invalid similarity score`);
     }
   });
@@ -219,7 +219,7 @@ export const validateVisualSearchResponse = (response: any): ValidationResult =>
 };
 
 // ✅ Generic API Response Validator
-export const validateStandardizedApiResponse = (response: any): ValidationResult => {
+export const validateStandardizedApiResponse = (response: unknown): ValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -229,27 +229,27 @@ export const validateStandardizedApiResponse = (response: any): ValidationResult
   }
 
   // Check for required fields
-  if (typeof response.success !== 'boolean') {
+  if (typeof (response as any).success !== 'boolean') {
     errors.push('Missing or invalid success field');
   }
 
-  if (!response.success && !response.error) {
+  if (!(response as any).success && !(response as any).error) {
     errors.push('Failed response missing error information');
   }
 
-  if (response.success && !response.data) {
+  if ((response as any).success && !(response as any).data) {
     warnings.push('Successful response missing data field');
   }
 
   // Validate metadata if present
-  if (response.metadata) {
-    if (!response.metadata.timestamp) {
+  if ((response as any).metadata) {
+    if (!(response as any).metadata.timestamp) {
       warnings.push('Missing timestamp in metadata');
     }
-    if (!response.metadata.requestId) {
+    if (!(response as any).metadata.requestId) {
       warnings.push('Missing requestId in metadata');
     }
-    if (!response.metadata.apiType) {
+    if (!(response as any).metadata.apiType) {
       warnings.push('Missing apiType in metadata');
     }
   } else {
@@ -258,7 +258,7 @@ export const validateStandardizedApiResponse = (response: any): ValidationResult
 
   return {
     isValid: errors.length === 0,
-    data: response.data,
+    data: (response as any).data,
     errors,
     warnings,
   };
@@ -267,7 +267,7 @@ export const validateStandardizedApiResponse = (response: any): ValidationResult
 // ✅ Validation utility with logging
 export const validateAndLog = <T>(
   response: any,
-  validator: (response: any) => ValidationResult<T>,
+  validator: (response: unknown) => ValidationResult<T>,
   context: string,
 ): ValidationResult<T> => {
   const result = validator(response);

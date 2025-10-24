@@ -319,7 +319,7 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     if (budgetUsedPercentage >= this.config.emergencyThreshold) {
       alerts.push({
         type: 'emergency',
-        message: 'Emergency: Monthly budget almost exhausted!',
+        message: 'Emergency: Monthly budget almost exhausted',
         currentSpend: usage.totalCost,
         budgetRemaining: remainingBudget,
         projectedSpend,

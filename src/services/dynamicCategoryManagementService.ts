@@ -292,22 +292,22 @@ class DynamicCategoryManagementService {
     this.cacheTimestamp = null;
   }
 
-  private buildHierarchy(categories: any[]): CategoryHierarchy[] {
+  private buildHierarchy(categories: unknown[]): CategoryHierarchy[] {
     const categoryMap = new Map<string, CategoryHierarchy>();
     const rootCategories: CategoryHierarchy[] = [];
 
     // First pass: create all category objects
     categories.forEach(cat => {
       const hierarchy = this.mapToHierarchy(cat);
-      categoryMap.set(cat.id, hierarchy);
+      categoryMap.set((cat as any).id, hierarchy);
     });
 
     // Second pass: build parent-child relationships
     categories.forEach(cat => {
-      const hierarchy = categoryMap.get(cat.id)!;
+      const hierarchy = categoryMap.get((cat as any).id)!;
 
-      if (cat.parent_category_id) {
-        const parent = categoryMap.get(cat.parent_category_id);
+      if ((cat as any).parent_category_id) {
+        const parent = categoryMap.get((cat as any).parent_category_id);
         if (parent) {
           if (!parent.children) parent.children = [];
           parent.children.push(hierarchy);
@@ -320,22 +320,22 @@ class DynamicCategoryManagementService {
     return rootCategories;
   }
 
-  private mapToHierarchy(data: any): CategoryHierarchy {
+  private mapToHierarchy(data: unknown): CategoryHierarchy {
     return {
-      id: data.id,
-      categoryKey: data.category_key,
-      name: data.name,
-      displayName: data.display_name,
-      description: data.description,
-      parentCategoryId: data.parent_category_id,
-      hierarchyLevel: data.hierarchy_level,
-      sortOrder: data.sort_order,
-      displayGroup: data.display_group,
-      isActive: data.is_active,
-      isPrimaryCategory: data.is_primary_category,
-      aiExtractionEnabled: data.ai_extraction_enabled,
-      aiConfidenceThreshold: data.ai_confidence_threshold,
-      processingPriority: data.processing_priority,
+      id: (data as any).id,
+      categoryKey: (data as any).category_key,
+      name: (data as any).name,
+      displayName: (data as any).display_name,
+      description: (data as any).description,
+      parentCategoryId: (data as any).parent_category_id,
+      hierarchyLevel: (data as any).hierarchy_level,
+      sortOrder: (data as any).sort_order,
+      displayGroup: (data as any).display_group,
+      isActive: (data as any).is_active,
+      isPrimaryCategory: (data as any).is_primary_category,
+      aiExtractionEnabled: (data as any).ai_extraction_enabled,
+      aiConfidenceThreshold: (data as any).ai_confidence_threshold,
+      processingPriority: (data as any).processing_priority,
       children: [],
     };
   }

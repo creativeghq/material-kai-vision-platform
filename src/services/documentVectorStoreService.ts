@@ -561,7 +561,7 @@ export class DocumentVectorStoreService {
         return new Set();
       }
 
-      return new Set(data?.map((item: any) => (item as Record<string, unknown>).chunk_id as string) || []);
+      return new Set(data?.map((item: unknown) => (item as Record<string, unknown>).chunk_id as string) || []);
 
     } catch (error) {
       console.warn('Error fetching existing chunk IDs', {

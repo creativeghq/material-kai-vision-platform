@@ -175,7 +175,7 @@ const Phase3MetricsPanel: React.FC = () => {
       />
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-end">
-          <Button onClick={() => fetchMetrics()} disabled={refreshing} variant="outline">
+          <Button onClick={() => fetchMetrics()} onKeyDown={(e) => e.key === 'Enter' && fetchMetrics()} disabled={refreshing} variant="outline">
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>

@@ -474,7 +474,7 @@ export class ConsolidatedPDFController {
             pageRange: {
               ...(validationResult.data.options.pageRange.start !== undefined && { start: validationResult.data.options.pageRange.start }),
               ...(validationResult.data.options.pageRange.end !== undefined && { end: validationResult.data.options.pageRange.end }),
-            }
+            },
           }),
           ...(validationResult.data.options.outputFormat && { outputFormat: validationResult.data.options.outputFormat }),
           ...(validationResult.data.options.workspaceAware !== undefined && { workspaceAware: validationResult.data.options.workspaceAware }),
@@ -509,8 +509,8 @@ export class ConsolidatedPDFController {
           workspace: {
             userId: authContext.user.id,
             ...extractionRequest.metadata?.workspace,
-          }
-        };
+          },
+  };
       }
 
       // Determine processing type based on options
@@ -552,8 +552,8 @@ export class ConsolidatedPDFController {
           options: {
             ...extractionRequest.options,
             include_functional_metadata: true,
-          }
-        };
+          },
+  };
 
         let jobId: string | undefined;
         let job: ProcessingJob | undefined;
@@ -899,8 +899,8 @@ export class ConsolidatedPDFController {
             pageNumber: (result.metadata?.pageNumber as number) || 0,
             chunkIndex: (result.metadata?.chunkIndex as number) || 0,
             tags: (result.metadata?.tags as string[]) || [],
-          }
-        })),
+          },
+  })),
         totalResults: searchResults.totalMatches,
         searchTime: searchResults.processingTime,
       };
@@ -1082,8 +1082,8 @@ export class ConsolidatedPDFController {
         databaseMetrics: {
           totalJobs: jobMetrics?.length || 0,
           successRate: jobMetrics ? ((jobMetrics.filter(j => j.status === 'completed').length / jobMetrics.length) * 100).toFixed(2) : 'N/A',
-        }
-      };
+        },
+  };
 
       return {
         success: true,
@@ -1137,8 +1137,8 @@ export class ConsolidatedPDFController {
     jobType: string;
     filename?: string;
     fileSize?: number;
-    options: any;
-    metadata?: any;
+    options: unknown;
+    metadata?: unknown;
   }): Promise<void> {
     try {
       await supabase
@@ -1165,8 +1165,8 @@ export class ConsolidatedPDFController {
    */
   private async updateProcessingJob(jobId: string, updates: {
     status?: string;
-    results?: any;
-    error_details?: any;
+    results?: unknown;
+    error_details?: unknown;
     started_at?: string;
     completed_at?: string;
   }): Promise<void> {

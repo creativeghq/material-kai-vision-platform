@@ -40,7 +40,7 @@ const FIELD_MAPPINGS = new Map<string, string>([
   ['factory', 'coreIdentity'],
   ['groupOfCompanies', 'coreIdentity'],
   ['quarryName', 'coreIdentity'],
-  
+
   // Physical Properties mappings
   ['length', 'physicalProperties'],
   ['width', 'physicalProperties'],
@@ -58,7 +58,7 @@ const FIELD_MAPPINGS = new Map<string, string>([
   ['stoneDensity', 'physicalProperties'],
   ['porosity', 'physicalProperties'],
   ['moistureContent', 'physicalProperties'],
-  
+
   // Visual Properties mappings
   ['primaryColor', 'visualProperties'],
   ['secondaryColor', 'visualProperties'],
@@ -72,7 +72,7 @@ const FIELD_MAPPINGS = new Map<string, string>([
   ['veiningPattern', 'visualProperties'],
   ['movementPattern', 'visualProperties'],
   ['vRating', 'visualProperties'],
-  
+
   // Technical Specifications mappings
   ['breakingStrength', 'technicalSpecifications'],
   ['modulusOfRupture', 'technicalSpecifications'],
@@ -99,7 +99,7 @@ const FIELD_MAPPINGS = new Map<string, string>([
   ['antimicrobial', 'technicalSpecifications'],
   ['soundInsulation', 'technicalSpecifications'],
   ['dimensionalStability', 'technicalSpecifications'],
-  
+
   // Commercial Information mappings
   ['priceRange', 'commercialInformation'],
   ['priceCurrency', 'commercialInformation'],
@@ -112,7 +112,7 @@ const FIELD_MAPPINGS = new Map<string, string>([
   ['applicationArea', 'commercialInformation'],
   ['usageType', 'commercialInformation'],
   ['environments', 'commercialInformation'],
-  
+
   // Sustainability & Compliance mappings
   ['sustainability', 'sustainabilityCompliance'],
   ['recycledContentPercent', 'sustainabilityCompliance'],
@@ -120,7 +120,7 @@ const FIELD_MAPPINGS = new Map<string, string>([
   ['vocLevel', 'sustainabilityCompliance'],
   ['energyEfficiency', 'sustainabilityCompliance'],
   ['carbonFootprint', 'sustainabilityCompliance'],
-  
+
   // Installation & Maintenance mappings
   ['installationMethod', 'installationMaintenance'],
   ['installationFormat', 'installationMaintenance'],
@@ -177,7 +177,7 @@ serve(async (req) => {
     // Organize into canonical schema
     const canonicalMetadata = organizeIntoCanonicalSchema(
       extractedMetadata,
-      options.includeCategories
+      options.includeCategories,
     );
 
     // Calculate metrics
@@ -212,7 +212,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error in canonical metadata extraction:', error);
-    
+
     return new Response(
       JSON.stringify({
         error: 'Failed to extract canonical metadata',
@@ -224,7 +224,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
-      }
+      },
     );
   }
 });
@@ -232,8 +232,8 @@ serve(async (req) => {
 async function extractMetadataWithAI(content: string, metafieldDefs: any[]): Promise<Record<string, any>> {
   try {
     // Create extraction prompt
-    const fieldDescriptions = metafieldDefs.slice(0, 50).map(def => 
-      `- ${def.field_name}: ${def.description} (Type: ${def.field_type})`
+    const fieldDescriptions = metafieldDefs.slice(0, 50).map(def =>
+      `- ${def.field_name}: ${def.description} (Type: ${def.field_type})`,
     );
 
     const prompt = `
@@ -292,7 +292,7 @@ Return only valid JSON with extracted values. Use null for missing values.
 
 function organizeIntoCanonicalSchema(
   extractedMetadata: Record<string, any>,
-  includeCategories?: string[]
+  includeCategories?: string[],
 ): Record<string, any> {
   const canonicalMetadata: Record<string, any> = {
     coreIdentity: {},
@@ -307,7 +307,7 @@ function organizeIntoCanonicalSchema(
   // Organize fields by category
   for (const [fieldName, value] of Object.entries(extractedMetadata)) {
     const category = FIELD_MAPPINGS.get(fieldName);
-    
+
     if (category && (!includeCategories || includeCategories.includes(category))) {
       if (!canonicalMetadata[category]) {
         canonicalMetadata[category] = {};
@@ -329,22 +329,22 @@ function organizeIntoCanonicalSchema(
 function calculateOverallConfidence(
   extractedMetadata: Record<string, any>,
   extractedFields: number,
-  totalFields: number
+  totalFields: number,
 ): number {
   // Base confidence from extraction coverage
   const coverageScore = totalFields > 0 ? extractedFields / totalFields : 0;
-  
+
   // Bonus for critical fields
   const criticalFields = ['manufacturer', 'brand', 'collection', 'materialCategory', 'primaryColor'];
   const criticalFieldsFound = criticalFields.filter(field => extractedMetadata[field]).length;
   const criticalBonus = criticalFieldsFound / criticalFields.length * 0.2;
-  
+
   // Quality bonus for non-empty values
-  const nonEmptyValues = Object.values(extractedMetadata).filter(value => 
-    value !== null && value !== undefined && value !== ''
+  const nonEmptyValues = Object.values(extractedMetadata).filter(value =>
+    value !== null && value !== undefined && value !== '',
   ).length;
   const qualityBonus = extractedFields > 0 ? (nonEmptyValues / extractedFields) * 0.1 : 0;
-  
+
   return Math.min(1.0, coverageScore + criticalBonus + qualityBonus);
 }
 
@@ -352,7 +352,7 @@ async function saveCanonicalMetadata(
   supabase: any,
   productId: string,
   canonicalMetadata: Record<string, any>,
-  rawMetadata: Record<string, any>
+  rawMetadata: Record<string, any>,
 ): Promise<void> {
   try {
     // Update product with canonical metadata in properties field

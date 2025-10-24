@@ -30,8 +30,8 @@ async function fetchMaterialCategories() {
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
-        'apikey': supabaseKey
-      }
+        'apikey': supabaseKey,
+      },
     });
 
     if (!response.ok) {
@@ -55,7 +55,7 @@ async function fetchMaterialCategories() {
           finish,
           size,
           installationMethod,
-          application
+          application,
         };
       }
 
@@ -73,29 +73,29 @@ async function fetchMaterialCategories() {
         finish: ['natural', 'stained', 'painted', 'varnished', 'oiled', 'waxed', 'lacquered'],
         size: ['small', 'medium', 'large', 'custom', 'standard', 'plank', 'board'],
         installationMethod: ['nailed', 'screwed', 'glued', 'interlocking', 'floating', 'stapled'],
-        application: ['interior', 'exterior', 'structural', 'decorative', 'flooring', 'furniture']
+        application: ['interior', 'exterior', 'structural', 'decorative', 'flooring', 'furniture'],
       },
       METAL: {
         name: 'Metal',
         finish: ['brushed', 'polished', 'matte', 'anodized', 'galvanized', 'powder-coated', 'painted'],
         size: ['small', 'medium', 'large', 'custom', 'sheet', 'rod', 'tube'],
         installationMethod: ['welded', 'bolted', 'screwed', 'riveted', 'clipped', 'magnetic'],
-        application: ['structural', 'decorative', 'industrial', 'architectural', 'mechanical', 'electrical']
+        application: ['structural', 'decorative', 'industrial', 'architectural', 'mechanical', 'electrical'],
       },
       CERAMIC: {
         name: 'Ceramic',
         finish: ['glazed', 'unglazed', 'matte', 'glossy', 'textured', 'polished', 'natural'],
         size: ['small', 'medium', 'large', 'tile', 'slab', 'custom', 'mosaic'],
         installationMethod: ['adhesive', 'mortar', 'mechanical', 'grouted', 'dry-set', 'wet-set'],
-        application: ['interior', 'exterior', 'flooring', 'wall', 'countertop', 'decorative']
+        application: ['interior', 'exterior', 'flooring', 'wall', 'countertop', 'decorative'],
       },
       STONE: {
         name: 'Stone',
         finish: ['natural', 'polished', 'honed', 'brushed', 'flamed', 'sandblasted', 'tumbled'],
         size: ['small', 'medium', 'large', 'slab', 'tile', 'block', 'veneer'],
         installationMethod: ['mortar', 'adhesive', 'mechanical', 'dry-stack', 'anchored', 'grouted'],
-        application: ['interior', 'exterior', 'structural', 'decorative', 'landscaping', 'countertop']
-      }
+        application: ['interior', 'exterior', 'structural', 'decorative', 'landscaping', 'countertop'],
+      },
     };
   }
 }
@@ -298,7 +298,7 @@ Extract all relevant meta fields and provide material category classification. F
     }
 
     const gatewayResponse = await response.json();
-    
+
     if (!gatewayResponse.success) {
       console.error('MIVAA chat completion failed:', gatewayResponse.error);
       return { confidence: 0 };
@@ -312,7 +312,7 @@ Extract all relevant meta fields and provide material category classification. F
 
     try {
       const analysis = JSON.parse(typeof analysisContent === 'string' ? analysisContent : JSON.stringify(analysisContent));
-      
+
       // Validate and clean the analysis results
       const cleanedAnalysis: MaterialMetaExtraction = {
         finish: analysis.finish || null,
@@ -323,7 +323,7 @@ Extract all relevant meta fields and provide material category classification. F
         metal_types: Array.isArray(analysis.metal_types) ? analysis.metal_types : null,
         category: analysis.category || null,
         confidence: analysis.confidence || 0.8,
-        
+
         // Comprehensive functional metadata
         slip_resistance_r_value: analysis.slip_resistance_r_value || null,
         surface_gloss_level: analysis.surface_gloss_level || null,
@@ -566,7 +566,7 @@ function validateMetaFields(metadata: MaterialMetaExtraction): MaterialMetaExtra
 
   const categoryKey = metadata.category.toUpperCase();
   const categoryDef = MATERIAL_CATEGORIES[categoryKey as keyof typeof MATERIAL_CATEGORIES];
-  
+
   if (!categoryDef) {
     console.warn(`Unknown category: ${metadata.category}`);
     return metadata;
@@ -709,7 +709,7 @@ serve(async (req) => {
     // Analyze extracted text with MIVAA (preferred) or OpenAI (fallback) for meta fields and categories
     let materialMetadata: MaterialMetaExtraction | undefined;
     let enhancedResult: EnhancedExtractionResult;
-    
+
     if (extractionResult.data?.markdown && requestBody.options?.includeMetadata !== false) {
       console.log('Analyzing extracted text with hybrid metadata extraction (AI + pattern matching)...');
       const aiAnalysisStart = Date.now();
@@ -720,14 +720,14 @@ serve(async (req) => {
           : { confidence: 0 }; // MIVAA-only architecture, no OpenAI fallback
 
         materialMetadata = validateMetaFields(rawMetadata);
-        
+
         enhancedResult = {
           originalResult: extractionResult.data,
           materialMetadata,
           extractionSource: 'mivaa_with_ai_analysis',
           aiAnalysisTime: Date.now() - aiAnalysisStart,
         };
-        
+
         console.log(`AI analysis completed in ${Date.now() - aiAnalysisStart}ms via ${USE_MIVAA_PROXY ? 'MIVAA' : 'MIVAA-only fallback'}`);
         if (materialMetadata.confidence && materialMetadata.confidence > 0.5) {
           console.log(`Extracted meta fields: category=${materialMetadata.category}, finish=${materialMetadata.finish}, size=${materialMetadata.size}`);

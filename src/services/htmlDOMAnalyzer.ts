@@ -813,7 +813,7 @@ export class HTMLDOMAnalyzer {
             total_candidates: results.productCandidates.length,
             high_quality_candidates: results.productCandidates.filter(c => c.qualityScore > 0.7).length,
             analysis_timestamp: new Date().toISOString(),
-            layout_analysis_version: '1.1.0'
+            layout_analysis_version: '1.1.0',
           } as unknown,
         });
 
@@ -873,7 +873,7 @@ export class HTMLDOMAnalyzer {
   async extractProductCandidates(
     doc: Document,
     elements: DOMElement[],
-    textBlocks: TextBlock[]
+    textBlocks: TextBlock[],
   ): Promise<ProductCandidate[]> {
     const candidates: ProductCandidate[] = [];
 
@@ -889,7 +889,7 @@ export class HTMLDOMAnalyzer {
 
     // Filter out non-product content (index, sustainability, technical)
     const filteredCandidates = candidates.filter(candidate =>
-      candidate.contentType === 'product' && candidate.qualityScore > 0.5
+      candidate.contentType === 'product' && candidate.qualityScore > 0.5,
     );
 
     console.log(`🎯 Found ${filteredCandidates.length} high-quality product candidates from ${candidates.length} total candidates`);
@@ -902,7 +902,7 @@ export class HTMLDOMAnalyzer {
    */
   private async analyzeTextBlockForProduct(
     textBlock: TextBlock,
-    elements: DOMElement[]
+    elements: DOMElement[],
   ): Promise<ProductCandidate | null> {
     const text = textBlock.text;
     const id = `product_candidate_${textBlock.id}`;
@@ -1089,7 +1089,7 @@ export class HTMLDOMAnalyzer {
   private calculateProductQualityScore(
     text: string,
     patterns: ProductCandidate['patterns'],
-    extractedData: ProductCandidate['extractedData']
+    extractedData: ProductCandidate['extractedData'],
   ): number {
     let score = 0;
 

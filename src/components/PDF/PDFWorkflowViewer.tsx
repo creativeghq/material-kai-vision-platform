@@ -164,6 +164,11 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={() => toggleJobExpansion(job.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        toggleJobExpansion(job.id);
+                      }
+                    }}
                     className="p-1 h-auto text-sm bg-transparent hover:bg-gray-100"
                   >
                     {isExpanded ?
@@ -192,6 +197,11 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                   {job.status === 'failed' && onRetryJob && (
                     <Button
                       onClick={() => onRetryJob(job.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onRetryJob(job.id);
+                        }
+                      }}
                       className="text-sm border border-gray-300 hover:bg-gray-50 px-3 py-1"
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
@@ -255,6 +265,11 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                 {(step.details || step.logs || step.error) && (
                                   <Button
                                     onClick={() => toggleStepExpansion(step.id)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        toggleStepExpansion(step.id);
+                                      }
+                                    }}
                                     className="p-1 h-auto text-sm bg-transparent hover:bg-gray-100"
                                   >
                                     {isStepExpanded ?
@@ -309,6 +324,13 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                           setSelectedDocumentTitle(step.metadata?.title || 'HTML Document');
                                           setHtmlViewerOpen(true);
                                         }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            setSelectedKnowledgeEntryId(step.metadata?.knowledgeEntryId || '');
+                                            setSelectedDocumentTitle(step.metadata?.title || 'HTML Document');
+                                            setHtmlViewerOpen(true);
+                                          }
+                                        }}
                                           className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline mr-4"
                                         >
                                           <ExternalLink className="h-3 w-3" />
@@ -318,6 +340,12 @@ export const PDFWorkflowViewer: React.FC<PDFWorkflowViewerProps> = ({
                                          onClick={() => {
                                            // Navigate to knowledge base with search filter
                                            window.open('/admin/knowledge-base', '_blank');
+                                         }}
+                                         onKeyDown={(e) => {
+                                           if (e.key === 'Enter') {
+                                             // Navigate to knowledge base with search filter
+                                             window.open('/admin/knowledge-base', '_blank');
+                                           }
                                          }}
                                          className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800 underline"
                                        >

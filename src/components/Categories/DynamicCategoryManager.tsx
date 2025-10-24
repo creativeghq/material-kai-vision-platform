@@ -4,7 +4,7 @@
  * Displays and manages material and product categories with hierarchical structure
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Tag, Folder, Package } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,11 +55,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
     processingPriority: 1,
   });
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
       const [allCategories, products, materials] = await Promise.all([
@@ -81,7 +77,11 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   const handleCreateCategory = async () => {
     if (!newCategory.categoryKey || !newCategory.name || !newCategory.displayName) {
@@ -136,6 +136,12 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
           onClick={() => {
             setSelectedCategory(category);
             onCategorySelect?.(category);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setSelectedCategory(category);
+              onCategorySelect?.(category);
+            }
           }}
         >
           <CardContent className="p-3">
@@ -213,8 +219,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="categoryKey">Category Key</Label>
-                  <Input
+                  <Label htmlFor="categoryKey">Category Key</Label><Input
                     id="categoryKey"
                     value={newCategory.categoryKey || ''}
                     onChange={(e) => setNewCategory({ ...newCategory, categoryKey: e.target.value })}
@@ -231,8 +236,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <Label htmlFor="displayName">Display Name</Label>
-                  <Input
+                  <Label htmlFor="displayName">Display Name</Label><Input
                     id="displayName"
                     value={newCategory.displayName || ''}
                     onChange={(e) => setNewCategory({ ...newCategory, displayName: e.target.value })}
@@ -249,8 +253,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
                   />
                 </div>
                 <div>
-                  <Label htmlFor="displayGroup">Display Group</Label>
-                  <Select
+                  <Label htmlFor="displayGroup">Display Group</Label><Select
                     value={newCategory.displayGroup}
                     onValueChange={(value) => setNewCategory({ ...newCategory, displayGroup: value })}
                   >
@@ -268,10 +271,25 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
                   </Select>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateDialog(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setShowCreateDialog(false);
+                      }
+                    }}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={handleCreateCategory}>
+                  <Button
+                    onClick={handleCreateCategory}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleCreateCategory();
+                      }
+                    }}
+                  >
                     Create Category
                   </Button>
                 </div>
@@ -287,7 +305,6 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="materials">Materials</TabsTrigger>
         </TabsList>
-
         <TabsContent value="all" className="space-y-4">
           <Card>
             <CardHeader>
@@ -356,8 +373,7 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
         <Card>
           <CardHeader>
             <CardTitle>Category Details</CardTitle>
-          </CardHeader>
-          <CardContent>
+          </CardHeader><CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Category Key</Label>

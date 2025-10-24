@@ -118,6 +118,11 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
               onClick={() => {
                 setFilter(f);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setFilter(f);
+                }
+              }}
               className={`px-3 py-1 rounded text-sm font-medium ${
                 filter === f
                   ? 'bg-blue-600 text-white'
@@ -195,6 +200,12 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
         onClick={() => {
           loadCommissions();
           onRefresh?.();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            loadCommissions();
+            onRefresh?.();
+          }
         }}
         className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
       >

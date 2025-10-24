@@ -1,6 +1,6 @@
 /**
  * Retrieval Quality Measurement Utility for Edge Functions
- * 
+ *
  * Measures and stores retrieval quality metrics:
  * - Precision (relevant chunks / retrieved chunks)
  * - Recall (relevant chunks retrieved / total relevant)
@@ -35,7 +35,7 @@ export async function evaluateRetrievalQuality(
   query: string,
   retrievedChunks: RetrievalResult[],
   relevantChunkIds: string[],
-  supabaseClient: ReturnType<typeof createClient>
+  supabaseClient: ReturnType<typeof createClient>,
 ): Promise<RetrievalMetrics> {
   const startTime = Date.now();
 
@@ -86,7 +86,7 @@ export async function evaluateRetrievalQuality(
  */
 async function storeRetrievalMetrics(
   metrics: RetrievalMetrics,
-  supabaseClient: ReturnType<typeof createClient>
+  supabaseClient: ReturnType<typeof createClient>,
 ): Promise<void> {
   try {
     const { error } = await supabaseClient
@@ -118,10 +118,10 @@ async function storeRetrievalMetrics(
  */
 export function identifyRelevantChunks(
   query: string,
-  allChunks: Array<{ id: string; content: string }>
+  allChunks: Array<{ id: string; content: string }>,
 ): string[] {
   const queryTerms = query.toLowerCase().split(/\s+/);
-  
+
   return allChunks
     .filter(chunk => {
       const chunkContent = chunk.content.toLowerCase();

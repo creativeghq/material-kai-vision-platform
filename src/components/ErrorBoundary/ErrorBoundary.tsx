@@ -201,20 +201,41 @@ export class ErrorBoundary extends Component<Props, State> {
 
           <div className="flex flex-wrap gap-2">
             {canRetry && (
-              <Button onClick={this.handleRetry} variant="default">
+              <Button
+                onClick={this.handleRetry}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    this.handleRetry();
+                  }
+                }}
+                variant="default">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Try Again ({this.maxRetries - this.retryCount} left)
               </Button>
             )}
 
             {isPageLevel && (
-              <Button onClick={this.handleGoHome} variant="outline">
+              <Button
+                onClick={this.handleGoHome}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    this.handleGoHome();
+                  }
+                }}
+                variant="outline">
                 <Home className="w-4 h-4 mr-2" />
                 Go Home
               </Button>
             )}
 
-            <Button onClick={this.handleReload} variant="outline">
+            <Button
+              onClick={this.handleReload}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  this.handleReload();
+                }
+              }}
+              variant="outline">
               <RefreshCw className="w-4 h-4 mr-2" />
               Reload Page
             </Button>

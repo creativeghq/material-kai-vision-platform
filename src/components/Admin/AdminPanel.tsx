@@ -186,14 +186,13 @@ export const AdminPanel: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/')} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
                 className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Activity className="h-4 w-4" />
                 Back to Main
-              </Button>
-              <Button
-                onClick={() => navigate('/admin')}
+              </Button><Button
+                onClick={() => navigate('/admin')} onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
                 className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
               >
                 <BarChart3 className="h-4 w-4" />
@@ -208,7 +207,7 @@ export const AdminPanel: React.FC = () => {
               </p>
             </div>
           </div>
-          <Button onClick={fetchAnalyticsData} disabled={loading}>
+          <Button onClick={fetchAnalyticsData} onKeyDown={(e) => e.key === 'Enter' && fetchAnalyticsData()} disabled={loading}>
             <Activity className="h-4 w-4 mr-2" />
             Refresh Data
           </Button>
@@ -268,8 +267,7 @@ export const AdminPanel: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Recent AI Analysis Events</CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -280,8 +278,7 @@ export const AdminPanel: React.FC = () => {
                     <TableHead>Processing Time</TableHead>
                     <TableHead>Details</TableHead>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
+                </TableHeader><TableBody>
                   {analyticsData.map((event) => (
                     <TableRow key={event.id}>
                       <TableCell className="text-sm">
@@ -325,7 +322,7 @@ export const AdminPanel: React.FC = () => {
                       <TableCell colSpan={6} className="text-center py-8">
                         <div className="text-muted-foreground">
                           <BarChart3 className="h-8 w-8 mx-auto mb-2" />
-                          No analytics data yet. Try uploading some materials for AI analysis!
+                          No analytics data yet. Try uploading some materials for AI analysis
                         </div>
                       </TableCell>
                     </TableRow>
@@ -424,9 +421,7 @@ export const AdminPanel: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="rag" className="space-y-4">
+        </TabsContent><TabsContent value="rag" className="space-y-4">
           {/* RAGManagementPanel functionality moved to IntegratedRAGManagement */}
           <div className="text-center p-8">
             <p className="text-muted-foreground">

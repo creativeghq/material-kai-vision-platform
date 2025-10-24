@@ -98,7 +98,7 @@ const HealthPage: React.FC = () => {
               Last checked: {lastChecked.toLocaleTimeString()}
             </span>
           )}
-          <Button onClick={runHealthCheck} disabled={loading}>
+          <Button onClick={runHealthCheck} onKeyDown={(e) => e.key === 'Enter' && runHealthCheck()} disabled={loading}>
             {loading ? 'Checking...' : 'Refresh'}
           </Button>
         </div>

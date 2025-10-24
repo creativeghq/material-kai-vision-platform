@@ -273,7 +273,7 @@ export const IntegratedRAGManagement: React.FC = () => {
 
       toast({
         title: 'Feedback Submitted',
-        description: 'Thank you for your feedback!',
+        description: 'Thank you for your feedback',
       });
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -337,8 +337,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                   Enhanced RAG Knowledge Search
                   <Badge className="ml-auto border border-gray-300 bg-gray-50 text-gray-700">AI-Powered</Badge>
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </CardHeader><CardContent className="space-y-4">
                 {/* Main Search Input */}
                 <div className="flex gap-2">
                   <Input
@@ -348,7 +347,15 @@ export const IntegratedRAGManagement: React.FC = () => {
                     onKeyPress={(e) => e.key === 'Enter' && handleEnhancedSearch()}
                     className="flex-1"
                   />
-                  <Button onClick={handleEnhancedSearch} disabled={isSearching}>
+                  <Button
+                    onClick={handleEnhancedSearch}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleEnhancedSearch();
+                      }
+                    }}
+                    disabled={isSearching}
+                  >
                     {isSearching ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
@@ -443,6 +450,14 @@ export const IntegratedRAGManagement: React.FC = () => {
                             ...prev,
                             stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
                           }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setContext(prev => ({
+                                ...prev,
+                                stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
+                              }));
+                            }
+                          }}
                         >
                           {style} ×
                         </Badge>
@@ -451,8 +466,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Material Categories</Label>
-                    <Input
+                    <Label>Material Categories</Label><Input
                       placeholder="e.g., flooring, countertops"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter') {
@@ -476,6 +490,14 @@ export const IntegratedRAGManagement: React.FC = () => {
                             ...prev,
                             materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
                           }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setContext(prev => ({
+                                ...prev,
+                                materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
+                              }));
+                            }
+                          }}
                         >
                           {category} ×
                         </Badge>
@@ -538,6 +560,11 @@ export const IntegratedRAGManagement: React.FC = () => {
                                 key={i}
                                 className="bg-transparent hover:bg-accent hover:text-accent-foreground h-6 px-2 text-xs"
                                 onClick={() => setQuery(suggestion)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    setQuery(suggestion);
+                                  }
+                                }}
                               >
                                 {suggestion}
                               </Button>
@@ -545,9 +572,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                           </div>
                         )}
                       </div>
-                    </CardHeader>
-
-                    <CardContent>
+                    </CardHeader><CardContent>
                       <Tabs defaultValue="knowledge" className="w-full">
                         <TabsList className="grid grid-cols-4 w-full">
                           <TabsTrigger value="knowledge" className="flex items-center gap-2">
@@ -701,12 +726,22 @@ export const IntegratedRAGManagement: React.FC = () => {
                           <Button
                             className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                             onClick={() => handleFeedback(1)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleFeedback(1);
+                              }
+                            }}
                           >
                             <ThumbsUp className="h-4 w-4" />
                           </Button>
                           <Button
                             className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
                             onClick={() => handleFeedback(0)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleFeedback(0);
+                              }
+                            }}
                           >
                             <ThumbsDown className="h-4 w-4" />
                           </Button>
@@ -727,8 +762,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                   <Database className="h-5 w-5" />
                   Add Knowledge Entry
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </CardHeader><CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Title</label>
@@ -785,7 +819,15 @@ export const IntegratedRAGManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <Button onClick={handleAddKnowledgeEntry} className="w-full">
+                <Button
+                  onClick={handleAddKnowledgeEntry}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAddKnowledgeEntry();
+                    }
+                  }}
+                  className="w-full"
+                >
                   <Upload className="h-4 w-4 mr-2" />
                   Add to Knowledge Base
                 </Button>
@@ -801,8 +843,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                   <Rocket className="h-5 w-5" />
                   Hugging Face Model Training
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </CardHeader><CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* CLIP Fine-tuning */}
                   <Card>
@@ -818,13 +859,24 @@ export const IntegratedRAGManagement: React.FC = () => {
                       </div>
                       <Button
                         onClick={handleStartCLIPTraining}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleStartCLIPTraining();
+                          }
+                        }}
                         disabled={isTraining}
                         className="w-full mt-4"
                       >
                         {isTraining ? (
-                          <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Training...</>
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Training...
+                          </>
                         ) : (
-                          <><Sparkles className="h-4 w-4 mr-2" /> Start CLIP Training</>
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Start CLIP Training
+                          </>
                         )}
                       </Button>
                     </CardContent>
@@ -844,13 +896,24 @@ export const IntegratedRAGManagement: React.FC = () => {
                       </div>
                       <Button
                         onClick={handleStartMaterialClassification}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleStartMaterialClassification();
+                          }
+                        }}
                         disabled={isTraining}
                         className="w-full mt-4"
                       >
                         {isTraining ? (
-                          <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Training...</>
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Training...
+                          </>
                         ) : (
-                          <><Sparkles className="h-4 w-4 mr-2" /> Start Classification Training</>
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Start Classification Training
+                          </>
                         )}
                       </Button>
                     </CardContent>
@@ -861,8 +924,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Recent Training Jobs</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  </CardHeader><CardContent>
                     {trainingStatus.length === 0 ? (
                       <p className="text-center text-muted-foreground py-4">
                         No training jobs found
@@ -899,8 +961,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                   <BarChart3 className="h-5 w-5" />
                   Search Analytics & Performance
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 {analytics ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card>
@@ -978,8 +1039,7 @@ export const IntegratedRAGManagement: React.FC = () => {
                   <Settings className="h-5 w-5" />
                   System Configuration
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card>

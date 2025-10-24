@@ -78,6 +78,15 @@ export const FunctionalCategoryFilters = ({
                         : [...currentValues, rValue];
                       updatePropertyFilter('slipSafetyRatings', 'rValue', newValues);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.slipSafetyRatings?.rValue || [];
+                        const newValues = currentValues.includes(rValue)
+                          ? currentValues.filter(v => v !== rValue)
+                          : [...currentValues, rValue];
+                        updatePropertyFilter('slipSafetyRatings', 'rValue', newValues);
+                      }
+                    }}
                     className="text-xs"
                   >
                     {rValue}
@@ -101,6 +110,15 @@ export const FunctionalCategoryFilters = ({
                         ? currentValues.filter(v => v !== test)
                         : [...currentValues, test];
                       updatePropertyFilter('slipSafetyRatings', 'barefootRampTest', newValues);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.slipSafetyRatings?.barefootRampTest || [];
+                        const newValues = currentValues.includes(test)
+                          ? currentValues.filter(v => v !== test)
+                          : [...currentValues, test];
+                        updatePropertyFilter('slipSafetyRatings', 'barefootRampTest', newValues);
+                      }
                     }}
                     className="text-xs"
                   >
@@ -164,6 +182,15 @@ export const FunctionalCategoryFilters = ({
                         : [...currentValues, cert];
                       updatePropertyFilter('slipSafetyRatings', 'safetyCertifications', newValues);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.slipSafetyRatings?.safetyCertifications || [];
+                        const newValues = currentValues.includes(cert)
+                          ? currentValues.filter(v => v !== cert)
+                          : [...currentValues, cert];
+                        updatePropertyFilter('slipSafetyRatings', 'safetyCertifications', newValues);
+                      }
+                    }}
                     className="text-xs"
                   >
                     {cert}
@@ -197,6 +224,15 @@ export const FunctionalCategoryFilters = ({
                         ? currentValues.filter(v => v !== level)
                         : [...currentValues, level];
                       updatePropertyFilter('surfaceGlossReflectivity', 'glossLevel', newValues);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.surfaceGlossReflectivity?.glossLevel || [];
+                        const newValues = currentValues.includes(level)
+                          ? currentValues.filter(v => v !== level)
+                          : [...currentValues, level];
+                        updatePropertyFilter('surfaceGlossReflectivity', 'glossLevel', newValues);
+                      }
                     }}
                     className="text-xs capitalize"
                   >
@@ -269,6 +305,15 @@ export const FunctionalCategoryFilters = ({
                         ? currentValues.filter(v => v !== rating)
                         : [...currentValues, rating];
                       updatePropertyFilter('mechanicalPropertiesExtended', 'peiRating', newValues);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.mechanicalPropertiesExtended?.peiRating || [];
+                        const newValues = currentValues.includes(rating)
+                          ? currentValues.filter(v => v !== rating)
+                          : [...currentValues, rating];
+                        updatePropertyFilter('mechanicalPropertiesExtended', 'peiRating', newValues);
+                      }
                     }}
                     className="text-xs"
                   >
@@ -411,6 +456,15 @@ export const FunctionalCategoryFilters = ({
                         : [...currentValues, level];
                       updatePropertyFilter('chemicalHygieneResistance', 'acidResistance', newValues);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.chemicalHygieneResistance?.acidResistance || [];
+                        const newValues = currentValues.includes(level)
+                          ? currentValues.filter(v => v !== level)
+                          : [...currentValues, level];
+                        updatePropertyFilter('chemicalHygieneResistance', 'acidResistance', newValues);
+                      }
+                    }}
                     className="text-xs capitalize"
                   >
                     {level}
@@ -435,6 +489,15 @@ export const FunctionalCategoryFilters = ({
                         : [...currentValues, level];
                       updatePropertyFilter('chemicalHygieneResistance', 'alkaliResistance', newValues);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.chemicalHygieneResistance?.alkaliResistance || [];
+                        const newValues = currentValues.includes(level)
+                          ? currentValues.filter(v => v !== level)
+                          : [...currentValues, level];
+                        updatePropertyFilter('chemicalHygieneResistance', 'alkaliResistance', newValues);
+                      }
+                    }}
                     className="text-xs capitalize"
                   >
                     {level}
@@ -458,6 +521,15 @@ export const FunctionalCategoryFilters = ({
                         ? currentValues.filter(v => v !== classNum)
                         : [...currentValues, classNum];
                       updatePropertyFilter('chemicalHygieneResistance', 'stainResistanceClass', newValues);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.chemicalHygieneResistance?.stainResistanceClass || [];
+                        const newValues = currentValues.includes(classNum)
+                          ? currentValues.filter(v => v !== classNum)
+                          : [...currentValues, classNum];
+                        updatePropertyFilter('chemicalHygieneResistance', 'stainResistanceClass', newValues);
+                      }
                     }}
                     className="text-xs"
                   >
@@ -552,6 +624,15 @@ export const FunctionalCategoryFilters = ({
                         : [...currentValues, level];
                       updatePropertyFilter('environmentalSustainability', 'greenguardLevel', newValues);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.environmentalSustainability?.greenguardLevel || [];
+                        const newValues = currentValues.includes(level)
+                          ? currentValues.filter(v => v !== level)
+                          : [...currentValues, level];
+                        updatePropertyFilter('environmentalSustainability', 'greenguardLevel', newValues);
+                      }
+                    }}
                     className="text-xs capitalize"
                   >
                     {level === 'none' ? 'Not Certified' : `Greenguard ${level}`}
@@ -644,6 +725,15 @@ export const FunctionalCategoryFilters = ({
                         : [...currentValues, variation];
                       updatePropertyFilter('dimensionalAesthetic', 'shadeVariation', newValues);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentValues = filters.propertyFilters.dimensionalAesthetic?.shadeVariation || [];
+                        const newValues = currentValues.includes(variation)
+                          ? currentValues.filter(v => v !== variation)
+                          : [...currentValues, variation];
+                        updatePropertyFilter('dimensionalAesthetic', 'shadeVariation', newValues);
+                      }
+                    }}
                     className="text-xs"
                   >
                     {variation}
@@ -660,7 +750,7 @@ export const FunctionalCategoryFilters = ({
       default:
         return (
           <div className="p-4 text-sm text-muted-foreground">
-            Category filters for &quot;{category}&quot; are not yet implemented.
+            Category filters for "{category}" are not yet implemented.
           </div>
         );
     }

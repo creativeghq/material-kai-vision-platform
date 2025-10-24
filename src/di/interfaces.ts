@@ -165,7 +165,7 @@ export interface IDocumentChunkingService extends IBaseService {
    */
   chunkDocument(
     document: IDocumentInput,
-    strategy: IChunkingStrategy
+    strategy: IChunkingStrategy,
   ): Promise<IChunkingResult>;
 
   /**
@@ -480,7 +480,7 @@ export interface IMivaaToRagTransformerService extends IBaseService {
     mivaaDocument: IMivaaDocument,
     workspaceId: string,
     documentId: string,
-    config: ITransformationConfig
+    config: ITransformationConfig,
   ): Promise<ITransformationResult>;
 
   /**
@@ -503,7 +503,7 @@ export interface IMivaaToRagTransformerService extends IBaseService {
    */
   calculateQualityMetrics(
     mivaaDocument: IMivaaDocument,
-    ragDocument: RagDocument
+    ragDocument: RagDocument,
   ): IQualityMetrics;
 }
 

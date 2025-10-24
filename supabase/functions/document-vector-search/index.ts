@@ -1,6 +1,7 @@
 import 'https://deno.land/x/xhr@0.1.0/mod.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
 import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
 
 const corsHeaders = {
@@ -70,7 +71,7 @@ async function generateQueryEmbeddingViaMivaa(query: string): Promise<number[]> 
         payload: {
           text: query,
           model: 'text-embedding-3-large',
-          dimensions: 1536
+          dimensions: 1536,
         },
       }),
     });
@@ -81,7 +82,7 @@ async function generateQueryEmbeddingViaMivaa(query: string): Promise<number[]> 
     }
 
     const gatewayResponse = await response.json();
-    
+
     if (!gatewayResponse.success) {
       throw new Error(`MIVAA embedding failed: ${gatewayResponse.error?.message || 'Unknown error'}`);
     }
@@ -96,7 +97,7 @@ async function generateQueryEmbeddingViaMivaa(query: string): Promise<number[]> 
 // Generate query embedding using MIVAA-only approach
 async function generateQueryEmbedding(query: string): Promise<number[]> {
   console.log('Using MIVAA for document query embedding generation');
-  
+
   try {
     return await generateQueryEmbeddingViaMivaa(query);
   } catch (error) {
@@ -201,7 +202,7 @@ async function processDocumentSearch(request: SearchRequest): Promise<VectorSear
         request.query,
         retrievedChunks,
         relevantChunkIds,
-        supabase
+        supabase,
       );
 
       console.log(`✅ Retrieval Quality: Precision=${(retrievalMetrics.precision * 100).toFixed(1)}%, Recall=${(retrievalMetrics.recall * 100).toFixed(1)}%, MRR=${retrievalMetrics.mrr.toFixed(3)}`);

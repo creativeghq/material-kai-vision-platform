@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Anthropic } from "https://esm.sh/@anthropic-ai/sdk@0.24.3";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { Anthropic } from 'https://esm.sh/@anthropic-ai/sdk@0.24.3';
 
 interface ClassificationRequest {
   chunk_text: string;
@@ -23,10 +23,10 @@ interface ClassifyResponse {
 const buildClassificationPrompt = (request: ClassificationRequest): string => {
   const contextInfo = request.context
     ? `\nContext: ${request.context}`
-    : "";
+    : '';
   const titleInfo = request.pdf_title
     ? `\nPDF Title: ${request.pdf_title}`
-    : "";
+    : '';
 
   return `You are a content classification expert. Classify the following text chunk from a PDF document.
 
@@ -54,28 +54,28 @@ Respond in JSON format:
 };
 
 const parseClassificationResponse = (
-  responseText: string
+  responseText: string,
 ): ClassificationResult => {
   try {
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error("No JSON found in response");
+      throw new Error('No JSON found in response');
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
 
     return {
-      content_type: parsed.content_type || "OTHER",
+      content_type: parsed.content_type || 'OTHER',
       confidence: Math.min(1, Math.max(0, parsed.confidence || 0)),
-      reasoning: parsed.reasoning || "",
+      reasoning: parsed.reasoning || '',
       sub_categories: parsed.sub_categories || [],
     };
   } catch (error) {
-    console.error("Failed to parse classification response:", error);
+    console.error('Failed to parse classification response:', error);
     return {
-      content_type: "OTHER",
+      content_type: 'OTHER',
       confidence: 0,
-      reasoning: "Failed to parse response",
+      reasoning: 'Failed to parse response',
       sub_categories: [],
     };
   }
@@ -83,25 +83,25 @@ const parseClassificationResponse = (
 
 serve(async (req: Request) => {
   // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response("ok", {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
       headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
   }
 
   try {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+        JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }),
         {
           status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
+          headers: { 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -110,11 +110,11 @@ serve(async (req: Request) => {
 
     if (!request.chunk_text) {
       return new Response(
-        JSON.stringify({ error: "chunk_text is required" }),
+        JSON.stringify({ error: 'chunk_text is required' }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
+          headers: { 'Content-Type': 'application/json' },
+        },
       );
     }
 
@@ -124,19 +124,19 @@ serve(async (req: Request) => {
     const prompt = buildClassificationPrompt(request);
 
     const response = await client.messages.create({
-      model: "claude-4-5-haiku-20250514",
+      model: 'claude-4-5-haiku-20250514',
       max_tokens: 1024,
       temperature: 0.1,
       messages: [
         {
-          role: "user",
+          role: 'user',
           content: prompt,
         },
       ],
     });
 
     const responseText =
-      response.content[0].type === "text" ? response.content[0].text : "";
+      response.content[0].type === 'text' ? response.content[0].text : '';
     const classification = parseClassificationResponse(responseText);
 
     const result: ClassifyResponse = {
@@ -147,23 +147,23 @@ serve(async (req: Request) => {
 
     return new Response(JSON.stringify(result), {
       headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
       },
     });
   } catch (error) {
-    console.error("Classification error:", error);
+    console.error('Classification error:', error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : 'Unknown error',
       }),
       {
         status: 500,
         headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
         },
-      }
+      },
     );
   }
 });

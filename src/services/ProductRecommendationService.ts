@@ -40,7 +40,7 @@ export interface RecommendationResponse {
 }
 
 class ProductRecommendationServiceImpl extends BaseService {
-  private qualityDashboardService: typeof QualityDashboardService;
+  private qualityDashboardService: any;
 
   constructor() {
     super({
@@ -51,7 +51,7 @@ class ProductRecommendationServiceImpl extends BaseService {
       timeout: 30000,
     });
 
-    this.qualityDashboardService = QualityDashboardService.getInstance();
+    this.qualityDashboardService = (QualityDashboardService as any).getInstance();
   }
 
   /**

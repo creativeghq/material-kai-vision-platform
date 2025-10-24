@@ -288,7 +288,7 @@ export function validateEmbedding(embedding: number[]): boolean {
  */
 export async function generateSemanticAnalysis(
   imageData: string,
-  analysisType: string = 'material_identification'
+  analysisType: string = 'material_identification',
 ): Promise<string> {
   if (!MIVAA_CONFIG.apiKey) {
     throw new Error('MIVAA_API_KEY environment variable is required');
@@ -345,7 +345,7 @@ export async function generateSemanticAnalysis(
         throw new Error(`MIVAA semantic analysis error: ${result.error?.message || 'Unknown error'}`);
       }
 
-      console.log(`✅ Semantic analysis generated via MIVAA successfully`);
+      console.log('✅ Semantic analysis generated via MIVAA successfully');
       return result.data.analysis;
 
     } catch (error) {

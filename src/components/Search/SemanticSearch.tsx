@@ -274,7 +274,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
     <Card
       key={result.id}
       className="cursor-pointer hover:shadow-md transition-shadow"
-      onClick={() => onResultSelect?.(result)}
+      onClick={() => onResultSelect?.(result)} onKeyDown={(e) => e.key === 'Enter' && onResultSelect?.(result)}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
@@ -377,17 +377,29 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 onClick={() => {
                   // Toggle filters panel - implement as needed
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    // Toggle filters panel - implement as needed
+                  }
+                }}
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
               </Button>
-
               <Button
                 className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 onClick={() => handleFiltersChange({
                   sortBy: filters.sortBy,
                   sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc',
                 })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleFiltersChange({
+                      sortBy: filters.sortBy,
+                      sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc',
+                    });
+                  }
+                }}
               >
                 {filters.sortOrder === 'desc' ? (
                   <SortDesc className="h-4 w-4 mr-2" />
@@ -407,7 +419,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
-                onClick={() => setViewMode('list')}
+                onClick={() => setViewMode('list')} onKeyDown={(e) => e.key === 'Enter' && setViewMode('list')}
               >
                 <List className="h-4 w-4" />
               </Button>
@@ -416,7 +428,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
-                onClick={() => setViewMode('grid')}
+                onClick={() => setViewMode('grid')} onKeyDown={(e) => e.key === 'Enter' && setViewMode('grid')}
               >
                 <Grid className="h-4 w-4" />
               </Button>
@@ -448,7 +460,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
             {error}
             <Button
               className="ml-2 h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-              onClick={() => executeSearch(query)}
+              onClick={() => executeSearch(query)} onKeyDown={(e) => e.key === 'Enter' && executeSearch(query)}
             >
               <RefreshCw className="h-4 w-4 mr-1" />
               Retry
@@ -474,6 +486,12 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
                 onClick={() => {
                   setQuery('');
                   setResults([]);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setQuery('');
+                    setResults([]);
+                  }
                 }}
               >
                 Clear search

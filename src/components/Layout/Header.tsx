@@ -78,7 +78,13 @@ export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) =
                   <User className="mr-2 h-4 w-4" />
                   <span>{user.email}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSignOut}>
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSignOut();
+                    }
+                  }}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sign out</span>
                 </DropdownMenuItem>

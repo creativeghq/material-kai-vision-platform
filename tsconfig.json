@@ -37,7 +37,8 @@
     "src/types/global.d.ts",
     "src/types/modules.d.ts",
     "src/types/jsx.d.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "tailwind.config.ts"
   ],
   "exclude": [
     "node_modules",
@@ -45,7 +46,7 @@
     "coverage",
     ".ruru",
     "scripts",
-    "supabase",
+    "supabase/**",
     "src/pages/PDFProcessing.tsx",
     "src/debug/**",
     "src/api/agents.ts",

@@ -61,8 +61,8 @@ interface AutoPopulationResult {
   document_name: string;
   fields_populated: Array<{
     field_name: string;
-    old_value: any;
-    new_value: any;
+    old_value: unknown;
+    new_value: unknown;
     confidence: number;
     source: 'entity_extraction' | 'ai_analysis' | 'pattern_matching';
   }>;
@@ -434,14 +434,14 @@ export const MetadataFieldsManagement: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Button
                 className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/')} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
               <Button
                 className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-2"
-                onClick={() => navigate('/admin')}
+                onClick={() => navigate('/admin')} onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Admin
@@ -457,19 +457,19 @@ export const MetadataFieldsManagement: React.FC = () => {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => openDialog()}>
+              <Button onClick={() => openDialog()} onKeyDown={(e) => e.key === 'Enter' && openDialog()}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Field
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingField ? 'Edit Metadata Field' : 'Create Metadata Field'}
-              </DialogTitle>
-            </DialogHeader>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingField ? 'Edit Metadata Field' : 'Create Metadata Field'}
+                </DialogTitle>
+              </DialogHeader>
 
-            <div className="space-y-4">
+              <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="field_name">Field Name (Code)</Label>
@@ -511,8 +511,7 @@ export const MetadataFieldsManagement: React.FC = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="sort_order">Sort Order</Label>
-                  <Input
+                  <Label htmlFor="sort_order">Sort Order</Label><Input
                     id="sort_order"
                     type="number"
                     value={formData.sort_order}
@@ -541,8 +540,7 @@ export const MetadataFieldsManagement: React.FC = () => {
               </div>
 
               <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
+                <Label htmlFor="description">Description</Label><Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -571,11 +569,11 @@ export const MetadataFieldsManagement: React.FC = () => {
                         placeholder="Add option..."
                         onKeyPress={(e) => e.key === 'Enter' && addDropdownOption()}
                       />
-                      <Button type="button" onClick={addDropdownOption}>Add</Button>
+                      <Button type="button" onClick={addDropdownOption} onKeyDown={(e) => e.key === 'Enter' && addDropdownOption()}>Add</Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {formData.dropdown_options.map((option, index) => (
-                        <Badge key={index} className="cursor-pointer bg-secondary text-secondary-foreground" onClick={() => removeDropdownOption(index)}>
+                        <Badge key={index} className="cursor-pointer bg-secondary text-secondary-foreground" onClick={() => removeDropdownOption(index)} onKeyDown={(e) => e.key === 'Enter' && removeDropdownOption(index)}>
                           {option} ×
                         </Badge>
                       ))}
@@ -617,10 +615,10 @@ export const MetadataFieldsManagement: React.FC = () => {
               )}
 
               <div className="flex justify-end space-x-2">
-                <Button onClick={() => setIsDialogOpen(false)} className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
+                <Button onClick={() => setIsDialogOpen(false)} onKeyDown={(e) => e.key === 'Enter' && setIsDialogOpen(false)} className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground">
                   Cancel
                 </Button>
-                <Button onClick={handleSaveField}>
+                <Button onClick={handleSaveField} onKeyDown={(e) => e.key === 'Enter' && handleSaveField()}>
                   {editingField ? 'Update' : 'Create'} Field
                 </Button>
               </div>
@@ -638,8 +636,7 @@ export const MetadataFieldsManagement: React.FC = () => {
             <Settings className="w-5 h-5" />
             Configured Metadata Fields
           </CardTitle>
-        </CardHeader>
-        <CardContent>
+        </CardHeader><CardContent>
           {isLoading ? (
             <div className="text-center py-8">Loading...</div>
           ) : (
@@ -698,13 +695,13 @@ export const MetadataFieldsManagement: React.FC = () => {
                       <div className="flex space-x-2">
                         <Button
                           className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0"
-                          onClick={() => openDialog(field)}
+                          onClick={() => openDialog(field)} onKeyDown={(e) => e.key === 'Enter' && openDialog()}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button
                           className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0"
-                          onClick={() => handleDeleteField(field)}
+                          onClick={() => handleDeleteField(field)} onKeyDown={(e) => e.key === 'Enter' && handleDeleteField(field)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -792,7 +789,7 @@ export const MetadataFieldsManagement: React.FC = () => {
               </p>
             </div>
             <Button
-              onClick={autoPopulateMetadata}
+              onClick={autoPopulateMetadata} onKeyDown={(e) => e.key === 'Enter' && autoPopulateMetadata()}
               disabled={isAutoPopulating || selectedDocuments.length === 0}
               className="flex items-center gap-2"
             >

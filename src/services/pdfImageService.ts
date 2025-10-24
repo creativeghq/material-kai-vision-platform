@@ -22,8 +22,8 @@ export interface ImageAnalysisResult {
   id: string;
   analysis_type: string;
   confidence: number;
-  result_data: any;
-  metadata?: any;
+  result_data: unknown;
+  metadata?: unknown;
 }
 
 export interface ImageWithAnalysis extends PDFImage {
@@ -117,7 +117,7 @@ class PDFImageService {
         .eq('image_id', imageId);
 
       // Get related chunks if available
-      const relatedChunks: any[] = [];
+      const relatedChunks: unknown[] = [];
       if (imageData.metadata?.associated_chunks) {
         const { data: chunksData } = await supabase
           .from('document_chunks')
@@ -310,7 +310,7 @@ class PDFImageService {
         .from('document_images')
         .select(`
           *,
-          documents!inner(
+          documentsinner(
             id,
             title,
             filename
@@ -378,7 +378,7 @@ class PDFImageService {
         throw new Error(`Failed to fetch image types: ${error.message}`);
       }
 
-      const types = new Set(data?.map((item: any) => item.image_type) || []);
+      const types = new Set(data?.map((item: unknown) => (item as any).image_type) || []);
       return Array.from(types).sort() as string[];
     } catch (error) {
       console.error('Error fetching image types:', error);

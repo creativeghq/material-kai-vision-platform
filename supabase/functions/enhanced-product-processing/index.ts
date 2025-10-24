@@ -1,9 +1,9 @@
 /**
  * Enhanced Product Processing Edge Function
- * 
+ *
  * Removes artificial product limits and implements intelligent processing
  * to find ALL expected products from documents with smart quality filtering.
- * 
+ *
  * Features:
  * - Unlimited product detection
  * - Intelligent chunk-to-product mapping
@@ -65,41 +65,41 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { action, documentId, workspaceId = "ffafc28b-1b8b-4b0d-b226-9f9a6154004e", config } = await req.json() as EnhancedProcessingRequest;
+    const { action, documentId, workspaceId = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e', config } = await req.json() as EnhancedProcessingRequest;
 
     console.log(`🚀 Enhanced product processing: ${action} for document ${documentId}`);
 
     switch (action) {
       case 'expand_coverage':
         return await expandProductCoverage(supabase, documentId, workspaceId, config);
-      
+
       case 'analyze_coverage':
         return await analyzeCoverage(supabase, documentId);
-      
+
       case 'get_progress':
         return await getProgress(supabase, documentId);
-      
+
       case 'optimize_detection':
         return await optimizeDetection(supabase, documentId, config);
-      
+
       default:
         return new Response(
           JSON.stringify({ error: `Unknown action: ${action}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
     }
 
   } catch (error) {
     console.error('Enhanced product processing error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'Enhanced product processing failed', 
-        details: error.message 
+      JSON.stringify({
+        error: 'Enhanced product processing failed',
+        details: error.message,
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });
@@ -111,10 +111,10 @@ async function expandProductCoverage(
   supabase: any,
   documentId: string,
   workspaceId: string,
-  config: any = {}
+  config: any = {},
 ): Promise<Response> {
   const startTime = Date.now();
-  
+
   try {
     console.log(`📊 Starting coverage expansion for document ${documentId}`);
 
@@ -130,7 +130,7 @@ async function expandProductCoverage(
       enableCrossChunkAnalysis: true,
       enableProductMerging: true,
       enableContextualValidation: true,
-      ...config
+      ...config,
     };
 
     // Step 1: Analyze current coverage
@@ -146,9 +146,9 @@ async function expandProductCoverage(
         JSON.stringify({
           success: false,
           error: 'No chunks found for document',
-          documentId
+          documentId,
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -176,12 +176,12 @@ async function expandProductCoverage(
 
     // Step 7: Create products in database
     const creationResults = await createValidatedProducts(supabase, validatedProducts, documentId, workspaceId);
-    
+
     const processingTime = Date.now() - startTime;
-    
+
     // Step 8: Generate final analysis
     const finalAnalysis = await analyzeCurrentCoverage(supabase, documentId);
-    
+
     const result = {
       success: true,
       documentId,
@@ -197,31 +197,31 @@ async function expandProductCoverage(
         afterExpansion: finalAnalysis,
         improvement: {
           productsAdded: finalAnalysis.detectedProducts - currentAnalysis.detectedProducts,
-          coverageIncrease: ((finalAnalysis.detectedProducts / finalAnalysis.expectedProducts) - 
-                           (currentAnalysis.detectedProducts / currentAnalysis.expectedProducts)) * 100
-        }
+          coverageIncrease: ((finalAnalysis.detectedProducts / finalAnalysis.expectedProducts) -
+                           (currentAnalysis.detectedProducts / currentAnalysis.expectedProducts)) * 100,
+        },
       },
       recommendations: generateRecommendations(finalAnalysis, validatedProducts),
-      config: defaultConfig
+      config: defaultConfig,
     };
 
     console.log(`🎉 Coverage expansion completed: ${result.productsCreated} products created in ${processingTime}ms`);
-    
+
     return new Response(
       JSON.stringify(result),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
 
   } catch (error) {
-    console.error(`❌ Coverage expansion failed:`, error);
+    console.error('❌ Coverage expansion failed:', error);
     return new Response(
       JSON.stringify({
         success: false,
         error: 'Coverage expansion failed',
         details: error.message,
-        documentId
+        documentId,
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 }
@@ -255,7 +255,7 @@ async function analyzeCurrentCoverage(supabase: any, documentId: string): Promis
 
     // Estimate expected products based on document analysis
     const expectedProducts = await estimateExpectedProducts(supabase, documentId);
-    
+
     // Identify missing product types
     const expectedTypes = ['flooring', 'wall_covering', 'furniture', 'lighting', 'textile', 'accessory'];
     const missingProductTypes = expectedTypes.filter(type => !productTypes[type]);
@@ -268,7 +268,7 @@ async function analyzeCurrentCoverage(supabase: any, documentId: string): Promis
     };
 
   } catch (error) {
-    console.error(`❌ Failed to analyze current coverage:`, error);
+    console.error('❌ Failed to analyze current coverage:', error);
     return {
       detectedProducts: 0,
       expectedProducts: 10,
@@ -299,7 +299,7 @@ async function getEnhancedChunks(supabase: any, documentId: string): Promise<any
     return chunks || [];
 
   } catch (error) {
-    console.error(`❌ Failed to get enhanced chunks:`, error);
+    console.error('❌ Failed to get enhanced chunks:', error);
     return [];
   }
 }
@@ -310,19 +310,19 @@ async function getEnhancedChunks(supabase: any, documentId: string): Promise<any
 async function performIntelligentMapping(
   chunks: any[],
   documentId: string,
-  config: any
+  config: any,
 ): Promise<ProductCandidate[]> {
   const candidates: ProductCandidate[] = [];
 
   try {
     // Process chunks in batches for better performance
     const batchSize = 20;
-    
+
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize);
-      
+
       const batchCandidates = await Promise.all(
-        batch.map(chunk => analyzeChunkForProducts(chunk, documentId, config))
+        batch.map(chunk => analyzeChunkForProducts(chunk, documentId, config)),
       );
 
       // Flatten and filter valid candidates
@@ -331,9 +331,9 @@ async function performIntelligentMapping(
         .filter(candidate => candidate !== null) as ProductCandidate[];
 
       candidates.push(...validCandidates);
-      
+
       console.log(`📦 Processed batch ${Math.floor(i / batchSize) + 1}: ${validCandidates.length} candidates found`);
-      
+
       // Add small delay to prevent overwhelming the system
       if (i + batchSize < chunks.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -343,7 +343,7 @@ async function performIntelligentMapping(
     return candidates;
 
   } catch (error) {
-    console.error(`❌ Failed to perform intelligent mapping:`, error);
+    console.error('❌ Failed to perform intelligent mapping:', error);
     return [];
   }
 }
@@ -409,7 +409,7 @@ async function analyzeChunkWithAI(content: string, chunk: any, config: any): Pro
   const productIndicators = [
     'collection', 'series', 'design', 'material', 'finish', 'color',
     'dimension', 'size', 'specification', 'feature', 'application',
-    'installation', 'maintenance', 'warranty', 'certification'
+    'installation', 'maintenance', 'warranty', 'certification',
   ];
 
   const productTypeKeywords = {
@@ -418,14 +418,14 @@ async function analyzeChunkWithAI(content: string, chunk: any, config: any): Pro
     furniture: ['chair', 'table', 'desk', 'cabinet', 'shelf', 'sofa', 'bed'],
     lighting: ['light', 'lamp', 'fixture', 'led', 'bulb', 'illumination', 'chandelier'],
     textile: ['fabric', 'textile', 'upholstery', 'curtain', 'blind', 'rug'],
-    accessory: ['accessory', 'hardware', 'handle', 'knob', 'trim', 'fitting']
+    accessory: ['accessory', 'hardware', 'handle', 'knob', 'trim', 'fitting'],
   };
 
   const lowerContent = content.toLowerCase();
 
   // Calculate confidence based on product indicators
   const indicatorMatches = productIndicators.filter(indicator =>
-    lowerContent.includes(indicator)
+    lowerContent.includes(indicator),
   ).length;
 
   const confidence = Math.min(indicatorMatches / productIndicators.length * 2, 1.0);
@@ -496,7 +496,7 @@ async function performCrossChunkAnalysis(candidates: ProductCandidate[]): Promis
     const similarCandidates = candidates.filter(other =>
       other.id !== candidate.id &&
       !processed.has(other.id) &&
-      areSimilarProducts(candidate, other)
+      areSimilarProducts(candidate, other),
     );
 
     if (similarCandidates.length > 0) {
@@ -523,7 +523,7 @@ function areSimilarProducts(candidate1: ProductCandidate, candidate2: ProductCan
   // Check product name similarity
   const nameSimilarity = calculateStringSimilarity(
     candidate1.productName.toLowerCase(),
-    candidate2.productName.toLowerCase()
+    candidate2.productName.toLowerCase(),
   );
 
   // Check product type match
@@ -543,7 +543,7 @@ function mergeCandidates(primary: ProductCandidate, others: ProductCandidate[]):
 
   // Use the candidate with highest confidence as base
   const bestCandidate = allCandidates.reduce((best, current) =>
-    current.confidence > best.confidence ? current : best
+    current.confidence > best.confidence ? current : best,
   );
 
   return {
@@ -583,7 +583,7 @@ async function createValidatedProducts(
   supabase: any,
   candidates: ProductCandidate[],
   documentId: string,
-  workspaceId: string
+  workspaceId: string,
 ): Promise<{ created: number; failed: number }> {
   let created = 0;
   let failed = 0;
@@ -643,18 +643,18 @@ async function analyzeCoverage(supabase: any, documentId: string): Promise<Respo
       JSON.stringify({
         success: true,
         documentId,
-        analysis
+        analysis,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
     return new Response(
       JSON.stringify({
         success: false,
         error: 'Coverage analysis failed',
-        details: error.message
+        details: error.message,
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 }
@@ -675,18 +675,18 @@ async function getProgress(supabase: any, documentId: string): Promise<Response>
       JSON.stringify({
         success: true,
         documentId,
-        progress: progress || { status: 'not_started', progress: 0 }
+        progress: progress || { status: 'not_started', progress: 0 },
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
     return new Response(
       JSON.stringify({
         success: false,
         error: 'Progress retrieval failed',
-        details: error.message
+        details: error.message,
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 }
@@ -708,7 +708,7 @@ async function optimizeDetection(supabase: any, documentId: string, config: any)
       estimatedImprovement: {
         additionalProducts: Math.max(0, Math.floor(chunks.length / 10) - analysis.detectedProducts),
         confidenceIncrease: 0.15,
-      }
+      },
     };
 
     return new Response(
@@ -716,18 +716,18 @@ async function optimizeDetection(supabase: any, documentId: string, config: any)
         success: true,
         documentId,
         currentAnalysis: analysis,
-        optimizations
+        optimizations,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
     return new Response(
       JSON.stringify({
         success: false,
         error: 'Detection optimization failed',
-        details: error.message
+        details: error.message,
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 }
@@ -755,7 +755,7 @@ function levenshteinDistance(str1: string, str2: string): number {
       matrix[j][i] = Math.min(
         matrix[j][i - 1] + 1,
         matrix[j - 1][i] + 1,
-        matrix[j - 1][i - 1] + indicator
+        matrix[j - 1][i - 1] + indicator,
       );
     }
   }

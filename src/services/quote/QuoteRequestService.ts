@@ -14,7 +14,7 @@ export interface QuoteRequest {
 }
 
 export interface QuoteRequestWithItems extends QuoteRequest {
-  items?: any[];
+  items?: unknown[];
 }
 
 /**

@@ -1,15 +1,16 @@
 /**
  * Multi-Modal Image-Product Association Service
- * 
+ *
  * Creates intelligent image-product linking using:
  * - Spatial proximity (40% weight): Same page ±1, spatial distance
  * - Caption similarity (30% weight): Text similarity between image captions and product descriptions
  * - CLIP visual similarity (30% weight): Visual-text similarity using existing CLIP embeddings
- * 
+ *
  * Replaces random associations with weighted confidence scoring for meaningful relationships.
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { EntityRelationshipService } from './entityRelationshipService';
 import { EnhancedClipIntegrationService } from './enhancedClipIntegrationService';
 
@@ -116,7 +117,7 @@ export class MultiModalImageProductAssociationService {
       for (const image of images) {
         for (const product of products) {
           totalEvaluated++;
-          
+
           try {
             const association = await MultiModalImageProductAssociationService.evaluateAssociation(
               image,
@@ -124,7 +125,7 @@ export class MultiModalImageProductAssociationService {
               opts,
             );
 
-            if (association.overallScore >= opts.overallThreshold!) {
+            if (association.overallScore >= opts.overallThreshold) {
               allAssociations.push(association);
             }
           } catch (error) {
@@ -175,7 +176,7 @@ export class MultiModalImageProductAssociationService {
     product: any,
     options: AssociationOptions,
   ): Promise<ImageProductAssociation> {
-    const weights = options.weights!;
+    const weights = options.weights;
 
     // Calculate spatial proximity score
     const spatialScore = await MultiModalImageProductAssociationService.calculateSpatialScore(
@@ -323,7 +324,7 @@ export class MultiModalImageProductAssociationService {
       // Use the enhanced CLIP integration service for real CLIP scoring
       const clipResult = await EnhancedClipIntegrationService.calculateRealClipScore(
         image.id,
-        product.id
+        product.id,
       );
 
       if (clipResult.confidence > 0.7) {
@@ -459,8 +460,8 @@ export class MultiModalImageProductAssociationService {
 
       // Check limits
       if (
-        imageCount < options.maxAssociationsPerImage! &&
-        productCount < options.maxAssociationsPerProduct!
+        imageCount < options.maxAssociationsPerImage &&
+        productCount < options.maxAssociationsPerProduct
       ) {
         finalAssociations.push(association);
         imageAssociationCounts.set(association.imageId, imageCount + 1);
@@ -594,7 +595,7 @@ export class MultiModalImageProductAssociationService {
 
       const totalAssociations = associations?.length || 0;
       const averageConfidence = totalAssociations > 0
-        ? associations!.reduce((sum, assoc) => sum + assoc.confidence, 0) / totalAssociations
+        ? associations.reduce((sum, assoc) => sum + assoc.confidence, 0) / totalAssociations
         : 0;
 
       // Group associations by score ranges

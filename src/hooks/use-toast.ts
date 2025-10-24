@@ -32,8 +32,8 @@ function genId() {
 type Action =
   | {
       type: typeof actionTypes.ADD_TOAST
-      toast: ToasterToast
-    }
+      toast: ToasterToast,
+  }
   | {
       type: typeof actionTypes.UPDATE_TOAST
       toast: Partial<ToasterToast>

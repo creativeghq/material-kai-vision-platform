@@ -123,8 +123,7 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
       <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
         <CardHeader>
           <CardTitle>Overall Quality Score</CardTitle>
-        </CardHeader>
-        <CardContent>
+        </CardHeader><CardContent>
           <div className="flex items-center justify-between">
             <div>
               <div className="text-5xl font-bold">
@@ -195,6 +194,16 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
               setLastUpdated(new Date());
               setLoading(false);
             });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              setLoading(true);
+              service.getDashboardData(workspaceId).then(dashboardData => {
+                setData(dashboardData);
+                setLastUpdated(new Date());
+                setLoading(false);
+              });
+            }
           }}
           disabled={loading}
         >

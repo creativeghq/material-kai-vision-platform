@@ -505,7 +505,7 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/')} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
                 className="flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
               >
                 <Home className="h-4 w-4" />
@@ -691,8 +691,7 @@ const AdminDashboard: React.FC = () => {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Network I/O</CardTitle>
                   <Wifi className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
+                </CardHeader><CardContent>
                   <div className="text-2xl font-bold">
                     <span className={getMetricColor(systemMetrics.network, 'network')}>
                       {systemMetrics.network.toFixed(1)} MB/s
@@ -811,10 +810,10 @@ const AdminDashboard: React.FC = () => {
               </Button>
               {selectedUsers.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('activate')}>
+                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('activate')} onKeyDown={(e) => e.key === 'Enter' && handleBulkUserAction('activate')}>
                     Activate ({selectedUsers.length})
                   </Button>
-                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('deactivate')}>
+                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('deactivate')} onKeyDown={(e) => e.key === 'Enter' && handleBulkUserAction('deactivate')}>
                     Deactivate ({selectedUsers.length})
                   </Button>
                 </div>
@@ -879,13 +878,13 @@ const AdminDashboard: React.FC = () => {
                           <td className="p-4 text-sm text-muted-foreground">{user.lastLogin}</td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('edit', user.id)}>
+                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('edit', user.id)} onKeyDown={(e) => e.key === 'Enter' && handleUserAction('edit', user.id)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('view', user.id)}>
+                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('view', user.id)} onKeyDown={(e) => e.key === 'Enter' && handleUserAction('view', user.id)}>
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('delete', user.id)}>
+                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('delete', user.id)} onKeyDown={(e) => e.key === 'Enter' && handleUserAction('delete', user.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>

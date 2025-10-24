@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+
 import { corsHeaders } from '../_shared/cors.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -27,7 +28,7 @@ Deno.serve(async (req) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: corsHeaders }
+        { status: 401, headers: corsHeaders },
       );
     }
 
@@ -38,7 +39,7 @@ Deno.serve(async (req) => {
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders }
+        { status: 401, headers: corsHeaders },
       );
     }
 
@@ -50,7 +51,7 @@ Deno.serve(async (req) => {
       if (!plan_id) {
         return new Response(
           JSON.stringify({ error: 'Missing plan_id' }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
 
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
       if (planError || !plan) {
         return new Response(
           JSON.stringify({ error: 'Plan not found' }),
-          { status: 404, headers: corsHeaders }
+          { status: 404, headers: corsHeaders },
         );
       }
 
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
           message: 'Checkout session creation requires Stripe API setup',
           plan: plan,
         }),
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
@@ -95,7 +96,7 @@ Deno.serve(async (req) => {
       if (!package_id) {
         return new Response(
           JSON.stringify({ error: 'Missing package_id' }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: corsHeaders },
         );
       }
 
@@ -109,7 +110,7 @@ Deno.serve(async (req) => {
       if (packageError || !creditPackage) {
         return new Response(
           JSON.stringify({ error: 'Package not found' }),
-          { status: 404, headers: corsHeaders }
+          { status: 404, headers: corsHeaders },
         );
       }
 
@@ -121,7 +122,7 @@ Deno.serve(async (req) => {
           message: 'Credit purchase requires Stripe API setup',
           package: creditPackage,
         }),
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
@@ -146,13 +147,13 @@ Deno.serve(async (req) => {
       if (error) {
         return new Response(
           JSON.stringify({ data: null }),
-          { status: 200, headers: corsHeaders }
+          { status: 200, headers: corsHeaders },
         );
       }
 
       return new Response(
         JSON.stringify({ data }),
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
@@ -167,25 +168,25 @@ Deno.serve(async (req) => {
       if (error) {
         return new Response(
           JSON.stringify({ error: 'Credits not found' }),
-          { status: 404, headers: corsHeaders }
+          { status: 404, headers: corsHeaders },
         );
       }
 
       return new Response(
         JSON.stringify({ data }),
-        { status: 200, headers: corsHeaders }
+        { status: 200, headers: corsHeaders },
       );
     }
 
     return new Response(
       JSON.stringify({ error: 'Not found' }),
-      { status: 404, headers: corsHeaders }
+      { status: 404, headers: corsHeaders },
     );
   } catch (error) {
     console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: corsHeaders },
     );
   }
 });

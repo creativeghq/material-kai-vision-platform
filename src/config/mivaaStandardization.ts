@@ -43,11 +43,11 @@ export interface StandardMivaaPayload {
     quality?: 'standard' | 'high';
 
     // Custom options
-    [key: string]: any;
+    [key: string]: unknown;
   };
 
   // Metadata
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   tags?: string[];
 }
 
@@ -60,7 +60,7 @@ export interface StandardMivaaResponse<T = any> {
   error?: {
     code: string;
     message: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
     retryable?: boolean;
   };
   metadata: {

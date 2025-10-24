@@ -177,7 +177,7 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
                     </p>
                   </div>
                   <button
-                    onClick={() => handleRemoveProduct(product.product_id)}
+                    onClick={() => handleRemoveProduct(product.product_id)} onKeyDown={(e) => e.key === 'Enter' && handleRemoveProduct(product.product_id)}
                     className="text-red-600 hover:text-red-800 font-medium text-sm"
                   >
                     Remove
@@ -200,7 +200,7 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
       </div>
 
       <button
-        onClick={loadProducts}
+        onClick={loadProducts} onKeyDown={(e) => e.key === 'Enter' && loadProducts()}
         className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
       >
         Refresh

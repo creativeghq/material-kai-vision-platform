@@ -220,7 +220,7 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={() => setShowFilters(!showFilters)} onKeyDown={(e) => e.key === 'Enter' && setShowFilters(!showFilters)}
               className="flex items-center gap-2"
             >
               <Filter className="h-4 w-4" />
@@ -232,15 +232,19 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setViewMode('grid')}
+              onClick={() => setViewMode('grid')} onKeyDown={(e) => e.key === 'Enter' && setViewMode('grid')}
               className="rounded-r-none border-r"
             >
               <Grid3X3 className="h-4 w-4" />
-            </Button>
-            <Button
+            </Button><Button
               variant={viewMode === 'list' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('list')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setViewMode('list');
+                }
+              }}
               className="rounded-l-none"
             >
               <List className="h-4 w-4" />
@@ -258,12 +262,11 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 <Filter className="h-5 w-5" />
                 Filter & Sort Materials
               </span>
-              <Button variant="outline" size="sm" onClick={resetFilters}>
+              <Button variant="outline" size="sm" onClick={resetFilters} onKeyDown={(e) => e.key === 'Enter' && resetFilters()}>
                 Reset All
               </Button>
             </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </CardHeader><CardContent className="space-y-4">
             {/* Search and Category */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -403,6 +406,11 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc');
+                    }
+                  }}
                   className="mt-7 flex items-center gap-2"
                 >
                   <ArrowUpDown className="h-4 w-4" />
@@ -523,7 +531,15 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
           </div>
           <div className="flex items-center gap-1 ml-4">
             {onSelect && (
-              <Button size="sm" variant="outline" onClick={onSelect}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onSelect}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onSelect();
+                  }
+                }}>
                 Select
               </Button>
             )}
@@ -531,6 +547,11 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
               size="sm"
               variant="ghost"
               onClick={onToggleExpand}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onToggleExpand();
+                }
+              }}
               className="p-2"
             >
               <Info className="h-4 w-4" />
@@ -538,7 +559,6 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
           </div>
         </div>
       </CardHeader>
-
       <Collapsible open={expanded} onOpenChange={onToggleExpand}>
         <CollapsibleContent>
           <CardContent className="space-y-4">

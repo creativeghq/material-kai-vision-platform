@@ -171,7 +171,7 @@ export class WebSocketManager {
 
     if (this.isConnected()) {
       try {
-        this.ws!.send(JSON.stringify(fullMessage));
+        this.ws.send(JSON.stringify(fullMessage));
         return true;
       } catch (error) {
         console.error('Failed to send WebSocket message:', error);
@@ -293,7 +293,7 @@ export class WebSocketManager {
       const message = this.messageQueue.shift();
       if (message) {
         try {
-          this.ws!.send(JSON.stringify(message));
+          this.ws.send(JSON.stringify(message));
         } catch (error) {
           console.error('Failed to send queued message:', error);
           // Re-queue the message

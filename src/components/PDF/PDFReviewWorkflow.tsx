@@ -333,8 +333,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                 {stats.approved} Approved
               </span>
             </div>
-          </CardTitle>
-          <CardDescription>
+          </CardTitle><CardDescription>
             Review extracted materials and route them through AI workflows
           </CardDescription>
         </CardHeader>
@@ -346,7 +345,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
           <Progress value={(stats.reviewed / stats.total) * 100} className="mt-2" />
         </CardContent>
       </Card>
-
       <Tabs defaultValue="review" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="review">Review Materials</TabsTrigger>
@@ -357,7 +355,14 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         <TabsContent value="review" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Material Review</h3>
-            <Button onClick={selectAllApproved} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5">
+            <Button
+              onClick={selectAllApproved}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  selectAllApproved();
+                }
+              }}
+              className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5">
               Select All Approved
             </Button>
           </div>
@@ -463,6 +468,11 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                         <Button
                           className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
                           onClick={() => updateTileReview(tile.id, { reviewed: true, approved: true })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              updateTileReview(tile.id, { reviewed: true, approved: true });
+                            }
+                          }}
                         >
                           <Check className="h-4 w-4 mr-1" />
                           Approve
@@ -470,6 +480,11 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                         <Button
                           className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
                           onClick={() => updateTileReview(tile.id, { reviewed: true, approved: false })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              updateTileReview(tile.id, { reviewed: true, approved: false });
+                            }
+                          }}
                         >
                           <X className="h-4 w-4 mr-1" />
                           Reject
@@ -492,6 +507,11 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                   key={workflow.id}
                   className={`cursor-pointer transition-colors ${workflowActions.has(workflow.id) ? 'border-primary bg-primary/5' : ''}`}
                   onClick={() => toggleWorkflowAction(workflow.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      toggleWorkflowAction(workflow.id);
+                    }
+                  }}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -508,7 +528,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
             </div>
           </div>
         </TabsContent>
-
         <TabsContent value="execute" className="space-y-4">
           <Card>
             <CardHeader>
@@ -542,6 +561,11 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
               <div className="flex gap-2">
                 <Button
                   onClick={executeWorkflow}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      executeWorkflow();
+                    }
+                  }}
                   disabled={selectedTiles.size === 0 || workflowActions.size === 0 || processingWorkflow}
                   className="flex-1"
                 >

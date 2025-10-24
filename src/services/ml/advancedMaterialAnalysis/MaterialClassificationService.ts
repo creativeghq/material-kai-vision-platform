@@ -75,9 +75,9 @@ export interface ClassificationModel {
 
 export class MaterialClassificationService {
   private config: MaterialClassificationConfig;
-  private attentionModule!: TextureAttentionModule;
-  private gaborFilters!: TextureGaborFilters;
-  private multiScaleModule!: MultiScaleTextureModule;
+  private attentionModule: TextureAttentionModule;
+  private gaborFilters: TextureGaborFilters;
+  private multiScaleModule: MultiScaleTextureModule;
   private ensemble: ModelEnsemble | null = null;
   private modelWeights: Map<string, Float32Array> = new Map();
 

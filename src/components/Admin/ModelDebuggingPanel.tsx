@@ -198,7 +198,7 @@ const ModelDebuggingPanel: React.FC = () => {
 
       toast({
         title: 'Test Complete',
-        description: `${modelName} test completed successfully!`,
+        description: `${modelName} test completed successfully`,
       });
     } catch {
       toast({
@@ -253,7 +253,7 @@ const ModelDebuggingPanel: React.FC = () => {
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex gap-2">
             <Button
-              onClick={testAllModels}
+              onClick={testAllModels} onKeyDown={(e) => e.key === 'Enter' && testAllModels()}
               disabled={isLoading}
               className="flex items-center gap-2"
             >
@@ -281,8 +281,7 @@ const ModelDebuggingPanel: React.FC = () => {
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 Working
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               <div className="text-2xl font-bold text-green-600">{workingModels}</div>
               <p className="text-xs text-muted-foreground">Operational models</p>
             </CardContent>
@@ -294,8 +293,7 @@ const ModelDebuggingPanel: React.FC = () => {
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 Failing
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               <div className="text-2xl font-bold text-red-600">{failingModels}</div>
               <p className="text-xs text-muted-foreground">Models with issues</p>
             </CardContent>
@@ -307,8 +305,7 @@ const ModelDebuggingPanel: React.FC = () => {
                 <Clock className="h-4 w-4 text-yellow-600" />
                 Untested
               </CardTitle>
-            </CardHeader>
-            <CardContent>
+            </CardHeader><CardContent>
               <div className="text-2xl font-bold text-yellow-600">{untestedModels}</div>
               <p className="text-xs text-muted-foreground">Pending tests</p>
             </CardContent>
@@ -374,7 +371,7 @@ const ModelDebuggingPanel: React.FC = () => {
                                   </code>
                                   <Button
                                     className="bg-transparent hover:bg-accent hover:text-accent-foreground h-6 w-6 p-0"
-                                    onClick={() => copyToClipboard(model.versionHash)}
+                                    onClick={() => copyToClipboard(model.versionHash)} onKeyDown={(e) => e.key === 'Enter' && copyToClipboard(model.versionHash)}
                                   >
                                     <Copy className="h-3 w-3" />
                                   </Button>
@@ -404,15 +401,14 @@ const ModelDebuggingPanel: React.FC = () => {
                           <div className="flex gap-2">
                             <Button
                               className="h-8 px-3 text-sm flex items-center gap-1"
-                              onClick={() => testModel(model.name)}
+                              onClick={() => testModel(model.name)} onKeyDown={(e) => e.key === 'Enter' && testModel(model.name)}
                               disabled={isLoading}
                             >
                               <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
                               Test Model
-                            </Button>
-                            <Button
+                            </Button><Button
                               className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1"
-                              onClick={() => copyToClipboard(model.name)}
+                              onClick={() => copyToClipboard(model.name)} onKeyDown={(e) => e.key === 'Enter' && copyToClipboard(model.name)}
                             >
                               <Copy className="h-3 w-3" />
                               Copy Name
@@ -456,7 +452,7 @@ const ModelDebuggingPanel: React.FC = () => {
                                     <div className="mt-2">
                                       <Button
                                         className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1 text-xs"
-                                        onClick={() => window.open(log.imageUrl, '_blank')}
+                                        onClick={() => window.open(log.imageUrl, '_blank')} onKeyDown={(e) => e.key === 'Enter' && window.open()}
                                         aria-label={`View generated image for ${log.model}`}
                                       >
                                         <ExternalLink className="h-3 w-3" />

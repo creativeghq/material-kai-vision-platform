@@ -25,6 +25,11 @@ export const FeatureGrid: React.FC<FeatureGridProps> = ({ onNavigate }) => {
             key={card.id}
             className={styles.featureCard}
             onClick={() => onNavigate(card.path)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                onNavigate(card.path);
+              }
+            }}
           >
             <CardHeader className="pb-4">
               <div className={styles.featureHeader}>

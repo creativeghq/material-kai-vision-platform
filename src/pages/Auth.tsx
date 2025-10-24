@@ -100,6 +100,11 @@ export const Auth: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setShowForgotPassword(false);
+                        }
+                      }}
                       className="text-sm text-muted-foreground hover:text-primary underline"
                     >
                       Back to Sign In
@@ -136,6 +141,11 @@ export const Auth: React.FC = () => {
                         size="icon"
                         className="absolute right-0 top-0 h-full px-3"
                         onClick={() => setShowPassword(!showPassword)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setShowPassword(!showPassword);
+                          }
+                        }}
                       >
                         {showPassword ? (
                           <EyeOff className="w-4 h-4" />
@@ -153,6 +163,11 @@ export const Auth: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setShowForgotPassword(true);
+                        }
+                      }}
                       className="text-sm text-muted-foreground hover:text-primary underline"
                     >
                       Forgot Password?
@@ -202,6 +217,11 @@ export const Auth: React.FC = () => {
                       size="icon"
                       className="absolute right-0 top-0 h-full px-3"
                       onClick={() => setShowPassword(!showPassword)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setShowPassword(!showPassword);
+                        }
+                      }}
                     >
                       {showPassword ? (
                         <EyeOff className="w-4 h-4" />

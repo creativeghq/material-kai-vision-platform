@@ -1,5 +1,6 @@
-import { BaseService, ServiceConfig } from '../base/BaseService';
 import { supabase } from '@/integrations/supabase/client';
+
+import { BaseService, ServiceConfig } from '../base/BaseService';
 
 import { MLResult, MaterialAnalysisResult, ImageClassificationResult } from './types';
 import { ImageClassifierService } from './imageClassifier';

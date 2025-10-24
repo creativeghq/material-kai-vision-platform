@@ -330,7 +330,7 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
       case 'not_contains':
         return !String(fieldValue).includes(String(definition.value));
       case 'matches_regex':
-        return new RegExp(definition.value).test(String(fieldValue));
+        return new RegExp(String(definition.value)).test(String(fieldValue));
       case 'in_range':
         return fieldValue >= definition.value[0] && fieldValue <= definition.value[1];
       default:

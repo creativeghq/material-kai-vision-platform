@@ -258,7 +258,7 @@ export class SpatialMaterialMapper {
     };
   }> {
     // Calculate average color
-    const colors = surfacePoints.filter(p => p.color).map(p => p.color!);
+    const colors = surfacePoints.filter(p => p.color).map(p => p.color);
     const averageColor: [number, number, number] = colors.length > 0 ? [
       colors.reduce((sum, c) => sum + c[0], 0) / colors.length,
       colors.reduce((sum, c) => sum + c[1], 0) / colors.length,
@@ -369,7 +369,7 @@ export class SpatialMaterialMapper {
   }
 
   private calculateColorVariance(points: SpatialPoint[]): number {
-    const colors = points.filter(p => p.color).map(p => p.color!);
+    const colors = points.filter(p => p.color).map(p => p.color);
     if (colors.length === 0) return 0;
 
     const avgColor = [
@@ -501,7 +501,7 @@ export class SpatialMaterialMapper {
 
   private calculateReflectance(points: SpatialPoint[]): number {
     // Calculate reflectance based on intensity values
-    const intensities = points.filter(p => p.intensity !== undefined).map(p => p.intensity!);
+    const intensities = points.filter(p => p.intensity !== undefined).map(p => p.intensity);
     if (intensities.length === 0) return 0.5;
 
     const avgIntensity = intensities.reduce((sum, i) => sum + i, 0) / intensities.length;

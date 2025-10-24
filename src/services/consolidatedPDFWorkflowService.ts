@@ -208,7 +208,7 @@ export class ConsolidatedPDFWorkflowService {
     console.log('🚀 [PDF Processing] Starting PDF processing workflow');
     console.log(`📋 [PDF Processing] Job ID: ${jobId}`);
     console.log(`📄 [PDF Processing] File: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-    console.log(`⚙️  [PDF Processing] Options:`, options);
+    console.log('⚙️  [PDF Processing] Options:', options);
 
     // Create MIVAA workflow steps
     const steps = this.createWorkflowSteps();
@@ -227,16 +227,16 @@ export class ConsolidatedPDFWorkflowService {
     };
 
     this.jobs.set(jobId, job);
-    console.log(`✅ [PDF Processing] Job created and registered`);
+    console.log('✅ [PDF Processing] Job created and registered');
 
     // Initialize WebSocket tracking for real-time progress
     pdfProcessingWebSocketService.startJob(jobId, file.name);
-    console.log(`🔌 [PDF Processing] WebSocket tracking initialized`);
+    console.log('🔌 [PDF Processing] WebSocket tracking initialized');
 
     this.notifyUpdate(job);
 
     // Start MIVAA processing workflow
-    console.log(`🔄 [PDF Processing] Starting MIVAA workflow execution`);
+    console.log('🔄 [PDF Processing] Starting MIVAA workflow execution');
     this.executeMivaaWorkflow(jobId, file, options);
 
     return jobId;
@@ -357,14 +357,14 @@ export class ConsolidatedPDFWorkflowService {
         return;
       }
 
-      console.log(`✅ [MIVAA Workflow] Job found, starting authentication step`);
+      console.log('✅ [MIVAA Workflow] Job found, starting authentication step');
 
       // Step 1: Authentication
       await this.executeStep(jobId, 'auth', async () => {
-        console.log(`🔐 [Auth] Checking user authentication...`);
+        console.log('🔐 [Auth] Checking user authentication...');
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error || !user) {
-          console.error(`❌ [Auth] Authentication failed:`, error);
+          console.error('❌ [Auth] Authentication failed:', error);
           throw new Error('User not authenticated');
         }
         console.log(`✅ [Auth] User authenticated: ${user.email} (${user.id})`);
@@ -379,11 +379,11 @@ export class ConsolidatedPDFWorkflowService {
       });
 
       // Step 2: File Upload
-      console.log(`📤 [Upload] Starting file upload step`);
+      console.log('📤 [Upload] Starting file upload step');
       const uploadResult: unknown = await this.executeStep(jobId, 'upload', async () => {
         const fileName = `${Date.now()}-${file.name}`;
         const { data: { user } } = await supabase.auth.getUser();
-        const fullPath = `${user!.id}/${fileName}`;
+        const fullPath = `${user.id}/${fileName}`;
 
         console.log(`📤 [Upload] Uploading to: pdf-documents/${fullPath}`);
         console.log(`📤 [Upload] File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
@@ -393,11 +393,11 @@ export class ConsolidatedPDFWorkflowService {
           .upload(fullPath, file);
 
         if (error) {
-          console.error(`❌ [Upload] Upload failed:`, error);
+          console.error('❌ [Upload] Upload failed:', error);
           throw new Error(`Upload failed: ${error.message}`);
         }
 
-        console.log(`✅ [Upload] File uploaded successfully`);
+        console.log('✅ [Upload] File uploaded successfully');
 
         const { data: { publicUrl } } = supabase.storage
           .from('pdf-documents')
@@ -438,15 +438,15 @@ export class ConsolidatedPDFWorkflowService {
       });
 
       // Step 4: MIVAA Processing
-      console.log(`🤖 [MIVAA] Starting MIVAA processing step`);
+      console.log('🤖 [MIVAA] Starting MIVAA processing step');
       const mivaaResult = await this.executeStep(jobId, 'mivaa-processing', async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.error(`❌ [MIVAA] User not authenticated`);
+          console.error('❌ [MIVAA] User not authenticated');
           throw new Error('User not authenticated');
         }
 
-        console.log(`✅ [MIVAA] User authenticated for MIVAA processing`);
+        console.log('✅ [MIVAA] User authenticated for MIVAA processing');
 
         // Update progress: Starting MIVAA processing
         this.updateJobStep(jobId, 'mivaa-processing', {
@@ -474,7 +474,7 @@ export class ConsolidatedPDFWorkflowService {
           },
         };
 
-        console.log(`📋 [MIVAA] Processing request:`, processingRequest);
+        console.log('📋 [MIVAA] Processing request:', processingRequest);
 
         // Update progress: Sending to MIVAA
         this.updateJobStep(jobId, 'mivaa-processing', {
@@ -498,7 +498,7 @@ export class ConsolidatedPDFWorkflowService {
         });
 
         // Convert File to FormData for RAG upload endpoint
-        console.log(`📦 [MIVAA] Preparing FormData for RAG upload`);
+        console.log('📦 [MIVAA] Preparing FormData for RAG upload');
         const formData = new FormData();
         formData.append('file', file);
         formData.append('title', file.name);
@@ -506,7 +506,7 @@ export class ConsolidatedPDFWorkflowService {
         formData.append('chunk_size', String(processingRequest.options.chunkSize || 1000));
         formData.append('chunk_overlap', String(processingRequest.options.overlap || 200));
 
-        console.log(`📦 [MIVAA] FormData prepared:`, {
+        console.log('📦 [MIVAA] FormData prepared:', {
           filename: file.name,
           enable_embedding: true,
           chunk_size: processingRequest.options.chunkSize || 1000,
@@ -514,9 +514,9 @@ export class ConsolidatedPDFWorkflowService {
         });
 
         // Call RAG upload endpoint through Supabase edge function (supports multipart/form-data)
-        console.log(`🚀 [MIVAA] Calling MIVAA RAG upload via edge function...`);
+        console.log('🚀 [MIVAA] Calling MIVAA RAG upload via edge function...');
         const response = await this.callMivaaRagUpload(formData);
-        console.log(`📥 [MIVAA] RAG upload response:`, response);
+        console.log('📥 [MIVAA] RAG upload response:', response);
 
         // Check for MIVAA gateway errors in the response data (direct call format)
         if (!response.success && response.error) {
@@ -568,7 +568,7 @@ export class ConsolidatedPDFWorkflowService {
               'Initializing MIVAA processing...',
               'Preparing document for analysis',
               'Sending document to MIVAA service...',
-              '✅ Processing completed successfully!',
+              '✅ Processing completed successfully',
             ],
           });
 
@@ -599,7 +599,7 @@ export class ConsolidatedPDFWorkflowService {
                 'Initializing MIVAA processing...',
                 'Preparing document for analysis',
                 'Sending document to MIVAA service...',
-                '✅ Processing completed successfully!',
+                '✅ Processing completed successfully',
               ],
             });
 
@@ -882,7 +882,7 @@ export class ConsolidatedPDFWorkflowService {
                 'Authorization': `Bearer ${(import.meta as any).env?.VITE_MIVAA_API_KEY || ''}`,
               },
               body: JSON.stringify({
-                image_ids: images.map((img: any) => img.id),
+                image_ids: images.map((img: unknown) => (img as any).id),
                 workspace_id: user?.id || 'default',
               }),
             },
@@ -965,7 +965,7 @@ export class ConsolidatedPDFWorkflowService {
                 'Authorization': `Bearer ${(import.meta as any).env?.VITE_MIVAA_API_KEY || ''}`,
               },
               body: JSON.stringify({
-                chunk_ids: chunks.map((chunk: any) => chunk.id),
+                chunk_ids: chunks.map((chunk: unknown) => (chunk as any).id),
                 workspace_id: user?.id || 'default',
               }),
             },
@@ -1027,7 +1027,7 @@ export class ConsolidatedPDFWorkflowService {
               overallThreshold: 0.6, // Only create associations with 60%+ confidence
               maxAssociationsPerImage: 3,
               maxAssociationsPerProduct: 5,
-            }
+            },
           );
 
           const details = [
@@ -1041,7 +1041,7 @@ export class ConsolidatedPDFWorkflowService {
             details.push(this.createInfoDetail('Top associations:'));
             associationResult.associations.slice(0, 3).forEach((assoc, i) => {
               details.push(this.createInfoDetail(
-                `  ${i + 1}. Score: ${(assoc.overallScore * 100).toFixed(1)}% - ${assoc.reasoning}`
+                `  ${i + 1}. Score: ${(assoc.overallScore * 100).toFixed(1)}% - ${assoc.reasoning}`,
               ));
             });
           }
@@ -1128,7 +1128,7 @@ export class ConsolidatedPDFWorkflowService {
                     confidenceThreshold: 0.6,
                     extractionMethod: 'ai_extraction',
                     validateRequired: true,
-                  }
+                  },
                 );
 
                 totalProductsProcessed++;
@@ -1233,7 +1233,7 @@ export class ConsolidatedPDFWorkflowService {
               const embedding = await EnhancedClipIntegrationService.generateProductClipEmbeddings(
                 product.id,
                 content,
-                { forceRegenerate: false }
+                { forceRegenerate: false },
               );
 
               if (embedding) {
@@ -1258,7 +1258,7 @@ export class ConsolidatedPDFWorkflowService {
               try {
                 const clipResult = await EnhancedClipIntegrationService.calculateRealClipScore(
                   assoc.image_id,
-                  assoc.product_id
+                  assoc.product_id,
                 );
 
                 if (clipResult.confidence > 0.7) {
@@ -1659,12 +1659,12 @@ export class ConsolidatedPDFWorkflowService {
             });
 
             if (imagesResponse.success && imagesResponse.data && Array.isArray(imagesResponse.data)) {
-              images = imagesResponse.data.map((img: any) => ({
-                ...img,
-                url: img.storage_url || img.public_url || img.image_url || img.url,
-                image_url: img.storage_url || img.public_url || img.image_url || img.url,
+              images = imagesResponse.data.map((img: unknown) => ({
+                ...(img as any),
+                url: (img as any).storage_url || (img as any).public_url || (img as any).image_url || (img as any).url,
+                image_url: (img as any).storage_url || (img as any).public_url || (img as any).image_url || (img as any).url,
                 storage_uploaded: true,
-                storage_bucket: img.storage_bucket || 'pdf-tiles',
+                storage_bucket: (img as any).storage_bucket || 'pdf-tiles',
               }));
               console.log(`✅ Fetched ${images.length} images from MIVAA (with storage URLs)`);
             } else {
@@ -1694,14 +1694,14 @@ export class ConsolidatedPDFWorkflowService {
           if (chunksError) {
             console.error('Database chunks query error:', chunksError);
           } else if (dbChunks && dbChunks.length > 0) {
-            chunks = dbChunks.map((chunk: any) => ({
-              chunk_id: chunk.id,
-              content: chunk.content,
-              page_number: chunk.metadata?.page_number || 1,
-              chunk_index: chunk.chunk_index || 0,
-              start_char: chunk.metadata?.start_char || 0,
-              end_char: chunk.metadata?.end_char || chunk.content?.length || 0,
-              metadata: chunk.metadata || {},
+            chunks = dbChunks.map((chunk: unknown) => ({
+              chunk_id: (chunk as any).id,
+              content: (chunk as any).content,
+              page_number: (chunk as any).metadata?.page_number || 1,
+              chunk_index: (chunk as any).chunk_index || 0,
+              start_char: (chunk as any).metadata?.start_char || 0,
+              end_char: (chunk as any).metadata?.end_char || (chunk as any).content?.length || 0,
+              metadata: (chunk as any).metadata || {},
             }));
             console.log(`✅ Retrieved ${chunks.length} chunks from database fallback`);
           }
@@ -2037,7 +2037,7 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       // ✅ NEW: Intelligent Chunk-Image Association
-      console.log(`🔗 Starting intelligent chunk-image association...`);
+      console.log('🔗 Starting intelligent chunk-image association...');
       let chunkImageLinksCreated = 0;
       try {
         if (chunksStored > 0 && imagesStored > 0) {
@@ -2074,11 +2074,11 @@ export class ConsolidatedPDFWorkflowService {
                 relationshipType: 'illustrates',
                 calculateRelevance: true,
                 relevanceThreshold: 0.6, // Only link if relevance > 60%
-              }
+              },
             );
 
             chunkImageLinksCreated = linkingResult.linksCreated;
-            console.log(`✅ Intelligent chunk-image linking completed:`);
+            console.log('✅ Intelligent chunk-image linking completed:');
             console.log(`   Links created: ${linkingResult.linksCreated}/${linkingResult.totalAttempted}`);
             console.log(`   Average links per image: ${(linkingResult.linksCreated / storedImages.length).toFixed(1)}`);
             console.log(`   Skipped low relevance: ${linkingResult.skippedLowRelevance || 0}`);
@@ -2116,13 +2116,13 @@ export class ConsolidatedPDFWorkflowService {
               document_id: documentId,
               include_products: true,  // NEW: Enable product quality scoring
               include_images: true,    // NEW: Validate image quality scoring
-              comprehensive: true      // NEW: Enable all quality metrics
+              comprehensive: true,      // NEW: Enable all quality metrics
             }),
           });
 
           if (qualityScoringResponse.ok) {
             const qualityScoringResult = await qualityScoringResponse.json();
-            console.log(`✅ Enhanced quality scoring completed:`);
+            console.log('✅ Enhanced quality scoring completed:');
             console.log(`   Chunks scored: ${qualityScoringResult.scored_chunks}/${qualityScoringResult.total_chunks}`);
             console.log(`   Images validated: ${qualityScoringResult.validated_images || 0}/${qualityScoringResult.total_images || 0}`);
             console.log(`   Products scored: ${qualityScoringResult.scored_products || 0}/${qualityScoringResult.total_products || 0}`);
@@ -2138,7 +2138,7 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       // ✅ FALLBACK: Generate missing embeddings if MIVAA didn't create them
-      console.log(`🔄 Checking for missing embeddings...`);
+      console.log('🔄 Checking for missing embeddings...');
       try {
         const { count: embeddingCount } = await supabase
           .from('document_vectors')
@@ -2211,24 +2211,24 @@ export class ConsolidatedPDFWorkflowService {
   /**
    * Create standardized MIVAA result object
    */
-  private createMivaaResult(result: any) {
+  private createMivaaResult(result: unknown) {
     return {
       details: [
         this.createSuccessDetail('MIVAA microservice processing completed successfully'),
         this.createSuccessDetail('Advanced PDF extraction using LlamaIndex RAG'),
-        this.createSuccessDetail(`Processing completed with ${result.sources?.length || result.content?.chunks?.length || 0} sources`),
-        this.createSuccessDetail(`Generated ${result.chunks?.length || result.content?.chunks?.length || 0} text chunks`),
-        this.createSuccessDetail(`Extracted ${result.images?.length || result.content?.images?.length || 0} images`),
+        this.createSuccessDetail(`Processing completed with ${(result as any).sources?.length || (result as any).content?.chunks?.length || 0} sources`),
+        this.createSuccessDetail(`Generated ${(result as any).chunks?.length || (result as any).content?.chunks?.length || 0} text chunks`),
+        this.createSuccessDetail(`Extracted ${(result as any).images?.length || (result as any).content?.images?.length || 0} images`),
         this.createSuccessDetail('Generated 1536-dimension embeddings'),
-        this.createSuccessDetail(`Quality score: ${Math.round((result.confidence || result.metadata?.confidence_score || 0) * 100)}%`),
+        this.createSuccessDetail(`Quality score: ${Math.round(((result as any).confidence || (result as any).metadata?.confidence_score || 0) * 100)}%`),
       ],
       metadata: {
         service: 'MIVAA',
-        sourcesGenerated: result.sources?.length || result.content?.chunks?.length || 0,
-        chunksCreated: result.chunks?.length || result.content?.chunks?.length || 0,
-        imagesExtracted: result.images?.length || result.content?.images?.length || 0,
-        confidence: result.confidence || result.metadata?.confidence_score || 0,
-        processingTime: result.processingTime || result.metrics?.processing_time_seconds || 0,
+        sourcesGenerated: (result as any).sources?.length || (result as any).content?.chunks?.length || 0,
+        chunksCreated: (result as any).chunks?.length || (result as any).content?.chunks?.length || 0,
+        imagesExtracted: (result as any).images?.length || (result as any).content?.images?.length || 0,
+        confidence: (result as any).confidence || (result as any).metadata?.confidence_score || 0,
+        processingTime: (result as any).processingTime || (result as any).metrics?.processing_time_seconds || 0,
       },
       result,
     };
@@ -2335,7 +2335,7 @@ export class ConsolidatedPDFWorkflowService {
                 'Preparing document for analysis',
                 'Sending document to MIVAA service...',
                 `✅ Job started with ID: ${actualMivaaJobId}`,
-                '✅ Processing completed successfully!',
+                '✅ Processing completed successfully',
                 `📝 Generated ${chunksCreated} text chunks`,
                 `🖼️ Extracted ${imagesExtracted} images`,
                 `📄 Processed ${textLength} characters of text`,
@@ -2397,7 +2397,7 @@ export class ConsolidatedPDFWorkflowService {
                         'Preparing document for analysis',
                         'Sending document to MIVAA service...',
                         `✅ Job started with ID: ${actualMivaaJobId}`,
-                        '✅ Processing completed successfully!',
+                        '✅ Processing completed successfully',
                         `📝 Generated ${chunksCreated} text chunks`,
                         `🖼️ Extracted ${imagesExtracted} images`,
                         `📄 Processed ${textLength} characters of text`,
@@ -2654,14 +2654,14 @@ export class ConsolidatedPDFWorkflowService {
         throw new Error(`MIVAA RAG upload failed: HTTP ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      console.log(`📦 [MIVAA RAG] Parsing response JSON...`);
+      console.log('📦 [MIVAA RAG] Parsing response JSON...');
       const data = await response.json();
-      console.log(`✅ [MIVAA RAG] Response data:`, data);
+      console.log('✅ [MIVAA RAG] Response data:', data);
 
       // Check if async processing (HTTP 202)
       if (response.status === 202 && data.success && data.data?.job_id) {
         console.log(`📋 [MIVAA RAG] Async job started with ID: ${data.data.job_id}`);
-        console.log(`🔄 [MIVAA RAG] Starting polling for job completion...`);
+        console.log('🔄 [MIVAA RAG] Starting polling for job completion...');
 
         // Poll for job completion
         const jobResult = await this.pollMivaaJobStatus(data.data.job_id);
@@ -2675,11 +2675,11 @@ export class ConsolidatedPDFWorkflowService {
 
       // Check for application-level errors
       if (!data.success && data.error) {
-        console.error(`❌ [MIVAA RAG] Application error:`, data.error);
+        console.error('❌ [MIVAA RAG] Application error:', data.error);
         throw new Error(`MIVAA RAG upload failed: ${data.error.message || 'Unknown error'}`);
       }
 
-      console.log(`✅ [MIVAA RAG] Upload successful!`);
+      console.log('✅ [MIVAA RAG] Upload successful');
       return {
         success: true,
         data: data.data || data,
@@ -2720,8 +2720,8 @@ export class ConsolidatedPDFWorkflowService {
    * based on page proximity, spatial layout, and relevance thresholds.
    */
   async linkChunksToImages(
-    chunks: any[],
-    images: any[],
+    chunks: unknown[],
+    images: unknown[],
     options: { relationshipType?: string; calculateRelevance?: boolean; relevanceThreshold?: number } = {},
   ): Promise<{ linksCreated: number; totalAttempted: number; skippedLowRelevance: number }> {
     const relationshipType = options.relationshipType || 'illustrates';
@@ -2742,7 +2742,7 @@ export class ConsolidatedPDFWorkflowService {
       // ✅ NEW APPROACH: For each image, find the most relevant chunks (not every chunk)
       for (let j = 0; j < images.length; j++) {
         const image = images[j];
-        const imagePage = image.page_number || 0;
+        const imagePage = (image as any).page_number || 0;
 
         // Find chunks that are spatially and contextually relevant to this image
         const relevantChunks = this.findRelevantChunksForImage(image, chunks, relevanceThreshold);
@@ -2754,21 +2754,21 @@ export class ConsolidatedPDFWorkflowService {
 
           try {
             await EntityRelationshipService.linkChunkToImage(
-              chunk.id,
-              image.id,
+              (chunk as any).id,
+              (image as any).id,
               relationshipType as any,
               relevanceScore,
             );
 
             linksCreated++;
-            console.log(`  ✅ Linked to chunk on page ${chunk.page_number || 'unknown'} (relevance: ${relevanceScore.toFixed(2)})`);
+            console.log(`  ✅ Linked to chunk on page ${(chunk as any).page_number || 'unknown'} (relevance: ${relevanceScore.toFixed(2)})`);
           } catch (error) {
-            console.warn(`  ⚠️ Failed to link to chunk ${chunk.id}:`, error);
+            console.warn(`  ⚠️ Failed to link to chunk ${(chunk as any).id}:`, error);
           }
         }
       }
 
-      console.log(`✅ Intelligent chunk-image linking completed:`);
+      console.log('✅ Intelligent chunk-image linking completed:');
       console.log(`   Links created: ${linksCreated}/${totalAttempted}`);
       console.log(`   Skipped low relevance: ${skippedLowRelevance}`);
       console.log(`   Average links per image: ${(linksCreated / images.length).toFixed(1)}`);
@@ -2790,14 +2790,14 @@ export class ConsolidatedPDFWorkflowService {
    */
   private findRelevantChunksForImage(
     image: any,
-    chunks: any[],
+    chunks: unknown[],
     relevanceThreshold: number,
   ): Array<{ chunk: any; relevanceScore: number }> {
     const imagePage = image.page_number || 0;
     const relevantChunks: Array<{ chunk: any; relevanceScore: number }> = [];
 
     for (const chunk of chunks) {
-      const chunkPage = chunk.page_number || 0;
+      const chunkPage = (chunk as any).page_number || 0;
       let relevanceScore = 0;
 
       // 1. Page-based relevance (primary factor)
@@ -2814,14 +2814,14 @@ export class ConsolidatedPDFWorkflowService {
       }
 
       // 2. Content-based relevance boost (secondary factor)
-      if (chunk.content && image.caption) {
-        const contentSimilarity = this.calculateContentSimilarity(chunk.content, image.caption);
+      if ((chunk as any).content && (image as any).caption) {
+        const contentSimilarity = this.calculateContentSimilarity((chunk as any).content, (image as any).caption);
         relevanceScore += contentSimilarity * 0.2; // Up to 20% boost
       }
 
       // 3. Image type relevance (tertiary factor)
-      if (image.image_type === 'product' && chunk.content) {
-        const hasProductKeywords = /\b(product|material|ceramic|tile|collection|design)\b/i.test(chunk.content);
+      if ((image as any).image_type === 'product' && (chunk as any).content) {
+        const hasProductKeywords = /\b(product|material|ceramic|tile|collection|design)\b/i.test((chunk as any).content);
         if (hasProductKeywords) {
           relevanceScore += 0.1; // 10% boost for product-related content
         }
@@ -2859,8 +2859,8 @@ export class ConsolidatedPDFWorkflowService {
    * Link products to images with relationship types
    */
   async linkProductsToImages(
-    products: any[],
-    images: any[],
+    products: unknown[],
+    images: unknown[],
     options: { relationshipType?: string; calculateRelevance?: boolean } = {},
   ): Promise<{ linksCreated: number; totalAttempted: number }> {
     const relationshipType = options.relationshipType || 'depicts';
@@ -2887,8 +2887,8 @@ export class ConsolidatedPDFWorkflowService {
             let relevanceScore = 0.5; // Default medium relevance
             if (calculateRelevance) {
               // Simple relevance: products from same page as image have higher relevance
-              const productPageNumber = product.properties?.page_number || 0;
-              const imagePageNumber = image.page_number || 0;
+              const productPageNumber = (product as any).properties?.page_number || 0;
+              const imagePageNumber = (image as any).page_number || 0;
 
               if (productPageNumber === imagePageNumber) {
                 relevanceScore = 0.9;
@@ -2898,8 +2898,8 @@ export class ConsolidatedPDFWorkflowService {
             }
 
             await EntityRelationshipService.linkProductToImage(
-              product.id,
-              image.id,
+              (product as any).id,
+              (image as any).id,
               relationshipType as any,
               relevanceScore,
             );
@@ -2928,7 +2928,7 @@ export class ConsolidatedPDFWorkflowService {
    * Create products from chunks with metafield extraction
    */
   async createProductsFromChunksWithMetafields(
-    chunks: any[],
+    chunks: unknown[],
     documentId: string,
     userId: string,
     options: { maxProducts?: number; extractMetafields?: boolean } = {},
@@ -2946,7 +2946,7 @@ export class ConsolidatedPDFWorkflowService {
 
     try {
       // Get metafield definitions if extraction is enabled
-      let metafieldDefs: any[] = [];
+      let metafieldDefs: unknown[] = [];
       let fieldDefinitionsMap = new Map();
 
       if (extractMetafields) {
@@ -2956,7 +2956,7 @@ export class ConsolidatedPDFWorkflowService {
           .order('sort_order', { ascending: true });
 
         if (defs && defs.length > 0) {
-          metafieldDefs = defs;
+          metafieldDefs = defs as any;
           defs.forEach((field: any) => {
             fieldDefinitionsMap.set(field.id, field);
           });
@@ -2970,8 +2970,8 @@ export class ConsolidatedPDFWorkflowService {
         try {
           // Extract product information from chunk
           const productName = `Product from Chunk ${i + 1}`;
-          const productDescription = chunk.content?.substring(0, 200) || 'No description';
-          const productLongDescription = chunk.content || 'No long description';
+          const productDescription = (chunk as any).content?.substring(0, 200) || 'No description';
+          const productLongDescription = (chunk as any).content || 'No long description';
 
           console.log(`📝 Creating product ${i + 1}/${Math.min(chunks.length, maxProducts)}...`);
 
@@ -2983,14 +2983,14 @@ export class ConsolidatedPDFWorkflowService {
               description: productDescription,
               long_description: productLongDescription,
               properties: {
-                source_chunk_id: chunk.id,
+                source_chunk_id: (chunk as any).id,
                 document_id: documentId,
-                chunk_index: chunk.chunk_index,
-                page_number: chunk.page_number,
+                chunk_index: (chunk as any).chunk_index,
+                page_number: (chunk as any).page_number,
               },
               metadata: {
                 extracted_from: 'knowledge_base_chunk',
-                chunk_metadata: chunk.metadata,
+                chunk_metadata: (chunk as any).metadata,
                 extraction_date: new Date().toISOString(),
               },
               status: 'draft',
@@ -3021,7 +3021,7 @@ export class ConsolidatedPDFWorkflowService {
               const productText = `${product.name} ${product.description} ${product.long_description}`;
               const metafields = await MetafieldService.extractMetafieldsFromText(
                 productText,
-                metafieldDefs,
+                metafieldDefs as any,
               );
 
               if (Object.keys(metafields).length > 0) {
@@ -3042,7 +3042,7 @@ export class ConsolidatedPDFWorkflowService {
           // Link chunk to product
           try {
             await EntityRelationshipService.linkChunkToProduct(
-              chunk.id,
+              (chunk as any).id,
               product.id,
               'source',
               1.0,

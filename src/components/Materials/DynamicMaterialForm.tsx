@@ -411,6 +411,11 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         <div className="flex justify-end space-x-2 pt-4">
           <Button
             onClick={handleSave}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSave();
+              }
+            }}
             disabled={isSaving}
             className="flex items-center gap-2"
           >

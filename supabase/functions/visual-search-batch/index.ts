@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 // Import standardized Edge Function response types
 import {
-  
+
   createSuccessResponse,
   createErrorResponse,
   createJSONResponse,
@@ -139,16 +139,16 @@ async function validateBatchRequest(request: BatchAnalysisRequest): Promise<stri
 
 async function createBatchJob(request: BatchAnalysisRequest): Promise<string> {
   const batchId = `BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   // Calculate estimated processing time
   const baseTimePerItem = {
     'quick': 2000,      // 2 seconds
-    'standard': 5000,   // 5 seconds  
-    'comprehensive': 10000 // 10 seconds
+    'standard': 5000,   // 5 seconds
+    'comprehensive': 10000, // 10 seconds
   };
-  
+
   const estimatedTimeMs = request.items.length * baseTimePerItem[request.batch_settings.analysis_depth];
-  
+
   try {
     // Create batch job record
     const { error: batchError } = await supabase
@@ -162,7 +162,7 @@ async function createBatchJob(request: BatchAnalysisRequest): Promise<string> {
         batch_settings: request.batch_settings,
         notification_webhook: request.notification_webhook,
         estimated_duration_ms: estimatedTimeMs,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .select('id')
       .single();
@@ -181,7 +181,7 @@ async function createBatchJob(request: BatchAnalysisRequest): Promise<string> {
       focus_areas: item.focus_areas || request.batch_settings.focus_areas,
       item_metadata: item.metadata,
       status: 'pending',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     }));
 
     const { error: itemsError } = await supabase
@@ -202,13 +202,13 @@ async function createBatchJob(request: BatchAnalysisRequest): Promise<string> {
 async function processBatchJob(batchId: string): Promise<void> {
   // This would typically be handled by a background worker
   // For now, we'll start the processing asynchronously
-  
+
   // Update batch status to processing
   await supabase
     .from('visual_search_batch_jobs')
-    .update({ 
+    .update({
       status: 'processing',
-      started_at: new Date().toISOString()
+      started_at: new Date().toISOString(),
     })
     .eq('batch_id', batchId);
 
@@ -262,21 +262,21 @@ async function getBatchStatus(batchId: string): Promise<BatchJobStatus | null> {
         completed_items: completed.length,
         failed_items: failed.length,
         current_item: processing[0]?.item_id,
-        ...(estimatedCompletion && {estimated_completion: estimatedCompletion})
+        ...(estimatedCompletion && {estimated_completion: estimatedCompletion}),
       },
       results: {
         completed_analyses: completed.map((item: any) => item.analysis_id).filter(Boolean),
         failed_analyses: failed.map((item: any) => ({
           item_id: item.item_id,
           error: item.error_message || 'Unknown error',
-          retry_count: item.retry_count || 0
-        }))
+          retry_count: item.retry_count || 0,
+        })),
       },
       timing: {
         started_at: batchData.started_at || batchData.created_at,
         estimated_duration_ms: batchData.estimated_duration_ms,
-        completed_at: batchData.completed_at
-      }
+        completed_at: batchData.completed_at,
+      },
     };
   } catch (error) {
     console.error('Failed to get batch status:', error);
@@ -300,7 +300,7 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const pathSegments = url.pathname.split('/').filter(Boolean);
-    
+
     // Handle different endpoints:
     // POST /visual-search-batch - Submit new batch
     // GET /visual-search-batch/{batch_id} - Get batch status
@@ -317,7 +317,7 @@ Deno.serve(async (req: Request) => {
         const response = createErrorResponse(
           'BATCH_VALIDATION_FAILED',
           'Batch request validation failed',
-          { validation_errors: validationErrors }
+          { validation_errors: validationErrors },
         );
         return createJSONResponse(response, 400);
       }
@@ -340,22 +340,22 @@ Deno.serve(async (req: Request) => {
           total_items: body.items.length,
           estimated_processing_time_ms: body.items.length * 5000, // 5s per item average
           priority_level: body.batch_settings.priority,
-          queue_position: 1 // Placeholder
+          queue_position: 1, // Placeholder
         },
         processing_details: {
           max_concurrent: body.batch_settings.max_concurrent,
           retry_policy: {
             max_retries: 3,
-            retry_delay_ms: 5000
+            retry_delay_ms: 5000,
           },
-          timeout_per_item_ms: 30000
+          timeout_per_item_ms: 30000,
         },
-        ...(body.notification_webhook && {webhook_url: body.notification_webhook})
+        ...(body.notification_webhook && {webhook_url: body.notification_webhook}),
       };
 
       const response = createSuccessResponse(resultData, {
         processingTime,
-        version: '1.0.0'
+        version: '1.0.0',
       });
 
       return createJSONResponse(response);
@@ -369,7 +369,7 @@ Deno.serve(async (req: Request) => {
         const response = createErrorResponse(
           'MISSING_BATCH_ID',
           'Batch ID is required in the URL path',
-          { expected_format: '/visual-search-batch/{batch_id}' }
+          { expected_format: '/visual-search-batch/{batch_id}' },
         );
         return createJSONResponse(response, 400);
       }
@@ -379,7 +379,7 @@ Deno.serve(async (req: Request) => {
         const response = createErrorResponse(
           'BATCH_NOT_FOUND',
           `Batch job ${batchId} not found`,
-          { batch_id: batchId }
+          { batch_id: batchId },
         );
         return createJSONResponse(response, 404);
       }
@@ -390,10 +390,10 @@ Deno.serve(async (req: Request) => {
           const response = createErrorResponse(
             'BATCH_NOT_READY',
             'Batch processing is not yet complete',
-            { 
+            {
               current_status: batchStatus.status,
-              progress: batchStatus.progress
-            }
+              progress: batchStatus.progress,
+            },
           );
           return createJSONResponse(response, 202); // Accepted but not ready
         }
@@ -408,7 +408,7 @@ Deno.serve(async (req: Request) => {
           const response = createErrorResponse(
             'RESULTS_FETCH_ERROR',
             'Failed to fetch batch analysis results',
-            { error: resultsError.message }
+            { error: resultsError.message },
           );
           return createJSONResponse(response, 500);
         }
@@ -420,10 +420,10 @@ Deno.serve(async (req: Request) => {
           summary: {
             total_processed: batchStatus.progress.completed_items,
             total_failed: batchStatus.progress.failed_items,
-            success_rate: batchStatus.progress.total_items > 0 
-              ? (batchStatus.progress.completed_items / batchStatus.progress.total_items) * 100 
-              : 0
-          }
+            success_rate: batchStatus.progress.total_items > 0
+              ? (batchStatus.progress.completed_items / batchStatus.progress.total_items) * 100
+              : 0,
+          },
         });
 
         return createJSONResponse(response);
@@ -437,7 +437,7 @@ Deno.serve(async (req: Request) => {
       const response = createErrorResponse(
         'METHOD_NOT_ALLOWED',
         'Only POST and GET methods are allowed',
-        { allowed_methods: ['POST', 'GET'] }
+        { allowed_methods: ['POST', 'GET'] },
       );
       return createJSONResponse(response, 405);
     }
@@ -450,8 +450,8 @@ Deno.serve(async (req: Request) => {
       error instanceof Error ? error.message : 'Unknown error occurred during batch processing',
       {
         timestamp: new Date().toISOString(),
-        error_type: error instanceof Error ? error.constructor.name : 'UnknownError'
-      }
+        error_type: error instanceof Error ? error.constructor.name : 'UnknownError',
+      },
     );
 
     return createJSONResponse(response, 500);

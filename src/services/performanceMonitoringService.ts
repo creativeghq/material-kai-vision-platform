@@ -1,6 +1,6 @@
 /**
  * Performance Monitoring & Analytics Service
- * 
+ *
  * Comprehensive monitoring system to track:
  * - Product detection accuracy and processing times
  * - Quality scores and user engagement metrics
@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService, ServiceConfig } from './base/BaseService';
 
 export interface PerformanceMetrics {
@@ -21,7 +22,7 @@ export interface PerformanceMetrics {
     averageProductsPerDocument: number;
     qualityDistribution: Record<string, number>;
   };
-  
+
   // Processing Performance
   processing: {
     averageProcessingTime: number;
@@ -30,7 +31,7 @@ export interface PerformanceMetrics {
     errorRate: number;
     throughput: number;
   };
-  
+
   // Quality Metrics
   quality: {
     averageQualityScore: number;
@@ -38,7 +39,7 @@ export interface PerformanceMetrics {
     humanReviewRate: number;
     qualityImprovementRate: number;
   };
-  
+
   // User Engagement
   userEngagement: {
     searchVolume: number;
@@ -47,7 +48,7 @@ export interface PerformanceMetrics {
     conversionRate: number;
     userSatisfaction: number;
   };
-  
+
   // System Health
   systemHealth: {
     uptime: number;
@@ -129,15 +130,15 @@ export class PerformanceMonitoringService extends BaseService {
     averageProcessingTime: 30000, // 30 seconds
     errorRate: 0.05, // 5%
     responseTime: 2000, // 2 seconds
-    
+
     // Quality thresholds
     averageQualityScore: 0.7, // 70%
     humanReviewRate: 0.3, // 30%
-    
+
     // User engagement thresholds
     clickThroughRate: 0.1, // 10%
     sessionDuration: 60000, // 1 minute
-    
+
     // System health thresholds
     cpuUtilization: 0.8, // 80%
     memoryUsage: 0.85, // 85%
@@ -149,11 +150,11 @@ export class PerformanceMonitoringService extends BaseService {
    */
   async getPerformanceMetrics(
     timeRange: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ): Promise<PerformanceMetrics> {
     try {
       const cacheKey = `metrics-${workspaceId}-${timeRange.start}-${timeRange.end}`;
-      
+
       if (this.metricsCache.has(cacheKey)) {
         return this.metricsCache.get(cacheKey);
       }
@@ -163,13 +164,13 @@ export class PerformanceMonitoringService extends BaseService {
         processingMetrics,
         qualityMetrics,
         userEngagementMetrics,
-        systemHealthMetrics
+        systemHealthMetrics,
       ] = await Promise.all([
         this.getProductDetectionMetrics(timeRange, workspaceId),
         this.getProcessingMetrics(timeRange, workspaceId),
         this.getQualityMetrics(timeRange, workspaceId),
         this.getUserEngagementMetrics(timeRange, workspaceId),
-        this.getSystemHealthMetrics(timeRange, workspaceId)
+        this.getSystemHealthMetrics(timeRange, workspaceId),
       ]);
 
       const metrics: PerformanceMetrics = {
@@ -196,7 +197,7 @@ export class PerformanceMonitoringService extends BaseService {
    */
   private async getProductDetectionMetrics(
     timeRange: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ) {
     try {
       // Get product creation analytics
@@ -216,15 +217,15 @@ export class PerformanceMonitoringService extends BaseService {
         .lte('created_at', timeRange.end);
 
       const totalProcessed = productAnalytics?.length || 0;
-      const averageDetectionTime = productAnalytics?.reduce((sum, event) => 
+      const averageDetectionTime = productAnalytics?.reduce((sum, event) =>
         sum + (event.event_data?.processing_time || 0), 0) / Math.max(totalProcessed, 1);
 
       const qualityScores = qualityData?.map(q => q.quality_score) || [];
-      const detectionAccuracy = qualityScores.length > 0 
-        ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length 
+      const detectionAccuracy = qualityScores.length > 0
+        ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length
         : 0;
 
-      const averageProductsPerDocument = productAnalytics?.reduce((sum, event) => 
+      const averageProductsPerDocument = productAnalytics?.reduce((sum, event) =>
         sum + (event.event_data?.products_detected || 0), 0) / Math.max(totalProcessed, 1);
 
       // Quality distribution
@@ -259,7 +260,7 @@ export class PerformanceMonitoringService extends BaseService {
    */
   private async getProcessingMetrics(
     timeRange: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ) {
     try {
       // Get processing events
@@ -270,17 +271,17 @@ export class PerformanceMonitoringService extends BaseService {
         .gte('created_at', timeRange.start)
         .lte('created_at', timeRange.end);
 
-      const processingTimes = processingEvents?.map(event => 
+      const processingTimes = processingEvents?.map(event =>
         event.event_data?.processing_time || 0) || [];
-      
-      const averageProcessingTime = processingTimes.length > 0 
-        ? processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length 
+
+      const averageProcessingTime = processingTimes.length > 0
+        ? processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length
         : 0;
 
-      const errorEvents = processingEvents?.filter(event => 
+      const errorEvents = processingEvents?.filter(event =>
         event.event_data?.status === 'error') || [];
-      const errorRate = processingEvents?.length > 0 
-        ? errorEvents.length / processingEvents.length 
+      const errorRate = processingEvents?.length > 0
+        ? errorEvents.length / processingEvents.length
         : 0;
 
       const throughput = processingEvents?.length || 0;
@@ -309,7 +310,7 @@ export class PerformanceMonitoringService extends BaseService {
    */
   private async getQualityMetrics(
     timeRange: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ) {
     try {
       // Get quality assessments
@@ -320,8 +321,8 @@ export class PerformanceMonitoringService extends BaseService {
         .lte('created_at', timeRange.end);
 
       const qualityScores = qualityAssessments?.map(q => q.quality_score) || [];
-      const averageQualityScore = qualityScores.length > 0 
-        ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length 
+      const averageQualityScore = qualityScores.length > 0
+        ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length
         : 0;
 
       // Get human review tasks
@@ -331,8 +332,8 @@ export class PerformanceMonitoringService extends BaseService {
         .gte('created_at', timeRange.start)
         .lte('created_at', timeRange.end);
 
-      const humanReviewRate = qualityAssessments?.length > 0 
-        ? (reviewTasks?.length || 0) / qualityAssessments.length 
+      const humanReviewRate = qualityAssessments?.length > 0
+        ? (reviewTasks?.length || 0) / qualityAssessments.length
         : 0;
 
       // Quality trends (daily averages)
@@ -363,7 +364,7 @@ export class PerformanceMonitoringService extends BaseService {
    */
   private async getUserEngagementMetrics(
     timeRange: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ) {
     try {
       // Get search analytics
@@ -393,16 +394,16 @@ export class PerformanceMonitoringService extends BaseService {
         .lte('created_at', timeRange.end);
 
       const sessionDurations = sessions?.map(s => s.duration_ms || 0) || [];
-      const sessionDuration = sessionDurations.length > 0 
-        ? sessionDurations.reduce((sum, duration) => sum + duration, 0) / sessionDurations.length 
+      const sessionDuration = sessionDurations.length > 0
+        ? sessionDurations.reduce((sum, duration) => sum + duration, 0) / sessionDurations.length
         : 0;
 
       const conversionEvents = interactions?.filter(i => i.event_type === 'conversion') || [];
       const conversionRate = searchVolume > 0 ? conversionEvents.length / searchVolume : 0;
 
       const satisfactionScores = sessions?.map(s => s.satisfaction_score || 0) || [];
-      const userSatisfaction = satisfactionScores.length > 0 
-        ? satisfactionScores.reduce((sum, score) => sum + score, 0) / satisfactionScores.length 
+      const userSatisfaction = satisfactionScores.length > 0
+        ? satisfactionScores.reduce((sum, score) => sum + score, 0) / satisfactionScores.length
         : 0;
 
       return {
@@ -429,7 +430,7 @@ export class PerformanceMonitoringService extends BaseService {
    */
   private async getSystemHealthMetrics(
     timeRange: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ) {
     try {
       // Get system performance events
@@ -440,16 +441,16 @@ export class PerformanceMonitoringService extends BaseService {
         .gte('created_at', timeRange.start)
         .lte('created_at', timeRange.end);
 
-      const responseTimes = systemEvents?.map(event => 
+      const responseTimes = systemEvents?.map(event =>
         event.event_data?.response_time || 0) || [];
-      
-      const responseTime = responseTimes.length > 0 
-        ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length 
+
+      const responseTime = responseTimes.length > 0
+        ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length
         : 0;
 
       // Calculate uptime (percentage of successful requests)
       const totalRequests = systemEvents?.length || 0;
-      const successfulRequests = systemEvents?.filter(event => 
+      const successfulRequests = systemEvents?.filter(event =>
         event.event_data?.status === 'success').length || 0;
       const uptime = totalRequests > 0 ? successfulRequests / totalRequests : 1;
 
@@ -477,7 +478,7 @@ export class PerformanceMonitoringService extends BaseService {
    */
   async generateAlerts(
     metrics: PerformanceMetrics,
-    workspaceId: string
+    workspaceId: string,
   ): Promise<PerformanceAlert[]> {
     const alerts: PerformanceAlert[] = [];
 
@@ -549,7 +550,7 @@ export class PerformanceMonitoringService extends BaseService {
   async generatePerformanceReport(
     reportType: 'daily' | 'weekly' | 'monthly' | 'custom',
     period: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ): Promise<PerformanceReport> {
     try {
       const metrics = await this.getPerformanceMetrics(period, workspaceId);
@@ -583,20 +584,20 @@ export class PerformanceMonitoringService extends BaseService {
    */
   private async getQualityTrends(
     timeRange: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ): Promise<Array<{ timestamp: string; score: number }>> {
     // Implementation would aggregate quality scores by day
     return [];
   }
 
   private calculateQualityImprovementRate(
-    trends: Array<{ timestamp: string; score: number }>
+    trends: Array<{ timestamp: string; score: number }>,
   ): number {
     if (trends.length < 2) return 0;
-    
+
     const firstScore = trends[0].score;
     const lastScore = trends[trends.length - 1].score;
-    
+
     return lastScore > firstScore ? (lastScore - firstScore) / firstScore : 0;
   }
 
@@ -639,7 +640,7 @@ export class PerformanceMonitoringService extends BaseService {
   private async analyzeTrends(
     metrics: PerformanceMetrics,
     period: { start: string; end: string },
-    workspaceId: string
+    workspaceId: string,
   ) {
     // Implementation would compare current metrics with historical data
     return [

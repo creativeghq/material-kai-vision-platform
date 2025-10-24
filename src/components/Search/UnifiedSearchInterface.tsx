@@ -110,8 +110,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         people: [],
       };
 
-      data?.forEach((item: any) => {
-        const entities = item.extracted_entities as EntityData[] || [];
+      data?.forEach((item: unknown) => {
+        const entities = (item as any).extracted_entities as EntityData[] || [];
         entities.forEach(entity => {
           if (entity.confidence >= 0.7) { // Only include high-confidence entities
             switch (entity.type) {
@@ -303,9 +303,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
             .in('id', resultIds)
             .not('extracted_entities', 'is', null);
 
-          entityData?.forEach((item: any) => {
-            if (item.extracted_entities) {
-              entityDataMap[item.id] = item.extracted_entities as EntityData[];
+          entityData?.forEach((item: unknown) => {
+            if ((item as any).extracted_entities) {
+              entityDataMap[(item as any).id] = (item as any).extracted_entities as EntityData[];
             }
           });
         } catch (entityError) {
@@ -438,7 +438,11 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 placeholder="Search materials: 'Cement tile 60x120', 'Fire resistance', 'Waterproof flooring'..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && performSearch()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    performSearch();
+                  }
+                }}
                 className="pr-10"
               />
               <Type className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />

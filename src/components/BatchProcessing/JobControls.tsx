@@ -153,6 +153,11 @@ export const JobControls: React.FC<JobControlsProps> = ({
 
                     className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('resume', onResume)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAction('resume', onResume);
+                      }
+                    }}
                     disabled={disabled || isLoading === 'resume'}
                   >
                     <Play className="h-3 w-3" />
@@ -171,6 +176,11 @@ export const JobControls: React.FC<JobControlsProps> = ({
 
                     className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('pause', onPause)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAction('pause', onPause);
+                      }
+                    }}
                     disabled={disabled || isLoading === 'pause'}
                   >
                     <Pause className="h-3 w-3" />
@@ -197,12 +207,19 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to cancel &quot;{job.name}&quot;? This action cannot be undone.
+                    Are you sure you want to cancel "{job.name}"? This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleAction('cancel', onCancel)}>
+                  <AlertDialogAction
+                    onClick={() => handleAction('cancel', onCancel)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAction('cancel', onCancel);
+                      }
+                    }}
+                  >
                     Confirm
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -219,6 +236,11 @@ export const JobControls: React.FC<JobControlsProps> = ({
 
                     className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('retry', onRetry)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAction('retry', onRetry);
+                      }
+                    }}
                     disabled={disabled || isLoading === 'retry'}
                   >
                     <RotateCcw className="h-3 w-3" />
@@ -245,12 +267,19 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete &quot;{job.name}&quot;? This will remove all job data and cannot be undone.
+                    Are you sure you want to delete "{job.name}"? This will remove all job data and cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleAction('delete', onDelete)}>
+                  <AlertDialogAction
+                    onClick={() => handleAction('delete', onDelete)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAction('delete', onDelete);
+                      }
+                    }}
+                  >
                     Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -272,13 +301,17 @@ export const JobControls: React.FC<JobControlsProps> = ({
         <div className="text-sm text-muted-foreground">
           Progress: {job.filesProcessed}/{job.totalFiles} files ({job.progress}%)
         </div>
-      </CardHeader>
-      <CardContent>
+      </CardHeader><CardContent>
         <div className="flex flex-wrap gap-2">
           {/* Resume/Pause Button */}
           {job.status === 'paused' && job.canPause && onResume && (
             <Button
               onClick={() => handleAction('resume', onResume)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAction('resume', onResume);
+                }
+              }}
               disabled={disabled || isLoading === 'resume'}
 
             >
@@ -291,6 +324,11 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <Button
               className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
               onClick={() => handleAction('pause', onPause)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAction('pause', onPause);
+                }
+              }}
               disabled={disabled || isLoading === 'pause'}
             >
               <Pause className="h-4 w-4" />
@@ -314,12 +352,19 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to cancel &quot;{job.name}&quot;? This action cannot be undone and any progress will be lost.
+                    Are you sure you want to cancel "{job.name}"? This action cannot be undone and any progress will be lost.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleAction('cancel', onCancel)}>
+                  <AlertDialogAction
+                    onClick={() => handleAction('cancel', onCancel)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAction('cancel', onCancel);
+                      }
+                    }}
+                  >
                     Confirm Cancellation
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -332,6 +377,11 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <Button
               className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
               onClick={() => handleAction('retry', onRetry)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAction('retry', onRetry);
+                }
+              }}
               disabled={disabled || isLoading === 'retry'}
             >
               <RotateCcw className="h-4 w-4" />
@@ -356,12 +406,19 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Job</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete &quot;{job.name}&quot;? This will permanently remove all job data, logs, and results. This action cannot be undone.
+                    Are you sure you want to delete "{job.name}"? This will permanently remove all job data, logs, and results. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleAction('delete', onDelete)}>
+                  <AlertDialogAction
+                    onClick={() => handleAction('delete', onDelete)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAction('delete', onDelete);
+                      }
+                    }}
+                  >
                     Delete Permanently
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -471,14 +528,18 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
           Batch Operations
           <Badge className="bg-secondary text-secondary-foreground">{selectedJobs.length} selected</Badge>
         </CardTitle>
-      </CardHeader>
-      <CardContent>
+      </CardHeader><CardContent>
         <div className="flex flex-wrap gap-2">
           {/* Batch Pause */}
           {pausableJobs.length > 0 && onBatchPause && (
             <Button
               className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleBatchAction('pause', onBatchPause)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleBatchAction('pause', onBatchPause);
+                }
+              }}
               disabled={disabled || isLoading === 'pause'}
 
             >
@@ -491,6 +552,11 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
           {resumableJobs.length > 0 && onBatchResume && (
             <Button
               onClick={() => handleBatchAction('resume', onBatchResume)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleBatchAction('resume', onBatchResume);
+                }
+              }}
               disabled={disabled || isLoading === 'resume'}
 
             >
@@ -521,7 +587,14 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleBatchAction('cancel', onBatchCancel)}>
+                  <AlertDialogAction
+                    onClick={() => handleBatchAction('cancel', onBatchCancel)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleBatchAction('cancel', onBatchCancel);
+                      }
+                    }}
+                  >
                     Confirm Cancellation
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -534,6 +607,11 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
             <Button
               className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleBatchAction('retry', onBatchRetry)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleBatchAction('retry', onBatchRetry);
+                }
+              }}
               disabled={disabled || isLoading === 'retry'}
 
             >
@@ -564,7 +642,14 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleBatchAction('delete', onBatchDelete)}>
+                  <AlertDialogAction
+                    onClick={() => handleBatchAction('delete', onBatchDelete)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleBatchAction('delete', onBatchDelete);
+                      }
+                    }}
+                  >
                     Delete Permanently
                   </AlertDialogAction>
                 </AlertDialogFooter>

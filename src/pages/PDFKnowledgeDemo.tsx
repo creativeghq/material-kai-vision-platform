@@ -129,7 +129,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
               <strong>How it works:</strong> Add content to the knowledge base with a PDF URL.
-              When users search and find relevant content, they can click &quot;View PDF Details&quot;
+              When users search and find relevant content, they can click "View PDF Details"
               to access the original document for comprehensive information.
             </AlertDescription>
           </Alert>
@@ -153,7 +153,14 @@ export const PDFKnowledgeDemo: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button onClick={addSampleEntry} className="w-full">
+              <Button
+                onClick={addSampleEntry}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    addSampleEntry();
+                  }
+                }}
+                className="w-full">
                 Add Sample Knowledge Entry with PDF Link
               </Button>
 
@@ -200,6 +207,11 @@ export const PDFKnowledgeDemo: React.FC = () => {
                               size="sm"
                               className="flex items-center gap-1"
                               onClick={() => window.open(result.pdfUrl as string, '_blank')}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  window.open(result.pdfUrl as string, '_blank');
+                                }
+                              }}
                             >
                               <ExternalLink className="h-3 w-3" />
                               View PDF Details
@@ -269,7 +281,7 @@ export const PDFKnowledgeDemo: React.FC = () => {
               <div>
                 <h4 className="font-semibold">Search & Access</h4>
                 <p className="text-sm text-muted-foreground">
-                  Users can search the extracted content and click &quot;View PDF Details&quot; for the full document
+                  Users can search the extracted content and click "View PDF Details" for the full document
                 </p>
               </div>
             </div>

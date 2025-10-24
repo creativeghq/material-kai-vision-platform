@@ -110,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       } else {
         toast({
-          title: 'Welcome back!',
+          title: 'Welcome back',
           description: "You've been signed in successfully.",
         });
       }

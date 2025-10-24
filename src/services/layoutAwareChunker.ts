@@ -314,19 +314,19 @@ export class LayoutAwareChunker {
     chunk.htmlContent += '\n' + element.innerHTML;
 
     // Update metadata
-    chunk.metadata!.elementIds.push(element.id);
-    chunk.metadata!.wordCount += this.countWords(element.textContent);
-    chunk.metadata!.characterCount += element.textContent.length;
-    chunk.metadata!.readingTime = this.estimateReadingTime(chunk.text!);
-    chunk.metadata!.complexity = Math.max(chunk.metadata!.complexity, this.calculateComplexity(element.textContent));
+    chunk.metadata.elementIds.push(element.id);
+    chunk.metadata.wordCount += this.countWords(element.textContent);
+    chunk.metadata.characterCount += element.textContent.length;
+    chunk.metadata.readingTime = this.estimateReadingTime(chunk.text);
+    chunk.metadata.complexity = Math.max(chunk.metadata.complexity, this.calculateComplexity(element.textContent));
 
     // Merge semantic tags
     const newTags = this.extractSemanticTags(element);
-    chunk.metadata!.semanticTags = [...new Set([...chunk.metadata!.semanticTags, ...newTags])];
+    chunk.metadata.semanticTags = [...new Set([...chunk.metadata.semanticTags, ...newTags])];
 
     // Update confidence (weighted average)
-    const totalElements = chunk.metadata!.elementIds.length;
-    chunk.metadata!.confidence = (chunk.metadata!.confidence * (totalElements - 1) + element.confidence) / totalElements;
+    const totalElements = chunk.metadata.elementIds.length;
+    chunk.metadata.confidence = (chunk.metadata.confidence * (totalElements - 1) + element.confidence) / totalElements;
   }
 
   /**
@@ -338,19 +338,19 @@ export class LayoutAwareChunker {
   ): Promise<DocumentChunk> {
     // Ensure all required fields are present
     const chunk: DocumentChunk = {
-      id: partialChunk.id!,
+      id: partialChunk.id,
       documentId,
-      chunkIndex: partialChunk.chunkIndex!,
-      text: partialChunk.text!,
-      htmlContent: partialChunk.htmlContent!,
-      chunkType: partialChunk.chunkType!,
-      hierarchyLevel: partialChunk.hierarchyLevel!,
-      pageNumber: partialChunk.pageNumber!,
-      bbox: partialChunk.bbox!,
+      chunkIndex: partialChunk.chunkIndex,
+      text: partialChunk.text,
+      htmlContent: partialChunk.htmlContent,
+      chunkType: partialChunk.chunkType,
+      hierarchyLevel: partialChunk.hierarchyLevel,
+      pageNumber: partialChunk.pageNumber,
+      bbox: partialChunk.bbox,
       ...(partialChunk.parentChunkId ? { parentChunkId: partialChunk.parentChunkId } : {}),
-      childChunkIds: partialChunk.childChunkIds!,
-      metadata: partialChunk.metadata!,
-      createdAt: partialChunk.createdAt!,
+      childChunkIds: partialChunk.childChunkIds,
+      metadata: partialChunk.metadata,
+      createdAt: partialChunk.createdAt,
     };
 
     // Clean up text
@@ -374,7 +374,7 @@ export class LayoutAwareChunker {
 
     // Start new chunk if hierarchy level changes significantly
     if (options.respectHierarchy &&
-        Math.abs(element.hierarchy - currentChunk.hierarchyLevel!) > 1) {
+        Math.abs(element.hierarchy - currentChunk.hierarchyLevel) > 1) {
       return true;
     }
 

@@ -301,6 +301,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         : [...current, rValue];
                       updateCategoryFilter('rValue', updated);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = slipFilters?.rValue || [];
+                        const updated = current.includes(rValue)
+                          ? current.filter((v: string) => v !== rValue)
+                          : [...current, rValue];
+                        updateCategoryFilter('rValue', updated);
+                      }
+                    }}
                   >
                     {rValue}
                   </Button>
@@ -310,8 +319,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
 
             {/* DCOF Range */}
             <div className="space-y-1">
-              <Label className="text-xs">DCOF Range (≥0.42 recommended)</Label>
-              <Slider
+              <Label className="text-xs">DCOF Range (≥0.42 recommended)</Label><Slider
                 value={slipFilters?.dcofRange || [0, 1]}
                 onValueChange={(value) => updateCategoryFilter('dcofRange', value as [number, number])}
                 max={1}
@@ -341,6 +349,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         ? current.filter((v: string) => v !== grade)
                         : [...current, grade];
                       updateCategoryFilter('barefootRampTest', updated);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = slipFilters?.barefootRampTest || [];
+                        const updated = current.includes(grade)
+                          ? current.filter((v: string) => v !== grade)
+                          : [...current, grade];
+                        updateCategoryFilter('barefootRampTest', updated);
+                      }
                     }}
                   >
                     Class {grade}
@@ -373,6 +390,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         : [...current, level];
                       updateCategoryFilter('glossLevel', updated);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = glossFilters?.glossLevel || [];
+                        const updated = current.includes(level)
+                          ? current.filter((v: string) => v !== level)
+                          : [...current, level];
+                        updateCategoryFilter('glossLevel', updated);
+                      }
+                    }}
                   >
                     {level.replace('-', ' ')}
                   </Button>
@@ -382,8 +408,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
 
             {/* Gloss Value Range */}
             <div className="space-y-1">
-              <Label className="text-xs">Gloss Value (0-100)</Label>
-              <Slider
+              <Label className="text-xs">Gloss Value (0-100)</Label><Slider
                 value={glossFilters?.glossValueRange || [0, 100]}
                 onValueChange={(value) => updateCategoryFilter('glossValueRange', value as [number, number])}
                 max={100}
@@ -432,8 +457,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
           <div className="space-y-3">
             {/* Mohs Hardness Range */}
             <div className="space-y-1">
-              <Label className="text-xs">Mohs Hardness (1-10)</Label>
-              <Slider
+              <Label className="text-xs">Mohs Hardness (1-10)</Label><Slider
                 value={mechanicalFilters?.mohsHardnessRange || [1, 10]}
                 onValueChange={(value) => updateCategoryFilter('mohsHardnessRange', value as [number, number])}
                 max={10}
@@ -464,6 +488,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         : [...current, rating];
                       updateCategoryFilter('peiRating', updated);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = mechanicalFilters?.peiRating || [];
+                        const updated = current.includes(rating)
+                          ? current.filter((v: number) => v !== rating)
+                          : [...current, rating];
+                        updateCategoryFilter('peiRating', updated);
+                      }
+                    }}
                   >
                     Class {rating}
                   </Button>
@@ -488,6 +521,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         : [...current, level];
                       updateCategoryFilter('impactResistanceClass', updated);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = mechanicalFilters?.impactResistanceClass || [];
+                        const updated = current.includes(level)
+                          ? current.filter((v: string) => v !== level)
+                          : [...current, level];
+                        updateCategoryFilter('impactResistanceClass', updated);
+                      }
+                    }}
                   >
                     {level}
                   </Button>
@@ -504,8 +546,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
           <div className="space-y-3">
             {/* Thermal Conductivity Range */}
             <div className="space-y-1">
-              <Label className="text-xs">Thermal Conductivity (W/m·K)</Label>
-              <Slider
+              <Label className="text-xs">Thermal Conductivity (W/m·K)</Label><Slider
                 value={thermalFilters?.thermalConductivityRange || [0, 50]}
                 onValueChange={(value) => updateCategoryFilter('thermalConductivityRange', value as [number, number])}
                 max={50}
@@ -554,8 +595,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
           <div className="space-y-3">
             {/* Water Absorption Range */}
             <div className="space-y-1">
-              <Label className="text-xs">Water Absorption (%)</Label>
-              <Slider
+              <Label className="text-xs">Water Absorption (%)</Label><Slider
                 value={waterFilters?.waterAbsorptionRange || [0, 20]}
                 onValueChange={(value) => updateCategoryFilter('waterAbsorptionRange', value as [number, number])}
                 max={20}
@@ -585,6 +625,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         ? current.filter((v: string) => v !== classification)
                         : [...current, classification];
                       updateCategoryFilter('waterAbsorptionClass', updated);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = waterFilters?.waterAbsorptionClass || [];
+                        const updated = current.includes(classification)
+                          ? current.filter((v: string) => v !== classification)
+                          : [...current, classification];
+                        updateCategoryFilter('waterAbsorptionClass', updated);
+                      }
                     }}
                   >
                     {classification}
@@ -642,6 +691,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         : [...current, level];
                       updateCategoryFilter('acidResistance', updated);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = chemicalFilters?.acidResistance || [];
+                        const updated = current.includes(level)
+                          ? current.filter((v: string) => v !== level)
+                          : [...current, level];
+                        updateCategoryFilter('acidResistance', updated);
+                      }
+                    }}
                   >
                     {level}
                   </Button>
@@ -665,6 +723,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         ? current.filter((v: number) => v !== rating)
                         : [...current, rating];
                       updateCategoryFilter('stainResistanceClass', updated);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = chemicalFilters?.stainResistanceClass || [];
+                        const updated = current.includes(rating)
+                          ? current.filter((v: number) => v !== rating)
+                          : [...current, rating];
+                        updateCategoryFilter('stainResistanceClass', updated);
+                      }
                     }}
                   >
                     Class {rating}
@@ -700,8 +767,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
           <div className="space-y-3">
             {/* NRC Range */}
             <div className="space-y-1">
-              <Label className="text-xs">Noise Reduction Coefficient (NRC)</Label>
-              <Slider
+              <Label className="text-xs">Noise Reduction Coefficient (NRC)</Label><Slider
                 value={acousticFilters?.nrcRange || [0, 1]}
                 onValueChange={(value) => updateCategoryFilter('nrcRange', value as [number, number])}
                 max={1}
@@ -757,6 +823,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         : [...current, rating];
                       updateCategoryFilter('vocEmissionRange', updated);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = envFilters?.vocEmissionRange || [];
+                        const updated = current.includes(rating)
+                          ? current.filter((v: string) => v !== rating)
+                          : [...current, rating];
+                        updateCategoryFilter('vocEmissionRange', updated);
+                      }
+                    }}
                   >
                     {rating}
                   </Button>
@@ -766,8 +841,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
 
             {/* Total Recycled Content Range */}
             <div className="space-y-1">
-              <Label className="text-xs">Total Recycled Content (%)</Label>
-              <Slider
+              <Label className="text-xs">Total Recycled Content (%)</Label><Slider
                 value={envFilters?.totalRecycledContentRange || [0, 100]}
                 onValueChange={(value) => updateCategoryFilter('totalRecycledContentRange', value as [number, number])}
                 max={100}
@@ -838,8 +912,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
           <div className="space-y-3">
             {/* Texture Depth Range */}
             <div className="space-y-1">
-              <Label className="text-xs">Texture Depth (mm)</Label>
-              <Slider
+              <Label className="text-xs">Texture Depth (mm)</Label><Slider
                 value={dimensionalFilters?.textureDepthRange || [0, 10]}
                 onValueChange={(value) => updateCategoryFilter('textureDepthRange', value as [number, number])}
                 max={10}
@@ -870,6 +943,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         : [...current, variation];
                       updateCategoryFilter('shadeVariation', updated);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = dimensionalFilters?.shadeVariation || [];
+                        const updated = current.includes(variation)
+                          ? current.filter((v: string) => v !== variation)
+                          : [...current, variation];
+                        updateCategoryFilter('shadeVariation', updated);
+                      }
+                    }}
                   >
                     {variation}
                   </Button>
@@ -893,6 +975,15 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         ? current.filter((v: string) => v !== texture)
                         : [...current, texture];
                       updateCategoryFilter('textureType', updated);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const current = dimensionalFilters?.textureType || [];
+                        const updated = current.includes(texture)
+                          ? current.filter((v: string) => v !== texture)
+                          : [...current, texture];
+                        updateCategoryFilter('textureType', updated);
+                      }
                     }}
                   >
                     {texture}
@@ -972,6 +1063,11 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                     checked={isActive}
                     onCheckedChange={(checked) => handleCategoryToggle(categoryKey, !!checked)}
                     onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation();
+                      }
+                    }}
                   />
                   <Icon className={`h-4 w-4 ${category.color}`} />
                   <span className="text-sm font-medium">{category.displayName}</span>
@@ -979,8 +1075,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </div>
             </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
+          </CollapsibleTrigger><CollapsibleContent>
             <CardContent className="pt-0 p-3">
               <div className="text-xs text-muted-foreground mb-3">
                 Searchable properties: {category.searchableProperties.join(', ')}
@@ -1001,8 +1096,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
             <Filter className="h-4 w-4" />
             Functional Property Search
           </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 space-y-3">
+        </CardHeader><CardContent className="p-4 pt-0 space-y-3">
           {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -1027,6 +1121,11 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                     <X
                       className="h-3 w-3 ml-1 cursor-pointer"
                       onClick={() => handleCategoryToggle(categoryKey, false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleCategoryToggle(categoryKey, false);
+                        }
+                      }}
                     />
                   </Badge>
                 );
@@ -1036,7 +1135,17 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
 
           {/* Clear Filters */}
           {(filters.searchQuery || filters.activeCategories.length > 0) && (
-            <Button variant="outline" size="sm" onClick={clearAllFilters} className="w-full text-xs">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearAllFilters}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  clearAllFilters();
+                }
+              }}
+              className="w-full text-xs"
+            >
               <X className="h-3 w-3 mr-1" />
               Clear All Filters
             </Button>
@@ -1058,8 +1167,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
           <p className="text-sm text-muted-foreground">
             Search and filter materials by their functional properties across 9 metadata categories
           </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </CardHeader><CardContent className="space-y-4">
           {/* Main Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -1081,6 +1189,11 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setShowAdvancedFilters(!showAdvancedFilters);
+                  }
+                }}
                 className="text-xs"
               >
                 <Settings className="h-3 w-3 mr-1" />
@@ -1088,7 +1201,16 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
               </Button>
             </div>
             {(filters.searchQuery || filters.activeCategories.length > 0) && (
-              <Button variant="outline" size="sm" onClick={clearAllFilters}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearAllFilters}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    clearAllFilters();
+                  }
+                }}
+              >
                 <X className="h-4 w-4 mr-1" />
                 Clear All
               </Button>
@@ -1104,8 +1226,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
           <p className="text-sm text-muted-foreground">
             Select which functional property categories to include in your search
           </p>
-        </CardHeader>
-        <CardContent>
+        </CardHeader><CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {Object.keys(FUNCTIONAL_CATEGORIES).map(categoryKey =>
               renderCategoryFilter(categoryKey),
@@ -1122,8 +1243,7 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
             <p className="text-sm text-muted-foreground">
               Fine-tune your search with specific property value ranges and criteria for active categories
             </p>
-          </CardHeader>
-          <CardContent>
+          </CardHeader><CardContent>
             {filters.activeCategories.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-8">
                 Select one or more functional metadata categories above to access advanced property filters
@@ -1165,6 +1285,13 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                         resetFilters.propertyFilters = {};
                         onFiltersChange(resetFilters);
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const resetFilters = { ...filters };
+                          resetFilters.propertyFilters = {};
+                          onFiltersChange(resetFilters);
+                        }
+                      }}
                       className="text-xs"
                     >
                       <X className="h-3 w-3 mr-1" />
@@ -1173,6 +1300,11 @@ export const FunctionalPropertySearch: React.FC<FunctionalPropertySearchProps> =
                     <Button
                       size="sm"
                       onClick={() => onFiltersChange(filters)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onFiltersChange(filters);
+                        }
+                      }}
                       className="text-xs"
                     >
                       Apply Filters

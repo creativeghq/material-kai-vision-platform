@@ -80,8 +80,7 @@ export const SearchHub: React.FC<SearchHubProps> = ({
               <Clock className="h-5 w-5" />
               Recent Searches
             </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+          </CardHeader><CardContent className="space-y-2">
             {recentSearches.map((search, index) => (
               <div
                 key={index}
@@ -92,6 +91,16 @@ export const SearchHub: React.FC<SearchHubProps> = ({
                   if (searchInput) {
                     searchInput.value = search;
                     searchInput.focus();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    // Auto-fill search with recent query
+                    const searchInput = document.querySelector('input[placeholder*="Search materials"]') as HTMLInputElement;
+                    if (searchInput) {
+                      searchInput.value = search;
+                      searchInput.focus();
+                    }
                   }
                 }}
               >
@@ -116,6 +125,11 @@ export const SearchHub: React.FC<SearchHubProps> = ({
                 key={material.id}
                 className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer"
                 onClick={() => handleQuickAction('material', material.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleQuickAction('material', material.id);
+                  }
+                }}
               >
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4 text-muted-foreground" />
@@ -150,6 +164,16 @@ export const SearchHub: React.FC<SearchHubProps> = ({
                     searchInput.focus();
                   }
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    // Auto-fill search with trending query
+                    const searchInput = document.querySelector('input[placeholder*="Search materials"]') as HTMLInputElement;
+                    if (searchInput) {
+                      searchInput.value = query;
+                      searchInput.focus();
+                    }
+                  }
+                }}
               >
                 <span className="text-sm">{query}</span>
                 <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -169,6 +193,11 @@ export const SearchHub: React.FC<SearchHubProps> = ({
             <Button
               className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleQuickAction('3d')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleQuickAction('3d');
+                }
+              }}
             >
               <Sparkles className="h-6 w-6" />
               <span className="text-sm">Generate 3D</span>
@@ -177,16 +206,26 @@ export const SearchHub: React.FC<SearchHubProps> = ({
             <Button
               className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleQuickAction('moodboard')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleQuickAction('moodboard');
+                }
+              }}
             >
               <Star className="h-6 w-6" />
               <span className="text-sm">Create Moodboard</span>
             </Button>
-
             <Button
               className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => {
                 // Open catalog view
                 window.location.href = '/catalog';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  // Open catalog view
+                  window.location.href = '/catalog';
+                }
               }}
             >
               <Package className="h-6 w-6" />
@@ -198,6 +237,12 @@ export const SearchHub: React.FC<SearchHubProps> = ({
               onClick={() => {
                 // Open knowledge base
                 window.location.href = '/rag';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  // Open knowledge base
+                  window.location.href = '/rag';
+                }
               }}
             >
               <BookOpen className="h-6 w-6" />

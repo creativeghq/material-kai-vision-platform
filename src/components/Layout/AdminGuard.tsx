@@ -34,7 +34,16 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({
               <p>Your current role: <span className="font-medium capitalize">{role}</span></p>
               <p>Required role: <span className="font-medium">Admin</span></p>
             </div>
-            <Button onClick={() => navigate(fallbackPath)} className="w-full" variant="outline">
+            <Button
+              onClick={() => navigate(fallbackPath)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  navigate(fallbackPath);
+                }
+              }}
+              className="w-full"
+              variant="outline"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Return to Dashboard
             </Button>

@@ -176,6 +176,11 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
           {(state === WebSocketState.FAILED || state === WebSocketState.DISCONNECTED) && (
             <button
               onClick={handleRetry}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleRetry();
+                }
+              }}
               className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
             >
               Retry

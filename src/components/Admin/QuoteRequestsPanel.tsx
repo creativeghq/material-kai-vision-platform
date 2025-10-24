@@ -85,6 +85,12 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
               setFilter(f);
               setPage(0);
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setFilter(f);
+                setPage(0);
+              }
+            }}
             className={`px-4 py-2 rounded-lg font-medium ${
               filter === f
                 ? 'bg-blue-600 text-white'
@@ -136,7 +142,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
                   </td>
                   <td className="text-center p-3">
                     <button
-                      onClick={() => onSelectRequest?.(request)}
+                      onClick={() => onSelectRequest?.(request)} onKeyDown={(e) => e.key === 'Enter' && onSelectRequest?.(request)}
                       className="text-blue-600 hover:text-blue-800 font-medium"
                     >
                       View
@@ -152,7 +158,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
       {/* Pagination */}
       <div className="mt-4 flex justify-between items-center">
         <button
-          onClick={() => setPage(Math.max(0, page - 1))}
+          onClick={() => setPage(Math.max(0, page - 1))} onKeyDown={(e) => e.key === 'Enter' && setPage(Math.max(0, page - 1))}
           disabled={page === 0}
           className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50"
         >
@@ -162,7 +168,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
           Page {page + 1}
         </span>
         <button
-          onClick={() => setPage(page + 1)}
+          onClick={() => setPage(page + 1)} onKeyDown={(e) => e.key === 'Enter' && setPage(page + 1)}
           disabled={requests.length < pageSize}
           className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50"
         >
@@ -171,7 +177,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
       </div>
 
       <button
-        onClick={loadRequests}
+        onClick={loadRequests} onKeyDown={(e) => e.key === 'Enter' && loadRequests()}
         className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
       >
         Refresh

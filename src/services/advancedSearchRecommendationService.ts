@@ -1,9 +1,9 @@
 /**
  * Advanced Search & Recommendation Engine
- * 
+ *
  * Implements multi-modal search combining text, visual, and metadata queries.
  * Creates recommendation system using product embeddings and user behavior patterns.
- * 
+ *
  * Features:
  * - Multi-modal search (text + visual + metadata)
  * - Embedding-based similarity search
@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+
 import { BaseService, ServiceConfig } from './base/BaseService';
 import { MultiVectorSearchService } from './multiVectorSearchService';
 import { AnalyticsService } from './AnalyticsService';
@@ -127,29 +128,29 @@ export interface AdvancedSearchResult {
   brand?: string;
   price?: number;
   currency?: string;
-  
+
   // Scoring and relevance
   relevanceScore: number;
   qualityScore: number;
   confidenceScore: number;
   personalizedScore: number;
-  
+
   // Multi-modal scores
   textSimilarity: number;
   visualSimilarity: number;
   semanticSimilarity: number;
   metadataSimilarity: number;
-  
+
   // Metadata
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   tags: string[];
-  properties: Record<string, any>;
-  
+  properties: Record<string, unknown>;
+
   // Source information
   sourceDocument?: string;
   sourceChunk?: string;
   extractedAt?: string;
-  
+
   // Recommendation context
   recommendationReason?: string;
   similarProducts?: string[];
@@ -175,23 +176,23 @@ export interface RecommendationResult {
   imageUrl?: string;
   category: string;
   price?: number;
-  
+
   // Recommendation scoring
   recommendationScore: number;
   confidenceScore: number;
   diversityScore: number;
-  
+
   // Recommendation reasoning
   reason: string;
   reasonType: 'similar_products' | 'user_behavior' | 'trending' | 'complementary' | 'quality_based';
   explanation: string;
-  
+
   // Supporting data
   similarityFactors: string[];
   userBehaviorFactors: string[];
   qualityMetrics: Record<string, number>;
-  
-  metadata: Record<string, any>;
+
+  metadata: Record<string, unknown>;
 }
 
 export interface AdvancedSearchResponse {
@@ -199,7 +200,7 @@ export interface AdvancedSearchResponse {
   totalCount: number;
   searchTime: number;
   searchId: string;
-  
+
   // Search analytics
   queryAnalysis: {
     intent: string;
@@ -207,21 +208,21 @@ export interface AdvancedSearchResponse {
     categories: string[];
     confidence: number;
   };
-  
+
   // Result analytics
   resultDistribution: {
     byType: Record<string, number>;
     byCategory: Record<string, number>;
     byQuality: Record<string, number>;
   };
-  
+
   // Personalization
   personalizationApplied: boolean;
   userProfile: UserBehaviorProfile;
-  
+
   // Recommendations
   relatedRecommendations: RecommendationResult[];
-  
+
   // Performance metrics
   performance: {
     searchTime: number;
@@ -236,16 +237,16 @@ export interface RecommendationResponse {
   totalCount: number;
   generationTime: number;
   recommendationId: string;
-  
+
   // Analytics
   algorithmUsed: string[];
   diversityAchieved: number;
   confidenceDistribution: Record<string, number>;
-  
+
   // User context
   userProfile: UserBehaviorProfile;
   sessionContext: SessionContext;
-  
+
   // Performance
   performance: {
     dataRetrievalTime: number;
@@ -281,7 +282,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   protected async doInitialize(): Promise<void> {
     // Initialize dependencies
-    await this.multiVectorService.initialize();
+    // MultiVectorSearchService is a static service, no initialization needed
     console.log('AdvancedSearchRecommendationService initialized');
   }
 
@@ -303,29 +304,29 @@ export class AdvancedSearchRecommendationService extends BaseService {
     return this.executeOperation(async () => {
       const startTime = Date.now();
       const searchId = `search-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
+
       this.logger.info(`🔍 Advanced search: ${request.query} (${request.searchType})`);
-      
+
       // Step 1: Analyze query and extract intent
       const queryAnalysis = await this.analyzeQuery(request.query);
-      
+
       // Step 2: Get user context and behavior profile
       const userContext = request.userContext || await this.getUserContext(request.userId, request.workspaceId);
-      
+
       // Step 3: Perform multi-modal search
       const searchResults = await this.performMultiModalSearch(request, queryAnalysis);
-      
+
       // Step 4: Apply personalization and ranking
       const personalizedResults = await this.personalizeResults(searchResults, userContext, queryAnalysis);
-      
+
       // Step 5: Generate related recommendations
       const recommendations = await this.generateRelatedRecommendations(request, personalizedResults, userContext);
-      
+
       // Step 6: Track search analytics
       await this.trackSearchAnalytics(request, personalizedResults, searchId, Date.now() - startTime);
-      
+
       const searchTime = Date.now() - startTime;
-      
+
       return {
         results: personalizedResults,
         totalCount: personalizedResults.length,
@@ -368,7 +369,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
       // Step 4: Apply diversity and ranking
       const rankedRecommendations = await this.rankAndDiversifyRecommendations(
         recommendations,
-        request.diversityFactor || 0.3
+        request.diversityFactor || 0.3,
       );
 
       // Step 5: Track recommendation analytics
@@ -445,7 +446,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
 
     const confidence = Math.min(
       0.5 + (entities.length * 0.1) + (categories.length * 0.15),
-      1.0
+      1.0,
     );
 
     return { intent, entities, categories, confidence };
@@ -490,7 +491,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   private async performMultiModalSearch(
     request: AdvancedSearchRequest,
-    queryAnalysis: any
+    queryAnalysis: any,
   ): Promise<AdvancedSearchResult[]> {
     const results: AdvancedSearchResult[] = [];
 
@@ -534,7 +535,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   private async performTextSearch(
     request: AdvancedSearchRequest,
-    queryAnalysis: any
+    queryAnalysis: any,
   ): Promise<AdvancedSearchResult[]> {
     try {
       // Search in document chunks
@@ -546,7 +547,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
           metadata,
           document_id,
           chunk_index,
-          documents!inner(filename, metadata)
+          documentsinner(filename, metadata)
         `)
         .eq('workspace_id', request.workspaceId)
         .textSearch('content', request.query)
@@ -595,10 +596,10 @@ export class AdvancedSearchRecommendationService extends BaseService {
         imageUrl: request.imageUrl,
         weights: { visual: 1.0, multimodal: 0.5 },
         filters: request.filters,
-        options: { limit: request.limit || 15 }
-      };
+        options: { limit: request.limit || 15 },
+  };
 
-      const visualResults = await MultiVectorSearchService.search(visualQuery);
+      const visualResults = await MultiVectorSearchService.search(visualQuery as any);
 
       return visualResults.results.map(result => ({
         id: result.id,
@@ -631,7 +632,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   private async performSemanticSearch(
     request: AdvancedSearchRequest,
-    queryAnalysis: any
+    queryAnalysis: any,
   ): Promise<AdvancedSearchResult[]> {
     try {
       // Use multi-vector service for semantic search
@@ -640,13 +641,13 @@ export class AdvancedSearchRecommendationService extends BaseService {
         weights: {
           text: 0.7,
           multimodal: 0.8,
-          application: queryAnalysis.categories.length > 0 ? 0.6 : 0.3
+          application: queryAnalysis.categories.length > 0 ? 0.6 : 0.3,
         },
         filters: request.filters,
-        options: { limit: request.limit || 15 }
-      };
+        options: { limit: request.limit || 15 },
+  };
 
-      const semanticResults = await MultiVectorSearchService.search(semanticQuery);
+      const semanticResults = await MultiVectorSearchService.search(semanticQuery as any);
 
       return semanticResults.results.map(result => ({
         id: result.id,
@@ -899,7 +900,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
   private async generateRecommendations(
     request: RecommendationRequest,
     userProfile: UserBehaviorProfile,
-    sessionContext: SessionContext
+    sessionContext: SessionContext,
   ): Promise<RecommendationResult[]> {
     const recommendations: RecommendationResult[] = [];
 
@@ -936,7 +937,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   private async generateCollaborativeRecommendations(
     request: RecommendationRequest,
-    userProfile: UserBehaviorProfile
+    userProfile: UserBehaviorProfile,
   ): Promise<RecommendationResult[]> {
     try {
       // Find similar users based on search patterns and interactions
@@ -998,7 +999,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   private async generateContentBasedRecommendations(
     request: RecommendationRequest,
-    userProfile: UserBehaviorProfile
+    userProfile: UserBehaviorProfile,
   ): Promise<RecommendationResult[]> {
     try {
       // Get user's preferred categories and materials
@@ -1057,7 +1058,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   private async generateEmbeddingBasedRecommendations(
     request: RecommendationRequest,
-    userProfile: UserBehaviorProfile
+    userProfile: UserBehaviorProfile,
   ): Promise<RecommendationResult[]> {
     try {
       // Use the most frequent query from user's search history as seed
@@ -1069,25 +1070,25 @@ export class AdvancedSearchRecommendationService extends BaseService {
         weights: {
           text: 0.4,
           multimodal: 0.6,
-          application: 0.5
+          application: 0.5,
         },
         filters: {
           categories: userProfile.preferences.implicitCategories,
         },
-        options: { limit: request.limit || 10 }
-      };
+        options: { limit: request.limit || 10 },
+  };
 
-      const embeddingResults = await MultiVectorSearchService.search(embeddingQuery);
+      const embeddingResults = await MultiVectorSearchService.search(embeddingQuery as any);
 
       return embeddingResults.results.map(result => ({
-        id: `embedding-${result.id}`,
-        productId: result.id,
-        title: result.title,
-        description: result.description,
-        imageUrl: result.imageUrl,
-        category: result.category,
-        price: result.price,
-        recommendationScore: result.similarity_score,
+        id: `embedding-${(result as any).id}`,
+        productId: (result as any).id,
+        title: (result as any).title,
+        description: (result as any).description,
+        imageUrl: (result as any).imageUrl,
+        category: (result as any).category,
+        price: (result as any).price || 0,
+        recommendationScore: (result as any).similarity_score,
         confidenceScore: 0.85,
         diversityScore: 0.7,
         reason: 'Semantically similar to your interests',
@@ -1171,7 +1172,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
    */
   private async generateQualityBasedRecommendations(
     request: RecommendationRequest,
-    userProfile: UserBehaviorProfile
+    userProfile: UserBehaviorProfile,
   ): Promise<RecommendationResult[]> {
     try {
       // Get high-quality products based on quality assessments
@@ -1181,7 +1182,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
           entity_id,
           quality_score,
           confidence_score,
-          products!inner(*)
+          productsinner(*)
         `)
         .eq('entity_type', 'product')
         .eq('products.workspace_id', request.workspaceId)
@@ -1207,7 +1208,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
         userBehaviorFactors: ['quality_preference'],
         qualityMetrics: {
           quality_score: item.quality_score,
-          confidence_score: item.confidence_score
+          confidence_score: item.confidence_score,
         },
         metadata: item.products.metadata || {},
       }));
@@ -1218,10 +1219,10 @@ export class AdvancedSearchRecommendationService extends BaseService {
   }
 
   // Helper methods for analytics and processing
-  private extractFrequentQueries(searches: any[]): string[] {
+  private extractFrequentQueries(searches: unknown[]): string[] {
     const queryCount = new Map<string, number>();
     searches.forEach(search => {
-      const query = search.input_data?.query;
+      const query = (search as any).input_data?.query;
       if (query) {
         queryCount.set(query, (queryCount.get(query) || 0) + 1);
       }
@@ -1233,10 +1234,10 @@ export class AdvancedSearchRecommendationService extends BaseService {
       .map(([query]) => query);
   }
 
-  private extractPreferredSearchTypes(searches: any[]): string[] {
+  private extractPreferredSearchTypes(searches: unknown[]): string[] {
     const typeCount = new Map<string, number>();
     searches.forEach(search => {
-      const type = search.input_data?.search_type || 'text';
+      const type = (search as any).input_data?.search_type || 'text';
       typeCount.set(type, (typeCount.get(type) || 0) + 1);
     });
 
@@ -1245,37 +1246,37 @@ export class AdvancedSearchRecommendationService extends BaseService {
       .map(([type]) => type);
   }
 
-  private calculateAvgSessionDuration(searches: any[]): number {
+  private calculateAvgSessionDuration(searches: unknown[]): number {
     if (searches.length === 0) return 0;
-    const totalTime = searches.reduce((sum, search) => sum + (search.processing_time_ms || 0), 0);
-    return totalTime / searches.length;
+    const totalTime = searches.reduce((sum, search) => sum + ((search as any).processing_time_ms || 0), 0);
+    return (totalTime as any) / searches.length;
   }
 
-  private calculateClickThroughRate(searches: any[], interactions: any[]): number {
+  private calculateClickThroughRate(searches: unknown[], interactions: unknown[]): number {
     if (searches.length === 0) return 0;
-    const clickEvents = interactions.filter(i => i.event_type === 'search_click').length;
+    const clickEvents = interactions.filter(i => (i as any).event_type === 'search_click').length;
     return clickEvents / searches.length;
   }
 
-  private calculateAvgDwellTime(interactions: any[]): number {
+  private calculateAvgDwellTime(interactions: unknown[]): number {
     const dwellTimes = interactions
-      .filter(i => i.event_data?.dwell_time)
-      .map(i => i.event_data.dwell_time);
+      .filter(i => (i as any).event_data?.dwell_time)
+      .map(i => (i as any).event_data.dwell_time);
 
     if (dwellTimes.length === 0) return 0;
     return dwellTimes.reduce((sum, time) => sum + time, 0) / dwellTimes.length;
   }
 
-  private calculateConversionRate(interactions: any[]): number {
-    const views = interactions.filter(i => i.event_type === 'product_view').length;
-    const conversions = interactions.filter(i => i.event_type === 'conversion').length;
+  private calculateConversionRate(interactions: unknown[]): number {
+    const views = interactions.filter(i => (i as any).event_type === 'product_view').length;
+    const conversions = interactions.filter(i => (i as any).event_type === 'conversion').length;
     return views > 0 ? conversions / views : 0;
   }
 
-  private extractPreferredResultTypes(interactions: any[]): string[] {
+  private extractPreferredResultTypes(interactions: unknown[]): string[] {
     const typeCount = new Map<string, number>();
     interactions.forEach(interaction => {
-      const type = interaction.event_data?.result_type;
+      const type = (interaction as any).event_data?.result_type;
       if (type) {
         typeCount.set(type, (typeCount.get(type) || 0) + 1);
       }
@@ -1287,12 +1288,12 @@ export class AdvancedSearchRecommendationService extends BaseService {
       .map(([type]) => type);
   }
 
-  private extractImplicitCategories(searches: any[], interactions: any[]): string[] {
+  private extractImplicitCategories(searches: unknown[], interactions: unknown[]): string[] {
     const categories = new Set<string>();
 
     // From search queries
     searches.forEach(search => {
-      const query = search.input_data?.query?.toLowerCase() || '';
+      const query = (search as any).input_data?.query?.toLowerCase() || '';
       if (query.includes('floor')) categories.add('flooring');
       if (query.includes('wall')) categories.add('wall_covering');
       if (query.includes('furniture')) categories.add('furniture');
@@ -1302,19 +1303,19 @@ export class AdvancedSearchRecommendationService extends BaseService {
 
     // From interactions
     interactions.forEach(interaction => {
-      const category = interaction.event_data?.category;
+      const category = (interaction as any).event_data?.category;
       if (category) categories.add(category);
     });
 
     return Array.from(categories);
   }
 
-  private extractImplicitMaterials(searches: any[]): string[] {
+  private extractImplicitMaterials(searches: unknown[]): string[] {
     const materials = new Set<string>();
     const materialKeywords = ['wood', 'metal', 'glass', 'ceramic', 'stone', 'fabric', 'plastic', 'concrete'];
 
     searches.forEach(search => {
-      const query = search.input_data?.query?.toLowerCase() || '';
+      const query = (search as any).input_data?.query?.toLowerCase() || '';
       materialKeywords.forEach(material => {
         if (query.includes(material)) materials.add(material);
       });
@@ -1419,7 +1420,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
   private personalizeResults(
     results: AdvancedSearchResult[],
     userContext: UserContext,
-    queryAnalysis: any
+    queryAnalysis: any,
   ): Promise<AdvancedSearchResult[]> {
     // Apply personalization scoring
     return Promise.resolve(results.map(result => {
@@ -1437,7 +1438,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
 
       // Boost based on search history
       const hasSearchedSimilar = userContext.searchHistory.some(h =>
-        h.query.toLowerCase().includes(result.category.toLowerCase())
+        h.query.toLowerCase().includes(result.category.toLowerCase()),
       );
       if (hasSearchedSimilar) {
         personalizedScore += 0.1;
@@ -1454,7 +1455,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
   private generateRelatedRecommendations(
     request: AdvancedSearchRequest,
     results: AdvancedSearchResult[],
-    userContext: UserContext
+    userContext: UserContext,
   ): Promise<RecommendationResult[]> {
     // Generate quick recommendations based on search results
     const topCategories = results.slice(0, 3).map(r => r.category);
@@ -1497,7 +1498,7 @@ export class AdvancedSearchRecommendationService extends BaseService {
 
   private rankAndDiversifyRecommendations(
     recommendations: RecommendationResult[],
-    diversityFactor: number
+    diversityFactor: number,
   ): Promise<RecommendationResult[]> {
     // Simple diversity algorithm - ensure variety in categories
     const diversified: RecommendationResult[] = [];
@@ -1541,10 +1542,10 @@ export class AdvancedSearchRecommendationService extends BaseService {
     request: AdvancedSearchRequest,
     results: AdvancedSearchResult[],
     searchId: string,
-    processingTime: number
+    processingTime: number,
   ): Promise<void> {
     try {
-      await this.analyticsService.trackEvent({
+      await (this.analyticsService as any).trackEvent({
         event_type: 'advanced_search',
         workspace_id: request.workspaceId,
         user_id: request.userId,
@@ -1567,10 +1568,10 @@ export class AdvancedSearchRecommendationService extends BaseService {
   private async trackRecommendationAnalytics(
     request: RecommendationRequest,
     recommendations: RecommendationResult[],
-    recommendationId: string
+    recommendationId: string,
   ): Promise<void> {
     try {
-      await this.analyticsService.trackEvent({
+      await (this.analyticsService as any).trackEvent({
         event_type: 'recommendation_generated',
         workspace_id: request.workspaceId,
         user_id: request.userId,

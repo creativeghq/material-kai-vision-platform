@@ -88,7 +88,7 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
     if (mivaaResponse.ok) {
       const mivaaData = await mivaaResponse.json();
       const analysisText = mivaaData.analysis_result || mivaaData.result;
-      
+
       try {
         return JSON.parse(analysisText);
       } catch (parseError) {
@@ -106,7 +106,7 @@ async function analyzeContentWithAI(content: string, analysisDepth: string): Pro
 
   // MIVAA-only approach - OpenAI integration removed for centralized AI management
   console.error('❌ All MIVAA methods failed for content analysis');
-  throw new Error(`Content analysis failed - MIVAA service required. OpenAI direct integration removed as part of centralized AI architecture. Please check MIVAA service availability.`);
+  throw new Error('Content analysis failed - MIVAA service required. OpenAI direct integration removed as part of centralized AI architecture. Please check MIVAA service availability.');
 }
 
 async function generateEmbedding(text: string): Promise<number[]> {

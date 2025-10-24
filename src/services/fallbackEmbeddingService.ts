@@ -1,6 +1,6 @@
 /**
  * Fallback Embedding Generation Service
- * 
+ *
  * Generates embeddings for document chunks when MIVAA service fails to do so.
  * Uses OpenAI's text-embedding-3-small model directly.
  */
@@ -92,7 +92,7 @@ export class FallbackEmbeddingService {
         console.log(`📦 Processing batch ${Math.floor(i / this.batchSize) + 1}/${Math.ceil(chunks.length / this.batchSize)}`);
 
         const results = await Promise.all(
-          batch.map(chunk => this.generateAndStoreEmbedding(chunk.id, chunk.content, documentId))
+          batch.map(chunk => this.generateAndStoreEmbedding(chunk.id, chunk.content, documentId)),
         );
 
         embeddingsGenerated += results.filter(r => r.success).length;
@@ -107,7 +107,7 @@ export class FallbackEmbeddingService {
       const processingTime = Date.now() - startTime;
       const successRate = chunks.length > 0 ? (embeddingsGenerated / chunks.length) * 100 : 0;
 
-      console.log(`✅ Fallback embedding generation completed:`);
+      console.log('✅ Fallback embedding generation completed:');
       console.log(`   - Total chunks: ${chunks.length}`);
       console.log(`   - Embeddings generated: ${embeddingsGenerated}`);
       console.log(`   - Failed: ${embeddingsFailed}`);
@@ -139,7 +139,7 @@ export class FallbackEmbeddingService {
   private async generateAndStoreEmbedding(
     chunkId: string,
     content: string,
-    documentId: string
+    documentId: string,
   ): Promise<EmbeddingResult> {
     try {
       // Generate embedding using OpenAI API

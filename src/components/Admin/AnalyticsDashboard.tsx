@@ -96,33 +96,33 @@ export const AnalyticsDashboard: React.FC = () => {
       if (apiError) throw apiError;
 
       // Filter and cast data to match expected types
-      const filteredSearchData = (searchData || []).filter((item: any) =>
-        item.created_at &&
-        item.event_type &&
-        item.id,
-      ).map((item: any) => ({
-        id: item.id,
-        query_text: (item.event_data as Record<string, unknown>)?.query as string || 'Unknown query',
-        results_shown: (item.event_data as Record<string, unknown>)?.results_count as number || 0,
-        clicks_count: (item.event_data as Record<string, unknown>)?.clicks as number || 0,
-        satisfaction_rating: (item.event_data as Record<string, unknown>)?.rating as number ?? 0,
-        response_time_ms: (item.event_data as Record<string, unknown>)?.response_time as number || 0,
-        created_at: item.created_at || new Date().toISOString(),
-        user_id: item.user_id,
-        session_id: item.session_id,
+      const filteredSearchData = (searchData || []).filter((item: unknown) =>
+        (item as any).created_at &&
+        (item as any).event_type &&
+        (item as any).id,
+      ).map((item: unknown) => ({
+        id: (item as any).id,
+        query_text: ((item as any).event_data as Record<string, unknown>)?.query as string || 'Unknown query',
+        results_shown: ((item as any).event_data as Record<string, unknown>)?.results_count as number || 0,
+        clicks_count: ((item as any).event_data as Record<string, unknown>)?.clicks as number || 0,
+        satisfaction_rating: ((item as any).event_data as Record<string, unknown>)?.rating as number ?? 0,
+        response_time_ms: ((item as any).event_data as Record<string, unknown>)?.response_time as number || 0,
+        created_at: (item as any).created_at || new Date().toISOString(),
+        user_id: (item as any).user_id,
+        session_id: (item as any).session_id,
       }));
 
-      const filteredApiData = (apiData || []).filter((item: any) =>
-        item.created_at &&
-        item.id &&
-        item.status_code !== null,
-      ).map((item: any) => ({
-        ...item,
-        response_status: item.status_code || 0,
-        response_time_ms: item.response_time_ms || 0,
-        user_id: item.api_key_id || 'anonymous',
-        endpoint_id: item.endpoint || 'unknown',
-        user_agent: item.user_agent || 'unknown',
+      const filteredApiData = (apiData || []).filter((item: unknown) =>
+        (item as any).created_at &&
+        (item as any).id &&
+        (item as any).status_code !== null,
+      ).map((item: unknown) => ({
+        ...(item as any),
+        response_status: (item as any).status_code || 0,
+        response_time_ms: (item as any).response_time_ms || 0,
+        user_id: (item as any).api_key_id || 'anonymous',
+        endpoint_id: (item as any).endpoint || 'unknown',
+        user_agent: (item as any).user_agent || 'unknown',
       }));
 
       setSearchAnalytics(filteredSearchData);
@@ -132,8 +132,8 @@ export const AnalyticsDashboard: React.FC = () => {
       const totalSearches = searchData?.length || 0;
       const totalApiCalls = apiData?.length || 0;
       const uniqueUsers = new Set([
-        ...searchData?.map((s: any) => s.user_id).filter(Boolean) || [],
-        ...apiData?.map((a: any) => a.api_key_id).filter(Boolean) || [],
+        ...searchData?.map((s: unknown) => (s as any).user_id).filter(Boolean) || [],
+        ...apiData?.map((a: unknown) => (a as any).api_key_id).filter(Boolean) || [],
       ]).size;
       const avgResponseTime = apiData?.reduce((sum: any, log: any) => sum + (log.response_time_ms || 0), 0) / Math.max(apiData?.length || 1, 1);
 
@@ -214,14 +214,13 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/')} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
                 className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
-              </Button>
-              <Button
-                onClick={() => navigate('/admin')}
+              </Button><Button
+                onClick={() => navigate('/admin')} onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
                 className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -236,7 +235,7 @@ export const AnalyticsDashboard: React.FC = () => {
               </p>
             </div>
           </div>
-          <Button onClick={fetchAnalyticsData} disabled={loading}>
+          <Button onClick={fetchAnalyticsData} onKeyDown={(e) => e.key === 'Enter' && fetchAnalyticsData()} disabled={loading}>
             <Activity className="h-4 w-4 mr-2" />
             Refresh Data
           </Button>
@@ -289,8 +288,7 @@ export const AnalyticsDashboard: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Recent Search Queries</CardTitle>
-              </CardHeader>
-              <CardContent>
+              </CardHeader><CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -301,8 +299,7 @@ export const AnalyticsDashboard: React.FC = () => {
                       <TableHead>Satisfaction</TableHead>
                       <TableHead>Time</TableHead>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                  </TableHeader><TableBody>
                     {searchAnalytics.slice(0, 10).map((search) => (
                       <TableRow key={search.id}>
                         <TableCell className="font-medium max-w-xs truncate">

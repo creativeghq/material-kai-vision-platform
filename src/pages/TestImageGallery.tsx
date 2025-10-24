@@ -72,6 +72,11 @@ const TestImageGallery: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setDocumentId(id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setDocumentId(id);
+                    }
+                  }}
                 >
                   {id}
                 </Button>
@@ -80,7 +85,15 @@ const TestImageGallery: React.FC = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={handleTestGallery} disabled={!documentId.trim()}>
+            <Button
+              onClick={handleTestGallery}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleTestGallery();
+                }
+              }}
+              disabled={!documentId.trim()}
+            >
               Load Image Gallery
             </Button>
             <Button
@@ -88,6 +101,12 @@ const TestImageGallery: React.FC = () => {
               onClick={() => {
                 setShowGallery(false);
                 setDocumentId('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setShowGallery(false);
+                  setDocumentId('');
+                }
               }}
             >
               Reset
@@ -188,8 +207,7 @@ const TestImageGallery: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle>Usage Instructions</CardTitle>
-        </CardHeader>
-        <CardContent>
+        </CardHeader><CardContent>
           <div className="space-y-4 text-sm">
             <div>
               <h4 className="font-medium mb-2">1. Testing with Real Data</h4>

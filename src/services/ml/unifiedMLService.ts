@@ -112,7 +112,7 @@ export interface UnifiedMLOptions {
   categories?: string[];
 
   // Generic options for extensibility
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -123,7 +123,7 @@ export interface UnifiedMLResult extends MLResult {
   serverJobId?: string;
   provider?: string;
   modelVersion?: string;
-  deviceInfo?: any;
+  deviceInfo?: unknown;
 }
 
 /**
@@ -590,7 +590,7 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
     initialized: boolean;
     clientServices: Record<string, boolean>;
     serverServices: Record<string, boolean>;
-    deviceInfo: any;
+    deviceInfo: unknown;
     cacheStats: { size: number; hitRate: number };
   }> {
     const deviceInfo = await DeviceDetector.getDeviceInfo();

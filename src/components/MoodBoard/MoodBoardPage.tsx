@@ -133,17 +133,34 @@ export const MoodBoardPage = () => {
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
             <Button
               onClick={() => setViewMode('grid')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setViewMode('grid');
+                }
+              }}
             >
               <Grid3X3 className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => setViewMode('list')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setViewMode('list');
+                }
+              }}
             >
               <List className="h-4 w-4" />
             </Button>
           </div>
 
-          <Button onClick={() => setShowCreateDialog(true)}>
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowCreateDialog(true);
+              }
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" />
             New MoodBoard
           </Button>
@@ -159,7 +176,14 @@ export const MoodBoardPage = () => {
             <p className="text-muted-foreground mb-4">
               Create your first moodboard to start organizing materials
             </p>
-            <Button onClick={() => setShowCreateDialog(true)}>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setShowCreateDialog(true);
+                }
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Create Your First MoodBoard
             </Button>
@@ -197,9 +221,7 @@ export const MoodBoardPage = () => {
                       )}
                     </div>
                   </div>
-                </CardHeader>
-
-                <CardContent className="pt-0">
+                </CardHeader><CardContent className="pt-0">
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{board.items?.length || 0} materials</span>
                     <span>{new Date(board.createdAt).toLocaleDateString()}</span>
@@ -213,6 +235,12 @@ export const MoodBoardPage = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteMoodBoard(board.id, board.title);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.stopPropagation();
+                          handleDeleteMoodBoard(board.id, board.title);
+                        }
                       }}
                     >
                       Delete
@@ -234,8 +262,7 @@ export const MoodBoardPage = () => {
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title">Title</Label>
-              <Input
+              <Label htmlFor="title">Title</Label><Input
                 id="title"
                 value={newMoodBoard.title}
                 onChange={(e) => setNewMoodBoard(prev => ({
@@ -275,12 +302,22 @@ export const MoodBoardPage = () => {
             <div className="flex gap-2 pt-4">
               <Button
                 onClick={() => setShowCreateDialog(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setShowCreateDialog(false);
+                  }
+                }}
                 className="flex-1"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCreateMoodBoard}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCreateMoodBoard();
+                  }
+                }}
                 disabled={creating}
                 className="flex-1"
               >

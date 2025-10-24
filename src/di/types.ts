@@ -169,7 +169,7 @@ export interface IServiceContainer {
    */
   registerInstance<T>(
     identifier: ServiceIdentifier<T>,
-    instance: T
+    instance: T,
   ): IServiceRegistrationBuilder<T>;
 
   /**

@@ -1,4 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 interface Database {
@@ -106,7 +106,7 @@ let cacheTimestamp: number | null = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function isCacheValid(): boolean {
-  return cacheTimestamp !== null && 
+  return cacheTimestamp !== null &&
          (Date.now() - cacheTimestamp) < CACHE_DURATION &&
          categoriesCache !== null &&
          propertiesCache !== null;
@@ -151,7 +151,7 @@ async function fetchCategoriesFromDB(supabase: any): Promise<MaterialCategory[]>
   validationRules.forEach((rule: any) => {
     const categoryId = rule.category_id;
     const propertyKey = rule.material_properties.property_key;
-    
+
     if (!categoryPropsMap.has(categoryId)) {
       categoryPropsMap.set(categoryId, []);
     }
@@ -175,7 +175,7 @@ async function fetchCategoriesFromDB(supabase: any): Promise<MaterialCategory[]>
     aiExtractionEnabled: cat.ai_extraction_enabled,
     aiConfidenceThreshold: cat.ai_confidence_threshold,
     processingPriority: cat.processing_priority,
-    metaFields: categoryPropsMap.get(cat.id) || allExtractableProps
+    metaFields: categoryPropsMap.get(cat.id) || allExtractableProps,
   }));
 
   return materialCategories;
@@ -205,7 +205,7 @@ async function fetchPropertiesFromDB(supabase: any): Promise<MaterialProperty[]>
     isRequired: prop.is_required,
     isSearchable: prop.is_searchable,
     isFilterable: prop.is_filterable,
-    isAiExtractable: prop.is_ai_extractable
+    isAiExtractable: prop.is_ai_extractable,
   }));
 }
 
@@ -249,12 +249,12 @@ Deno.serve(async (req: Request) => {
           success: true,
           data: categoriesCache,
           cached: true,
-          cacheAge: Date.now() - cacheTimestamp!
+          cacheAge: Date.now() - cacheTimestamp!,
         }), {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            'Access-Control-Allow-Origin': '*',
+          },
         });
 
       case 'properties':
@@ -262,12 +262,12 @@ Deno.serve(async (req: Request) => {
           success: true,
           data: propertiesCache,
           cached: true,
-          cacheAge: Date.now() - cacheTimestamp!
+          cacheAge: Date.now() - cacheTimestamp!,
         }), {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            'Access-Control-Allow-Origin': '*',
+          },
         });
 
       case 'legacy-format':
@@ -275,7 +275,7 @@ Deno.serve(async (req: Request) => {
         const legacyFormat = categoriesCache!.reduce((acc, cat) => {
           acc[cat.key] = {
             name: cat.name,
-            metaFields: cat.metaFields
+            metaFields: cat.metaFields,
           };
           return acc;
         }, {} as Record<string, { name: string; metaFields: string[] }>);
@@ -284,12 +284,12 @@ Deno.serve(async (req: Request) => {
           success: true,
           data: legacyFormat,
           cached: true,
-          cacheAge: Date.now() - cacheTimestamp!
+          cacheAge: Date.now() - cacheTimestamp!,
         }), {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            'Access-Control-Allow-Origin': '*',
+          },
         });
 
       case 'refresh':
@@ -297,19 +297,19 @@ Deno.serve(async (req: Request) => {
         categoriesCache = await fetchCategoriesFromDB(supabase);
         propertiesCache = await fetchPropertiesFromDB(supabase);
         cacheTimestamp = Date.now();
-        
+
         return new Response(JSON.stringify({
           success: true,
           message: `Cache refreshed. Loaded ${categoriesCache.length} categories and ${propertiesCache.length} properties`,
-          data: { 
-            categories: categoriesCache.length, 
-            properties: propertiesCache.length 
-          }
+          data: {
+            categories: categoriesCache.length,
+            properties: propertiesCache.length,
+          },
         }), {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            'Access-Control-Allow-Origin': '*',
+          },
         });
 
       default:
@@ -318,30 +318,30 @@ Deno.serve(async (req: Request) => {
           success: true,
           data: {
             categories: categoriesCache,
-            properties: propertiesCache
+            properties: propertiesCache,
           },
           cached: true,
-          cacheAge: Date.now() - cacheTimestamp!
+          cacheAge: Date.now() - cacheTimestamp!,
         }), {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            'Access-Control-Allow-Origin': '*',
+          },
         });
     }
 
   } catch (error) {
     console.error('Error in get-material-categories:', error);
-    
+
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: error.message,
     }), {
       status: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
+        'Access-Control-Allow-Origin': '*',
+      },
     });
   }
 });

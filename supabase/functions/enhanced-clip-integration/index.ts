@@ -70,7 +70,7 @@ function calculateCosineSimilarity(embedding1: number[], embedding2: number[]): 
 async function generateProductEmbeddings(
   productId: string,
   productText: string,
-  options: { forceRegenerate?: boolean } = {}
+  options: { forceRegenerate?: boolean } = {},
 ): Promise<any> {
   try {
     console.log(`🔗 Generating CLIP embeddings for product: ${productId}`);
@@ -115,7 +115,7 @@ async function generateProductEmbeddings(
     }
 
     const result = await response.json();
-    
+
     if (!result.success || !result.embedding) {
       throw new Error('Failed to generate CLIP embeddings');
     }
@@ -169,10 +169,10 @@ async function calculateClipSimilarity(imageId: string, productId: string): Prom
       .single();
 
     if (imageError || !imageAnalysis?.clip_embedding) {
-      return { 
-        score: 0.5, 
-        confidence: 0.3, 
-        metadata: { reason: 'no_image_embedding' } 
+      return {
+        score: 0.5,
+        confidence: 0.3,
+        metadata: { reason: 'no_image_embedding' },
       };
     }
 
@@ -184,10 +184,10 @@ async function calculateClipSimilarity(imageId: string, productId: string): Prom
       .single();
 
     if (productError || !product?.embedding) {
-      return { 
-        score: 0.5, 
-        confidence: 0.3, 
-        metadata: { reason: 'no_product_embedding' } 
+      return {
+        score: 0.5,
+        confidence: 0.3,
+        metadata: { reason: 'no_product_embedding' },
       };
     }
 
@@ -217,7 +217,7 @@ async function calculateClipSimilarity(imageId: string, productId: string): Prom
     };
 
   } catch (error) {
-    console.error(`❌ Error calculating CLIP similarity:`, error);
+    console.error('❌ Error calculating CLIP similarity:', error);
     return { score: 0.5, confidence: 0.1, metadata: { error: error.message } };
   }
 }
@@ -252,7 +252,7 @@ async function getClipStats(): Promise<any> {
       for (const product of productStats) {
         const model = product.embedding_model || 'unknown';
         modelDistribution[model] = (modelDistribution[model] || 0) + 1;
-        
+
         try {
           const embedding = JSON.parse(product.embedding);
           totalDimensions += embedding.length;
@@ -268,7 +268,7 @@ async function getClipStats(): Promise<any> {
       for (const analysis of imageStats) {
         const model = analysis.clip_model_version || 'unknown';
         modelDistribution[model] = (modelDistribution[model] || 0) + 1;
-        
+
         try {
           const embedding = JSON.parse(analysis.clip_embedding);
           totalDimensions += embedding.length;
@@ -322,7 +322,7 @@ Deno.serve(async (req) => {
         result = await generateProductEmbeddings(
           requestData.productId,
           requestData.productText,
-          requestData.options || {}
+          requestData.options || {},
         );
         break;
 
@@ -359,14 +359,14 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Enhanced CLIP Integration error:', error);
-    
+
     return createErrorResponse(
       error.message || 'Enhanced CLIP Integration failed',
       500,
       {
         timestamp: new Date().toISOString(),
         service: 'enhanced-clip-integration',
-      }
+      },
     );
   }
 });
