@@ -509,6 +509,36 @@ export const MaterialKnowledgeBase: React.FC = () => {
     return range;
   };
 
+  // Cross-tab navigation helpers for Phase 4
+  const navigateToTab = (tab: string) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateToChunkDetails = (chunkId: string) => {
+    navigateToTab('chunks');
+    setTimeout(() => {
+      const element = document.getElementById(`chunk-${chunkId}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
+  const navigateToImageDetails = (imageId: string) => {
+    navigateToTab('images');
+    setTimeout(() => {
+      const element = document.getElementById(`image-${imageId}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
+  const navigateToProductDetails = (productId: string) => {
+    navigateToTab('products');
+    setTimeout(() => {
+      const element = document.getElementById(`product-${productId}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
   const formatJsonForDisplay = (data: unknown): string => {
     if (!data) return 'N/A';
     try {
@@ -1671,7 +1701,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {metadataData.metadata.chunks.slice(0, 20).map((chunk: any) => (
-                        <Card key={chunk.id} className="border">
+                        <Card key={chunk.id} className="border hover:border-primary transition-colors">
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between mb-2">
                               <p className="text-sm text-muted-foreground line-clamp-1">{chunk.content_preview}</p>
@@ -1681,6 +1711,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                     Q: {(chunk.quality.quality_score * 100).toFixed(0)}%
                                   </Badge>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => navigateToChunkDetails(chunk.id)}
+                                >
+                                  <ChevronRight className="h-3 w-3" />
+                                  View
+                                </Button>
                               </div>
                             </div>
                             {chunk.metadata && Object.keys(chunk.metadata).length > 0 && (
@@ -1713,26 +1752,38 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
                       {metadataData.metadata.images.slice(0, 10).map((image: any) => (
-                        <Card key={image.id} className="border">
+                        <Card key={image.id} className="border hover:border-primary transition-colors">
                           <CardContent className="p-4">
                             <div className="flex gap-3">
                               {image.image_url && (
                                 <img
                                   src={image.image_url}
                                   alt="Image"
-                                  className="w-20 h-20 object-cover rounded"
+                                  className="w-20 h-20 object-cover rounded cursor-pointer"
+                                  onClick={() => navigateToImageDetails(image.id)}
                                 />
                               )}
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    Page {image.page_number || 'N/A'}
-                                  </Badge>
-                                  {image.quality?.quality_score && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Q: {(image.quality.quality_score * 100).toFixed(0)}%
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      Page {image.page_number || 'N/A'}
                                     </Badge>
-                                  )}
+                                    {image.quality?.quality_score && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        Q: {(image.quality.quality_score * 100).toFixed(0)}%
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => navigateToImageDetails(image.id)}
+                                  >
+                                    <ChevronRight className="h-3 w-3" />
+                                    View
+                                  </Button>
                                 </div>
                                 {image.metadata && Object.keys(image.metadata).length > 0 && (
                                   <div className="p-2 bg-muted/50 rounded text-xs">
@@ -1768,10 +1819,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {metadataData.metadata.products.slice(0, 20).map((product: any) => (
-                        <Card key={product.id} className="border">
+                        <Card key={product.id} className="border hover:border-primary transition-colors">
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between mb-2">
-                              <div>
+                              <div className="flex-1">
                                 <h4 className="font-medium">{product.name}</h4>
                                 <p className="text-sm text-muted-foreground line-clamp-1">
                                   {product.description_preview}
@@ -1783,6 +1834,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                     Q: {(product.quality.quality_score * 100).toFixed(0)}%
                                   </Badge>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => navigateToProductDetails(product.id)}
+                                >
+                                  <ChevronRight className="h-3 w-3" />
+                                  View
+                                </Button>
                               </div>
                             </div>
                             {product.metadata && Object.keys(product.metadata).length > 0 && (
@@ -2026,6 +2086,24 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Quick Navigation */}
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold mb-1">Need Deeper Analysis?</h3>
+                      <p className="text-sm text-muted-foreground">
+                        View AI-driven patterns, anomalies, and recommendations
+                      </p>
+                    </div>
+                    <Button onClick={() => navigateToTab('insights')} className="gap-2">
+                      <Eye className="h-4 w-4" />
+                      View Insights
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           ) : (
             <Card>
@@ -2508,6 +2586,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           </CardContent>
                         </Card>
                       ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <Button
+                        onClick={() => navigateToTab('insights')}
+                        variant="outline"
+                        className="w-full gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View All Patterns & Insights
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
