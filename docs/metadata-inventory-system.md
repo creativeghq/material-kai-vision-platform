@@ -1,8 +1,9 @@
 # 🗃️ **Complete Metadata Inventory System**
 
-**Last Updated**: 2025-10-24  
-**Status**: ✅ Production Ready  
+**Last Updated**: 2025-10-25
+**Status**: ✅ Production Ready
 **Coverage**: 65% → Target: 95%+
+**Source**: Consolidated from COMPLETE_METADATA_INVENTORY.md
 
 ---
 
@@ -16,6 +17,17 @@ The Material Kai Vision Platform maintains a comprehensive metadata system track
 - **Partially Implemented**: 50+ (25%)
 - **Not Implemented**: 20+ (10%)
 - **Embedding Types**: 6 (text, visual CLIP, multimodal, color, texture, application)
+- **Total Embedding Dimensions**: 3584D (1536 + 512 + 2048 + 256 + 256 + 512)
+
+### **Database Tables**
+- `materials` - Material catalog with properties
+- `products` - Product records from PDFs
+- `document_chunks` - Text chunks with embeddings
+- `document_images` - Extracted images with CLIP embeddings
+- `metafield_definitions` - Metadata field definitions
+- `metafield_values` - Metadata values for all entities
+- `quality_scoring_logs` - Quality assessment tracking
+- `chunk_relationships` - Semantic/sequential/hierarchical relationships
 
 ---
 

@@ -1,11 +1,238 @@
 # System Diagrams - Knowledge Base & Products
 
-**Document Version**: 1.0  
-**Date**: 2025-10-19
+**Document Version**: 2.0
+**Date**: 2025-10-25
+**Status**: ✅ Production Ready
 
 ---
 
-## 1. OVERALL SYSTEM ARCHITECTURE
+## 1. COMPLETE SYSTEM ARCHITECTURE
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (React/TypeScript)              │
+│                    PDFProcessing.tsx Component                  │
+└────────────────────────────┬──────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    EDGE FUNCTION (Supabase)                     │
+│                    mivaa-gateway/index.ts                       │
+│              handleFileUpload() → POST /api/rag/...             │
+└────────────────────────────┬──────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    FASTAPI BACKEND (Python)                     │
+│                  mivaa-pdf-extractor/app/api/                   │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ POST /api/rag/documents/upload-async                    │  │
+│  │ ├─ PDFProcessor.process_document()                      │  │
+│  │ │  ├─ Extract text & images                             │  │
+│  │ │  ├─ RealImageAnalysisService.analyze_image()          │  │
+│  │ │  │  ├─ Llama 3.2 90B Vision                           │  │
+│  │ │  │  ├─ Claude 4.5 Sonnet Vision                       │  │
+│  │ │  │  └─ CLIP embeddings                                │  │
+│  │ │  ├─ UnifiedChunkingService.chunk_text()               │  │
+│  │ │  │  ├─ Semantic chunking                              │  │
+│  │ │  │  ├─ Fixed-size chunking                            │  │
+│  │ │  │  ├─ Hybrid chunking                                │  │
+│  │ │  │  └─ Layout-aware chunking                          │  │
+│  │ │  └─ ProductEnrichmentService.enrich_products()        │  │
+│  │ │     ├─ RealEmbeddingsService.generate_all_embeddings()│  │
+│  │ │     │  ├─ Text (1536D)                                │  │
+│  │ │     │  ├─ Visual CLIP (512D)                          │  │
+│  │ │     │  ├─ Multimodal (2048D)                          │  │
+│  │ │     │  ├─ Color (256D)                                │  │
+│  │ │     │  ├─ Texture (256D)                              │  │
+│  │ │     │  └─ Application (512D)                          │  │
+│  │ │     └─ RealQualityScoringService.calculate_scores()   │  │
+│  │ │        ├─ Image quality                               │  │
+│  │ │        ├─ Chunk quality                               │  │
+│  │ │        └─ Product quality                             │  │
+│  │ └─ Store in Supabase                                    │  │
+│  │                                                          │  │
+│  ├─ POST /api/search/unified-search                        │  │
+│  │ └─ UnifiedSearchService.search()                        │  │
+│  │    ├─ Semantic search                                   │  │
+│  │    ├─ Visual search                                     │  │
+│  │    ├─ Multi-vector search                               │  │
+│  │    ├─ Hybrid search                                     │  │
+│  │    ├─ Material search                                   │  │
+│  │    └─ Keyword search                                    │  │
+│  │                                                          │  │
+│  └─ Other RAG endpoints                                    │  │
+│     ├─ /api/rag/documents/list                             │  │
+│     ├─ /api/rag/documents/{id}                             │  │
+│     ├─ /api/rag/query                                      │  │
+│     └─ /api/rag/search                                     │  │
+│                                                                 │
+└────────────────────────────┬──────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SUPABASE (PostgreSQL)                        │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ Tables:                                                  │  │
+│  │ ├─ documents                                             │  │
+│  │ ├─ document_chunks                                       │  │
+│  │ │  ├─ id, content, document_id                           │  │
+│  │ │  ├─ text_embedding_1536 (vector)                       │  │
+│  │ │  ├─ visual_clip_embedding_512 (vector)                 │  │
+│  │ │  ├─ multimodal_fusion_embedding_2048 (vector)          │  │
+│  │ │  ├─ color_embedding_256 (vector)                       │  │
+│  │ │  ├─ texture_embedding_256 (vector)                     │  │
+│  │ │  ├─ application_embedding_512 (vector)                 │  │
+│  │ │  ├─ quality_score, quality_metrics                     │  │
+│  │ │  └─ metadata                                           │  │
+│  │ ├─ products                                              │  │
+│  │ │  ├─ All 6 embedding types                              │  │
+│  │ │  ├─ quality_score, quality_metrics                     │  │
+│  │ │  └─ metadata                                           │  │
+│  │ ├─ images                                                │  │
+│  │ │  ├─ visual_clip_embedding_512 (vector)                 │  │
+│  │ │  ├─ quality_score                                      │  │
+│  │ │  └─ metadata                                           │  │
+│  │ └─ Other tables (metafields, etc.)                       │  │
+│  │                                                          │  │
+│  └─ Vector Search Functions:                               │  │
+│     ├─ search_chunks_by_embedding()                         │  │
+│     ├─ search_images_by_embedding()                         │  │
+│     ├─ search_materials()                                   │  │
+│     └─ search_chunks_keyword()                              │  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. AI MODELS & SERVICES ARCHITECTURE
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        AI MODELS LAYER                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ LLAMA (LlamaIndex RAG)                                   │  │
+│  │ ├─ Document parsing                                      │  │
+│  │ ├─ Semantic chunking                                     │  │
+│  │ ├─ Semantic analysis                                     │  │
+│  │ └─ Knowledge graph construction                          │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ ANTHROPIC CLAUDE                                         │  │
+│  │ ├─ Claude 4.5 Sonnet - Image validation & enrichment    │  │
+│  │ ├─ Claude 4.5 Haiku - Fast classification               │  │
+│  │ └─ Vision capabilities for image analysis               │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ OPENAI                                                   │  │
+│  │ ├─ CLIP - Visual embeddings (512D)                      │  │
+│  │ ├─ text-embedding-3-small - Text embeddings (1536D)     │  │
+│  │ └─ GPT-5 - Advanced reasoning & validation              │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ SPECIALIZED EMBEDDINGS                                   │  │
+│  │ ├─ Color Embedding Service (256D)                       │  │
+│  │ ├─ Texture Embedding Service (256D)                     │  │
+│  │ └─ Application Embedding Service (512D)                 │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. MULTI-VECTOR STORAGE SYSTEM
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    MULTI-VECTOR EMBEDDINGS                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Entity: CHUNK / PRODUCT / IMAGE                               │
+│  │                                                              │
+│  ├─ Text Embedding (1536D)                                     │
+│  │  └─ OpenAI text-embedding-3-small                           │
+│  │                                                              │
+│  ├─ Visual CLIP Embedding (512D)                               │
+│  │  └─ OpenAI CLIP                                             │
+│  │                                                              │
+│  ├─ Multimodal Fusion Embedding (2048D)                        │
+│  │  └─ Combined text + visual                                  │
+│  │                                                              │
+│  ├─ Color Embedding (256D)                                     │
+│  │  └─ Specialized color analysis                              │
+│  │                                                              │
+│  ├─ Texture Embedding (256D)                                   │
+│  │  └─ Specialized texture analysis                            │
+│  │                                                              │
+│  └─ Application Embedding (512D)                               │
+│     └─ Specialized application/use-case analysis               │
+│                                                                 │
+│  TOTAL: 6 embedding types, 3584 dimensions                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. QUALITY SCORING SYSTEM
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    5-DIMENSIONAL QUALITY SCORING                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 1. Semantic Completeness (28% weight)                   │  │
+│  │    ├─ Content coherence                                 │  │
+│  │    ├─ Topic coverage                                    │  │
+│  │    └─ Information density                               │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 2. Boundary Quality (30% weight)                        │  │
+│  │    ├─ Clean sentence breaks                             │  │
+│  │    ├─ Paragraph integrity                               │  │
+│  │    └─ Section coherence                                 │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 3. Context Preservation (15% weight)                    │  │
+│  │    ├─ Reference continuity                              │  │
+│  │    ├─ Contextual links                                  │  │
+│  │    └─ Semantic relationships                            │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 4. Structural Integrity (20% weight)                    │  │
+│  │    ├─ Heading preservation                              │  │
+│  │    ├─ List structure                                    │  │
+│  │    └─ Table integrity                                   │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 5. Metadata Richness (7% weight)                        │  │
+│  │    ├─ Extracted properties                              │  │
+│  │    ├─ Entity recognition                                │  │
+│  │    └─ Relationship mapping                              │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  FINAL SCORE: Weighted average (0-100)                         │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. LEGACY SYSTEM ARCHITECTURE (For Reference)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
