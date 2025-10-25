@@ -467,19 +467,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }
   };
 
-  const filteredChunks = chunks.filter(chunk =>
-    chunk.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (chunk.metadata as any)?.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (chunk.metadata as any)?.title?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  const filteredImages = images.filter(image =>
-    image.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    image.alt_text?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    image.contextual_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    image.nearest_heading?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
   const getChunksByDocument = (documentId: string) => {
     return chunks.filter(chunk => chunk.document_id === documentId);
   };

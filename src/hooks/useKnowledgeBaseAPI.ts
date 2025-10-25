@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL;
 
 interface MetadataResponse {
   workspace_id: string;
