@@ -26,6 +26,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  useKnowledgeBaseMetadata,
+  useQualityScores,
+  useEmbeddingsStats,
+  useDetections,
+  useQualityDashboard,
+  usePatterns,
+} from '@/hooks/useKnowledgeBaseAPI';
 
 interface DocumentChunk {
   id: string;
@@ -107,6 +115,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [imageChunkRelationships, setImageChunkRelationships] = useState<ImageChunkRelationship[]>([]);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   // Pagination state for chunks
   const [currentPage, setCurrentPage] = useState(1);
@@ -115,6 +124,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Use the new API hooks
+  const { data: metadataData, loading: metadataLoading } = useKnowledgeBaseMetadata(workspaceId);
+  const { data: qualityData, loading: qualityLoading } = useQualityScores(workspaceId);
+  const { data: embeddingsStatsData, loading: embeddingsStatsLoading } = useEmbeddingsStats(workspaceId);
+  const { data: detectionsData, loading: detectionsLoading } = useDetections(workspaceId);
+  const { data: dashboardData, loading: dashboardLoading } = useQualityDashboard(workspaceId, 30);
+  const { data: patternsData, loading: patternsLoading } = usePatterns(workspaceId);
 
   useEffect(() => {
     // Load page immediately, then fetch data in background
@@ -152,6 +169,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       const workspaceId = workspaceDataArray[0].workspace_id;
       console.log(`✅ Using workspace: ${workspaceId}`);
+      setWorkspaceId(workspaceId);
 
       // Load ALL chunks with document information (no limit)
       console.log('📊 Loading chunks from database...');
@@ -1571,140 +1589,1286 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
         {/* NEW: Metadata Tab */}
         <TabsContent value="metadata" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Metadata Management
-              </CardTitle>
-              <CardDescription>
-                Centralized metadata from chunks, images, and products
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Database className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Metadata tab - Coming soon
-                </p>
+          {metadataLoading ? (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center gap-3">
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Loading metadata...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : metadataData ? (
+            <>
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Total Entities</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{metadataData.summary.total_entities}</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Across chunks, images, and products
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">With Metadata</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{metadataData.summary.entities_with_metadata}</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {metadataData.summary.total_entities > 0
+                        ? `${((metadataData.summary.entities_with_metadata / metadataData.summary.total_entities) * 100).toFixed(1)}% coverage`
+                        : '0% coverage'}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Unique Fields</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{metadataData.summary.metadata_fields.length}</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Different metadata properties
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Metadata Fields */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Hash className="h-5 w-5" />
+                    Metadata Fields ({metadataData.summary.metadata_fields.length})
+                  </CardTitle>
+                  <CardDescription>All unique metadata fields across entities</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {metadataData.summary.metadata_fields.map((field) => (
+                      <Badge key={field} variant="secondary">
+                        {field}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Chunks Metadata */}
+              {metadataData.metadata.chunks && metadataData.metadata.chunks.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Chunks Metadata ({metadataData.metadata.chunks.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {metadataData.metadata.chunks.slice(0, 20).map((chunk: any) => (
+                        <Card key={chunk.id} className="border">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <p className="text-sm text-muted-foreground line-clamp-1">{chunk.content_preview}</p>
+                              <div className="flex gap-2">
+                                {chunk.quality?.quality_score && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Q: {(chunk.quality.quality_score * 100).toFixed(0)}%
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            {chunk.metadata && Object.keys(chunk.metadata).length > 0 && (
+                              <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                                <pre className="whitespace-pre-wrap">{JSON.stringify(chunk.metadata, null, 2)}</pre>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {metadataData.metadata.chunks.length > 20 && (
+                        <p className="text-sm text-muted-foreground text-center">
+                          Showing 20 of {metadataData.metadata.chunks.length} chunks
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Images Metadata */}
+              {metadataData.metadata.images && metadataData.metadata.images.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ImageIcon className="h-5 w-5" />
+                      Images Metadata ({metadataData.metadata.images.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                      {metadataData.metadata.images.slice(0, 10).map((image: any) => (
+                        <Card key={image.id} className="border">
+                          <CardContent className="p-4">
+                            <div className="flex gap-3">
+                              {image.image_url && (
+                                <img
+                                  src={image.image_url}
+                                  alt="Image"
+                                  className="w-20 h-20 object-cover rounded"
+                                />
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    Page {image.page_number || 'N/A'}
+                                  </Badge>
+                                  {image.quality?.quality_score && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Q: {(image.quality.quality_score * 100).toFixed(0)}%
+                                    </Badge>
+                                  )}
+                                </div>
+                                {image.metadata && Object.keys(image.metadata).length > 0 && (
+                                  <div className="p-2 bg-muted/50 rounded text-xs">
+                                    <pre className="whitespace-pre-wrap line-clamp-3">
+                                      {JSON.stringify(image.metadata, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {metadataData.metadata.images.length > 10 && (
+                        <p className="text-sm text-muted-foreground text-center col-span-2">
+                          Showing 10 of {metadataData.metadata.images.length} images
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Products Metadata */}
+              {metadataData.metadata.products && metadataData.metadata.products.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Products Metadata ({metadataData.metadata.products.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {metadataData.metadata.products.slice(0, 20).map((product: any) => (
+                        <Card key={product.id} className="border">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <h4 className="font-medium">{product.name}</h4>
+                                <p className="text-sm text-muted-foreground line-clamp-1">
+                                  {product.description_preview}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                {product.quality?.quality_score && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Q: {(product.quality.quality_score * 100).toFixed(0)}%
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            {product.metadata && Object.keys(product.metadata).length > 0 && (
+                              <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                                <pre className="whitespace-pre-wrap">{JSON.stringify(product.metadata, null, 2)}</pre>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {metadataData.metadata.products.length > 20 && (
+                        <p className="text-sm text-muted-foreground text-center">
+                          Showing 20 of {metadataData.metadata.products.length} products
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="text-center">
+                  <Database className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No metadata available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* NEW: Quality Scores Tab */}
         <TabsContent value="quality" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Badge className="h-5 w-5" />
-                Quality Scores
-              </CardTitle>
-              <CardDescription>
-                Quality metrics and distributions across all entities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Badge className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Quality scores tab - Coming soon
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {qualityLoading ? (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center gap-3">
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Loading quality scores...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : qualityData ? (
+            <>
+              {/* Chunks Quality KPIs */}
+              {qualityData.kpis.chunks && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Chunks Quality Metrics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Validated</p>
+                        <p className="text-2xl font-bold">{qualityData.kpis.chunks.total_validated}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Overall Score</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.chunks.avg_overall_score) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Valid</p>
+                        <p className="text-2xl font-bold text-green-600">{qualityData.kpis.chunks.valid_count}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Needs Review</p>
+                        <p className="text-2xl font-bold text-orange-600">{qualityData.kpis.chunks.needs_review_count}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Content Quality</p>
+                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_content_quality) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Boundary Quality</p>
+                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_boundary_quality) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Semantic Coherence</p>
+                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_semantic_coherence) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Completeness</p>
+                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_completeness) * 100).toFixed(0)}%</p>
+                      </div>
+                    </div>
+                    {qualityData.distributions.chunks && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium mb-2">Quality Distribution</p>
+                        <div className="flex gap-2">
+                          <Badge variant="default" className="bg-green-600">
+                            Excellent: {qualityData.distributions.chunks.excellent}
+                          </Badge>
+                          <Badge variant="default" className="bg-blue-600">
+                            Good: {qualityData.distributions.chunks.good}
+                          </Badge>
+                          <Badge variant="default" className="bg-yellow-600">
+                            Fair: {qualityData.distributions.chunks.fair}
+                          </Badge>
+                          <Badge variant="default" className="bg-red-600">
+                            Poor: {qualityData.distributions.chunks.poor}
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Images Quality KPIs */}
+              {qualityData.kpis.images && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ImageIcon className="h-5 w-5" />
+                      Images Quality Metrics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Validated</p>
+                        <p className="text-2xl font-bold">{qualityData.kpis.images.total_validated}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Quality Score</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.images.avg_quality_score) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Relevance</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.images.avg_relevance_score) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg OCR Confidence</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.images.avg_ocr_confidence) * 100).toFixed(0)}%</p>
+                      </div>
+                    </div>
+                    {qualityData.distributions.images && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium mb-2">Quality Distribution</p>
+                        <div className="flex gap-2">
+                          <Badge variant="default" className="bg-green-600">
+                            Excellent: {qualityData.distributions.images.excellent}
+                          </Badge>
+                          <Badge variant="default" className="bg-blue-600">
+                            Good: {qualityData.distributions.images.good}
+                          </Badge>
+                          <Badge variant="default" className="bg-yellow-600">
+                            Fair: {qualityData.distributions.images.fair}
+                          </Badge>
+                          <Badge variant="default" className="bg-red-600">
+                            Poor: {qualityData.distributions.images.poor}
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Products Quality KPIs */}
+              {qualityData.kpis.products && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Products Quality Metrics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Scored</p>
+                        <p className="text-2xl font-bold">{qualityData.kpis.products.total_scored}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Quality</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.products.avg_quality_score) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Confidence</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.products.avg_confidence_score) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Completeness</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.products.avg_completeness_score) * 100).toFixed(0)}%</p>
+                      </div>
+                    </div>
+                    {qualityData.distributions.products && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium mb-2">Quality Distribution</p>
+                        <div className="flex gap-2">
+                          <Badge variant="default" className="bg-green-600">
+                            Excellent: {qualityData.distributions.products.excellent}
+                          </Badge>
+                          <Badge variant="default" className="bg-blue-600">
+                            Good: {qualityData.distributions.products.good}
+                          </Badge>
+                          <Badge variant="default" className="bg-yellow-600">
+                            Fair: {qualityData.distributions.products.fair}
+                          </Badge>
+                          <Badge variant="default" className="bg-red-600">
+                            Poor: {qualityData.distributions.products.poor}
+                          </Badge>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Documents Quality */}
+              {qualityData.kpis.documents && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Documents Quality Metrics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Documents</p>
+                        <p className="text-2xl font-bold">{qualityData.kpis.documents.total_documents}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Coherence</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.documents.avg_coherence_score) * 100).toFixed(0)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Overall Quality</p>
+                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.documents.avg_overall_quality) * 100).toFixed(0)}%</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="text-center">
+                  <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No quality data available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* NEW: Embeddings Stats Tab */}
         <TabsContent value="embeddings-stats" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                Embeddings Statistics
-              </CardTitle>
-              <CardDescription>
-                Embedding coverage, models, and quality metrics
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Embeddings stats tab - Coming soon
-                </p>
+          {embeddingsStatsLoading ? (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center gap-3">
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Loading embeddings statistics...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : embeddingsStatsData ? (
+            <>
+              {/* Total Embeddings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="h-5 w-5" />
+                    Total Embeddings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold">{embeddingsStatsData.total_embeddings}</div>
+                  <p className="text-sm text-muted-foreground mt-1">Vector embeddings generated</p>
+                </CardContent>
+              </Card>
+
+              {/* Coverage Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Chunks Coverage</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{embeddingsStatsData.coverage.chunks.coverage_percentage}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {embeddingsStatsData.coverage.chunks.with_embeddings} / {embeddingsStatsData.coverage.chunks.total} chunks
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Images Coverage</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{embeddingsStatsData.coverage.images.coverage_percentage}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {embeddingsStatsData.coverage.images.with_embeddings} / {embeddingsStatsData.coverage.images.total} images
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Products Coverage</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{embeddingsStatsData.coverage.products.coverage_percentage}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {embeddingsStatsData.coverage.products.with_embeddings} / {embeddingsStatsData.coverage.products.total} products
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* By Entity Type */}
+              {Object.keys(embeddingsStatsData.by_type).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Layers className="h-5 w-5" />
+                      Embeddings by Entity Type
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {Object.entries(embeddingsStatsData.by_type).map(([type, count]) => (
+                        <div key={type} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{type}</Badge>
+                          </div>
+                          <div className="text-lg font-semibold">{count as number}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* By Model */}
+              {Object.keys(embeddingsStatsData.by_model).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Database className="h-5 w-5" />
+                      Embeddings by Model
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {Object.entries(embeddingsStatsData.by_model).map(([model, count]) => (
+                        <div key={model} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">{model}</Badge>
+                          </div>
+                          <div className="text-lg font-semibold">{count as number}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* By Embedding Type */}
+              {embeddingsStatsData.by_embedding_type && Object.keys(embeddingsStatsData.by_embedding_type).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Hash className="h-5 w-5" />
+                      Embeddings by Type
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(embeddingsStatsData.by_embedding_type).map(([type, count]) => (
+                        <Badge key={type} variant="default">
+                          {type}: {count as number}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Document Vectors */}
+              {embeddingsStatsData.document_vectors && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Document Vectors
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold mb-4">{embeddingsStatsData.document_vectors.total}</div>
+                    {embeddingsStatsData.document_vectors.by_type && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">By Vector Type:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(embeddingsStatsData.document_vectors.by_type).map(([type, count]) => (
+                            <Badge key={type} variant="outline">
+                              {type}: {count as number}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Quality Metrics */}
+              {embeddingsStatsData.quality && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Eye className="h-5 w-5" />
+                      Embedding Quality
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Stability Score</p>
+                        <p className="text-2xl font-bold">
+                          {(embeddingsStatsData.quality.avg_stability_score * 100).toFixed(0)}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Anomalies Detected</p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {embeddingsStatsData.quality.anomaly_count}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Analyzed</p>
+                        <p className="text-2xl font-bold">{embeddingsStatsData.quality.total_analyzed}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="text-center">
+                  <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No embeddings data available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* NEW: Detections Tab */}
         <TabsContent value="detections" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5" />
-                Detection Events
-              </CardTitle>
-              <CardDescription>
-                Track product, image, and chunk detection events
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Detections tab - Coming soon
-                </p>
+          {detectionsLoading ? (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center gap-3">
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Loading detections...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : detectionsData ? (
+            <>
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Total Detections</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{detectionsData.total_detections}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">
+                      {(parseFloat(detectionsData.summary.avg_confidence) * 100).toFixed(0)}%
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">High Confidence</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-green-600">
+                      {detectionsData.summary.high_confidence_count}
+                    </div>
+                    <p className="text-xs text-muted-foreground">≥80% confidence</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Low Confidence</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-orange-600">
+                      {detectionsData.summary.low_confidence_count}
+                    </div>
+                    <p className="text-xs text-muted-foreground">&lt;50% confidence</p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* By Type */}
+              {Object.keys(detectionsData.summary.by_type).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Layers className="h-5 w-5" />
+                      Detections by Type
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(detectionsData.summary.by_type).map(([type, count]) => (
+                        <Badge key={type} variant="default" className="text-base px-4 py-2">
+                          {type}: {count as number}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* By Event */}
+              {Object.keys(detectionsData.summary.by_event).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Hash className="h-5 w-5" />
+                      Detections by Event
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(detectionsData.summary.by_event).map(([event, count]) => (
+                        <div key={event} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                          <span className="font-medium">{event}</span>
+                          <Badge variant="secondary">{count as number}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Timeline */}
+              {detectionsData.timeline && Object.keys(detectionsData.timeline).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ChevronRight className="h-5 w-5" />
+                      Detection Timeline (Last 30 Days)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      {Object.entries(detectionsData.timeline)
+                        .sort(([a], [b]) => b.localeCompare(a))
+                        .slice(0, 10)
+                        .map(([date, count]) => (
+                          <div key={date} className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">{date}</span>
+                            <div className="flex items-center gap-2">
+                              <div className="w-32 bg-muted rounded-full h-2">
+                                <div
+                                  className="bg-primary h-2 rounded-full"
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      ((count as number) / Math.max(...Object.values(detectionsData.timeline!))) * 100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                              <span className="font-medium w-8 text-right">{count as number}</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Recent Detections */}
+              {detectionsData.detections.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Eye className="h-5 w-5" />
+                      Recent Detections ({detectionsData.detections.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {detectionsData.detections.slice(0, 50).map((detection: any) => (
+                        <Card key={detection.id} className="border">
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{detection.detection_type || 'chunk'}</Badge>
+                                <Badge variant="secondary">{detection.event}</Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {detection.confidence !== null && (
+                                  <Badge
+                                    variant={
+                                      detection.confidence >= 0.8
+                                        ? 'default'
+                                        : detection.confidence >= 0.5
+                                        ? 'secondary'
+                                        : 'destructive'
+                                    }
+                                  >
+                                    {(detection.confidence * 100).toFixed(0)}%
+                                  </Badge>
+                                )}
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(detection.created_at).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                            {detection.details && (
+                              <div className="mt-2 text-xs text-muted-foreground">
+                                Entity: {detection.entity_id?.substring(0, 8)}...
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="text-center">
+                  <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No detection data available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* NEW: Quality Dashboard Tab */}
         <TabsContent value="dashboard" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5" />
-                Quality Dashboard
-              </CardTitle>
-              <CardDescription>
-                Daily quality metrics, trends, and alerts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Quality dashboard tab - Coming soon
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {dashboardLoading ? (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center gap-3">
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Loading quality dashboard...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : dashboardData ? (
+            <>
+              {/* Period Info */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Reporting Period</p>
+                      <p className="font-medium">
+                        {dashboardData.period.start_date} to {dashboardData.period.end_date}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{dashboardData.period.days} days</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Alerts */}
+              {dashboardData.alerts.length > 0 && (
+                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-orange-900 dark:text-orange-100">
+                      <Filter className="h-5 w-5" />
+                      Active Alerts ({dashboardData.alerts.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {dashboardData.alerts.map((alert: any, idx: number) => (
+                        <Card key={idx} className="border-orange-300">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <Badge
+                                variant={alert.severity === 'high' ? 'destructive' : 'default'}
+                                className={alert.severity === 'medium' ? 'bg-orange-500' : ''}
+                              >
+                                {alert.severity}
+                              </Badge>
+                              <div className="flex-1">
+                                <p className="font-medium text-orange-900 dark:text-orange-100">
+                                  {alert.category}
+                                </p>
+                                <p className="text-sm text-orange-800 dark:text-orange-200 mt-1">
+                                  {alert.message}
+                                </p>
+                                <p className="text-xs text-orange-700 dark:text-orange-300 mt-2">
+                                  💡 {alert.recommendation}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Current KPIs - Chunks */}
+              {dashboardData.current_kpis.chunks && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Chunks Quality KPIs
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Quality</p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.chunks.avg_quality
+                            ? (dashboardData.current_kpis.chunks.avg_quality * 100).toFixed(0) + '%'
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Processed</p>
+                        <p className="text-2xl font-bold">{dashboardData.current_kpis.chunks.total_processed || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Below Threshold</p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {dashboardData.current_kpis.chunks.below_threshold || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Below %</p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.chunks.below_threshold_percentage}%
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Current KPIs - Images */}
+              {dashboardData.current_kpis.images && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ImageIcon className="h-5 w-5" />
+                      Images Quality KPIs
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Quality</p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.images.avg_quality
+                            ? (dashboardData.current_kpis.images.avg_quality * 100).toFixed(0) + '%'
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Extracted</p>
+                        <p className="text-2xl font-bold">{dashboardData.current_kpis.images.total_extracted || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Below Threshold</p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {dashboardData.current_kpis.images.below_threshold || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Below %</p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.images.below_threshold_percentage}%
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Current KPIs - Products */}
+              {dashboardData.current_kpis.products && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Products Quality KPIs
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Quality</p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.products.avg_quality
+                            ? (dashboardData.current_kpis.products.avg_quality * 100).toFixed(0) + '%'
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Created</p>
+                        <p className="text-2xl font-bold">{dashboardData.current_kpis.products.total_created || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Below Threshold</p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {dashboardData.current_kpis.products.below_threshold || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Below %</p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.products.below_threshold_percentage}%
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Trends */}
+              {dashboardData.trends && Object.keys(dashboardData.trends).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ChevronRight className="h-5 w-5" />
+                      Quality Trends
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {Object.entries(dashboardData.trends).map(([key, trend]: [string, any]) => (
+                        <div key={key} className="flex items-center justify-between p-3 bg-muted/50 rounded">
+                          <span className="font-medium capitalize">{key.replace(/_/g, ' ')}</span>
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              variant={
+                                trend.trend === 'improving'
+                                  ? 'default'
+                                  : trend.trend === 'declining'
+                                  ? 'destructive'
+                                  : 'secondary'
+                              }
+                            >
+                              {trend.trend}
+                            </Badge>
+                            <span className="text-sm font-medium">{trend.change_percentage}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="text-center">
+                  <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No dashboard data available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* NEW: Insights Tab */}
         <TabsContent value="insights" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="h-5 w-5" />
-                Patterns & Insights
-              </CardTitle>
-              <CardDescription>
-                AI-driven patterns, anomalies, and recommendations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Insights tab - Coming soon
-                </p>
+          {patternsLoading ? (
+            <Card>
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center gap-3">
+                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Analyzing patterns and insights...</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : patternsData ? (
+            <>
+              {/* Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Total Patterns</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">{patternsData.summary.total_patterns}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Anomalies</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-orange-600">{patternsData.summary.total_anomalies}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">High Severity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-red-600">
+                      {patternsData.summary.high_severity_count}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Medium Severity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-yellow-600">
+                      {patternsData.summary.medium_severity_count}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Patterns */}
+              {patternsData.patterns.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Eye className="h-5 w-5" />
+                      Detected Patterns ({patternsData.patterns.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {patternsData.patterns.map((pattern: any, idx: number) => (
+                        <Card
+                          key={idx}
+                          className={`border-2 ${
+                            pattern.severity === 'high'
+                              ? 'border-red-200 bg-red-50 dark:bg-red-950'
+                              : pattern.severity === 'medium'
+                              ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950'
+                              : 'border-blue-200 bg-blue-50 dark:bg-blue-950'
+                          }`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <Badge
+                                variant={
+                                  pattern.severity === 'high'
+                                    ? 'destructive'
+                                    : pattern.severity === 'medium'
+                                    ? 'default'
+                                    : 'secondary'
+                                }
+                                className={pattern.severity === 'medium' ? 'bg-yellow-500' : ''}
+                              >
+                                {pattern.severity}
+                              </Badge>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="font-semibold capitalize">{pattern.type.replace(/_/g, ' ')}</h4>
+                                  <Badge variant="outline">{pattern.affected_entities} entities</Badge>
+                                </div>
+                                <p className="text-sm mb-3">{pattern.description}</p>
+                                <div className="bg-white dark:bg-gray-900 rounded p-3 mb-3">
+                                  <p className="text-xs font-medium mb-1">💡 Recommendation:</p>
+                                  <p className="text-xs text-muted-foreground">{pattern.recommendation}</p>
+                                </div>
+                                {pattern.data && (
+                                  <details className="text-xs">
+                                    <summary className="cursor-pointer font-medium mb-2">View Details</summary>
+                                    <pre className="bg-muted/50 p-2 rounded overflow-x-auto">
+                                      {JSON.stringify(pattern.data, null, 2)}
+                                    </pre>
+                                  </details>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Anomalies */}
+              {patternsData.anomalies.length > 0 && (
+                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-orange-900 dark:text-orange-100">
+                      <Filter className="h-5 w-5" />
+                      Anomalies Detected ({patternsData.anomalies.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {patternsData.anomalies.map((anomaly: any, idx: number) => (
+                        <Card key={idx} className="border-orange-300">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <Badge variant="destructive">{anomaly.severity}</Badge>
+                              <div className="flex-1">
+                                <h4 className="font-semibold capitalize mb-2">
+                                  {anomaly.type.replace(/_/g, ' ')}
+                                </h4>
+                                <p className="text-sm text-orange-900 dark:text-orange-100 mb-3">
+                                  {anomaly.description}
+                                </p>
+                                <div className="bg-white dark:bg-gray-900 rounded p-3 mb-3">
+                                  <p className="text-xs font-medium mb-1">💡 Recommendation:</p>
+                                  <p className="text-xs text-muted-foreground">{anomaly.recommendation}</p>
+                                </div>
+                                {anomaly.data && (
+                                  <details className="text-xs">
+                                    <summary className="cursor-pointer font-medium mb-2">View Details</summary>
+                                    <pre className="bg-muted/50 p-2 rounded overflow-x-auto">
+                                      {JSON.stringify(anomaly.data, null, 2)}
+                                    </pre>
+                                  </details>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* No Issues Found */}
+              {patternsData.patterns.length === 0 && patternsData.anomalies.length === 0 && (
+                <Card className="border-green-200 bg-green-50 dark:bg-green-950">
+                  <CardContent className="p-8">
+                    <div className="text-center">
+                      <div className="text-6xl mb-4">✅</div>
+                      <h3 className="text-xl font-semibold text-green-900 dark:text-green-100 mb-2">
+                        All Systems Healthy!
+                      </h3>
+                      <p className="text-green-800 dark:text-green-200">
+                        No patterns or anomalies detected. Your knowledge base is performing optimally.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-8">
+                <div className="text-center">
+                  <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No insights data available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
       </Tabs>
