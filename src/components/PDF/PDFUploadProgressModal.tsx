@@ -14,6 +14,11 @@ import {
   Zap,
   Target,
   TrendingUp,
+  Database,
+  Package,
+  Link,
+  Hash,
+  Layers,
 } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -695,6 +700,196 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               </div>
                             </div>
                           ))}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Quantitative Results - Chunks, Images, Products, Embeddings */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Database className="h-4 w-4 text-indigo-600" />
+                      Generated Content & Entities
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-xs">
+                    {(() => {
+                      const results: { label: string; count: number; icon: React.ReactNode; color: string }[] = [];
+
+                      // Extract counts from step details
+                      job.steps.forEach(step => {
+                        step.details?.forEach((detail: unknown) => {
+                          const detailStr = typeof detail === 'string' ? detail : (detail as any)?.message || '';
+
+                          // Chunks created
+                          const chunkMatch = detailStr.match(/(\d+)\s+(?:text\s+)?chunks?/i);
+                          if (chunkMatch && !results.find(r => r.label === 'Text Chunks')) {
+                            results.push({
+                              label: 'Text Chunks',
+                              count: parseInt(chunkMatch[1]),
+                              icon: <FileText className="h-3 w-3" />,
+                              color: 'text-blue-600'
+                            });
+                          }
+
+                          // Images extracted
+                          const imageMatch = detailStr.match(/(\d+)\s+images?/i);
+                          if (imageMatch && !results.find(r => r.label === 'Images Extracted')) {
+                            results.push({
+                              label: 'Images Extracted',
+                              count: parseInt(imageMatch[1]),
+                              icon: <Eye className="h-3 w-3" />,
+                              color: 'text-green-600'
+                            });
+                          }
+
+                          // Products detected
+                          const productMatch = detailStr.match(/(\d+)\s+products?/i);
+                          if (productMatch && !results.find(r => r.label === 'Products Detected')) {
+                            results.push({
+                              label: 'Products Detected',
+                              count: parseInt(productMatch[1]),
+                              icon: <Package className="h-3 w-3" />,
+                              color: 'text-purple-600'
+                            });
+                          }
+
+                          // Embeddings generated
+                          const embeddingMatch = detailStr.match(/(\d+)\s+embeddings?/i);
+                          if (embeddingMatch && !results.find(r => r.label === 'Embeddings Generated')) {
+                            results.push({
+                              label: 'Embeddings Generated',
+                              count: parseInt(embeddingMatch[1]),
+                              icon: <Zap className="h-3 w-3" />,
+                              color: 'text-yellow-600'
+                            });
+                          }
+
+                          // Image-Product associations
+                          const associationMatch = detailStr.match(/(\d+)\s+(?:image-product\s+)?associations?/i);
+                          if (associationMatch && !results.find(r => r.label === 'Image-Product Links')) {
+                            results.push({
+                              label: 'Image-Product Links',
+                              count: parseInt(associationMatch[1]),
+                              icon: <Link className="h-3 w-3" />,
+                              color: 'text-orange-600'
+                            });
+                          }
+
+                          // Metadata fields
+                          const metadataMatch = detailStr.match(/(\d+)\s+metadata\s+fields?/i);
+                          if (metadataMatch && !results.find(r => r.label === 'Metadata Fields')) {
+                            results.push({
+                              label: 'Metadata Fields',
+                              count: parseInt(metadataMatch[1]),
+                              icon: <Hash className="h-3 w-3" />,
+                              color: 'text-pink-600'
+                            });
+                          }
+                        });
+                      });
+
+                      // Add default values if none found
+                      if (results.length === 0) {
+                        const knowledgeStep = job.steps.find(s => s.id === 'knowledge-storage');
+                        if (knowledgeStep?.status === 'completed') {
+                          results.push(
+                            { label: 'Text Chunks', count: 0, icon: <FileText className="h-3 w-3" />, color: 'text-blue-600' },
+                            { label: 'Images Extracted', count: 0, icon: <Eye className="h-3 w-3" />, color: 'text-green-600' },
+                            { label: 'Embeddings Generated', count: 0, icon: <Zap className="h-3 w-3" />, color: 'text-yellow-600' }
+                          );
+                        }
+                      }
+
+                      return (
+                        <div className="grid grid-cols-2 gap-2">
+                          {results.map((result, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                              <div className="flex items-center gap-2">
+                                <span className={result.color}>{result.icon}</span>
+                                <span className="text-muted-foreground text-xs">{result.label}</span>
+                              </div>
+                              <span className={`font-bold ${result.color}`}>{result.count}</span>
+                            </div>
+                          ))}
+                          {results.length === 0 && (
+                            <div className="col-span-2 text-muted-foreground text-center py-2">
+                              No quantitative results tracked
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Embedding Types Breakdown */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-cyan-600" />
+                      Embedding Types Generated
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-xs">
+                    {(() => {
+                      const embeddingTypes: { name: string; dimensions: string; status: boolean }[] = [];
+
+                      // Check for each embedding type
+                      const embeddingStep = job.steps.find(s => s.id === 'embedding-generation');
+                      const colorStep = job.steps.find(s => s.id === 'color-embeddings');
+                      const textureStep = job.steps.find(s => s.id === 'texture-embeddings');
+                      const applicationStep = job.steps.find(s => s.id === 'application-embeddings');
+                      const clipStep = job.steps.find(s => s.id === 'enhanced-clip-integration');
+
+                      if (embeddingStep?.status === 'completed') {
+                        embeddingTypes.push({ name: 'Text Embeddings', dimensions: '1536D', status: true });
+                      }
+                      if (clipStep?.status === 'completed') {
+                        embeddingTypes.push({ name: 'Visual Embeddings (CLIP)', dimensions: '512D', status: true });
+                      }
+                      if (colorStep?.status === 'completed') {
+                        embeddingTypes.push({ name: 'Color Embeddings', dimensions: '256D', status: true });
+                      }
+                      if (textureStep?.status === 'completed') {
+                        embeddingTypes.push({ name: 'Texture Embeddings', dimensions: '256D', status: true });
+                      }
+                      if (applicationStep?.status === 'completed') {
+                        embeddingTypes.push({ name: 'Application Embeddings', dimensions: '512D', status: true });
+                      }
+
+                      // Check for multimodal (fusion of text + visual)
+                      if (embeddingStep?.status === 'completed' && clipStep?.status === 'completed') {
+                        embeddingTypes.push({ name: 'Multimodal Embeddings', dimensions: '2048D', status: true });
+                      }
+
+                      return (
+                        <div className="space-y-1">
+                          {embeddingTypes.map((type, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="h-3 w-3 text-green-600" />
+                                <span className="text-muted-foreground">{type.name}</span>
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                {type.dimensions}
+                              </Badge>
+                            </div>
+                          ))}
+                          {embeddingTypes.length === 0 && (
+                            <div className="text-muted-foreground text-center py-2">
+                              No embeddings generated
+                            </div>
+                          )}
+                          {embeddingTypes.length > 0 && (
+                            <div className="mt-2 p-2 bg-cyan-50 rounded text-center">
+                              <span className="font-semibold text-cyan-900">
+                                {embeddingTypes.length} Embedding Types Generated
+                              </span>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
