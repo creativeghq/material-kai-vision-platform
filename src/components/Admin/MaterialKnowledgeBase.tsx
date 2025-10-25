@@ -123,15 +123,18 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('overview');
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
+  const [refreshInterval, setRefreshInterval] = useState<number>(30); // seconds
   const { toast } = useToast();
 
   // Use the new API hooks
-  const { data: metadataData, loading: metadataLoading } = useKnowledgeBaseMetadata(workspaceId);
-  const { data: qualityData, loading: qualityLoading } = useQualityScores(workspaceId);
-  const { data: embeddingsStatsData, loading: embeddingsStatsLoading } = useEmbeddingsStats(workspaceId);
-  const { data: detectionsData, loading: detectionsLoading } = useDetections(workspaceId);
-  const { data: dashboardData, loading: dashboardLoading } = useQualityDashboard(workspaceId, 30);
-  const { data: patternsData, loading: patternsLoading } = usePatterns(workspaceId);
+  const { data: metadataData, loading: metadataLoading, refetch: refetchMetadata } = useKnowledgeBaseMetadata(workspaceId);
+  const { data: qualityData, loading: qualityLoading, refetch: refetchQuality } = useQualityScores(workspaceId);
+  const { data: embeddingsStatsData, loading: embeddingsStatsLoading, refetch: refetchEmbeddings } = useEmbeddingsStats(workspaceId);
+  const { data: detectionsData, loading: detectionsLoading, refetch: refetchDetections } = useDetections(workspaceId);
+  const { data: dashboardData, loading: dashboardLoading, refetch: refetchDashboard } = useQualityDashboard(workspaceId, 30);
+  const { data: patternsData, loading: patternsLoading, refetch: refetchPatterns } = usePatterns(workspaceId);
 
   useEffect(() => {
     // Load page immediately, then fetch data in background
@@ -139,6 +142,30 @@ export const MaterialKnowledgeBase: React.FC = () => {
     // Start loading data asynchronously without blocking UI
     loadKnowledgeBaseData();
   }, []);
+
+  // Auto-refresh effect for new admin tabs
+  useEffect(() => {
+    if (!autoRefreshEnabled || !workspaceId) return;
+
+    const intervalId = setInterval(() => {
+      console.log('🔄 Auto-refreshing admin data...');
+      refetchMetadata?.();
+      refetchQuality?.();
+      refetchEmbeddings?.();
+      refetchDetections?.();
+      refetchDashboard?.();
+      refetchPatterns?.();
+      setLastRefreshTime(new Date());
+
+      toast({
+        title: 'Data Refreshed',
+        description: 'Admin data has been updated',
+        duration: 2000,
+      });
+    }, refreshInterval * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [autoRefreshEnabled, workspaceId, refreshInterval]);
 
   const loadKnowledgeBaseData = async () => {
     try {
@@ -539,6 +566,24 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }, 100);
   };
 
+  // Manual refresh all admin data
+  const refreshAllAdminData = () => {
+    console.log('🔄 Manually refreshing all admin data...');
+    refetchMetadata?.();
+    refetchQuality?.();
+    refetchEmbeddings?.();
+    refetchDetections?.();
+    refetchDashboard?.();
+    refetchPatterns?.();
+    setLastRefreshTime(new Date());
+
+    toast({
+      title: 'Refreshing Data',
+      description: 'Fetching latest admin data...',
+      duration: 2000,
+    });
+  };
+
   const formatJsonForDisplay = (data: unknown): string => {
     if (!data) return 'N/A';
     try {
@@ -624,13 +669,32 @@ export const MaterialKnowledgeBase: React.FC = () => {
             <h1 className="text-3xl font-bold">Material Knowledge Base</h1>
             <p className="text-muted-foreground">
               Comprehensive view of processed documents, chunks, images, and embeddings
+              {lastRefreshTime && (
+                <span className="text-xs ml-2">
+                  • Last updated: {lastRefreshTime.toLocaleTimeString()}
+                </span>
+              )}
             </p>
           </div>
         </div>
-        <Button onClick={loadKnowledgeBaseData} onKeyDown={(e) => e.key === 'Enter' && loadKnowledgeBaseData()} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+            variant={autoRefreshEnabled ? 'default' : 'outline'}
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${autoRefreshEnabled ? 'animate-spin' : ''}`} />
+            Auto-Refresh {autoRefreshEnabled ? 'ON' : 'OFF'}
+          </Button>
+          <Button onClick={refreshAllAdminData} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh All
+          </Button>
+          <Button onClick={loadKnowledgeBaseData} variant="outline" size="sm">
+            <Database className="h-4 w-4 mr-2" />
+            Reload Data
+          </Button>
+        </div>
       </div>
 
       {/* Stats Overview */}

@@ -99,46 +99,49 @@ export const useKnowledgeBaseMetadata = (workspaceId: string | null, entityType?
   const [data, setData] = useState<MetadataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
+  const fetchMetadata = async () => {
     if (!workspaceId) return;
 
-    const fetchMetadata = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-        const params = new URLSearchParams({ workspace_id: workspaceId });
-        if (entityType) params.append('entity_type', entityType);
+      const params = new URLSearchParams({ workspace_id: workspaceId });
+      if (entityType) params.append('entity_type', entityType);
 
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/admin-kb-metadata?${params}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/admin-kb-metadata?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        if (!response.ok) throw new Error('Failed to fetch metadata');
+      if (!response.ok) throw new Error('Failed to fetch metadata');
 
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchMetadata();
-  }, [workspaceId, entityType]);
+  }, [workspaceId, entityType, refreshTrigger]);
 
-  return { data, loading, error };
+  const refetch = () => setRefreshTrigger(prev => prev + 1);
+
+  return { data, loading, error, refetch };
 };
 
 /**
@@ -148,43 +151,46 @@ export const useQualityScores = (workspaceId: string | null) => {
   const [data, setData] = useState<QualityScoresResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
+  const fetchQualityScores = async () => {
     if (!workspaceId) return;
 
-    const fetchQualityScores = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/admin-kb-quality-scores?workspace_id=${workspaceId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/admin-kb-quality-scores?workspace_id=${workspaceId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        if (!response.ok) throw new Error('Failed to fetch quality scores');
+      if (!response.ok) throw new Error('Failed to fetch quality scores');
 
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchQualityScores();
-  }, [workspaceId]);
+  }, [workspaceId, refreshTrigger]);
 
-  return { data, loading, error };
+  const refetch = () => setRefreshTrigger(prev => prev + 1);
+
+  return { data, loading, error, refetch };
 };
 
 /**
@@ -194,43 +200,46 @@ export const useEmbeddingsStats = (workspaceId: string | null) => {
   const [data, setData] = useState<EmbeddingsStatsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
+  const fetchEmbeddingsStats = async () => {
     if (!workspaceId) return;
 
-    const fetchEmbeddingsStats = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/admin-kb-embeddings-stats?workspace_id=${workspaceId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/admin-kb-embeddings-stats?workspace_id=${workspaceId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        if (!response.ok) throw new Error('Failed to fetch embeddings stats');
+      if (!response.ok) throw new Error('Failed to fetch embeddings stats');
 
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchEmbeddingsStats();
-  }, [workspaceId]);
+  }, [workspaceId, refreshTrigger]);
 
-  return { data, loading, error };
+  const refetch = () => setRefreshTrigger(prev => prev + 1);
+
+  return { data, loading, error, refetch };
 };
 
 /**
@@ -245,48 +254,51 @@ export const useDetections = (
   const [data, setData] = useState<DetectionsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
+  const fetchDetections = async () => {
     if (!workspaceId) return;
 
-    const fetchDetections = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-        const params = new URLSearchParams({ workspace_id: workspaceId });
-        if (detectionType) params.append('detection_type', detectionType);
-        if (startDate) params.append('start_date', startDate);
-        if (endDate) params.append('end_date', endDate);
+      const params = new URLSearchParams({ workspace_id: workspaceId });
+      if (detectionType) params.append('detection_type', detectionType);
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
 
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/admin-kb-detections?${params}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/admin-kb-detections?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        if (!response.ok) throw new Error('Failed to fetch detections');
+      if (!response.ok) throw new Error('Failed to fetch detections');
 
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDetections();
-  }, [workspaceId, detectionType, startDate, endDate]);
+  }, [workspaceId, detectionType, startDate, endDate, refreshTrigger]);
 
-  return { data, loading, error };
+  const refetch = () => setRefreshTrigger(prev => prev + 1);
+
+  return { data, loading, error, refetch };
 };
 
 /**
@@ -296,43 +308,46 @@ export const useQualityDashboard = (workspaceId: string | null, days: number = 3
   const [data, setData] = useState<QualityDashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
+  const fetchDashboard = async () => {
     if (!workspaceId) return;
 
-    const fetchDashboard = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/admin-kb-quality-dashboard?workspace_id=${workspaceId}&days=${days}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/admin-kb-quality-dashboard?workspace_id=${workspaceId}&days=${days}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        if (!response.ok) throw new Error('Failed to fetch quality dashboard');
+      if (!response.ok) throw new Error('Failed to fetch quality dashboard');
 
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDashboard();
-  }, [workspaceId, days]);
+  }, [workspaceId, days, refreshTrigger]);
 
-  return { data, loading, error };
+  const refetch = () => setRefreshTrigger(prev => prev + 1);
+
+  return { data, loading, error, refetch };
 };
 
 /**
@@ -342,42 +357,45 @@ export const usePatterns = (workspaceId: string | null) => {
   const [data, setData] = useState<PatternsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
+  const fetchPatterns = async () => {
     if (!workspaceId) return;
 
-    const fetchPatterns = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-        const response = await fetch(
-          `${SUPABASE_URL}/functions/v1/admin-kb-patterns?workspace_id=${workspaceId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/admin-kb-patterns?workspace_id=${workspaceId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        if (!response.ok) throw new Error('Failed to fetch patterns');
+      if (!response.ok) throw new Error('Failed to fetch patterns');
 
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchPatterns();
-  }, [workspaceId]);
+  }, [workspaceId, refreshTrigger]);
 
-  return { data, loading, error };
+  const refetch = () => setRefreshTrigger(prev => prev + 1);
+
+  return { data, loading, error, refetch };
 };
 
