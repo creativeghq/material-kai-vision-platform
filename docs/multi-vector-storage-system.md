@@ -173,22 +173,23 @@ interface EmbeddingMetadata {
 
 ## 🔧 SERVICES ARCHITECTURE
 
-### MultiVectorGenerationService
-**File**: `src/services/multiVectorGenerationService.ts` (792 lines)
+### RealEmbeddingsService
+**File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py` (452 lines)
 
 #### Key Methods
-```typescript
-// Generate all embeddings for a product
-static async generateProductEmbeddings(
-  productId: string,
-  options: EmbeddingGenerationOptions = {}
-): Promise<EmbeddingGenerationResult>
+```python
+# Generate text embedding
+async def generate_text_embedding(
+  self,
+  text: str
+) -> Dict[str, Any]
 
-// Batch generate embeddings for multiple products
-static async batchGenerateProductEmbeddings(
-  productIds: string[],
-  options: EmbeddingGenerationOptions = {}
-): Promise<BatchGenerationResult>
+# Generate visual embedding
+async def generate_visual_embedding(
+  self,
+  image_url: Optional[str],
+  image_data: Optional[str]
+) -> Optional[List[float]]
 
 // Get embedding statistics
 static async getEmbeddingStatistics(): Promise<EmbeddingStatistics>

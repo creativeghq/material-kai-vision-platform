@@ -36,6 +36,8 @@
 
 - **[Platform Functionality](./platform-functionality.md)** - Complete feature overview and user guide
 - **[Platform Flows](./platform-flows.md)** - Workflow documentation for all major processes
+- **[Platform Enhancements & Processes](./platform-enhancements-processes.md)** - ✨ NEW - Complete documentation of all platform enhancements, image processing improvements, and metadata system
+- **[Metadata Inventory System](./metadata-inventory-system.md)** - ✨ NEW - Complete inventory of 200+ metadata fields with coverage analysis
 - **[API Documentation](./api-documentation.md)** - REST API endpoints and integration
 - **[Database Schema](./database-schema.md)** - Database structure and relationships
 - **[Security & Authentication](./security-authentication.md)** - Auth systems and security practices

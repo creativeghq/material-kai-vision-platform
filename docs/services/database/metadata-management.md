@@ -13,6 +13,8 @@ The Metadata Management Service enables administrators to define, manage, and au
 - **Technology**: React + TypeScript + Supabase
 - **Database**: material_metadata_fields table (121 fields)
 - **Integration**: MIVAA for auto-population
+- **Coverage**: 65% of 200+ total metadata fields
+- **Related Documentation**: [Metadata Inventory System](../../metadata-inventory-system.md)
 
 ---
 

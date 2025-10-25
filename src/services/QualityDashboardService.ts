@@ -11,6 +11,7 @@ import { BaseService } from './base/BaseService';
 import { ImageValidationService } from './ImageValidationService';
 import { ProductEnrichmentService } from './ProductEnrichmentService';
 import { ValidationRulesService } from './ValidationRulesService';
+import { pdfProcessingWebSocketService } from './realtime/PDFProcessingWebSocketService';
 
 export interface QualityMetrics {
   timestamp: string;
@@ -255,6 +256,41 @@ class QualityDashboardServiceImpl extends BaseService {
         recommendations,
       };
     }, 'getDashboardData');
+  }
+
+  /**
+   * Broadcast quality metrics via WebSocket for real-time updates
+   */
+  async broadcastQualityMetrics(jobId: string, workspaceId: string): Promise<void> {
+    try {
+      const metrics = await this.getQualityMetrics(workspaceId);
+
+      // Broadcast to all connected clients via WebSocket
+      pdfProcessingWebSocketService.broadcast('quality-metrics-update', {
+        jobId,
+        workspaceId,
+        metrics,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`📊 Quality metrics broadcasted for job ${jobId}`);
+    } catch (error) {
+      console.error('Failed to broadcast quality metrics:', error);
+    }
+  }
+
+  /**
+   * Subscribe to real-time quality updates for a job
+   */
+  subscribeToQualityUpdates(jobId: string, callback: (data: any) => void): () => void {
+    // Subscribe to WebSocket messages for this job
+    const unsubscribe = pdfProcessingWebSocketService.subscribe('quality-metrics-update', (data) => {
+      if (data.jobId === jobId) {
+        callback(data);
+      }
+    });
+
+    return unsubscribe;
   }
 
   /**

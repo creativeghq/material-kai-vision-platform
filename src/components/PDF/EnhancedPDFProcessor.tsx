@@ -119,6 +119,66 @@ interface PDFImage {
   metadata: Record<string, unknown>;
 }
 
+/**
+ * Step 5: Real Quality Score Calculation Functions
+ * Replace hardcoded values (0.85, 0.90, 0.95) with real calculations
+ */
+
+function calculateLayoutPreservationQuality(chunks: PDFChunk[]): number {
+  if (!chunks || chunks.length === 0) return 0.5;
+
+  // Calculate based on chunk hierarchy and structure preservation
+  const hierarchyLevels = new Set(chunks.map(c => c.hierarchyLevel));
+  const chunkTypes = new Set(chunks.map(c => c.chunkType));
+
+  // More hierarchy levels and chunk types = better layout preservation
+  const hierarchyScore = Math.min(1.0, hierarchyLevels.size / 5);
+  const typeScore = Math.min(1.0, chunkTypes.size / 5);
+
+  return Math.round((hierarchyScore * 0.6 + typeScore * 0.4) * 100) / 100;
+}
+
+function calculateChunkingQuality(chunks: PDFChunk[]): number {
+  if (!chunks || chunks.length === 0) return 0.5;
+
+  // Calculate based on chunk size consistency and boundaries
+  const sizes = chunks.map(c => c.text.length);
+  const avgSize = sizes.reduce((a, b) => a + b, 0) / sizes.length;
+  const variance = sizes.reduce((sum, size) => sum + Math.pow(size - avgSize, 2), 0) / sizes.length;
+  const stdDev = Math.sqrt(variance);
+
+  // Lower variance = better chunking quality
+  const consistencyScore = Math.max(0, 1 - stdDev / avgSize);
+
+  // Check for proper boundaries (sentences ending with punctuation)
+  const properBoundaries = chunks.filter(c => /[.!?]$/.test(c.text.trim())).length;
+  const boundaryScore = properBoundaries / chunks.length;
+
+  return Math.round((consistencyScore * 0.5 + boundaryScore * 0.5) * 100) / 100;
+}
+
+function calculateImageMappingAccuracy(images: PDFImage[]): number {
+  if (!images || images.length === 0) return 0.5;
+
+  // Calculate based on image metadata completeness
+  const withMetadata = images.filter(img => img.metadata && Object.keys(img.metadata).length > 0).length;
+  const withPosition = images.filter(img => img.position && img.position.width > 0 && img.position.height > 0).length;
+
+  const metadataScore = withMetadata / images.length;
+  const positionScore = withPosition / images.length;
+
+  return Math.round((metadataScore * 0.5 + positionScore * 0.5) * 100) / 100;
+}
+
+function calculateOverallQuality(chunks: PDFChunk[], images: PDFImage[]): number {
+  const layoutScore = calculateLayoutPreservationQuality(chunks);
+  const chunkingScore = calculateChunkingQuality(chunks);
+  const imageMappingScore = calculateImageMappingAccuracy(images);
+
+  // Weighted average of all quality metrics
+  return Math.round((layoutScore * 0.35 + chunkingScore * 0.35 + imageMappingScore * 0.30) * 100) / 100;
+}
+
 interface PDFLayoutElement {
   id: string;
   type: 'text' | 'image' | 'table' | 'header' | 'footer';
@@ -397,10 +457,14 @@ export function EnhancedPDFProcessor() {
         quality: {
           id: 'quality-1',
           documentId: documentId,
-          layoutPreservation: 0.85,
-          chunkingQuality: 0.90,
-          imageMappingAccuracy: 0.80,
-          overallQuality: 0.85,
+          // Step 5: Calculate real quality scores based on actual data (not hardcoded 0.85, 0.90, 0.95)
+          layoutPreservation: calculateLayoutPreservationQuality(extractionResult?.content?.chunks || []),
+          chunkingQuality: calculateChunkingQuality(extractionResult?.content?.chunks || []),
+          imageMappingAccuracy: calculateImageMappingAccuracy(extractionResult?.content?.images || []),
+          overallQuality: calculateOverallQuality(
+            extractionResult?.content?.chunks || [],
+            extractionResult?.content?.images || []
+          ),
           statistics: {
             totalChunks: extractionResult?.content?.chunks?.length || 1,
             totalImages: extractionResult?.content?.images?.length || 0,

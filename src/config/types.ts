@@ -57,6 +57,20 @@ export interface BatchProcessingConfig {
   };
 }
 
+export interface MivaaIntegrationConfig {
+  baseUrl: string;
+  apiKey?: string;
+  timeout: number;
+  retryAttempts: number;
+  retryDelay: number;
+  retryBackoffMultiplier: number;
+  circuitBreaker: {
+    enabled: boolean;
+    failureThreshold: number;
+    resetTimeout: number;
+  };
+}
+
 // Performance configuration
 export interface PerformanceConfig {
   caching: {
@@ -117,6 +131,7 @@ export interface AppConfig extends BaseConfig {
     mivaaToRagTransformer: MivaaToRagTransformerConfig;
     validationIntegration: ValidationIntegrationConfig;
     batchProcessing: BatchProcessingConfig;
+    mivaaIntegration: MivaaIntegrationConfig;
   };
   performance: PerformanceConfig;
   externalDependencies: ExternalDependenciesConfig;

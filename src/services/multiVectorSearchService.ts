@@ -13,8 +13,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-import { MultiVectorGenerationService } from './multiVectorGenerationService';
-
 // Search query interfaces
 export interface MultiVectorSearchQuery {
   text?: string;

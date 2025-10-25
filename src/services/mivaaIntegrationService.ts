@@ -6,12 +6,16 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { RetryHelper, RetryOptions } from '@/utils/retryHelper';
+import { CircuitBreaker } from '@/services/circuitBreaker';
 
 export interface MivaaConfig {
   baseUrl: string;
   apiKey?: string;
   timeout: number;
   retryAttempts: number;
+  retryDelay: number;
+  retryBackoffMultiplier: number;
 }
 
 export interface MivaaResponse<T = any> {
@@ -57,14 +61,32 @@ export interface PDFProcessingOptions {
 export class MivaaIntegrationService {
   private static instance: MivaaIntegrationService;
   private config: MivaaConfig;
+  private circuitBreaker: CircuitBreaker;
 
-  private constructor() {
-    this.config = {
+  private constructor(config?: MivaaConfig) {
+    // Use provided config or load from environment
+    this.config = config || {
       baseUrl: process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
       apiKey: process.env.MIVAA_API_KEY,
       timeout: 30000,
       retryAttempts: 3,
+      retryDelay: 1000,
+      retryBackoffMultiplier: 2,
     };
+
+    // Initialize circuit breaker for fault tolerance
+    this.circuitBreaker = new CircuitBreaker({
+      failureThreshold: 5,
+      resetTimeout: 60000,
+      monitoringPeriod: 10000,
+    });
+  }
+
+  /**
+   * Initialize with configuration from centralized config system
+   */
+  public static initializeWithConfig(config: MivaaConfig): void {
+    MivaaIntegrationService.instance = new MivaaIntegrationService(config);
   }
 
   public static getInstance(): MivaaIntegrationService {
@@ -150,7 +172,7 @@ export class MivaaIntegrationService {
   }
 
   /**
-   * Call MIVAA endpoint directly
+   * Call MIVAA endpoint with retry logic and circuit breaker
    */
   private async callMivaaEndpoint<T>(
     endpoint: string,
@@ -160,59 +182,74 @@ export class MivaaIntegrationService {
     const startTime = Date.now();
 
     try {
-      const url = `${this.config.baseUrl}${endpoint}`;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
+      // Use circuit breaker to prevent cascading failures
+      return await this.circuitBreaker.execute(async () => {
+        // Use retry logic for transient failures
+        return await RetryHelper.withRetry(
+          async () => {
+            const url = `${this.config.baseUrl}${endpoint}`;
+            const headers: Record<string, string> = {
+              'Content-Type': 'application/json',
+            };
 
-      if (this.config.apiKey) {
-        headers['Authorization'] = `Bearer ${this.config.apiKey}`;
-      }
+            if (this.config.apiKey) {
+              headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+            }
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: method !== 'GET' ? JSON.stringify(data) : undefined,
-        signal: AbortSignal.timeout(this.config.timeout),
+            const response = await fetch(url, {
+              method,
+              headers,
+              body: method !== 'GET' ? JSON.stringify(data) : undefined,
+              signal: AbortSignal.timeout(this.config.timeout),
+            });
+
+            const responseData = await response.json();
+            const processingTime = Date.now() - startTime;
+
+            if (!response.ok) {
+              // Throw error for retry logic to handle
+              const error = new Error(
+                `MIVAA API error: ${response.status} - ${responseData.message || 'Unknown error'}`
+              );
+              (error as any).status = response.status;
+              (error as any).details = responseData;
+              throw error;
+            }
+
+            return {
+              success: true,
+              data: responseData,
+              metadata: {
+                timestamp: new Date().toISOString(),
+                processingTime,
+                endpoint,
+                version: '1.0.0',
+              },
+            };
+          },
+          {
+            maxAttempts: this.config.retryAttempts,
+            delay: this.config.retryDelay,
+            backoffMultiplier: this.config.retryBackoffMultiplier,
+            retryCondition: (error: unknown) => {
+              // Retry on network errors and 5xx server errors
+              if (error instanceof Error) {
+                const status = (error as any).status;
+                return !status || status >= 500;
+              }
+              return true;
+            },
+          }
+        );
       });
-
-      const responseData = await response.json();
-      const processingTime = Date.now() - startTime;
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: {
-            code: `HTTP_${response.status}`,
-            message: responseData.message || `HTTP ${response.status} error`,
-            details: responseData,
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            processingTime,
-            endpoint,
-            version: '1.0.0',
-          },
-        };
-      }
-
-      return {
-        success: true,
-        data: responseData,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          processingTime,
-          endpoint,
-          version: '1.0.0',
-        },
-      };
     } catch (error) {
+      const processingTime = Date.now() - startTime;
       return {
         success: false,
         error: {
-          code: 'NETWORK_ERROR',
+          code: 'MIVAA_ERROR',
           message: error instanceof Error ? error.message : 'Unknown error',
-          details: error,
+          details: error instanceof Error ? { message: error.message } : error,
         },
         metadata: {
           timestamp: new Date().toISOString(),

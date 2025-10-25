@@ -1,833 +1,333 @@
 /**
  * Enhanced CLIP Integration Service
  *
- * Leverages existing CLIP embeddings from VisualFeatureExtractionService and MaterialVisualSearchService
- * to improve product-image associations and enable advanced visual similarity search capabilities.
- *
- * Features:
- * - Real CLIP embedding-based product-image matching
- * - Advanced visual similarity search with multi-modal queries
- * - Product recommendation based on visual similarity
- * - Cross-modal search (text-to-image, image-to-text)
- * - Batch processing for large-scale similarity computations
+ * Handles CLIP-specific operations:
+ * - Generate CLIP embeddings via Python API
+ * - Calculate real cosine similarity
+ * - Batch CLIP processing
+ * - Product recommendations via visual similarity
+ * - Integration with multiModalImageProductAssociationService
  */
 
 import { supabase } from '@/integrations/supabase/client';
 
-import { VisualFeatureExtractionService } from './visualFeatureExtractionService';
-// import { MaterialVisualSearchService } from './materialVisualSearchService'; // TODO: Add when available
-
-export interface ClipEmbedding {
-  embedding: number[];
-  model: string;
-  dimensions: number;
+export interface ClipEmbeddingResult {
+  entityId: string;
+  entityType: 'product' | 'image';
+  embedding: number[]; // 512D CLIP embedding
   confidence: number;
-  created_at: string;
+  generatedAt: string;
+  success: boolean;
+  error?: string;
 }
 
-export interface ProductImageMatch {
+export interface VisualRecommendation {
   productId: string;
-  imageId: string;
-  visualSimilarity: number;
-  textualSimilarity: number;
-  combinedScore: number;
-  confidence: number;
-  reasoning: string;
-  metadata: {
-    clipModel: string;
-    embeddingDimensions: number;
-    processingTime: number;
-    matchingMethod: 'clip_cosine' | 'hybrid_multimodal' | 'cross_modal';
-  };
-}
-
-export interface VisualSearchQuery {
-  type: 'image_to_products' | 'text_to_images' | 'hybrid_multimodal';
-  imageData?: string;
-  textQuery?: string;
-  filters?: {
-    materialType?: string;
-    colorFamily?: string;
-    priceRange?: [number, number];
-    categories?: string[];
-  };
-  similarityThreshold?: number;
-  maxResults?: number;
-}
-
-export interface VisualSearchResult {
-  id: string;
-  type: 'product' | 'image';
-  name: string;
-  description?: string;
-  imageUrl?: string;
+  productName: string;
   similarity: number;
-  confidence: number;
-  metadata: Record<string, unknown>;
-}
-
-export interface ProductRecommendation {
-  productId: string;
-  name: string;
-  description: string;
-  imageUrl?: string;
-  visualSimilarity: number;
-  reasoningFactors: {
-    colorSimilarity: number;
-    textureSimilarity: number;
-    shapeSimilarity: number;
-    materialTypeSimilarity: number;
-  };
-  confidence: number;
-}
-
-export interface ClipIntegrationStats {
-  productsWithEmbeddings: number;
-  imagesWithEmbeddings: number;
-  totalEmbeddings: number;
-  averageEmbeddingDimensions: number;
-  modelDistribution: Record<string, number>;
-  lastUpdated: string;
+  imageCount: number;
 }
 
 export class EnhancedClipIntegrationService {
-  private static readonly CLIP_EMBEDDING_DIMENSION = 512;
-  private static readonly SIMILARITY_THRESHOLD = 0.75;
-  private static readonly MAX_BATCH_SIZE = 100;
+  private static instance: EnhancedClipIntegrationService;
+  private readonly CLIP_EMBEDDING_DIM = 512;
+  private readonly SIMILARITY_THRESHOLD = 0.5;
 
-  /**
-   * Generate CLIP embeddings for product text descriptions
-   */
-  static async generateProductClipEmbeddings(
-    productId: string,
-    productText: string,
-    options: {
-      forceRegenerate?: boolean;
-      includeMetadata?: boolean;
-    } = {},
-  ): Promise<ClipEmbedding | null> {
-    try {
-      console.log(`🔗 Generating CLIP embeddings for product: ${productId}`);
+  private constructor() {}
 
-      // Check if embeddings already exist
-      if (!options.forceRegenerate) {
-        const existing = await this.getProductClipEmbedding(productId);
-        if (existing) {
-          console.log(`✅ Using existing CLIP embeddings for product: ${productId}`);
-          return existing;
-        }
-      }
-
-      // Generate CLIP text embeddings using MIVAA gateway directly
-      const response = await fetch(`${process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000'}/api/mivaa/gateway`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'clip_embedding_generation',
-          payload: {
-            text_query: productText,
-            embedding_type: 'text_similarity',
-            options: {
-              normalize: true,
-              dimensions: 512,
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        console.warn(`⚠️ Failed to generate CLIP embeddings for product: ${productId} - HTTP ${response.status}`);
-        return null;
-      }
-
-      const result = await response.json();
-
-      if (!result.success || !result.data?.embedding) {
-        console.warn(`⚠️ Failed to generate CLIP embeddings for product: ${productId} - Invalid response`);
-        return null;
-      }
-
-      const clipEmbedding: ClipEmbedding = {
-        embedding: result.data.embedding,
-        model: result.data.model_used || 'clip-vit-base-patch32',
-        dimensions: result.data.embedding.length,
-        confidence: result.data.confidence || 1.0,
-        created_at: new Date().toISOString(),
-      };
-
-      // Store in products table
-      await this.storeProductClipEmbedding(productId, clipEmbedding);
-
-      console.log(`✅ Generated and stored CLIP embeddings for product: ${productId}`);
-      return clipEmbedding;
-
-    } catch (error) {
-      console.error(`❌ Error generating CLIP embeddings for product ${productId}:`, error);
-      return null;
+  static getInstance(): EnhancedClipIntegrationService {
+    if (!EnhancedClipIntegrationService.instance) {
+      EnhancedClipIntegrationService.instance = new EnhancedClipIntegrationService();
     }
+    return EnhancedClipIntegrationService.instance;
   }
 
   /**
-   * Get existing CLIP embedding for a product
+   * Generate CLIP embeddings for products (batch)
    */
-  static async getProductClipEmbedding(productId: string): Promise<ClipEmbedding | null> {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('embedding, embedding_model, updated_at')
-        .eq('id', productId)
-        .single();
+  async generateProductClipEmbeddings(products: any[]): Promise<ClipEmbeddingResult[]> {
+    console.log(`🎬 Generating CLIP embeddings for ${products.length} products`);
 
-      if (error || !data?.embedding) {
-        return null;
+    const results = await Promise.allSettled(
+      products.map(product => this.generateProductClipEmbedding(product))
+    );
+
+    const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as ClipEmbeddingResult).success).length;
+    console.log(`✅ CLIP generation complete: ${successCount}/${results.length} successful`);
+
+    return results.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
       }
-
       return {
-        embedding: JSON.parse(data.embedding),
-        model: data.embedding_model || 'clip-vit-base-patch32',
-        dimensions: JSON.parse(data.embedding).length,
-        confidence: 1.0,
-        created_at: data.updated_at,
+        entityId: products[index].id,
+        entityType: 'product',
+        embedding: [],
+        confidence: 0,
+        generatedAt: new Date().toISOString(),
+        success: false,
+        error: (result.reason as Error).message,
       };
-
-    } catch (error) {
-      console.error(`❌ Error retrieving CLIP embedding for product ${productId}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Store CLIP embedding for a product
-   */
-  private static async storeProductClipEmbedding(
-    productId: string,
-    clipEmbedding: ClipEmbedding,
-  ): Promise<void> {
-    const { error } = await supabase
-      .from('products')
-      .update({
-        embedding: JSON.stringify(clipEmbedding.embedding),
-        embedding_model: clipEmbedding.model,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', productId);
-
-    if (error) {
-      throw new Error(`Failed to store CLIP embedding for product ${productId}: ${error.message}`);
-    }
-  }
-
-  /**
-   * Calculate cosine similarity between two CLIP embeddings
-   */
-  static calculateCosineSimilarity(embedding1: number[], embedding2: number[]): number {
-    if (embedding1.length !== embedding2.length) {
-      throw new Error('Embeddings must have the same dimensions');
-    }
-
-    let dotProduct = 0;
-    let norm1 = 0;
-    let norm2 = 0;
-
-    for (let i = 0; i < embedding1.length; i++) {
-      dotProduct += embedding1[i] * embedding2[i];
-      norm1 += embedding1[i] * embedding1[i];
-      norm2 += embedding2[i] * embedding2[i];
-    }
-
-    const similarity = dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
-    return Math.max(0, Math.min(1, similarity)); // Clamp to [0, 1]
-  }
-
-  /**
-   * Enhanced product-image matching using real CLIP embeddings
-   */
-  static async calculateRealClipScore(
-    imageId: string,
-    productId: string,
-  ): Promise<{ score: number; confidence: number; metadata: Record<string, unknown> }> {
-    try {
-      console.log(`🔍 Calculating real CLIP score for image ${imageId} and product ${productId}`);
-
-      // Get image CLIP embedding from material_visual_analysis
-      const { data: imageAnalysis, error: imageError } = await supabase
-        .from('material_visual_analysis')
-        .select('clip_embedding, clip_model_version')
-        .eq('material_id', imageId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (imageError || !imageAnalysis?.clip_embedding) {
-        console.warn(`⚠️ No CLIP embedding found for image: ${imageId}`);
-        return { score: 0.5, confidence: 0.3, metadata: { reason: 'no_image_embedding' } };
-      }
-
-      // Get product CLIP embedding
-      const productEmbedding = await this.getProductClipEmbedding(productId);
-      if (!productEmbedding) {
-        console.warn(`⚠️ No CLIP embedding found for product: ${productId}`);
-        return { score: 0.5, confidence: 0.3, metadata: { reason: 'no_product_embedding' } };
-      }
-
-      // Parse image embedding
-      const imageEmbedding = JSON.parse(imageAnalysis.clip_embedding);
-
-      // Calculate cosine similarity
-      const similarity = this.calculateCosineSimilarity(imageEmbedding, productEmbedding.embedding);
-
-      // Calculate confidence based on embedding quality and model consistency
-      const modelMatch = imageAnalysis.clip_model_version === productEmbedding.model;
-      const confidence = modelMatch ? 0.95 : 0.85;
-
-      console.log(`✅ CLIP similarity: ${similarity.toFixed(3)} (confidence: ${confidence.toFixed(3)})`);
-
-      return {
-        score: similarity,
-        confidence,
-        metadata: {
-          imageModel: imageAnalysis.clip_model_version,
-          productModel: productEmbedding.model,
-          modelMatch,
-          embeddingDimensions: imageEmbedding.length,
-          method: 'clip_cosine_similarity',
-        },
-      };
-
-    } catch (error) {
-      console.error('❌ Error calculating real CLIP score:', error);
-      return { score: 0.5, confidence: 0.1, metadata: { error: error.message } };
-    }
-  }
-
-  /**
-   * Perform advanced visual similarity search
-   */
-  static async performVisualSimilaritySearch(
-    query: VisualSearchQuery,
-  ): Promise<{ results: VisualSearchResult[]; metadata: Record<string, unknown> }> {
-    try {
-      console.log(`🔍 Performing visual similarity search: ${query.type}`);
-      const startTime = Date.now();
-
-      let queryEmbedding: number[] | null = null;
-      let searchMetadata: Record<string, unknown> = {
-        queryType: query.type,
-        similarityThreshold: query.similarityThreshold || this.SIMILARITY_THRESHOLD,
-        maxResults: query.maxResults || 20,
-      };
-
-      // Generate query embedding based on type
-      if (query.type === 'image_to_products' && query.imageData) {
-        queryEmbedding = await this.generateImageClipEmbedding(query.imageData);
-        searchMetadata.hasImageQuery = true;
-      } else if (query.type === 'text_to_images' && query.textQuery) {
-        queryEmbedding = await this.generateTextClipEmbedding(query.textQuery);
-        searchMetadata.hasTextQuery = true;
-      } else if (query.type === 'hybrid_multimodal') {
-        // Combine image and text embeddings
-        const imageEmb = query.imageData ? await this.generateImageClipEmbedding(query.imageData) : null;
-        const textEmb = query.textQuery ? await this.generateTextClipEmbedding(query.textQuery) : null;
-
-        if (imageEmb && textEmb) {
-          // Average the embeddings for hybrid search
-          queryEmbedding = imageEmb.map((val, idx) => (val + textEmb[idx]) / 2);
-          searchMetadata.hybridMode = true;
-        } else {
-          queryEmbedding = imageEmb || textEmb;
-        }
-      }
-
-      if (!queryEmbedding) {
-        throw new Error('Failed to generate query embedding');
-      }
-
-      // Search based on query type
-      let results: VisualSearchResult[] = [];
-
-      if (query.type === 'image_to_products' || query.type === 'hybrid_multimodal') {
-        results = await this.searchSimilarProducts(queryEmbedding, query);
-      } else if (query.type === 'text_to_images') {
-        results = await this.searchSimilarImages(queryEmbedding, query);
-      }
-
-      // Apply filters
-      if (query.filters) {
-        results = this.applySearchFilters(results, query.filters);
-      }
-
-      // Sort by similarity and limit results
-      results = results
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, query.maxResults || 20);
-
-      const processingTime = Date.now() - startTime;
-      searchMetadata.processingTime = processingTime;
-      searchMetadata.resultsCount = results.length;
-
-      console.log(`✅ Visual search completed: ${results.length} results in ${processingTime}ms`);
-
-      return { results, metadata: searchMetadata };
-
-    } catch (error) {
-      console.error('❌ Error performing visual similarity search:', error);
-      return { results: [], metadata: { error: error.message } };
-    }
-  }
-
-  /**
-   * Generate CLIP embedding for image data using MIVAA gateway
-   */
-  private static async generateImageClipEmbedding(imageData: string): Promise<number[] | null> {
-    try {
-      // Use MIVAA gateway directly for image embedding generation
-      const response = await fetch(`${process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000'}/api/mivaa/gateway`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'clip_embedding_generation',
-          payload: {
-            image_data: imageData,
-            embedding_type: 'visual_similarity',
-            options: {
-              normalize: true,
-              dimensions: 512,
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`MIVAA gateway error: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success && result.data?.embedding) {
-        return Array.isArray(result.data.embedding) ? result.data.embedding : null;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('❌ Error generating image CLIP embedding:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Generate CLIP embedding for text query using MIVAA gateway
-   */
-  private static async generateTextClipEmbedding(textQuery: string): Promise<number[] | null> {
-    try {
-      // Use MIVAA gateway directly for text embedding generation
-      const response = await fetch(`${process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL || 'http://localhost:3000'}/api/mivaa/gateway`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'clip_embedding_generation',
-          payload: {
-            text_query: textQuery,
-            embedding_type: 'text_similarity',
-            options: {
-              normalize: true,
-              dimensions: 512,
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`MIVAA gateway error: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success && result.data?.embedding) {
-        return Array.isArray(result.data.embedding) ? result.data.embedding : null;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('❌ Error generating text CLIP embedding:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Search for products similar to query embedding
-   */
-  private static async searchSimilarProducts(
-    queryEmbedding: number[],
-    query: VisualSearchQuery,
-  ): Promise<VisualSearchResult[]> {
-    try {
-      // Get all products with embeddings
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('id, name, description, embedding, embedding_model')
-        .not('embedding', 'is', null)
-        .limit(query.maxResults ? query.maxResults * 2 : 100); // Get more to filter
-
-      if (error || !products) {
-        throw new Error(`Failed to fetch products: ${error?.message}`);
-      }
-
-      const results: VisualSearchResult[] = [];
-      const threshold = query.similarityThreshold || this.SIMILARITY_THRESHOLD;
-
-      for (const product of products) {
-        try {
-          const productEmbedding = JSON.parse(product.embedding);
-          const similarity = this.calculateCosineSimilarity(queryEmbedding, productEmbedding);
-
-          if (similarity >= threshold) {
-            results.push({
-              id: product.id,
-              type: 'product',
-              name: product.name,
-              description: product.description,
-              similarity,
-              confidence: 0.9,
-              metadata: {
-                embeddingModel: product.embedding_model,
-                embeddingDimensions: productEmbedding.length,
-              },
-            });
-          }
-        } catch (embeddingError) {
-          console.warn(`⚠️ Error processing product ${product.id}:`, embeddingError);
-        }
-      }
-
-      return results;
-
-    } catch (error) {
-      console.error('❌ Error searching similar products:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Search for images similar to query embedding
-   */
-  private static async searchSimilarImages(
-    queryEmbedding: number[],
-    query: VisualSearchQuery,
-  ): Promise<VisualSearchResult[]> {
-    try {
-      // Get images with CLIP embeddings from material_visual_analysis
-      const { data: analyses, error } = await supabase
-        .from('material_visual_analysis')
-        .select(`
-          material_id,
-          clip_embedding,
-          clip_model_version,
-          imagesinner(id, filename, url, caption, alt_text)
-        `)
-        .not('clip_embedding', 'is', null)
-        .limit(query.maxResults ? query.maxResults * 2 : 100);
-
-      if (error || !analyses) {
-        throw new Error(`Failed to fetch image analyses: ${error?.message}`);
-      }
-
-      const results: VisualSearchResult[] = [];
-      const threshold = query.similarityThreshold || this.SIMILARITY_THRESHOLD;
-
-      for (const analysis of analyses) {
-        try {
-          const imageEmbedding = JSON.parse(analysis.clip_embedding);
-          const similarity = this.calculateCosineSimilarity(queryEmbedding, imageEmbedding);
-
-          if (similarity >= threshold && analysis.images) {
-            const image = analysis.images;
-            results.push({
-              id: image.id,
-              type: 'image',
-              name: image.filename || image.caption || 'Untitled Image',
-              description: image.alt_text || image.caption,
-              imageUrl: image.url,
-              similarity,
-              confidence: 0.9,
-              metadata: {
-                clipModel: analysis.clip_model_version,
-                embeddingDimensions: imageEmbedding.length,
-              },
-            });
-          }
-        } catch (embeddingError) {
-          console.warn(`⚠️ Error processing image analysis ${analysis.material_id}:`, embeddingError);
-        }
-      }
-
-      return results;
-
-    } catch (error) {
-      console.error('❌ Error searching similar images:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Apply search filters to results
-   */
-  private static applySearchFilters(
-    results: VisualSearchResult[],
-    filters: NonNullable<VisualSearchQuery['filters']>,
-  ): VisualSearchResult[] {
-    return results.filter(result => {
-      // Material type filter
-      if (filters.materialType && result.metadata?.materialType !== filters.materialType) {
-        return false;
-      }
-
-      // Color family filter
-      if (filters.colorFamily && result.metadata?.colorFamily !== filters.colorFamily) {
-        return false;
-      }
-
-      // Price range filter (for products)
-      if (filters.priceRange && result.type === 'product') {
-        const price = (result.metadata as any)?.price;
-        if (price && ((price as any) < filters.priceRange[0] || (price as any) > filters.priceRange[1])) {
-          return false;
-        }
-      }
-
-      // Categories filter
-      if (filters.categories && filters.categories.length > 0) {
-        const resultCategories = (result.metadata as any)?.categories || [];
-        const hasMatchingCategory = filters.categories.some(cat =>
-          (resultCategories as any).includes(cat),
-        );
-        if (!hasMatchingCategory) {
-          return false;
-        }
-      }
-
-      return true;
     });
   }
 
   /**
-   * Generate product recommendations based on visual similarity
+   * Generate CLIP embedding for a single product
    */
-  static async generateProductRecommendations(
-    referenceProductId: string,
-    options: {
-      maxRecommendations?: number;
-      similarityThreshold?: number;
-      includeReasoningFactors?: boolean;
-    } = {},
-  ): Promise<ProductRecommendation[]> {
+  async generateProductClipEmbedding(product: any): Promise<ClipEmbeddingResult> {
     try {
-      console.log(`🎯 Generating product recommendations for: ${referenceProductId}`);
+      // Call MIVAA gateway to generate CLIP embedding
+      const response = await this.callMivaaGateway('generate_clip_embedding', {
+        entity_id: product.id,
+        entity_type: 'product',
+        text_content: product.description || product.name || '',
+        image_url: product.image_url,
+      });
 
-      // Get reference product embedding
-      const referenceEmbedding = await this.getProductClipEmbedding(referenceProductId);
-      if (!referenceEmbedding) {
-        console.warn(`⚠️ No CLIP embedding found for reference product: ${referenceProductId}`);
+      if (!response.success || !response.embedding) {
+        throw new Error(response.error || 'Failed to generate CLIP embedding');
+      }
+
+      const result: ClipEmbeddingResult = {
+        entityId: product.id,
+        entityType: 'product',
+        embedding: response.embedding,
+        confidence: response.confidence || 0.9,
+        generatedAt: new Date().toISOString(),
+        success: true,
+      };
+
+      // Store in database
+      await this.storeClipEmbedding(result);
+
+      return result;
+    } catch (error) {
+      console.error(`❌ Failed to generate CLIP for product ${product.id}:`, error);
+      return {
+        entityId: product.id,
+        entityType: 'product',
+        embedding: [],
+        confidence: 0,
+        generatedAt: new Date().toISOString(),
+        success: false,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  /**
+   * Generate CLIP embeddings for images (batch)
+   */
+  async generateImageClipEmbeddings(images: any[]): Promise<ClipEmbeddingResult[]> {
+    console.log(`🎬 Generating CLIP embeddings for ${images.length} images`);
+
+    const results = await Promise.allSettled(
+      images.map(image => this.generateImageClipEmbedding(image))
+    );
+
+    return results.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      }
+      return {
+        entityId: images[index].id,
+        entityType: 'image',
+        embedding: [],
+        confidence: 0,
+        generatedAt: new Date().toISOString(),
+        success: false,
+        error: (result.reason as Error).message,
+      };
+    });
+  }
+
+  /**
+   * Generate CLIP embedding for a single image
+   */
+  async generateImageClipEmbedding(image: any): Promise<ClipEmbeddingResult> {
+    try {
+      const response = await this.callMivaaGateway('generate_clip_embedding', {
+        entity_id: image.id,
+        entity_type: 'image',
+        image_url: image.url || image.storage_path,
+        text_content: image.caption || '',
+      });
+
+      if (!response.success || !response.embedding) {
+        throw new Error(response.error || 'Failed to generate CLIP embedding');
+      }
+
+      const result: ClipEmbeddingResult = {
+        entityId: image.id,
+        entityType: 'image',
+        embedding: response.embedding,
+        confidence: response.confidence || 0.9,
+        generatedAt: new Date().toISOString(),
+        success: true,
+      };
+
+      await this.storeClipEmbedding(result);
+      return result;
+    } catch (error) {
+      console.error(`❌ Failed to generate CLIP for image ${image.id}:`, error);
+      return {
+        entityId: image.id,
+        entityType: 'image',
+        embedding: [],
+        confidence: 0,
+        generatedAt: new Date().toISOString(),
+        success: false,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  /**
+   * Calculate real CLIP similarity between two embeddings
+   */
+  calculateClipSimilarity(embedding1: number[], embedding2: number[]): number {
+    if (!embedding1 || !embedding2 || embedding1.length === 0 || embedding2.length === 0) {
+      return 0;
+    }
+
+    // Cosine similarity
+    const dotProduct = embedding1.reduce((sum, val, i) => sum + val * embedding2[i], 0);
+    const magnitude1 = Math.sqrt(embedding1.reduce((sum, val) => sum + val * val, 0));
+    const magnitude2 = Math.sqrt(embedding2.reduce((sum, val) => sum + val * val, 0));
+
+    if (magnitude1 === 0 || magnitude2 === 0) {
+      return 0;
+    }
+
+    return dotProduct / (magnitude1 * magnitude2);
+  }
+
+  /**
+   * Get visual recommendations for an image
+   */
+  async getVisualRecommendations(imageId: string, limit: number = 10): Promise<VisualRecommendation[]> {
+    try {
+      // Get image CLIP embedding
+      const imageEmbedding = await this.getClipEmbedding(imageId, 'image');
+      if (!imageEmbedding || imageEmbedding.length === 0) {
+        console.warn(`No CLIP embedding found for image ${imageId}`);
         return [];
       }
 
-      // Search for similar products
-      const searchQuery: VisualSearchQuery = {
-        type: 'image_to_products',
-        similarityThreshold: options.similarityThreshold || 0.7,
-        maxResults: options.maxRecommendations || 10,
-      };
+      // Get all product CLIP embeddings
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('id, name, image_url')
+        .limit(1000);
 
-      const searchResults = await this.searchSimilarProducts(referenceEmbedding.embedding, searchQuery);
+      if (error) throw error;
+      if (!products || products.length === 0) return [];
 
-      // Filter out the reference product itself
-      const filteredResults = searchResults.filter(result => result.id !== referenceProductId);
+      // Calculate similarities
+      const recommendations: VisualRecommendation[] = [];
 
-      // Convert to ProductRecommendation format
-      const recommendations: ProductRecommendation[] = [];
+      for (const product of products) {
+        const productEmbedding = await this.getClipEmbedding(product.id, 'product');
+        if (!productEmbedding || productEmbedding.length === 0) continue;
 
-      for (const result of filteredResults) {
-        const recommendation: ProductRecommendation = {
-          productId: result.id,
-          name: result.name,
-          description: result.description || '',
-          imageUrl: result.imageUrl,
-          visualSimilarity: result.similarity,
-          reasoningFactors: {
-            colorSimilarity: result.similarity * 0.8, // Approximate based on overall similarity
-            textureSimilarity: result.similarity * 0.9,
-            shapeSimilarity: result.similarity * 0.7,
-            materialTypeSimilarity: result.similarity * 0.85,
-          },
-          confidence: result.confidence,
-        };
+        const similarity = this.calculateClipSimilarity(imageEmbedding, productEmbedding);
 
-        recommendations.push(recommendation);
+        if (similarity >= this.SIMILARITY_THRESHOLD) {
+          recommendations.push({
+            productId: product.id,
+            productName: product.name,
+            similarity,
+            imageCount: 0, // Could be fetched if needed
+          });
+        }
       }
 
-      console.log(`✅ Generated ${recommendations.length} product recommendations`);
-      return recommendations;
-
+      // Sort by similarity and limit
+      return recommendations.sort((a, b) => b.similarity - a.similarity).slice(0, limit);
     } catch (error) {
-      console.error('❌ Error generating product recommendations:', error);
+      console.error('Error getting visual recommendations:', error);
       return [];
     }
   }
 
   /**
-   * Batch process CLIP embeddings for multiple products
+   * Store CLIP embedding in database
    */
-  static async batchGenerateProductEmbeddings(
-    products: Array<{ id: string; text: string }>,
-    options: {
-      batchSize?: number;
-      forceRegenerate?: boolean;
-      onProgress?: (completed: number, total: number) => void;
-    } = {},
-  ): Promise<{ successful: number; failed: number; results: Array<{ productId: string; success: boolean; embedding?: ClipEmbedding }> }> {
+  private async storeClipEmbedding(result: ClipEmbeddingResult): Promise<void> {
     try {
-      console.log(`🔄 Batch processing CLIP embeddings for ${products.length} products`);
-
-      const batchSize = options.batchSize || this.MAX_BATCH_SIZE;
-      const results: Array<{ productId: string; success: boolean; embedding?: ClipEmbedding }> = [];
-      let successful = 0;
-      let failed = 0;
-
-      // Process in batches
-      for (let i = 0; i < products.length; i += batchSize) {
-        const batch = products.slice(i, i + batchSize);
-
-        const batchPromises = batch.map(async product => {
-          try {
-            const embedding = await this.generateProductClipEmbeddings(
-              product.id,
-              product.text,
-              { forceRegenerate: options.forceRegenerate },
-            );
-
-            if (embedding) {
-              successful++;
-              return { productId: product.id, success: true, embedding };
-            } else {
-              failed++;
-              return { productId: product.id, success: false };
-            }
-          } catch (error) {
-            console.error(`❌ Error processing product ${product.id}:`, error);
-            failed++;
-            return { productId: product.id, success: false };
-          }
+      const { error } = await supabase
+        .from('embeddings')
+        .upsert({
+          entity_id: result.entityId,
+          entity_type: result.entityType,
+          embedding_type: 'visual_clip_512',
+          embedding_vector: result.embedding,
+          confidence: result.confidence,
+          generated_at: result.generatedAt,
+        }, {
+          onConflict: 'entity_id,entity_type,embedding_type',
         });
 
-        const batchResults = await Promise.all(batchPromises);
-        results.push(...batchResults);
-
-        // Report progress
-        if (options.onProgress) {
-          options.onProgress(results.length, products.length);
-        }
-
-        console.log(`📊 Batch ${Math.floor(i / batchSize) + 1} completed: ${batchResults.length} products processed`);
-      }
-
-      console.log(`✅ Batch processing completed: ${successful} successful, ${failed} failed`);
-
-      return { successful, failed, results };
-
+      if (error) throw error;
     } catch (error) {
-      console.error('❌ Error in batch processing:', error);
-      return { successful: 0, failed: products.length, results: [] };
+      console.error('Error storing CLIP embedding:', error);
     }
   }
 
   /**
-   * Get comprehensive statistics about CLIP integration
+   * Retrieve CLIP embedding from database
    */
-  static async getClipIntegrationStats(): Promise<{
-    productsWithEmbeddings: number;
-    imagesWithEmbeddings: number;
-    totalEmbeddings: number;
-    averageEmbeddingDimensions: number;
-    modelDistribution: Record<string, number>;
-    lastUpdated: string;
-  }> {
+  async getClipEmbedding(entityId: string, entityType: 'product' | 'image'): Promise<number[] | null> {
     try {
-      // Get product embedding stats
-      const { data: productStats, error: productError } = await supabase
-        .from('products')
-        .select('embedding, embedding_model')
-        .not('embedding', 'is', null);
+      const { data, error } = await supabase
+        .from('embeddings')
+        .select('embedding_vector')
+        .eq('entity_id', entityId)
+        .eq('entity_type', entityType)
+        .eq('embedding_type', 'visual_clip_512')
+        .single();
 
-      // Get image embedding stats
-      const { data: imageStats, error: imageError } = await supabase
-        .from('material_visual_analysis')
-        .select('clip_embedding, clip_model_version')
-        .not('clip_embedding', 'is', null);
-
-      if (productError || imageError) {
-        throw new Error(`Failed to fetch stats: ${productError?.message || imageError?.message}`);
-      }
-
-      const modelDistribution: Record<string, number> = {};
-      let totalDimensions = 0;
-      let embeddingCount = 0;
-
-      // Process product embeddings
-      if (productStats) {
-        for (const product of productStats) {
-          const model = product.embedding_model || 'unknown';
-          modelDistribution[model] = (modelDistribution[model] || 0) + 1;
-
-          try {
-            const embedding = JSON.parse(product.embedding);
-            totalDimensions += embedding.length;
-            embeddingCount++;
-          } catch (error) {
-            console.warn('⚠️ Error parsing product embedding:', error);
-          }
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Not found
         }
+        throw error;
       }
 
-      // Process image embeddings
-      if (imageStats) {
-        for (const analysis of imageStats) {
-          const model = analysis.clip_model_version || 'unknown';
-          modelDistribution[model] = (modelDistribution[model] || 0) + 1;
-
-          try {
-            const embedding = JSON.parse(analysis.clip_embedding);
-            totalDimensions += embedding.length;
-            embeddingCount++;
-          } catch (error) {
-            console.warn('⚠️ Error parsing image embedding:', error);
-          }
-        }
-      }
-
-      return {
-        productsWithEmbeddings: productStats?.length || 0,
-        imagesWithEmbeddings: imageStats?.length || 0,
-        totalEmbeddings: embeddingCount,
-        averageEmbeddingDimensions: embeddingCount > 0 ? Math.round(totalDimensions / embeddingCount) : 0,
-        modelDistribution,
-        lastUpdated: new Date().toISOString(),
-      };
-
+      return data?.embedding_vector || null;
     } catch (error) {
-      console.error('❌ Error getting CLIP integration stats:', error);
-      return {
-        productsWithEmbeddings: 0,
-        imagesWithEmbeddings: 0,
-        totalEmbeddings: 0,
-        averageEmbeddingDimensions: 0,
-        modelDistribution: {},
-        lastUpdated: new Date().toISOString(),
-      };
+      console.error(`Error retrieving CLIP embedding for ${entityId}:`, error);
+      return null;
     }
   }
+
+  /**
+   * Call MIVAA gateway
+   */
+  private async callMivaaGateway(action: string, payload: any): Promise<any> {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration not found');
+    }
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/mivaa-gateway`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, payload }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`MIVAA gateway error: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
+
+export default EnhancedClipIntegrationService.getInstance();
+

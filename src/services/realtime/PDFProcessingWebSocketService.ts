@@ -148,6 +148,44 @@ class PDFProcessingWebSocketService {
   }
 
   /**
+   * Broadcast a message to all subscribers of a specific event type
+   */
+  public broadcast(eventType: string, data: any): void {
+    try {
+      if (this.wsManager && this.wsManager.isConnected()) {
+        this.wsManager.send({
+          type: eventType,
+          data,
+        });
+      }
+      console.log(`📡 Broadcasted ${eventType} event:`, data);
+    } catch (error) {
+      console.error(`Failed to broadcast ${eventType}:`, error);
+    }
+  }
+
+  /**
+   * Subscribe to a specific event type
+   */
+  public subscribe(eventType: string, callback: (data: any) => void): () => void {
+    // Store subscription in a map for event-based subscriptions
+    if (!this.subscribers.has(eventType)) {
+      this.subscribers.set(eventType, new Set());
+    }
+
+    const callbacks = this.subscribers.get(eventType)!;
+    callbacks.add(callback as any);
+
+    // Return unsubscribe function
+    return () => {
+      callbacks.delete(callback as any);
+      if (callbacks.size === 0) {
+        this.subscribers.delete(eventType);
+      }
+    };
+  }
+
+  /**
    * Start tracking a new PDF processing job
    */
   public startJob(jobId: string, fileName: string, totalPages: number = 0): void {

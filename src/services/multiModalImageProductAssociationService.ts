@@ -12,7 +12,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import { EntityRelationshipService } from './entityRelationshipService';
-import { EnhancedClipIntegrationService } from './enhancedClipIntegrationService';
+import enhancedClipIntegrationService from './enhancedClipIntegrationService';
 
 export interface ImageProductAssociation {
   imageId: string;
@@ -315,26 +315,25 @@ export class MultiModalImageProductAssociationService {
   }
 
   /**
-   * Calculate CLIP visual similarity score (0-1) using enhanced CLIP integration
+   * Calculate CLIP visual similarity score (0-1) using real CLIP embeddings
    */
   private static async calculateClipScore(image: any, product: any): Promise<number> {
     try {
-      console.log(`🔍 Calculating enhanced CLIP score for image ${image.id} and product ${product.id}`);
+      console.log(`🔍 Calculating CLIP score for image ${image.id} and product ${product.id}`);
 
-      // Use the enhanced CLIP integration service for real CLIP scoring
-      const clipResult = await EnhancedClipIntegrationService.calculateRealClipScore(
-        image.id,
-        product.id,
-      );
+      // Fetch real CLIP embeddings from database
+      const imageEmbedding = await enhancedClipIntegrationService.getClipEmbedding(image.id, 'image');
+      const productEmbedding = await enhancedClipIntegrationService.getClipEmbedding(product.id, 'product');
 
-      if (clipResult.confidence > 0.7) {
-        console.log(`✅ Real CLIP score: ${clipResult.score.toFixed(3)} (confidence: ${clipResult.confidence.toFixed(3)})`);
-        return clipResult.score;
+      // If both embeddings exist, calculate real cosine similarity
+      if (imageEmbedding && imageEmbedding.length > 0 && productEmbedding && productEmbedding.length > 0) {
+        const similarity = enhancedClipIntegrationService.calculateClipSimilarity(imageEmbedding, productEmbedding);
+        console.log(`✅ CLIP similarity: ${similarity.toFixed(3)} for image ${image.id} and product ${product.id}`);
+        return similarity;
       }
 
-      // Fallback to text similarity if CLIP embeddings are not available
-      console.log(`⚠️ Using text similarity fallback (CLIP confidence: ${clipResult.confidence.toFixed(3)})`);
-
+      // Fallback: Use text similarity if embeddings not available
+      console.warn(`⚠️ CLIP embeddings not found for image ${image.id} or product ${product.id}, using text fallback`);
       const imageCaption = image.caption || image.alt_text || '';
       const productText = product.description || product.name || '';
 
@@ -343,12 +342,10 @@ export class MultiModalImageProductAssociationService {
           { caption: imageCaption },
           { description: productText },
         );
-
-        // Adjust for visual context but reduce confidence
-        return Math.min(1.0, textSimilarity * 1.1);
+        return textSimilarity;
       }
 
-      return 0.5;
+      return 0.5; // Neutral fallback
 
     } catch (error) {
       console.warn('⚠️ Error calculating CLIP score:', error);

@@ -90,6 +90,8 @@ Brief description of service purpose and functionality
 2. **[Entity-Based Filtering](../ENTITY_BASED_SEARCH_FILTERS_IMPLEMENTATION.md)** ✅ - Smart content filtering
 3. **[Multi-Modal Testing](../MULTIMODAL_TESTING_IMPLEMENTATION.md)** ✅ - Comprehensive AI testing
 4. **[Auto-Metadata Population](../AUTO_METADATA_POPULATION_IMPLEMENTATION.md)** ✅ - AI-powered automation
+5. **[Image Semantic Linking](../platform-enhancements-processes.md)** ✨ - Image-to-chunk linking and metadata extraction
+6. **[Metadata Inventory System](../metadata-inventory-system.md)** ✨ - Complete 200+ field metadata reference
 
 ## 📋 **Service Status**
 

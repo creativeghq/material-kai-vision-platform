@@ -51,6 +51,19 @@ export const developmentConfig: AppConfig = {
         initialDelay: 1000,
       },
     },
+    mivaaIntegration: {
+      baseUrl: process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
+      apiKey: process.env.MIVAA_API_KEY,
+      timeout: 30000,
+      retryAttempts: 3,
+      retryDelay: 1000,
+      retryBackoffMultiplier: 2,
+      circuitBreaker: {
+        enabled: true,
+        failureThreshold: 5,
+        resetTimeout: 60000,
+      },
+    },
   },
 
   // Performance configuration

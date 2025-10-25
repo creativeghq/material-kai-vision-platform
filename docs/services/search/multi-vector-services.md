@@ -23,21 +23,21 @@ The Multi-Vector Services provide advanced embedding generation and search capab
 
 ---
 
-## 🔧 MULTIVECTORGENERATIONSERVICE
+## 🔧 REAL EMBEDDINGS SERVICE
 
-**File**: `src/services/multiVectorGenerationService.ts` (792 lines)
+**File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py` (452 lines)
 
 ### **Purpose**
-Generate and manage all 6 embedding types for products, chunks, and images with comprehensive error handling and quality monitoring.
+Generate and manage all 6 embedding types using real AI models (replaces old multiVectorGenerationService.ts).
 
 ### **Key Methods**
 
-#### `generateProductEmbeddings(productId, options)`
-```typescript
-static async generateProductEmbeddings(
-  productId: string,
-  options: EmbeddingGenerationOptions = {}
-): Promise<EmbeddingGenerationResult>
+#### `generate_text_embedding(text)`
+```python
+async def generate_text_embedding(
+  self,
+  text: str
+) -> Dict[str, Any]
 ```
 
 **Features**:

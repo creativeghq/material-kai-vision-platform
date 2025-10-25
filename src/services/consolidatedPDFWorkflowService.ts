@@ -7,10 +7,16 @@ import { pdfProcessingWebSocketService } from './realtime/PDFProcessingWebSocket
 import { chunkQualityService } from './chunkQualityService';
 import { MetafieldService } from './metafieldService';
 import { EntityRelationshipService } from './entityRelationshipService';
-import { fallbackEmbeddingService } from './fallbackEmbeddingService';
 import { MultiModalImageProductAssociationService } from './multiModalImageProductAssociationService';
 import { CanonicalMetadataSchemaService } from './canonicalMetadataSchemaService';
-import { EnhancedClipIntegrationService } from './enhancedClipIntegrationService';
+import multiVectorGenerationService from './multiVectorGenerationService';
+import enhancedClipIntegrationService from './enhancedClipIntegrationService';
+import { ProductEnrichmentService } from './ProductEnrichmentService';
+import { ImageValidationService } from './ImageValidationService';
+import { colorEmbeddingService } from './colorEmbeddingService';
+import { textureEmbeddingService } from './textureEmbeddingService';
+import { applicationEmbeddingService } from './applicationEmbeddingService';
+import { ValidationRulesService } from './ValidationRulesService';
 
 
 // Define interfaces locally to avoid importing from React components
@@ -311,6 +317,13 @@ export class ConsolidatedPDFWorkflowService {
         details: [],
       },
       {
+        id: 'image-validation',
+        name: 'Image Validation',
+        description: 'Validate image quality, dimensions, format, and relevance',
+        status: 'pending',
+        details: [],
+      },
+      {
         id: 'anthropic-product-enrichment',
         name: 'Anthropic Product Enrichment',
         description: 'Enrich product data using Claude 3.5 Sonnet',
@@ -332,9 +345,51 @@ export class ConsolidatedPDFWorkflowService {
         details: [],
       },
       {
+        id: 'validation-rules',
+        name: 'Validation Rules Enforcement',
+        description: 'Apply validation rules to chunks and products, flag violations',
+        status: 'pending',
+        details: [],
+      },
+      {
         id: 'enhanced-clip-integration',
         name: 'Enhanced CLIP Integration',
         description: 'Generate CLIP embeddings for products and enhance image-product matching',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'boundary-detection',
+        name: 'Boundary Detection',
+        description: 'Detect semantic boundaries between chunks and identify product boundaries',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'product-enrichment',
+        name: 'Product Enrichment',
+        description: 'Enrich products with material properties, descriptions, and related products',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'color-embeddings',
+        name: 'Color Embeddings',
+        description: 'Generate 256D color embeddings from images and material properties',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'texture-embeddings',
+        name: 'Texture Embeddings',
+        description: 'Generate 256D texture embeddings from images and material properties',
+        status: 'pending',
+        details: [],
+      },
+      {
+        id: 'application-embeddings',
+        name: 'Application Embeddings',
+        description: 'Generate 512D application embeddings for products and chunks',
         status: 'pending',
         details: [],
       },
@@ -919,6 +974,97 @@ export class ConsolidatedPDFWorkflowService {
         }
       });
 
+      // Step 9.5: Image Validation Service
+      await this.executeStep(jobId, 'image-validation', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+          const { data: { user } } = await supabase.auth.getUser();
+          const workspaceId = user?.id || 'default';
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for image validation'),
+              ],
+              metadata: {
+                imageValidationSkipped: true,
+              },
+            };
+          }
+
+          // Get all images for this document
+          const { data: images, error: imagesError } = await supabase
+            .from('document_images')
+            .select('id')
+            .eq('document_id', documentId);
+
+          if (imagesError || !images || images.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No images found for validation'),
+              ],
+              metadata: {
+                imageValidationSkipped: true,
+              },
+            };
+          }
+
+          const imageValidationService = new ImageValidationService();
+          let validatedCount = 0;
+          let passedCount = 0;
+          const validationErrors: string[] = [];
+
+          // Validate each image
+          for (const image of images) {
+            try {
+              const result = await imageValidationService.validateImage({
+                image_id: image.id,
+                workspace_id: workspaceId,
+              });
+
+              if (result.passed) {
+                passedCount++;
+              }
+              validatedCount++;
+            } catch (error) {
+              validationErrors.push(`Image ${image.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }
+
+          const details = [
+            this.createInfoDetail(`✅ Validated ${validatedCount}/${images.length} images`),
+            this.createInfoDetail(`✅ Passed validation: ${passedCount}/${validatedCount}`),
+          ];
+
+          if (validationErrors.length > 0) {
+            details.push(this.createInfoDetail(`⚠️ Validation errors: ${validationErrors.length}`));
+          }
+
+          return {
+            details,
+            metadata: {
+              validatedCount,
+              passedCount,
+              totalImages: images.length,
+              validationErrors: validationErrors.length,
+              imageValidationCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Image validation error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Image validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              imageValidationError: true,
+            },
+          };
+        }
+      });
+
       // Step 10: Anthropic Product Enrichment
       await this.executeStep(jobId, 'anthropic-product-enrichment', async () => {
         try {
@@ -1178,6 +1324,142 @@ export class ConsolidatedPDFWorkflowService {
         }
       });
 
+      // Step 12.5: Validation Rules Enforcement
+      await this.executeStep(jobId, 'validation-rules', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+          const { data: { user } } = await supabase.auth.getUser();
+          const workspaceId = user?.id || 'default';
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for validation rules'),
+              ],
+              metadata: {
+                validationRulesSkipped: true,
+              },
+            };
+          }
+
+          const validationRulesService = new ValidationRulesService();
+
+          // Get all chunks for this document
+          const { data: chunks, error: chunksError } = await supabase
+            .from('document_chunks')
+            .select('id')
+            .eq('document_id', documentId);
+
+          if (chunksError || !chunks || chunks.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No chunks found for validation'),
+              ],
+              metadata: {
+                validationRulesSkipped: true,
+              },
+            };
+          }
+
+          let totalChunksValidated = 0;
+          let totalChunksPassed = 0;
+          let totalViolations = 0;
+          const violationDetails: string[] = [];
+
+          // Validate each chunk
+          for (const chunk of chunks) {
+            try {
+              const response = await validationRulesService.validateChunk({
+                chunk_id: chunk.id,
+                workspace_id: workspaceId,
+              });
+
+              totalChunksValidated++;
+              if (response.passed) {
+                totalChunksPassed++;
+              } else {
+                totalViolations += response.failed_rules;
+                if (response.results.length > 0) {
+                  violationDetails.push(`Chunk ${chunk.id}: ${response.failed_rules} violations`);
+                }
+              }
+            } catch (error) {
+              console.warn(`Validation error for chunk ${chunk.id}:`, error);
+            }
+          }
+
+          // Get all products for this document
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('id')
+            .eq('document_id', documentId);
+
+          let totalProductsValidated = 0;
+          let totalProductsPassed = 0;
+
+          if (!productsError && products && products.length > 0) {
+            for (const product of products) {
+              try {
+                const response = await validationRulesService.validateChunk({
+                  chunk_id: product.id,
+                  workspace_id: workspaceId,
+                });
+
+                totalProductsValidated++;
+                if (response.passed) {
+                  totalProductsPassed++;
+                } else {
+                  totalViolations += response.failed_rules;
+                }
+              } catch (error) {
+                console.warn(`Validation error for product ${product.id}:`, error);
+              }
+            }
+          }
+
+          const details = [
+            this.createSuccessDetail(`✅ Validated ${totalChunksValidated} chunks`),
+            this.createSuccessDetail(`✅ Chunks passed: ${totalChunksPassed}/${totalChunksValidated}`),
+          ];
+
+          if (totalProductsValidated > 0) {
+            details.push(this.createSuccessDetail(`✅ Validated ${totalProductsValidated} products`));
+            details.push(this.createSuccessDetail(`✅ Products passed: ${totalProductsPassed}/${totalProductsValidated}`));
+          }
+
+          if (totalViolations > 0) {
+            details.push(this.createInfoDetail(`⚠️ Total violations found: ${totalViolations}`));
+            if (violationDetails.length > 0) {
+              details.push(this.createInfoDetail(`Details: ${violationDetails.slice(0, 5).join(', ')}`));
+            }
+          }
+
+          return {
+            details,
+            metadata: {
+              chunksValidated: totalChunksValidated,
+              chunksPassed: totalChunksPassed,
+              productsValidated: totalProductsValidated,
+              productsPassed: totalProductsPassed,
+              totalViolations,
+              validationRulesCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Validation rules error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Validation rules failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              validationRulesError: true,
+            },
+          };
+        }
+      });
+
       // Step 13: Enhanced CLIP Integration
       await this.executeStep(jobId, 'enhanced-clip-integration', async () => {
         try {
@@ -1198,7 +1480,7 @@ export class ConsolidatedPDFWorkflowService {
           // Get all products for this document
           const { data: products, error: productsError } = await supabase
             .from('products')
-            .select('id, name, description, long_description')
+            .select('id, name, description, long_description, image_url, properties')
             .eq('source_document_id', documentId);
 
           if (productsError) {
@@ -1216,90 +1498,50 @@ export class ConsolidatedPDFWorkflowService {
             };
           }
 
+          const startTime = Date.now();
           let embeddingsGenerated = 0;
-          let associationsEnhanced = 0;
-          let totalProcessingTime = 0;
+          let clipEmbeddingsGenerated = 0;
 
-          // Generate CLIP embeddings for products
-          for (const product of products) {
-            try {
-              const startTime = Date.now();
-              const content = [
-                product.name,
-                product.description,
-                product.long_description,
-              ].filter(Boolean).join('\n\n');
+          // 1. Batch generate all 6 embedding types via multiVectorGenerationService
+          console.log(`🔄 Batch generating multi-vector embeddings for ${products.length} products`);
+          const vectorResults = await multiVectorGenerationService.batchGenerateProductEmbeddings(
+            products,
+            { batchSize: 20, useCache: true }
+          );
+          embeddingsGenerated = vectorResults.filter(r => r.success).length;
 
-              const embedding = await EnhancedClipIntegrationService.generateProductClipEmbeddings(
-                product.id,
-                content,
-                { forceRegenerate: false },
-              );
+          // 2. Generate CLIP embeddings specifically via enhancedClipIntegrationService
+          console.log(`🎬 Generating CLIP embeddings for ${products.length} products`);
+          const clipResults = await enhancedClipIntegrationService.generateProductClipEmbeddings(products);
+          clipEmbeddingsGenerated = clipResults.filter(r => r.success).length;
 
-              if (embedding) {
-                embeddingsGenerated++;
-              }
+          // 3. Get all images for this document
+          const { data: images, error: imagesError } = await supabase
+            .from('extracted_images')
+            .select('id, url, storage_path, caption')
+            .eq('source_document_id', documentId);
 
-              totalProcessingTime += Date.now() - startTime;
-
-            } catch (error) {
-              console.warn(`⚠️ Failed to generate CLIP embedding for product ${product.id}:`, error);
-            }
+          if (!imagesError && images && images.length > 0) {
+            console.log(`🎬 Generating CLIP embeddings for ${images.length} images`);
+            const imageClipResults = await enhancedClipIntegrationService.generateImageClipEmbeddings(images);
+            const successfulImageClips = imageClipResults.filter(r => r.success).length;
+            console.log(`✅ Generated CLIP embeddings for ${successfulImageClips}/${images.length} images`);
           }
 
-          // Enhance existing image-product associations with real CLIP scores
-          const { data: associations, error: associationsError } = await supabase
-            .from('image_product_associations')
-            .select('image_id, product_id')
-            .in('product_id', products.map(p => p.id));
-
-          if (!associationsError && associations) {
-            for (const assoc of associations.slice(0, 20)) { // Limit to avoid timeout
-              try {
-                const clipResult = await EnhancedClipIntegrationService.calculateRealClipScore(
-                  assoc.image_id,
-                  assoc.product_id,
-                );
-
-                if (clipResult.confidence > 0.7) {
-                  // Update association with real CLIP score
-                  await supabase
-                    .from('image_product_associations')
-                    .update({
-                      clip_score: clipResult.score,
-                      confidence: clipResult.confidence,
-                      metadata: {
-                        ...clipResult.metadata,
-                        enhanced_clip: true,
-                        updated_at: new Date().toISOString(),
-                      },
-                    })
-                    .eq('image_id', assoc.image_id)
-                    .eq('product_id', assoc.product_id);
-
-                  associationsEnhanced++;
-                }
-              } catch (error) {
-                console.warn(`⚠️ Failed to enhance association ${assoc.image_id}-${assoc.product_id}:`, error);
-              }
-            }
-          }
+          const totalProcessingTime = Date.now() - startTime;
 
           const details = [
-            this.createInfoDetail(`Generated CLIP embeddings for ${embeddingsGenerated} products`),
-            this.createInfoDetail(`Enhanced ${associationsEnhanced} image-product associations`),
+            this.createInfoDetail(`✅ Generated multi-vector embeddings for ${embeddingsGenerated}/${products.length} products`),
+            this.createInfoDetail(`✅ Generated CLIP embeddings for ${clipEmbeddingsGenerated}/${products.length} products`),
             this.createInfoDetail(`Total processing time: ${totalProcessingTime}ms`),
+            this.createInfoDetail('🎬 CLIP embeddings are now stored in database and ready for associations'),
           ];
-
-          if (embeddingsGenerated > 0 || associationsEnhanced > 0) {
-            details.push(this.createInfoDetail('✅ Enhanced CLIP integration completed successfully'));
-          }
 
           return {
             details,
             metadata: {
               embeddingsGenerated,
-              associationsEnhanced,
+              clipEmbeddingsGenerated,
               totalProcessingTime,
               clipIntegrationCompleted: true,
             },
@@ -1313,6 +1555,434 @@ export class ConsolidatedPDFWorkflowService {
             ],
             metadata: {
               clipIntegrationError: true,
+            },
+          };
+        }
+      });
+
+      // Step 13.5: Boundary Detection
+      await this.executeStep(jobId, 'boundary-detection', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for boundary detection'),
+              ],
+              metadata: {
+                boundaryDetectionSkipped: true,
+              },
+            };
+          }
+
+          // Get all chunks for this document
+          const { data: chunks, error: chunksError } = await supabase
+            .from('document_chunks')
+            .select('id, content, page_number')
+            .eq('document_id', documentId);
+
+          if (chunksError || !chunks || chunks.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No chunks found for boundary detection'),
+              ],
+              metadata: {
+                boundaryDetectionSkipped: true,
+              },
+            };
+          }
+
+          // Simple boundary detection based on content analysis
+          let productBoundaries = 0;
+          let semanticBoundaries = 0;
+          let sectionBoundaries = 0;
+          let totalBoundaryScore = 0;
+
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i] as any;
+            const content = chunk.content || '';
+
+            // Calculate boundary score based on content characteristics
+            let boundaryScore = 0;
+
+            // Section headers (markdown style)
+            if (/^#+\s+/.test(content.trim())) {
+              sectionBoundaries++;
+              boundaryScore = 0.9;
+            }
+            // Product indicators (common product-related keywords)
+            else if (/product|model|collection|series|design|item|sku|code/i.test(content)) {
+              productBoundaries++;
+              boundaryScore = 0.7;
+            }
+            // Semantic boundaries (significant content changes)
+            else if (content.length > 100 && /[.!?]\s*$/.test(content.trim())) {
+              semanticBoundaries++;
+              boundaryScore = 0.6;
+            }
+
+            totalBoundaryScore += boundaryScore;
+
+            // Update chunk metadata with boundary information
+            try {
+              await supabase
+                .from('document_chunks')
+                .update({
+                  metadata: {
+                    boundary_score: boundaryScore,
+                    boundary_type: boundaryScore > 0.8 ? 'section' : boundaryScore > 0.6 ? 'semantic' : 'weak',
+                    is_product_boundary: boundaryScore > 0.6,
+                  },
+                })
+                .eq('id', chunk.id);
+            } catch (error) {
+              console.warn(`Failed to update boundary metadata for chunk ${chunk.id}:`, error);
+            }
+          }
+
+          const averageBoundaryScore = chunks.length > 0 ? totalBoundaryScore / chunks.length : 0;
+
+          const details = [
+            this.createSuccessDetail(`✅ Analyzed ${chunks.length} chunks for boundaries`),
+            this.createSuccessDetail(`✅ Product boundaries detected: ${productBoundaries}`),
+            this.createSuccessDetail(`✅ Semantic boundaries detected: ${semanticBoundaries}`),
+            this.createSuccessDetail(`✅ Section boundaries detected: ${sectionBoundaries}`),
+            this.createSuccessDetail(`✅ Average boundary score: ${averageBoundaryScore.toFixed(3)}`),
+          ];
+
+          return {
+            details,
+            metadata: {
+              total_chunks_analyzed: chunks.length,
+              product_boundaries: productBoundaries,
+              semantic_boundaries: semanticBoundaries,
+              section_boundaries: sectionBoundaries,
+              average_boundary_score: averageBoundaryScore,
+              boundaryDetectionCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Boundary detection error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Boundary detection failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              boundaryDetectionError: true,
+            },
+          };
+        }
+      });
+
+      // Step 14: Product Enrichment
+      await this.executeStep(jobId, 'product-enrichment', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+          const workspaceId = job?.metadata.workspaceId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for product enrichment'),
+              ],
+              metadata: {
+                productEnrichmentSkipped: true,
+              },
+            };
+          }
+
+          // Get all products for this document
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('id, name, description, long_description, image_url, properties')
+            .eq('source_document_id', documentId);
+
+          if (productsError) {
+            throw new Error(`Failed to get products: ${productsError.message}`);
+          }
+
+          if (!products || products.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No products found for enrichment'),
+              ],
+              metadata: {
+                productEnrichmentSkipped: true,
+              },
+            };
+          }
+
+          const enrichmentService = new ProductEnrichmentService();
+          let enrichedCount = 0;
+          const enrichmentErrors: string[] = [];
+
+          // Enrich each product
+          for (const product of products) {
+            try {
+              const result = await enrichmentService.enrichProduct(
+                product.id,
+                product,
+                documentId,
+                workspaceId || 'default'
+              );
+
+              if (result.success) {
+                enrichedCount++;
+              } else {
+                enrichmentErrors.push(`Product ${product.id}: ${result.error}`);
+              }
+            } catch (error) {
+              enrichmentErrors.push(`Product ${product.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }
+
+          const details = [
+            this.createInfoDetail(`✅ Enriched ${enrichedCount}/${products.length} products`),
+          ];
+
+          if (enrichmentErrors.length > 0) {
+            details.push(this.createInfoDetail(`⚠️ Enrichment errors: ${enrichmentErrors.length}`));
+            enrichmentErrors.slice(0, 5).forEach(err => {
+              details.push(this.createInfoDetail(`  - ${err}`));
+            });
+          }
+
+          return {
+            details,
+            metadata: {
+              enrichedCount,
+              totalProducts: products.length,
+              enrichmentErrors: enrichmentErrors.length,
+              productEnrichmentCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Product enrichment error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Product enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              productEnrichmentError: true,
+            },
+          };
+        }
+      });
+
+      // Step 15: Color Embeddings
+      await this.executeStep(jobId, 'color-embeddings', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+          const workspaceId = job?.metadata.workspaceId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for color embeddings'),
+              ],
+              metadata: {
+                colorEmbeddingsSkipped: true,
+              },
+            };
+          }
+
+          // Get all images for this document
+          const { data: images, error: imagesError } = await supabase
+            .from('document_images')
+            .select('id, image_url, metadata')
+            .eq('document_id', documentId);
+
+          if (imagesError || !images || images.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No images found for color embedding generation'),
+              ],
+              metadata: {
+                colorEmbeddingsSkipped: true,
+              },
+            };
+          }
+
+          // Generate color embeddings for all images
+          const colorRequests = images.map(img => ({
+            imageId: img.id,
+            imageUrl: img.image_url,
+            materialProperties: img.metadata,
+            workspaceId: workspaceId || 'default',
+          }));
+
+          const colorEmbeddings = await colorEmbeddingService.batchGenerateColorEmbeddings(colorRequests, 10);
+          const storeResult = await colorEmbeddingService.storeColorEmbeddings(colorEmbeddings, workspaceId || 'default');
+
+          return {
+            details: [
+              this.createInfoDetail(`✅ Generated color embeddings for ${storeResult.stored}/${images.length} images`),
+              this.createInfoDetail(`Color embedding model: color-palette-extractor-v1 (256D)`),
+            ],
+            metadata: {
+              colorEmbeddingsGenerated: storeResult.stored,
+              totalImages: images.length,
+              colorEmbeddingsCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Color embeddings error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Color embeddings failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              colorEmbeddingsError: true,
+            },
+          };
+        }
+      });
+
+      // Step 16: Texture Embeddings
+      await this.executeStep(jobId, 'texture-embeddings', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+          const workspaceId = job?.metadata.workspaceId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for texture embeddings'),
+              ],
+              metadata: {
+                textureEmbeddingsSkipped: true,
+              },
+            };
+          }
+
+          // Get all images for this document
+          const { data: images, error: imagesError } = await supabase
+            .from('document_images')
+            .select('id, image_url, metadata')
+            .eq('document_id', documentId);
+
+          if (imagesError || !images || images.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No images found for texture embedding generation'),
+              ],
+              metadata: {
+                textureEmbeddingsSkipped: true,
+              },
+            };
+          }
+
+          // Generate texture embeddings for all images
+          const textureRequests = images.map(img => ({
+            imageId: img.id,
+            imageUrl: img.image_url,
+            materialProperties: img.metadata,
+            workspaceId: workspaceId || 'default',
+          }));
+
+          const textureEmbeddings = await textureEmbeddingService.batchGenerateTextureEmbeddings(textureRequests, 10);
+          const storeResult = await textureEmbeddingService.storeTextureEmbeddings(textureEmbeddings, workspaceId || 'default');
+
+          return {
+            details: [
+              this.createInfoDetail(`✅ Generated texture embeddings for ${storeResult.stored}/${images.length} images`),
+              this.createInfoDetail(`Texture embedding model: texture-pattern-extractor-v1 (256D)`),
+            ],
+            metadata: {
+              textureEmbeddingsGenerated: storeResult.stored,
+              totalImages: images.length,
+              textureEmbeddingsCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Texture embeddings error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Texture embeddings failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              textureEmbeddingsError: true,
+            },
+          };
+        }
+      });
+
+      // Step 17: Application Embeddings
+      await this.executeStep(jobId, 'application-embeddings', async () => {
+        try {
+          const job = this.jobs.get(jobId);
+          const documentId = job?.metadata.documentId as string;
+          const workspaceId = job?.metadata.workspaceId as string;
+
+          if (!documentId) {
+            return {
+              details: [
+                this.createInfoDetail('No document ID available for application embeddings'),
+              ],
+              metadata: {
+                applicationEmbeddingsSkipped: true,
+              },
+            };
+          }
+
+          // Get all products for this document
+          const { data: products, error: productsError } = await supabase
+            .from('products')
+            .select('id, name, description, long_description, properties')
+            .eq('source_document_id', documentId);
+
+          if (productsError || !products || products.length === 0) {
+            return {
+              details: [
+                this.createInfoDetail('No products found for application embedding generation'),
+              ],
+              metadata: {
+                applicationEmbeddingsSkipped: true,
+              },
+            };
+          }
+
+          // Generate application embeddings for all products
+          const appRequests = products.map(prod => ({
+            productId: prod.id,
+            materialProperties: prod.properties,
+            description: prod.long_description || prod.description || '',
+            applications: prod.properties?.applications || [],
+            workspaceId: workspaceId || 'default',
+          }));
+
+          const appEmbeddings = await applicationEmbeddingService.batchGenerateApplicationEmbeddings(appRequests, 10);
+          const storeResult = await applicationEmbeddingService.storeApplicationEmbeddings(appEmbeddings, workspaceId || 'default');
+
+          return {
+            details: [
+              this.createInfoDetail(`✅ Generated application embeddings for ${storeResult.stored}/${products.length} products`),
+              this.createInfoDetail(`Application embedding model: application-classifier-v1 (512D)`),
+            ],
+            metadata: {
+              applicationEmbeddingsGenerated: storeResult.stored,
+              totalProducts: products.length,
+              applicationEmbeddingsCompleted: true,
+            },
+          };
+
+        } catch (error) {
+          console.error('❌ Application embeddings error:', error);
+          return {
+            details: [
+              this.createInfoDetail(`Application embeddings failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
+            ],
+            metadata: {
+              applicationEmbeddingsError: true,
             },
           };
         }
@@ -2145,12 +2815,7 @@ export class ConsolidatedPDFWorkflowService {
           .select('*', { count: 'exact', head: true })
           .eq('document_id', documentId);
 
-        if (embeddingCount === 0 && chunksStored > 0) {
-          console.warn(`⚠️ No embeddings found for ${chunksStored} chunks - running fallback embedding generation`);
-          const embeddingStats = await fallbackEmbeddingService.generateMissingEmbeddings(documentId);
-          embeddingsStored = embeddingStats.embeddingsGenerated;
-          console.log(`✅ Fallback embedding generation completed: ${embeddingStats.embeddingsGenerated}/${embeddingStats.totalChunks} embeddings generated`);
-        } else if (embeddingCount && embeddingCount > 0) {
+        if (embeddingCount && embeddingCount > 0) {
           embeddingsStored = embeddingCount;
           console.log(`✅ Embeddings already exist: ${embeddingCount} embeddings found`);
         }
