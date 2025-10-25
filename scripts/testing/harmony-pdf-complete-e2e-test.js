@@ -106,33 +106,37 @@ async function uploadHarmonyPDF() {
     const sizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(2);
     log('UPLOAD', `Downloaded ${sizeMB} MB`, 'success');
     
-    // Trigger processing via MIVAA gateway
-    log('UPLOAD', 'Triggering PDF processing...', 'info');
-    const processingResponse = await fetch(`${SUPABASE_URL}/functions/v1/pdf-processor`, {
+    // Trigger processing via MIVAA gateway (RAG upload endpoint)
+    log('UPLOAD', 'Triggering PDF processing via MIVAA gateway...', 'info');
+
+    // Create form data with the PDF
+    const FormData = (await import('form-data')).default;
+    const formData = new FormData();
+    formData.append('file', pdfBuffer, {
+      filename: 'harmony-signature-book-24-25.pdf',
+      contentType: 'application/pdf'
+    });
+    formData.append('workspace_id', WORKSPACE_ID);
+    formData.append('title', 'Harmony Signature Book 24-25 - E2E Test');
+
+    const processingResponse = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
+        ...formData.getHeaders()
       },
-      body: JSON.stringify({
-        url: HARMONY_PDF_URL,
-        title: 'Harmony Signature Book 24-25 - E2E Test',
-        workspace_id: WORKSPACE_ID,
-        options: {
-          extract_text: true,
-          extract_images: true,
-          create_products: true,
-          generate_embeddings: true
-        }
-      })
+      body: formData
     });
     
     const result = await processingResponse.json();
-    
+
+    log('UPLOAD', `Response status: ${processingResponse.status}`, 'info');
+    log('UPLOAD', `Response body: ${JSON.stringify(result, null, 2)}`, 'info');
+
     if (!processingResponse.ok) {
-      throw new Error(`Processing failed: ${result.error || processingResponse.statusText}`);
+      throw new Error(`Processing failed: ${result.error || result.message || processingResponse.statusText}`);
     }
-    
+
     if (result.job_id) {
       log('UPLOAD', `Job started: ${result.job_id}`, 'success');
       return { success: true, jobId: result.job_id, documentId: result.document_id };
@@ -141,7 +145,7 @@ async function uploadHarmonyPDF() {
       testResults.documentId = result.document_id;
       return { success: true, documentId: result.document_id };
     } else {
-      throw new Error('No job_id or document_id in response');
+      throw new Error(`No job_id or document_id in response. Got: ${JSON.stringify(result)}`);
     }
     
   } catch (error) {
