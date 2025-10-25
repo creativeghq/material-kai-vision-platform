@@ -677,12 +677,18 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-11">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="chunks">Chunks ({stats?.totalChunks || 0})</TabsTrigger>
           <TabsTrigger value="images">Images ({stats?.totalImages || 0})</TabsTrigger>
           <TabsTrigger value="embeddings">Embeddings ({stats?.totalEmbeddings || 0})</TabsTrigger>
           <TabsTrigger value="products">📦 Products ({products.length})</TabsTrigger>
+          <TabsTrigger value="metadata">📊 Metadata</TabsTrigger>
+          <TabsTrigger value="quality">⭐ Quality</TabsTrigger>
+          <TabsTrigger value="embeddings-stats">🧠 Embeddings</TabsTrigger>
+          <TabsTrigger value="detections">🔍 Detections</TabsTrigger>
+          <TabsTrigger value="dashboard">📈 Dashboard</TabsTrigger>
+          <TabsTrigger value="insights">💡 Insights</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -1563,6 +1569,143 @@ export const MaterialKnowledgeBase: React.FC = () => {
           </Card>
         </TabsContent>
 
+        {/* NEW: Metadata Tab */}
+        <TabsContent value="metadata" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Metadata Management
+              </CardTitle>
+              <CardDescription>
+                Centralized metadata from chunks, images, and products
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Database className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Metadata tab - Coming soon
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NEW: Quality Scores Tab */}
+        <TabsContent value="quality" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Badge className="h-5 w-5" />
+                Quality Scores
+              </CardTitle>
+              <CardDescription>
+                Quality metrics and distributions across all entities
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Badge className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Quality scores tab - Coming soon
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NEW: Embeddings Stats Tab */}
+        <TabsContent value="embeddings-stats" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                Embeddings Statistics
+              </CardTitle>
+              <CardDescription>
+                Embedding coverage, models, and quality metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Embeddings stats tab - Coming soon
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NEW: Detections Tab */}
+        <TabsContent value="detections" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                Detection Events
+              </CardTitle>
+              <CardDescription>
+                Track product, image, and chunk detection events
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Detections tab - Coming soon
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NEW: Quality Dashboard Tab */}
+        <TabsContent value="dashboard" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="h-5 w-5" />
+                Quality Dashboard
+              </CardTitle>
+              <CardDescription>
+                Daily quality metrics, trends, and alerts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Quality dashboard tab - Coming soon
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NEW: Insights Tab */}
+        <TabsContent value="insights" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Patterns & Insights
+              </CardTitle>
+              <CardDescription>
+                AI-driven patterns, anomalies, and recommendations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Insights tab - Coming soon
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       </Tabs>
     </div>

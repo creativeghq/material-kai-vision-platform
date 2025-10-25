@@ -913,6 +913,99 @@ export type Database = {
         }
         Relationships: [],
   }
+      quality_metrics_daily: {
+        Row: {
+          avg_chunk_quality: number | null
+          avg_image_quality: number | null
+          avg_product_quality: number | null
+          chunks_below_threshold: number | null
+          created_at: string | null
+          detection_accuracy: number | null
+          embedding_generation_failures: number | null
+          id: string
+          images_below_threshold: number | null
+          metric_date: string
+          products_below_threshold: number | null
+          total_chunks_processed: number | null
+          total_detections: number | null
+          total_embeddings_generated: number | null
+          total_images_extracted: number | null
+          total_products_created: number | null
+          workspace_id: string
+        }
+        Insert: {
+          avg_chunk_quality?: number | null
+          avg_image_quality?: number | null
+          avg_product_quality?: number | null
+          chunks_below_threshold?: number | null
+          created_at?: string | null
+          detection_accuracy?: number | null
+          embedding_generation_failures?: number | null
+          id?: string
+          images_below_threshold?: number | null
+          metric_date: string
+          products_below_threshold?: number | null
+          total_chunks_processed?: number | null
+          total_detections?: number | null
+          total_embeddings_generated?: number | null
+          total_images_extracted?: number | null
+          total_products_created?: number | null
+          workspace_id: string
+        }
+        Update: {
+          avg_chunk_quality?: number | null
+          avg_image_quality?: number | null
+          avg_product_quality?: number | null
+          chunks_below_threshold?: number | null
+          created_at?: string | null
+          detection_accuracy?: number | null
+          embedding_generation_failures?: number | null
+          id?: string
+          images_below_threshold?: number | null
+          metric_date?: string
+          products_below_threshold?: number | null
+          total_chunks_processed?: number | null
+          total_detections?: number | null
+          total_embeddings_generated?: number | null
+          total_images_extracted?: number | null
+          total_products_created?: number | null
+          workspace_id?: string
+        }
+        Relationships: [],
+  }
+      quality_scoring_logs: {
+        Row: {
+          chunk_id: string | null
+          confidence: number | null
+          created_at: string | null
+          detection_type: string | null
+          details: Json | null
+          entity_id: string | null
+          event: string | null
+          id: string
+        }
+        Insert: {
+          chunk_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          detection_type?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          event?: string | null
+          id?: string
+        }
+        Update: {
+          chunk_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          detection_type?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          event?: string | null
+          id?: string
+        }
+        Relationships: [],
+  }
       workspaces: {
         Row: {
           created_at: string | null
