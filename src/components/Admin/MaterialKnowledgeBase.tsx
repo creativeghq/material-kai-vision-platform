@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Search,
   FileText,
@@ -114,6 +114,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [stats, setStats] = useState<KnowledgeBaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [imageChunkRelationships, setImageChunkRelationships] = useState<ImageChunkRelationship[]>([]);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
@@ -166,6 +167,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
     return () => clearInterval(intervalId);
   }, [autoRefreshEnabled, workspaceId, refreshInterval]);
+
+  // Debounced search effect for performance
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const loadKnowledgeBaseData = async () => {
     try {
@@ -536,38 +546,41 @@ export const MaterialKnowledgeBase: React.FC = () => {
     return range;
   };
 
-  // Cross-tab navigation helpers for Phase 4
-  const navigateToTab = (tab: string) => {
+  // Cross-tab navigation helpers for Phase 4 (memoized with useCallback)
+  const navigateToTab = useCallback((tab: string) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
-  const navigateToChunkDetails = (chunkId: string) => {
-    navigateToTab('chunks');
+  const navigateToChunkDetails = useCallback((chunkId: string) => {
+    setActiveTab('chunks');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => {
       const element = document.getElementById(`chunk-${chunkId}`);
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
-  };
+  }, []);
 
-  const navigateToImageDetails = (imageId: string) => {
-    navigateToTab('images');
+  const navigateToImageDetails = useCallback((imageId: string) => {
+    setActiveTab('images');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => {
       const element = document.getElementById(`image-${imageId}`);
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
-  };
+  }, []);
 
-  const navigateToProductDetails = (productId: string) => {
-    navigateToTab('products');
+  const navigateToProductDetails = useCallback((productId: string) => {
+    setActiveTab('products');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => {
       const element = document.getElementById(`product-${productId}`);
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
-  };
+  }, []);
 
-  // Manual refresh all admin data
-  const refreshAllAdminData = () => {
+  // Manual refresh all admin data (memoized with useCallback)
+  const refreshAllAdminData = useCallback(() => {
     console.log('🔄 Manually refreshing all admin data...');
     refetchMetadata?.();
     refetchQuality?.();
@@ -582,7 +595,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
       description: 'Fetching latest admin data...',
       duration: 2000,
     });
-  };
+  }, [refetchMetadata, refetchQuality, refetchEmbeddings, refetchDetections, refetchDashboard, refetchPatterns, toast]);
 
   const formatJsonForDisplay = (data: unknown): string => {
     if (!data) return 'N/A';
@@ -595,6 +608,47 @@ export const MaterialKnowledgeBase: React.FC = () => {
       return String(data);
     }
   };
+
+  // Memoized filtered data for performance (using debounced search)
+  const filteredChunks = useMemo(() => {
+    if (!debouncedSearchQuery) return chunks;
+    const query = debouncedSearchQuery.toLowerCase();
+    return chunks.filter(chunk =>
+      chunk.content?.toLowerCase().includes(query) ||
+      chunk.chunk_index?.toString().includes(query) ||
+      getDocumentDisplayName(chunk).toLowerCase().includes(query)
+    );
+  }, [chunks, debouncedSearchQuery]);
+
+  const filteredImages = useMemo(() => {
+    if (!debouncedSearchQuery) return images;
+    const query = debouncedSearchQuery.toLowerCase();
+    return images.filter(image =>
+      image.caption?.toLowerCase().includes(query) ||
+      image.contextual_name?.toLowerCase().includes(query) ||
+      image.nearest_heading?.toLowerCase().includes(query)
+    );
+  }, [images, debouncedSearchQuery]);
+
+  const filteredProducts = useMemo(() => {
+    if (!debouncedSearchQuery) return products;
+    const query = debouncedSearchQuery.toLowerCase();
+    return products.filter(product =>
+      product.name?.toLowerCase().includes(query) ||
+      product.description?.toLowerCase().includes(query)
+    );
+  }, [products, debouncedSearchQuery]);
+
+  // Memoized pagination for chunks
+  const paginatedChunks = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredChunks.slice(startIndex, endIndex);
+  }, [filteredChunks, currentPage, itemsPerPage]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredChunks.length / itemsPerPage);
+  }, [filteredChunks.length, itemsPerPage]);
 
   const getImageDisplayName = (image: DocumentImage): string => {
     // Priority: contextual_name > caption > nearest_heading > "Untitled Image"
