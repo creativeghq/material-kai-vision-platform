@@ -88,6 +88,11 @@
 - **[Backward Compatibility Removal](./backward-compatibility-removal.md)** - 10 items to remove with impact analysis and testing strategy
 - **[Cleanup Implementation Plan](./cleanup-implementation-plan.md)** - 4-phase implementation plan (62 hours, 5 weeks)
 
+### 🤖 AI & Vision Models
+
+- **[Llama 4 Scout Implementation Summary](./llama-4-scout-implementation-summary.md)** ✨ NEW - Complete migration guide from Llama 3.2 90B to Llama 4 Scout 17B Vision with 3 major enhancements
+- **[Material Images API - Llama Integration](./material-images-api-llama-integration.md)** ✨ NEW - Auto-analysis with Llama 4 Scout Vision (69.4% MMMU, #1 OCR)
+
 ---
 
 ## 🚀 Quick Start

@@ -2164,6 +2164,20 @@ GET /api/models
 - `POST /api/images/upload-and-analyze` - Upload and analyze image
 - `GET /api/images/health` - Image service health
 
+### **Material Images API** (4 endpoints) ✨ NEW: Llama 4 Scout Vision Integration
+- `GET /material-images-api` - Get material images with filters
+- `POST /material-images-api` - Upload image with **auto-analysis** (Llama 4 Scout Vision)
+- `PUT /material-images-api/{id}` - Update image metadata
+- `DELETE /material-images-api/{id}` - Delete image
+
+**Features:**
+- ✅ **Auto-Analysis**: Llama 4 Scout Vision (69.4% MMMU, #1 OCR)
+- ✅ **Extracts**: Materials, colors, textures, patterns, finishes, descriptions, tags
+- ✅ **Searchable**: Auto-generated tags and color palettes
+- ✅ **Graceful Fallback**: Upload succeeds even if analysis fails
+
+📚 **[Full Documentation](./material-images-api-llama-integration.md)**
+
 ### **Admin API** (16 endpoints)
 - `GET /api/admin/jobs` - List jobs
 - `GET /api/admin/jobs/statistics` - Job statistics
