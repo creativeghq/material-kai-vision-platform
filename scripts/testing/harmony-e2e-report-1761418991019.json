@@ -1,0 +1,1544 @@
+{
+  "timestamp": "2025-10-25T18:51:01.486Z",
+  "documentId": null,
+  "steps": [
+    {
+      "step": "UPLOAD",
+      "message": "Starting Harmony PDF upload",
+      "type": "step",
+      "timestamp": "2025-10-25T18:51:01.492Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:01.492Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Downloaded 10.72 MB",
+      "type": "success",
+      "timestamp": "2025-10-25T18:51:03.890Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Triggering PDF processing via MIVAA gateway...",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:03.891Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response status: 202",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:09.377Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response body: {\n  \"success\": true,\n  \"data\": {\n    \"job_id\": \"ccaccd58-2706-491e-be24-d820c3b2a8d6\",\n    \"status\": \"pending\",\n    \"message\": \"Document processing started. Use job_id to check status.\"\n  }\n}",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:09.377Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Job started: ccaccd58-2706-491e-be24-d820c3b2a8d6",
+      "type": "success",
+      "timestamp": "2025-10-25T18:51:09.379Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Monitoring job: ccaccd58-2706-491e-be24-d820c3b2a8d6",
+      "type": "step",
+      "timestamp": "2025-10-25T18:51:09.380Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 1/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:14.383Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:15.217Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 2/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:20.221Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:21.649Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 3/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:26.657Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:27.706Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 4/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:32.713Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:34.012Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 5/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:39.018Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:39.997Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 6/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:45.003Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:45.843Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 7/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:50.845Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:51.698Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 8/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:56.710Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:51:57.597Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 9/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:02.610Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:03.454Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 10/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:08.457Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:09.386Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 11/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:14.388Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:15.424Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 12/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:20.429Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:21.257Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 13/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:26.271Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:27.141Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 14/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:32.141Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:32.998Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 15/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:38.000Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:39.240Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 16/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:44.243Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:45.727Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 17/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:50.728Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:51.771Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 18/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:56.772Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:52:57.641Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 19/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:02.649Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:03.112Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 20/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:08.118Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:09.004Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 21/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:14.012Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:14.953Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 22/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:19.965Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:20.918Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 23/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:25.919Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:27.096Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 24/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:32.107Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:32.562Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 25/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:37.569Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:38.635Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 26/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:43.639Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:44.474Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 27/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:49.478Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:50.368Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 28/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:55.370Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:53:56.192Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 29/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:01.199Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:02.770Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 30/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:07.777Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:08.693Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 31/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:13.694Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:14.469Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 32/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:19.473Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:20.262Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 33/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:25.264Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:26.023Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 34/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:31.030Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:32.222Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 35/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:37.233Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:38.061Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 36/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:43.069Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:43.891Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 37/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:48.897Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:49.708Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 38/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:54.715Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:54:55.491Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 39/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:00.494Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:01.503Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 40/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:06.512Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:07.297Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 41/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:12.310Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:13.212Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 42/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:18.223Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:19.082Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 43/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:24.101Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:24.947Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 44/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:29.951Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:30.868Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 45/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:35.875Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:36.741Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 46/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:41.744Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:42.493Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 47/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:47.501Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:48.402Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 48/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:53.410Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:54.192Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 49/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:55:59.195Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:00.000Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 50/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:05.014Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:06.261Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 51/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:11.276Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:12.051Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 52/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:17.062Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:17.960Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 53/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:22.976Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:23.813Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 54/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:28.821Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:29.127Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 55/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:34.127Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:34.904Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 56/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:39.908Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:40.286Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 57/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:45.292Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:46.120Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 58/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:51.132Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:52.007Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 59/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:57.015Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:56:57.818Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 60/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:02.825Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:03.637Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 61/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:08.640Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:09.410Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 62/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:14.415Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:15.238Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 63/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:20.240Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:20.552Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 64/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:25.554Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:26.434Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 65/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:31.447Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:32.393Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 66/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:37.399Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:38.222Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 67/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:43.230Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:44.101Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 68/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:49.112Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:49.954Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 69/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:54.961Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:57:55.913Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 70/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:00.914Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:02.197Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 71/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:07.202Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:08.020Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 72/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:13.029Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:13.810Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 73/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:18.818Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:19.624Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 74/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:24.630Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:25.568Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 75/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:30.582Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:31.483Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 76/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:36.487Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:37.322Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 77/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:42.324Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:43.180Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 78/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:48.187Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:48.662Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 79/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:53.670Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:58:55.467Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 80/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:00.470Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:01.488Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 81/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:06.496Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:07.410Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 82/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:12.423Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:13.307Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 83/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:18.308Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:19.166Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 84/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:24.170Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:24.974Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 85/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:29.986Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:30.780Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 86/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:35.784Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:36.943Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 87/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:41.953Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:42.943Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 88/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:47.946Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:48.749Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 89/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:53.750Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:54.526Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 90/120",
+      "type": "info",
+      "timestamp": "2025-10-25T18:59:59.527Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:00.699Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 91/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:05.701Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:06.542Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 92/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:11.548Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:12.379Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 93/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:17.391Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:18.258Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 94/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:23.268Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:24.187Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 95/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:29.192Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:29.980Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 96/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:34.983Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:35.850Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 97/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:40.851Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:41.640Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 98/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:46.643Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:47.497Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 99/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:52.502Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:53.415Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 100/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:58.416Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:00:59.300Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 101/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:04.301Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:05.351Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 102/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:10.354Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:11.472Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 103/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:16.480Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:17.535Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 104/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:22.540Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:23.933Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 105/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:28.938Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:30.120Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 106/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:35.120Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:36.665Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 107/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:41.674Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:43.119Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 108/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:48.124Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:49.951Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 109/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:54.957Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:01:56.489Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 110/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:01.490Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:03.160Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 111/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:08.165Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:09.694Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 112/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:14.698Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:15.727Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 113/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:20.731Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:21.721Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 114/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:26.722Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:28.155Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 115/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:33.156Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:34.547Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 116/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:39.554Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:41.607Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 117/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:46.612Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:48.646Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 118/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:53.648Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:02:56.256Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 119/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:03:01.261Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:03:04.018Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 120/120",
+      "type": "info",
+      "timestamp": "2025-10-25T19:03:09.027Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-25T19:03:11.012Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Error: Job monitoring timeout",
+      "type": "error",
+      "timestamp": "2025-10-25T19:03:11.012Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Test execution failed",
+      "type": "error",
+      "timestamp": "2025-10-25T19:03:11.013Z"
+    }
+  ],
+  "validations": {
+    "chunks": {
+      "passed": false,
+      "details": {}
+    },
+    "embeddings": {
+      "passed": false,
+      "details": {}
+    },
+    "images": {
+      "passed": false,
+      "details": {}
+    },
+    "products": {
+      "passed": false,
+      "details": {}
+    },
+    "search": {
+      "passed": false,
+      "details": {}
+    },
+    "quality": {
+      "passed": false,
+      "details": {}
+    },
+    "adminKB": {
+      "passed": false,
+      "details": {}
+    }
+  },
+  "errors": [
+    {
+      "step": "MAIN",
+      "error": "Job monitoring timeout",
+      "timestamp": "2025-10-25T19:03:11.013Z"
+    }
+  ],
+  "summary": {}
+}

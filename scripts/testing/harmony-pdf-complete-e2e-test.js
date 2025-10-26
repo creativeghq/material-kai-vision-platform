@@ -137,13 +137,17 @@ async function uploadHarmonyPDF() {
       throw new Error(`Processing failed: ${result.error || result.message || processingResponse.statusText}`);
     }
 
-    if (result.job_id) {
-      log('UPLOAD', `Job started: ${result.job_id}`, 'success');
-      return { success: true, jobId: result.job_id, documentId: result.document_id };
-    } else if (result.document_id) {
-      log('UPLOAD', `Document created: ${result.document_id}`, 'success');
-      testResults.documentId = result.document_id;
-      return { success: true, documentId: result.document_id };
+    // Handle both direct response and nested data response
+    const jobId = result.job_id || result.data?.job_id;
+    const documentId = result.document_id || result.data?.document_id;
+
+    if (jobId) {
+      log('UPLOAD', `Job started: ${jobId}`, 'success');
+      return { success: true, jobId: jobId, documentId: documentId };
+    } else if (documentId) {
+      log('UPLOAD', `Document created: ${documentId}`, 'success');
+      testResults.documentId = documentId;
+      return { success: true, documentId: documentId };
     } else {
       throw new Error(`No job_id or document_id in response. Got: ${JSON.stringify(result)}`);
     }
@@ -184,15 +188,22 @@ async function monitorProcessingJob(jobId) {
       });
       
       const statusData = await statusResponse.json();
-      
-      if (statusData.status === 'completed') {
+
+      // MIVAA returns { success, message, data: { status, progress, ... } }
+      const jobData = statusData.data || statusData;
+      const status = jobData.status;
+      const progress = jobData.progress || 0;
+      const documentId = jobData.document_id;
+      const error = jobData.error;
+
+      if (status === 'completed') {
         log('MONITOR', 'Processing completed!', 'success');
-        testResults.documentId = statusData.document_id;
-        return { success: true, documentId: statusData.document_id };
-      } else if (statusData.status === 'failed') {
-        throw new Error(`Job failed: ${statusData.error}`);
+        testResults.documentId = documentId;
+        return { success: true, documentId: documentId };
+      } else if (status === 'failed') {
+        throw new Error(`Job failed: ${error}`);
       } else {
-        log('MONITOR', `Status: ${statusData.status} (${statusData.progress || 0}%)`, 'info');
+        log('MONITOR', `Status: ${status} (${progress}%)`, 'info');
       }
       
     } catch (error) {

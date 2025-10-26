@@ -89,7 +89,7 @@
 | **HuggingFace API Token** | Vercel, GitHub, MIVAA | `HUGGINGFACE_API_KEY` or `HUGGINGFACE_API_TOKEN` | HF models, 3D generation | Create at huggingface.co/settings/tokens |
 | **HuggingFace Access Token** | MIVAA Deployment | `HUGGING_FACE_ACCESS_TOKEN` | Alternative HF token variable | Same as HUGGINGFACE_API_TOKEN |
 | **Replicate API Token** | Vercel, GitHub, MIVAA | `REPLICATE_API_TOKEN` or `REPLICATE_API_KEY` | 3D generation models | Create at replicate.com/account/api-tokens |
-| **TogetherAI API Key** | GitHub Secrets, MIVAA | `TOGETHER_API_KEY` | LLaMA Vision, fast inference | Create at api.together.xyz/settings/api-keys |
+| **TogetherAI API Key** | GitHub Secrets, MIVAA | `TOGETHER_API_KEY` | LLaMA 4 Scout Vision (69.4% MMMU, #1 OCR) | Create at api.together.xyz/settings/api-keys |
 | **Jina API Key** | MIVAA Deployment | `JINA_API_KEY` | Jina embeddings/reranking | Create at jina.ai |
 | **Firecrawl API Key** | MIVAA Deployment | `FIRECRAWL_API_KEY` | Web scraping service | Create at firecrawl.dev |
 
@@ -192,7 +192,7 @@
 - [ ] `ANTHROPIC_API_KEY` - Anthropic Claude access
 - [ ] `HUGGINGFACE_API_KEY` - HuggingFace models
 - [ ] `REPLICATE_API_TOKEN` - Replicate 3D models
-- [ ] `TOGETHER_API_KEY` - TogetherAI LLaMA Vision
+- [ ] `TOGETHER_API_KEY` - TogetherAI LLaMA 4 Scout Vision
 
 ### Material Kai Platform
 - [ ] `MATERIAL_KAI_API_KEY` - Platform API key (⚠️ **Must be available on server**)

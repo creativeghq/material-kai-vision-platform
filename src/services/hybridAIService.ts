@@ -177,6 +177,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     // Note: Using Supabase MIVAA gateway instead of direct calls
 
     // Map request type to MIVAA action
+    // llama_vision_analysis uses LLaMA 4 Scout (69.4% MMMU, #1 OCR)
     let mivaaAction: string;
     switch (request.type) {
       case 'material-analysis':

@@ -296,7 +296,8 @@ export class VisualFeatureExtractionService {
   }
 
   /**
-   * Perform parallel MIVAA analysis using both LLaMA vision and CLIP embeddings
+   * Perform parallel MIVAA analysis using both LLaMA 4 Scout vision and CLIP embeddings
+   * LLaMA 4 Scout: 69.4% MMMU benchmark, #1 open source OCR model
    */
   private static async performParallelMivaaAnalysis(params: {
     user_id: string;

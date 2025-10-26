@@ -123,7 +123,8 @@ async function performVisualAnalysis(
   const analysisId = `VSA-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   try {
-    // Use MIVAA gateway for advanced visual analysis
+    // Use MIVAA gateway for advanced visual analysis with LLaMA 4 Scout
+    // LLaMA 4 Scout: 69.4% MMMU benchmark, #1 open source OCR model
     const response = await fetch(`${MIVAA_GATEWAY_URL}/api/mivaa/gateway`, {
       method: 'POST',
       headers: {

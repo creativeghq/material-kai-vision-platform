@@ -929,7 +929,7 @@ Authorization: Bearer {token}
 4. **AI Coordination**: Multi-provider AI service management (OpenAI, TogetherAI, HuggingFace)
 5. **Document Management**: Workspace-aware document organization
 6. **Embedding Generation**: Text-embedding-ada-002 standardized embeddings (1536 dimensions)
-7. **Semantic Analysis**: Advanced material analysis with LLaMA Vision models
+7. **Semantic Analysis**: Advanced material analysis with LLaMA 4 Scout Vision (69.4% MMMU, #1 OCR)
 
 ### Base URL
 - **Development**: `http://localhost:8000`
@@ -2047,7 +2047,7 @@ Content-Type: multipart/form-data
 **Parameters:**
 - `image` (required): Image file for analysis
 - `prompt` (optional): Custom analysis prompt
-- `model` (optional): Model to use (default: meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo)
+- `model` (optional): Model to use (default: meta-llama/Llama-4-Scout-17B-16E-Instruct)
 
 **Response:**
 ```json
@@ -2055,7 +2055,7 @@ Content-Type: multipart/form-data
   "success": true,
   "analysis": "This image shows a ceramic tile with a blue and white geometric pattern...",
   "confidence": 0.95,
-  "model_used": "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
+  "model_used": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
   "processing_time_ms": 1500,
   "metadata": {
     "cache_hit": false,
@@ -2080,7 +2080,17 @@ GET /api/models
   "success": true,
   "models": [
     {
-      "id": "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
+      "id": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+      "type": "vision",
+      "capabilities": ["image_analysis", "text_generation", "ocr", "table_extraction"],
+      "status": "available",
+      "benchmark_scores": {
+        "mmmu": 69.4,
+        "ocr_rank": 1
+      }
+    },
+    {
+      "id": "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
       "type": "vision",
       "capabilities": ["image_analysis", "text_generation"],
       "status": "available"
@@ -2218,8 +2228,8 @@ Content-Type: application/json
 | `hybrid_search` | Perform hybrid search | `/api/search/hybrid` |
 | `get_recommendations` | Get search recommendations | `/api/search/recommendations` |
 | `get_analytics` | Get analytics data | `/api/analytics` |
-| `semantic_analysis` | Semantic analysis with LLaMA Vision | `/api/semantic-analysis` |
-| `llama_vision_analysis` | LLaMA Vision analysis | `/api/vision/llama-analyze` |
+| `semantic_analysis` | Semantic analysis with LLaMA 4 Scout Vision | `/api/semantic-analysis` |
+| `llama_vision_analysis` | LLaMA 4 Scout Vision analysis (69.4% MMMU, #1 OCR) | `/api/vision/llama-analyze` |
 | `clip_embedding_generation` | Generate CLIP embeddings | `/api/embeddings/clip-generate` |
 | `chat_completion` | Chat completions | `/api/chat/completions` |
 | `contextual_response` | Contextual chat response | `/api/chat/contextual` |
