@@ -189,21 +189,71 @@ async function monitorProcessingJob(jobId) {
       
       const statusData = await statusResponse.json();
 
-      // MIVAA returns { success, message, data: { status, progress, ... } }
+      // MIVAA returns { success, message, data: { status, progress, metadata, ... } }
       const jobData = statusData.data || statusData;
       const status = jobData.status;
       const progress = jobData.progress || 0;
       const documentId = jobData.document_id;
       const error = jobData.error;
+      const metadata = jobData.metadata || {};
 
       if (status === 'completed') {
         log('MONITOR', 'Processing completed!', 'success');
         testResults.documentId = documentId;
+
+        // ✅ FIX: Show detailed completion stats
+        if (metadata.chunks_created || metadata.images_extracted || metadata.products_created) {
+          log('MONITOR', `📊 Final Stats:`, 'info');
+          log('MONITOR', `   📄 Chunks: ${metadata.chunks_created || 0}`, 'info');
+          log('MONITOR', `   🖼️  Images: ${metadata.images_extracted || 0}`, 'info');
+          log('MONITOR', `   📦 Products: ${metadata.products_created || 0}`, 'info');
+
+          if (metadata.ai_usage) {
+            log('MONITOR', `   🤖 AI Usage:`, 'info');
+            log('MONITOR', `      - Llama calls: ${metadata.ai_usage.llama_calls || 0}`, 'info');
+            log('MONITOR', `      - Claude calls: ${metadata.ai_usage.claude_calls || 0}`, 'info');
+            log('MONITOR', `      - OpenAI calls: ${metadata.ai_usage.openai_calls || 0}`, 'info');
+            log('MONITOR', `      - CLIP embeddings: ${metadata.ai_usage.clip_embeddings || 0}`, 'info');
+          }
+
+          if (metadata.embeddings_generated) {
+            log('MONITOR', `   📊 Embeddings:`, 'info');
+            log('MONITOR', `      - Text: ${metadata.embeddings_generated.text || 0}`, 'info');
+            log('MONITOR', `      - Visual: ${metadata.embeddings_generated.visual || 0}`, 'info');
+            log('MONITOR', `      - Color: ${metadata.embeddings_generated.color || 0}`, 'info');
+            log('MONITOR', `      - Texture: ${metadata.embeddings_generated.texture || 0}`, 'info');
+            log('MONITOR', `      - Application: ${metadata.embeddings_generated.application || 0}`, 'info');
+          }
+        }
+
         return { success: true, documentId: documentId };
       } else if (status === 'failed') {
         throw new Error(`Job failed: ${error}`);
       } else {
-        log('MONITOR', `Status: ${status} (${progress}%)`, 'info');
+        // ✅ FIX: Show detailed progress during processing
+        let progressMsg = `Status: ${status} (${progress}%)`;
+
+        if (metadata.current_step) {
+          progressMsg += ` - ${metadata.current_step}`;
+        }
+
+        if (metadata.current_page && metadata.total_pages) {
+          progressMsg += ` [Page ${metadata.current_page}/${metadata.total_pages}]`;
+        }
+
+        if (metadata.chunks_created) {
+          progressMsg += ` | Chunks: ${metadata.chunks_created}`;
+        }
+
+        if (metadata.images_extracted) {
+          progressMsg += ` | Images: ${metadata.images_extracted}`;
+        }
+
+        if (metadata.products_created) {
+          progressMsg += ` | Products: ${metadata.products_created}`;
+        }
+
+        log('MONITOR', progressMsg, 'info');
       }
       
     } catch (error) {
