@@ -162,37 +162,61 @@ result = await classifier.classify_material(
 
 **Purpose:** Automatically analyze images when uploaded to knowledge base using Llama 4 Scout Vision.
 
-**Files Created:**
-- `supabase/functions/auto-analyze-image/index.ts` (230 lines)
-- `supabase/migrations/20251026_auto_analyze_images_trigger.sql` (120 lines)
+**Implementation Strategy:** ✅ **INTEGRATED INTO EXISTING FLOW** (Better Architecture)
+
+Instead of creating a separate Edge Function + database trigger, we integrated Llama 4 Scout analysis **directly into the existing `material-images-api` function**. This is superior because:
+
+1. ✅ **Single source of truth** - All image uploads go through one function
+2. ✅ **Immediate analysis** - Analysis happens during upload, not via trigger
+3. ✅ **Simpler architecture** - No database triggers or separate functions needed
+4. ✅ **Better error handling** - Upload and analysis in same transaction
+5. ✅ **Consistent data** - Every uploaded image gets analyzed automatically
+
+**Files Modified:**
+- `supabase/functions/material-images-api/index.ts` (+135 lines)
 
 **Features:**
-- ✅ Triggered on INSERT to `material_images` table
+- ✅ Auto-analyzes images during upload (can be disabled with `auto_analyze: false`)
 - ✅ Extracts: materials, colors, textures, patterns, finishes
 - ✅ Generates searchable descriptions and tags
-- ✅ Updates image record with analysis data
-- ✅ Stores confidence scores and metadata
-- ✅ Helper function to analyze existing images in batches
+- ✅ Stores analysis data, confidence scores, and metadata
+- ✅ Graceful fallback if analysis fails (upload continues)
+- ✅ Works with base64 image data uploads
 
-**Database Changes:**
-```sql
--- Trigger function
-CREATE FUNCTION trigger_llama_vision_analysis()
+**API Usage:**
+```typescript
+// Upload image with auto-analysis (default)
+POST /material-images-api
+{
+  "material_id": "uuid",
+  "image_data": "data:image/jpeg;base64,...",
+  "image_type": "primary",
+  "auto_analyze": true  // Optional, defaults to true
+}
 
--- Trigger on material_images
-CREATE TRIGGER on_material_image_uploaded
-  BEFORE INSERT ON material_images
-  FOR EACH ROW
-  EXECUTE FUNCTION trigger_llama_vision_analysis()
-
--- Helper to analyze existing images
-CREATE FUNCTION analyze_existing_images(batch_size INTEGER)
-```
-
-**Usage:**
-```sql
--- Analyze 50 existing images
-SELECT * FROM analyze_existing_images(50);
+// Response includes analysis_data
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "analysis_data": {
+      "materials": ["ceramic", "porcelain"],
+      "colors": ["white", "beige"],
+      "textures": ["smooth", "glossy"],
+      "patterns": ["solid"],
+      "finish": "glossy",
+      "description": "White glossy ceramic tile...",
+      "tags": ["ceramic", "tile", "glossy", "white"],
+      "properties": {...},
+      "confidence": 0.92
+    },
+    "tags": ["ceramic", "tile", "glossy", "white"],
+    "color_palette": {
+      "colors": ["white", "beige"],
+      "primary_color": "white"
+    }
+  }
+}
 ```
 
 ---
@@ -219,21 +243,17 @@ systemctl status mivaa-pdf-extractor.service
 
 ### 2. Deploy Supabase Edge Function
 ```bash
-# Deploy auto-analyze-image function
-supabase functions deploy auto-analyze-image
+# Deploy updated material-images-api function with Llama 4 Scout integration
+supabase functions deploy material-images-api
 
-# Set environment variables
+# Ensure TOGETHER_API_KEY is set in Supabase secrets
+supabase secrets list  # Check if TOGETHER_API_KEY exists
+# If not set:
 supabase secrets set TOGETHER_API_KEY=<your-key>
 ```
 
-### 3. Run Database Migration
-```bash
-# Execute migration
-supabase db push
-
-# Or manually via Supabase Dashboard:
-# SQL Editor → Run supabase/migrations/20251026_auto_analyze_images_trigger.sql
-```
+### 3. ~~Run Database Migration~~ (NOT NEEDED)
+**No database migration required!** The auto-analysis is integrated directly into the `material-images-api` Edge Function, so no triggers or database changes are needed.
 
 ### 4. Test End-to-End
 ```bash

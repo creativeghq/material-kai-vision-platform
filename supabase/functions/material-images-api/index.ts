@@ -312,13 +312,42 @@ async function handleUploadMaterialImage(request: Request): Promise<Response> {
       }
     }
 
+    // ✅ NEW: Auto-analyze image with Llama 4 Scout Vision (69.4% MMMU, #1 OCR)
+    let analysisData = body.analysis_data || {};
+    let autoTags = body.tags || [];
+    let colorPalette = body.color_palette || {};
+    let autoDescription = body.description;
+
+    // Only auto-analyze if image_data was provided (new upload)
+    if (body.image_data && body.auto_analyze !== false) {
+      try {
+        console.log('🔍 Auto-analyzing image with Llama 4 Scout Vision...');
+        const analysis = await analyzeImageWithLlama(body.image_data);
+
+        if (analysis) {
+          analysisData = analysis;
+          autoTags = analysis.tags || [];
+          colorPalette = {
+            colors: analysis.colors || [],
+            primary_color: (analysis.colors && analysis.colors[0]) || null
+          };
+          autoDescription = autoDescription || analysis.description;
+
+          console.log(`✅ Image analyzed: ${analysis.materials?.join(', ')} | Confidence: ${analysis.confidence}`);
+        }
+      } catch (analysisError) {
+        console.warn('⚠️ Auto-analysis failed, continuing without analysis:', analysisError);
+        // Continue with upload even if analysis fails
+      }
+    }
+
     // Create image record
     const imageData = {
       material_id: body.material_id,
       image_url: imageUrl,
       image_type: body.image_type || 'primary',
       title: body.title,
-      description: body.description,
+      description: autoDescription,
       alt_text: body.alt_text,
       file_name: fileName,
       file_size: fileSize,
@@ -329,11 +358,16 @@ async function handleUploadMaterialImage(request: Request): Promise<Response> {
       storage_bucket: 'material-images',
       display_order: body.display_order || 0,
       is_featured: body.is_featured || false,
-      metadata: body.metadata || {},
+      metadata: {
+        ...(body.metadata || {}),
+        auto_analyzed: body.image_data && body.auto_analyze !== false,
+        analysis_timestamp: body.image_data ? new Date().toISOString() : null,
+        analysis_model: body.image_data ? 'llama-4-scout-17b-vision' : null
+      },
       variants: body.variants || {},
-      analysis_data: body.analysis_data || {},
-      tags: body.tags || [],
-      color_palette: body.color_palette || {},
+      analysis_data: analysisData,
+      tags: autoTags,
+      color_palette: colorPalette,
       source_url: body.source_url,
       created_by: userId,
     };
@@ -636,3 +670,126 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+
+// ============================================================================
+// LLAMA 4 SCOUT VISION ANALYSIS
+// ============================================================================
+
+interface ImageAnalysisResult {
+  materials: string[];
+  colors: string[];
+  textures: string[];
+  patterns: string[];
+  finish: string;
+  description: string;
+  tags: string[];
+  properties: Record<string, any>;
+  confidence: number;
+}
+
+/**
+ * Analyze image with Llama 4 Scout Vision (69.4% MMMU, #1 OCR)
+ *
+ * Extracts: materials, colors, textures, patterns, finishes, descriptions, tags
+ */
+async function analyzeImageWithLlama(imageDataUrl: string): Promise<ImageAnalysisResult | null> {
+  const TOGETHER_API_KEY = Deno.env.get('TOGETHER_API_KEY');
+
+  if (!TOGETHER_API_KEY) {
+    console.warn('⚠️ TOGETHER_API_KEY not set - skipping auto-analysis');
+    return null;
+  }
+
+  try {
+    // Extract base64 data from data URL
+    let imageBase64 = imageDataUrl;
+    if (imageDataUrl.startsWith('data:')) {
+      const matches = imageDataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches) {
+        imageBase64 = matches[2];
+      }
+    }
+
+    const prompt = `Analyze this material/product image and extract comprehensive information in JSON format:
+{
+  "materials": ["<material1>", "<material2>"],
+  "colors": ["<color1>", "<color2>"],
+  "textures": ["<texture1>", "<texture2>"],
+  "patterns": ["<pattern1>", "<pattern2>"],
+  "finish": "<matte/glossy/satin/textured/polished/etc>",
+  "description": "<detailed description of the image>",
+  "tags": ["<tag1>", "<tag2>", "<tag3>"],
+  "properties": {
+    "surface_type": "<smooth/rough/embossed/etc>",
+    "style": "<modern/classic/industrial/etc>",
+    "application": "<flooring/wall/furniture/etc>",
+    "composition": "<estimated material composition>"
+  },
+  "confidence": <0.0-1.0>
+}
+
+Extract ALL visible materials, colors, textures, and patterns. Generate searchable tags. Provide a detailed description.
+Respond ONLY with valid JSON, no additional text.`;
+
+    const response = await fetch('https://api.together.xyz/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${TOGETHER_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${imageBase64}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 1024,
+        temperature: 0.1,
+        top_p: 0.9,
+        stop: ['```']
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Llama API error ${response.status}:`, errorText);
+      return null;
+    }
+
+    const result = await response.json();
+    let content = result.choices[0].message.content;
+
+    // Parse JSON response
+    content = content.trim();
+    if (content.startsWith('```json')) {
+      content = content.substring(7);
+    }
+    if (content.startsWith('```')) {
+      content = content.substring(3);
+    }
+    if (content.endsWith('```')) {
+      content = content.substring(0, content.length - 3);
+    }
+    content = content.trim();
+
+    const analysis: ImageAnalysisResult = JSON.parse(content);
+    return analysis;
+
+  } catch (error) {
+    console.error('❌ Llama analysis failed:', error);
+    return null;
+  }
+}
