@@ -215,20 +215,49 @@ async function monitorProcessingJob(jobId) {
 }
 
 // ============================================================================
-// STEP 3: VALIDATE CHUNKS (NO FAKE DATA)
+// STEP 3: GET DOCUMENT CONTENT FROM MIVAA API
 // ============================================================================
 
-async function validateChunks(documentId) {
-  log('VALIDATE_CHUNKS', 'Validating document chunks', 'step');
-  
+async function getDocumentContent(documentId) {
+  log('GET_CONTENT', 'Fetching document content from MIVAA API', 'step');
+
   try {
-    const { data: chunks, error } = await supabase
-      .from('document_chunks')
-      .select('*')
-      .eq('document_id', documentId)
-      .order('chunk_index');
-    
-    if (error) throw error;
+    // Use MIVAA API to get complete document content
+    const response = await fetch(`https://v1api.materialshub.gr/api/documents/documents/${documentId}/content?include_chunks=true&include_images=true`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`MIVAA API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    log('GET_CONTENT', `Retrieved ${data.chunks?.length || 0} chunks and ${data.images?.length || 0} images`, 'success');
+
+    return data;
+  } catch (error) {
+    recordError('GET_CONTENT', error);
+    return null;
+  }
+}
+
+// ============================================================================
+// STEP 4: VALIDATE CHUNKS (NO FAKE DATA)
+// ============================================================================
+
+async function validateChunks(documentId, contentData) {
+  log('VALIDATE_CHUNKS', 'Validating document chunks', 'step');
+
+  try {
+    const chunks = contentData?.chunks || [];
+
+    if (!chunks || chunks.length === 0) {
+      throw new Error('No chunks found in document content');
+    }
     
     const validation = {
       total: chunks.length,
@@ -793,8 +822,14 @@ async function runCompleteE2ETest() {
     log('MAIN', 'Waiting 10 seconds for processing to complete...', 'info');
     await new Promise(resolve => setTimeout(resolve, 10000));
 
-    // Step 3-8: Run all validations
-    await validateChunks(testResults.documentId);
+    // Step 3: Get complete document content from MIVAA API
+    const contentData = await getDocumentContent(testResults.documentId);
+    if (!contentData) {
+      throw new Error('Failed to retrieve document content from MIVAA API');
+    }
+
+    // Step 4-9: Run all validations using content data
+    await validateChunks(testResults.documentId, contentData);
     await validateEmbeddings(testResults.documentId);
     await validateImages(testResults.documentId);
     await validateProducts(testResults.documentId);
