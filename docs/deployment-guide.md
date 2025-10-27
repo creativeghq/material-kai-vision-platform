@@ -796,9 +796,272 @@ docker-compose -f docker-compose.prod.yml up -d
 - [ ] Validate security headers
 - [ ] Test critical workflows
 
+## 💾 Backup & Disaster Recovery
+
+### Automated Backup Strategy
+
+**Database Backups** (Supabase):
+```bash
+# Supabase provides automatic daily backups
+# Access backups in Supabase Dashboard → Settings → Backups
+
+# Point-in-time recovery (PITR) available for 7 days
+# Restore via Supabase Dashboard or API
+```
+
+**Application Data Backups**:
+```bash
+# Automated backup script (runs daily via cron)
+# Location: /usr/local/bin/backup-mivaa.sh
+
+# Manual backup
+backup-mivaa.sh
+
+# Backup location: /backups/mivaa_backup_YYYYMMDD_HHMMSS.tar.gz
+# Retention: Last 7 backups kept automatically
+```
+
+### Disaster Recovery Procedures
+
+**Database Recovery**:
+1. Go to Supabase Dashboard → Settings → Backups
+2. Select desired backup point
+3. Click "Restore" and confirm
+4. Verify data integrity after restore
+
+**Application Recovery**:
+```bash
+# Restore from backup
+cd /backups
+tar -xzf mivaa_backup_YYYYMMDD_HHMMSS.tar.gz -C /app
+
+# Restart service
+systemctl restart mivaa-pdf-extractor
+```
+
+---
+
+## 🗄️ Database Migrations & Schema Management
+
+### Migration Strategy
+
+**Using Supabase Migrations**:
+```bash
+# Create new migration
+supabase migration new add_new_table
+
+# Apply migrations
+supabase db push
+
+# Rollback migration
+supabase db reset
+```
+
+**Zero-Downtime Deployments**:
+1. Add new columns as nullable
+2. Deploy code that handles both old and new columns
+3. Backfill data in background job
+4. Remove old columns in subsequent deployment
+
+### Extension Management
+
+**Required PostgreSQL Extensions**:
+```sql
+-- Enable in Supabase Dashboard → SQL Editor
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "vector";
+CREATE EXTENSION IF NOT EXISTS "ltree";
+```
+
+---
+
+## 🔄 Job Recovery & Signal Handling
+
+### Job Persistence
+
+The platform implements automatic job recovery for PDF processing:
+
+**Job States**:
+- `pending` - Waiting to start
+- `processing` - Currently running
+- `completed` - Successfully finished
+- `failed` - Processing failed
+- `cancelled` - User cancelled
+
+**Recovery on Restart**:
+```python
+# Automatic on service startup
+# Resumes jobs in 'processing' state
+# Retries failed jobs up to max_retries
+```
+
+**Graceful Shutdown**:
+```bash
+# Service receives SIGTERM
+# Completes current operations
+# Persists job state
+# Exits cleanly
+
+# Timeout: 30 seconds before SIGKILL
+```
+
+---
+
+## 📊 Performance Optimization & Scaling
+
+### Horizontal Scaling
+
+**MIVAA Service Scaling**:
+```yaml
+# docker-compose.yml
+services:
+  mivaa-service:
+    deploy:
+      replicas: 3  # Scale to 3 instances
+```
+
+**Load Balancing**:
+```nginx
+upstream mivaa_backend {
+    server mivaa-service:8000;
+    server mivaa-service:8001;
+    server mivaa-service:8002;
+}
+
+server {
+    location / {
+        proxy_pass http://mivaa_backend;
+    }
+}
+```
+
+### Database Connection Pooling
+
+**Supabase Connection Pool**:
+```bash
+# Set in MIVAA environment
+DATABASE_POOL_SIZE=20
+DATABASE_POOL_TIMEOUT=30
+```
+
+### Caching Strategy
+
+**Application-Level Caching**:
+```typescript
+// Production caching configuration
+caching: {
+  enabled: true,
+  ttl: 3600000,        // 1 hour
+  maxSize: 1000,       // 1000 items
+  strategy: 'lru'      // Least Recently Used
+}
+```
+
+---
+
+## 🚨 Monitoring & Alerting
+
+### Metrics Collection
+
+**Key Metrics to Monitor**:
+- Request latency (p50, p95, p99)
+- Error rate (5xx, 4xx responses)
+- Database query performance
+- Memory usage
+- CPU utilization
+- Job processing time
+
+**Sentry Configuration**:
+```typescript
+// Frontend monitoring
+Sentry.init({
+  dsn: process.env.VITE_SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  tracesSampleRate: 1.0,
+  integrations: [
+    new Sentry.Replay({
+      maskAllText: true,
+      blockAllMedia: true,
+    }),
+  ],
+});
+```
+
+### Alert Thresholds
+
+```typescript
+alertThresholds: {
+  errorRate: 0.05,        // 5% error rate
+  responseTime: 2000,     // 2 seconds
+  memoryUsage: 0.7,       // 70% memory
+  cpuUsage: 0.8,          // 80% CPU
+}
+```
+
+---
+
+## 🔐 Security Hardening
+
+### API Rate Limiting
+
+```bash
+# MIVAA Service environment
+RATE_LIMIT_REQUESTS=50
+RATE_LIMIT_WINDOW=60  # per minute
+```
+
+### Security Headers
+
+```nginx
+# nginx.conf
+add_header X-Content-Type-Options "nosniff";
+add_header X-Frame-Options "DENY";
+add_header X-XSS-Protection "1; mode=block";
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+add_header Content-Security-Policy "default-src 'self'";
+```
+
+### Secrets Rotation
+
+**Rotation Schedule**:
+- JWT Secret: Every 90 days
+- API Keys: Every 180 days
+- Database Password: Every 90 days
+
+**Rotation Process**:
+1. Generate new secret
+2. Update in secret manager
+3. Deploy with new secret
+4. Verify functionality
+5. Revoke old secret
+
+---
+
+## 🌐 Edge Functions Deployment
+
+### Supabase Edge Functions
+
+**Deploy Function**:
+```bash
+# Create new function
+supabase functions new my-function
+
+# Deploy to production
+supabase functions deploy my-function --project-ref bgbavxtjlbvgplozizxu
+```
+
+**Environment Variables**:
+```bash
+# Set in Supabase Dashboard → Edge Functions → Secrets
+supabase secrets set JWT_SECRET_KEY=your_secret
+```
+
+---
+
 ## 🔗 Related Documentation
 
 - [Setup & Configuration](./setup-configuration.md) - Environment setup
 - [Security & Authentication](./security-authentication.md) - Security configuration
 - [Testing Strategy](./testing-strategy.md) - Pre-deployment testing
 - [Troubleshooting](./troubleshooting.md) - Issue resolution
+- [Job Recovery & Signal Handling](../mivaa-pdf-extractor/docs/JOB-RECOVERY-AND-SIGNAL-HANDLING.md) - Job persistence
