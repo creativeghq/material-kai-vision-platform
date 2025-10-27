@@ -147,6 +147,13 @@ jobs:
                           <a href="services-search.html">Search Services</a><br>
                           <a href="services-rag-knowledge.html">RAG Knowledge</a>
                       </div>
+
+                      <div class="doc-card">
+                          <h3>✨ Feature Documentation</h3>
+                          <a href="features/product-management.html">Product Management</a><br>
+                          <a href="features/chunk-management.html">Chunk Management</a><br>
+                          <a href="features/materials-page.html">Materials Page</a>
+                      </div>
                   </div>
 
                   <div class="services-section">

@@ -24,6 +24,7 @@ import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
 import { MetadataFieldsManagement } from './components/Admin/MetadataFieldsManagement';
 import { AITestingPanel } from './components/Admin/AITestingPanel';
+import { AIMonitoringDashboard } from './components/Admin/AIMonitoringDashboard';
 import { AnalyticsDashboard } from './components/Admin/AnalyticsDashboard';
 import { SystemPerformance } from './components/Admin/SystemPerformance';
 import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
@@ -48,6 +49,7 @@ import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMet
 import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
+import MaterialsPage from './pages/Materials';
 import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
 
@@ -225,6 +227,15 @@ const App = () => (
                 </AdminGuard>
               </AuthGuard>
             } />
+            <Route path="/admin/ai-monitoring" element={
+              <AuthGuard>
+                <AdminGuard>
+                  <Layout>
+                    <AIMonitoringDashboard />
+                  </Layout>
+                </AdminGuard>
+              </AuthGuard>
+            } />
             <Route path="/admin/packages" element={
               <AuthGuard>
                 <AdminGuard>
@@ -273,6 +284,13 @@ const App = () => (
               <AuthGuard>
                 <Layout>
                   <SearchHub />
+                </Layout>
+              </AuthGuard>
+            } />
+            <Route path="/materials" element={
+              <AuthGuard>
+                <Layout>
+                  <MaterialsPage />
                 </Layout>
               </AuthGuard>
             } />

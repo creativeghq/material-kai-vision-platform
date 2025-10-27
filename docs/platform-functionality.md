@@ -21,14 +21,52 @@ The Material Kai Vision Platform is a comprehensive AI-powered material intellig
 - **Quick Actions**: Start processing, AI Studio access
 
 #### Navigation Structure
+
+**User-Facing Routes** (All Authenticated Users):
 ```
 ├── Dashboard (/)
+├── Material Recognition (/recognition)
 ├── Search Hub (/search-hub)
-├── PDF Upload (/pdf-processing)
+├── Materials Catalog (/materials) ✨ NEW
+├── PDF Processing (/pdf-processing)
 ├── MoodBoards (/moodboard)
 ├── 3D Designer (/3d)
+├── AI Studio (/agents)
+├── Analytics (/analytics)
 ├── Web Scraper (/scraper)
-└── Admin Panel (/admin)
+└── PDF Knowledge Demo (/pdf-knowledge-demo)
+```
+
+**Admin-Only Routes** (Admin Users):
+```
+├── Admin Dashboard (/admin)
+├── Knowledge Base (/admin/knowledge-base) ✨ ENHANCED
+├── Agent ML Coordination (/admin/agent-ml)
+├── Material Analysis (/admin/material-analysis)
+├── Training Models (/admin/training-models)
+├── Performance Monitoring (/admin/performance)
+├── RAG Management (/admin/rag)
+├── Metadata Management (/admin/metadata)
+├── API Gateway (/admin/api-gateway)
+├── OCR Processor (/admin/ocr)
+├── PDF Processing Monitor (/admin/pdf-processing-monitor)
+├── 3D Suggestions (/admin/3d-suggestions)
+├── 3D Model Debugging (/admin/3d-model-debugging)
+├── MIVAA Docs Viewer (/admin/mivaa-docs)
+├── Quality Stability Metrics (/admin/quality-stability-metrics)
+├── Phase 3 Metrics (/admin/phase3-metrics)
+├── Chunk Quality Dashboard (/admin/chunk-quality)
+├── CRM Management (/admin/crm)
+├── Packages Panel (/admin/packages)
+└── Analytics (/admin/analytics)
+```
+
+**System Routes**:
+```
+├── Authentication (/auth)
+├── Auth Callback (/auth/callback)
+├── Health Check (/health, /ready)
+└── Coverage Reports (/coverage)
 ```
 
 ### 2. 🔐 Authentication & User Management
@@ -131,7 +169,45 @@ graph TD
 - **Export Options**: Save search results and insights
 - **Search History**: Track and revisit previous searches
 
-### 5. 📄 Document Intelligence & Analysis
+### 5. 📦 Materials Catalog ✨ NEW
+
+#### Materials Page (`/materials`)
+A user-facing catalog that displays all products from the knowledge base in a searchable, filterable interface accessible to all authenticated users.
+
+**Features**:
+- **Product Grid/List View**: Visual catalog with responsive layout
+- **Search Functionality**: Full-text search across product names and descriptions
+- **Category Filtering**: Filter by material categories (tiles, panels, flooring, etc.)
+- **Property Filters**: Filter by finish, size, application, and custom properties
+- **Sorting Options**: Sort by name, date added, category
+- **View Modes**: Toggle between grid view (visual) and list view (detailed)
+- **Product Cards**: Display product images, descriptions, categories, and metadata
+- **Real-time Data**: Live updates from knowledge base
+- **Responsive Design**: Optimized for desktop, tablet, and mobile
+
+**Product Information Display**:
+- Product thumbnail or placeholder image
+- Product name and description
+- Category badge
+- Key material properties (finish, size, pattern, texture)
+- Additional metadata (installation method, application)
+- Standards and certifications
+
+**User Interactions**:
+- Click to view product details
+- Search and filter to find specific materials
+- Switch between grid and list views
+- Refresh catalog for latest updates
+
+**Integration**:
+- Uses `MaterialCatalogListing` component for consistent UI
+- Loads products from Supabase `products` table
+- Transforms product data to Material format
+- Workspace-isolated (users only see their workspace products)
+
+**Access**: All authenticated users (not admin-only)
+
+### 6. 📄 Document Intelligence & Analysis
 
 #### Document Summarization (`/admin` - Knowledge Base Tab)
 - **AI-Generated Summaries**: Intelligent document summarization using advanced AI
@@ -376,6 +452,23 @@ The admin panel provides comprehensive system management through multiple tabs:
 - **Parameter Tuning**: Adjust model parameters for optimization
 - **Version Management**: Manage different model versions
 - **Testing Environment**: Safe environment for model testing
+
+##### Knowledge Base Management (`/admin/knowledge-base`) ✨ NEW
+- **Product Management**: Create, edit, delete, and preview products
+  - **Product Form Modal**: Comprehensive product creation/editing with dynamic fields
+  - **Product Delete Confirmation**: Safe deletion with relationship warnings
+  - **Product Preview Modal**: Detailed product view with all metadata and relationships
+  - **CRUD Operations**: Full create, read, update, delete functionality
+- **Chunk Management**: View and analyze text chunks from PDFs
+  - **Chunk Detail Modal**: Comprehensive chunk information display
+  - **Related Chunks**: View nearby chunks for context
+  - **Related Images**: See associated images with thumbnails
+  - **Embedding Information**: View embedding status and metadata
+  - **Quality Metrics**: Chunk quality scores and classification
+- **11 Comprehensive Tabs**: Documents, Chunks, Images, Embeddings, Products, Metafields, Detections, Scores, Patterns, Relationships, Export
+- **Real-time Updates**: Live data refresh and synchronization
+- **Advanced Filtering**: Filter by type, status, quality, and custom criteria
+- **Bulk Operations**: Process multiple items simultaneously
 
 #### System Configuration
 

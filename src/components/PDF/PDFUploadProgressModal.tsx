@@ -116,19 +116,35 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   onRetry,
 }: PDFUploadProgressModalProps) => {
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [aiMetrics, setAiMetrics] = useState<any>(null);
   // const [autoScroll, setAutoScroll] = useState(true);
 
-  // Auto-close modal after successful completion (optional)
+  // Fetch AI metrics for this job
   useEffect(() => {
-    if (job) {
-      // Auto-close modal after successful completion (optional)
-      // if (job.status === 'completed') {
-      //   setTimeout(() => {
-      //     onClose();
-      //   }, 3000); // Close after 3 seconds
-      // }
+    const fetchAIMetrics = async () => {
+      if (job?.id) {
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/v1/ai-metrics/job/${job.id}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setAiMetrics(data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch AI metrics:', error);
+        }
+      }
+    };
+
+    fetchAIMetrics();
+
+    // Refresh AI metrics every 5 seconds while job is running
+    if (job?.status === 'running') {
+      const interval = setInterval(fetchAIMetrics, 5000);
+      return () => clearInterval(interval);
     }
-  }, [job]);
+  }, [job?.id, job?.status]);
 
   // Real-time polling for job status updates
   useEffect(() => {
@@ -420,7 +436,24 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                       {step.status === 'pending' && <Clock className="h-4 w-4 text-gray-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium">{step.name}</div>
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{step.name}</div>
+                        {aiMetrics && aiMetrics.calls && (() => {
+                          const stepCalls = aiMetrics.calls.filter((c: any) =>
+                            c.task.toLowerCase().includes(step.id.toLowerCase()) ||
+                            step.name.toLowerCase().includes(c.task.toLowerCase())
+                          );
+                          if (stepCalls.length > 0) {
+                            const stepCost = stepCalls.reduce((sum: number, c: any) => sum + (c.cost || 0), 0);
+                            return (
+                              <div className="text-xs text-green-600 font-medium">
+                                ${stepCost.toFixed(4)}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
                       {step.details && step.details.length > 0 && (
                         <div className="text-xs text-muted-foreground mt-1 space-y-1">
                           {step.details.slice(0, 2).map((detail, idx) => (
@@ -605,6 +638,60 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                     })()}
                   </CardContent>
                 </Card>
+
+                {/* AI Cost & Performance Metrics */}
+                {aiMetrics && aiMetrics.total_calls > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                        AI Cost & Performance
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-xs">
+                      {/* Summary */}
+                      <div className="grid grid-cols-3 gap-4 p-3 bg-muted/50 rounded-lg">
+                        <div>
+                          <div className="text-muted-foreground">Total Cost</div>
+                          <div className="text-lg font-bold text-green-600">
+                            ${aiMetrics.total_cost.toFixed(4)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">AI Calls</div>
+                          <div className="text-lg font-bold">{aiMetrics.total_calls}</div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Avg Latency</div>
+                          <div className="text-lg font-bold">
+                            {Math.round(aiMetrics.calls.reduce((sum: number, c: any) => sum + (c.latency_ms || 0), 0) / aiMetrics.calls.length)}ms
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Individual AI Calls */}
+                      <div className="space-y-2">
+                        <div className="font-medium">AI Call Details:</div>
+                        {aiMetrics.calls.map((call: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between p-2 bg-card border rounded">
+                            <div className="flex-1">
+                              <div className="font-medium">{call.task}</div>
+                              <div className="text-muted-foreground">{call.model}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium text-green-600">
+                                ${(call.cost || 0).toFixed(4)}
+                              </div>
+                              <div className="text-muted-foreground">
+                                {call.latency_ms}ms • {((call.input_tokens || 0) + (call.output_tokens || 0)).toLocaleString()} tokens
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Quality & Relevancy Scores */}
                 <Card>

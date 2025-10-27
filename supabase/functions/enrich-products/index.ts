@@ -6,10 +6,17 @@ import {
   createErrorResponse,
   createJSONResponse,
 } from '../_shared/types.ts';
+import { createAILogger } from '../_shared/ai-logger.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+);
+
+// Initialize AI logger
+const aiLogger = createAILogger(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
 // Anthropic API configuration
@@ -155,6 +162,7 @@ Focus on:
 4. Related products that complement this one
 5. High confidence only if information is clear`;
 
+    const startTime = Date.now();
     const response = await fetch(ANTHROPIC_API_URL, {
       method: 'POST',
       headers: {
@@ -174,7 +182,19 @@ Focus on:
       }),
     });
 
+    const latencyMs = Date.now() - startTime;
+
     if (!response.ok) {
+      // Log failed AI call
+      await aiLogger.logAICall({
+        task: 'product_enrichment',
+        model: 'claude-3-5-sonnet-20241022',
+        latency_ms: latencyMs,
+        action: 'fallback_to_rules',
+        fallback_reason: 'Anthropic API error',
+        error_message: `HTTP ${response.status}: ${response.statusText}`,
+      });
+
       throw new Error(`Anthropic API error: ${response.status}`);
     }
 
@@ -183,6 +203,24 @@ Focus on:
     const enrichmentData = JSON.parse(enrichmentText);
 
     const confidenceScore = enrichmentData.confidence_score || 0;
+
+    // Log successful AI call
+    await aiLogger.logClaudeCall(
+      'product_enrichment',
+      'claude-3-5-sonnet-20241022',
+      data,
+      latencyMs,
+      confidenceScore,
+      {
+        model_confidence: 0.90,
+        completeness: confidenceScore,
+        consistency: 0.85,
+        validation: 0.80,
+      },
+      confidenceScore >= 0.7 ? 'use_ai_result' : 'fallback_to_rules',
+      undefined,
+      confidenceScore < 0.7 ? 'Low confidence score' : undefined
+    );
     const enrichmentStatus =
       confidenceScore >= 0.7
         ? 'enriched'

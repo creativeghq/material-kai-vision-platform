@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { performUnifiedVectorSearch, UnifiedSearchRequest } from '../_shared/unified-vector-search.ts';
 import { evaluateRetrievalQuality, identifyRelevantChunks, type RetrievalResult } from '../_shared/retrieval-quality.ts';
 import { evaluateResponseQuality, type ResponseQualityMetrics } from '../_shared/response-quality.ts';
+import { createAILogger } from '../_shared/ai-logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,9 @@ const USE_MIVAA_CHAT = Deno.env.get('USE_MIVAA_CHAT') !== 'false'; // For future
 
 // Initialize Supabase client
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Initialize AI logger
+const aiLogger = createAILogger(supabaseUrl, supabaseServiceKey);
 
 interface RAGSearchRequest {
   query: string;
@@ -86,6 +90,7 @@ Provide a comprehensive answer that synthesizes this information and directly ad
 
   console.log('Generating contextual response with MIVAA chat completion');
 
+  const startTime = Date.now();
   try {
     const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mivaa-gateway`, {
       method: 'POST',
@@ -113,16 +118,59 @@ Provide a comprehensive answer that synthesizes this information and directly ad
       }),
     });
 
+    const latencyMs = Date.now() - startTime;
+
     if (!response.ok) {
       console.error('MIVAA chat completion error for context generation');
+
+      // Log failed AI call
+      await aiLogger.logAICall({
+        task: 'rag_context_generation',
+        model: 'gpt-4',
+        latency_ms: latencyMs,
+        action: 'fallback_to_rules',
+        fallback_reason: 'MIVAA chat completion error',
+        error_message: `HTTP ${response.status}: ${response.statusText}`,
+      });
+
       return "I found relevant materials but couldn't generate a detailed response. Please check the search results.";
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || data.response || data.content || 'Response generated successfully.';
+    const content = data.choices?.[0]?.message?.content || data.response || data.content || 'Response generated successfully.';
+
+    // Log successful AI call
+    await aiLogger.logOpenAICall(
+      'rag_context_generation',
+      'gpt-4',
+      data,
+      latencyMs,
+      0.85, // Confidence score
+      {
+        model_confidence: 0.90,
+        completeness: 0.85,
+        consistency: 0.82,
+        validation: 0.80,
+      },
+      'use_ai_result'
+    );
+
+    return content;
 
   } catch (error) {
+    const latencyMs = Date.now() - startTime;
     console.error('MIVAA chat completion failed:', error);
+
+    // Log failed AI call
+    await aiLogger.logAICall({
+      task: 'rag_context_generation',
+      model: 'gpt-4',
+      latency_ms: latencyMs,
+      action: 'fallback_to_rules',
+      fallback_reason: 'MIVAA service unavailable',
+      error_message: error instanceof Error ? error.message : String(error),
+    });
+
     return "I found relevant materials but couldn't generate a detailed response. Please check MIVAA service availability.";
   }
 }

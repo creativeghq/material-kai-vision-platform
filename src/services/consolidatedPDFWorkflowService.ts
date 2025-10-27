@@ -2901,6 +2901,7 @@ export class ConsolidatedPDFWorkflowService {
 
   /**
    * Poll MIVAA job status until completion
+   * Queries background_jobs table directly for real-time status
    * @param jobIdOrMivaaJobId - Either the workflow job ID or MIVAA job ID
    * @param mivaaJobId - Optional MIVAA job ID if first param is workflow job ID
    */
@@ -2913,47 +2914,72 @@ export class ConsolidatedPDFWorkflowService {
     let attempts = 0;
     let lastCheckpointStage = '';
 
+    console.log(`🔄 [Job Polling] Starting to poll job: ${actualMivaaJobId}`);
+
     while (attempts < maxAttempts) {
       try {
-        // Use new edge function job status endpoint
-        const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
-        const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+        attempts++;
 
-        const statusUrl = `${supabaseUrl}/functions/v1/mivaa-gateway/job-status/${actualMivaaJobId}`;
+        // Query background_jobs table directly for real-time status
+        const { data: jobData, error: jobError } = await supabase
+          .from('background_jobs')
+          .select('*')
+          .eq('id', actualMivaaJobId)
+          .single();
 
-        const statusResponse = await fetch(statusUrl, {
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-        });
+        if (jobError) {
+          console.error(`❌ [Job Polling] Failed to query background_jobs: ${jobError.message}`);
 
-        if (!statusResponse.ok) {
-          console.error(`❌ Failed to get job status: ${statusResponse.status}`);
-          attempts++;
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          continue;
+          // Fallback to edge function endpoint if direct query fails
+          const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
+          const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+
+          const statusUrl = `${supabaseUrl}/functions/v1/mivaa-gateway/job-status/${actualMivaaJobId}`;
+
+          const statusResponse = await fetch(statusUrl, {
+            headers: {
+              'Authorization': `Bearer ${supabaseKey}`,
+            },
+          });
+
+          if (!statusResponse.ok) {
+            console.error(`❌ Failed to get job status: ${statusResponse.status}`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            continue;
+          }
+
+          const responseData = await statusResponse.json();
+          const fallbackJobData = responseData.data;
+
+          console.log(`🔍 [Job Polling] Fallback job status (attempt ${attempts}):`, {
+            jobId: actualMivaaJobId,
+            status: fallbackJobData?.status,
+            progress: fallbackJobData?.progress,
+          });
+
+          // Continue with fallback data
+          Object.assign(jobData || {}, fallbackJobData);
         }
 
-        const responseData = await statusResponse.json();
-        const jobData = responseData.data;
-
-        console.log(`🔍 MIVAA job status check (attempt ${attempts + 1}):`, {
+        console.log(`🔍 [Job Polling] Job status check (attempt ${attempts}):`, {
           jobId: actualMivaaJobId,
           status: jobData?.status,
           progress: jobData?.progress,
-          checkpoint: jobData?.last_checkpoint?.stage,
+          metadata: jobData?.metadata,
         });
 
-        // Extract progress details from MIVAA response
+        // Extract progress details from background_jobs table
         let progressPercentage = jobData?.progress || 0;
         const metadata = jobData?.metadata || {};
-        const lastCheckpoint = jobData?.last_checkpoint;
+        const jobStatus = jobData?.status;
+        const errorMessage = jobData?.error;
 
         // Extract detailed metrics from metadata
         const chunksCreated = metadata.chunks_created || 0;
         const imagesExtracted = metadata.images_extracted || 0;
         const productsCreated = metadata.products_created || 0;
         const totalPages = metadata.total_pages || 0;
+        const lastCheckpoint = metadata.last_checkpoint;
 
         // Map checkpoint stages to progress percentages
         const checkpointProgress: Record<string, number> = {
@@ -3056,19 +3082,22 @@ export class ConsolidatedPDFWorkflowService {
         }
 
         if (jobData) {
-          const status = jobData.status;
+          const status = jobStatus;
 
+          // Check for completion
           if (status === 'completed') {
-            // Extract actual processing results from job result
-            const result = jobData.result || {};
+            console.log(`✅ [Job Polling] Job completed successfully: ${actualMivaaJobId}`);
+
+            // Extract actual processing results from job metadata
+            const result = metadata.result || {};
             const details = result.details || {};
             const parameters = result.parameters || {};
 
-            const chunksCreated = details.chunks_created || parameters.chunks_created || result.chunks_created || 0;
-            const imagesExtracted = details.images_extracted || parameters.images_extracted || result.images_extracted || 0;
-            const textLength = details.text_length || parameters.text_length || result.text_length || 0;
-            const kbEntries = details.kb_entries_saved || parameters.kb_entries_saved || 0;
-            const documentId = details.document_id || parameters.document_id || result.document_id;
+            const chunksCreated = details.chunks_created || parameters.chunks_created || result.chunks_created || metadata.chunks_created || 0;
+            const imagesExtracted = details.images_extracted || parameters.images_extracted || result.images_extracted || metadata.images_extracted || 0;
+            const textLength = details.text_length || parameters.text_length || result.text_length || metadata.text_length || 0;
+            const kbEntries = details.kb_entries_saved || parameters.kb_entries_saved || metadata.kb_entries_saved || 0;
+            const documentId = details.document_id || parameters.document_id || result.document_id || jobData.document_id;
 
             // Job completed successfully (only update if workflow job ID is available)
             if (workflowJobId) {
@@ -3192,13 +3221,30 @@ export class ConsolidatedPDFWorkflowService {
             };
           } else if (status === 'failed' || status === 'error') {
             // Job failed
-            const errorMessage = jobData.error || jobData.error_message || 'Processing failed';
-            throw new Error(`MIVAA job failed: ${errorMessage}`);
+            console.error(`❌ [Job Polling] Job failed: ${actualMivaaJobId}`);
+            const errorMsg = errorMessage || jobData.error || jobData.error_message || 'Processing failed';
+
+            // Update workflow job with error (only if workflow job ID is available)
+            if (workflowJobId) {
+              this.updateJobStep(workflowJobId, 'mivaa-processing', {
+                status: 'failed',
+                error: errorMsg,
+                details: [
+                  'Initializing MIVAA processing...',
+                  'Preparing document for analysis',
+                  'Sending document to MIVAA service...',
+                  `✅ Job started with ID: ${actualMivaaJobId}`,
+                  `❌ Processing failed: ${errorMsg}`,
+                ],
+              });
+            }
+
+            throw new Error(`MIVAA job failed: ${errorMsg}`);
           } else if (status === 'processing' || status === 'pending' || status === 'running') {
             // Job still running, continue polling
-            console.log(`MIVAA job ${actualMivaaJobId} status: ${status}, progress: ${progressPercentage}%`);
+            console.log(`🔄 [Job Polling] Job ${actualMivaaJobId} status: ${status}, progress: ${progressPercentage}%`);
           } else {
-            console.warn(`Unknown MIVAA job status: ${status}`);
+            console.warn(`⚠️ [Job Polling] Unknown job status: ${status}`);
           }
         }
 

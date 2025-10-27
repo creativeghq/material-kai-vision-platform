@@ -46,6 +46,12 @@
 - **[Products & E-Commerce System](./platform-functionality.md#11--products--ecommerce-system)** - Product creation from PDFs, shopping cart, quotes, proposals, and commission tracking
 - **[Products System Technical Architecture](./products-system-technical-architecture.md)** - Complete technical architecture for product creation, management, and e-commerce integration
 
+### ✨ Feature Documentation
+
+- **[Product Management](./features/product-management.md)** - ✨ NEW - Comprehensive product CRUD operations, modals, and workflows
+- **[Chunk Management](./features/chunk-management.md)** - ✨ NEW - Chunk detail modal, relationships, and quality metrics
+- **[Materials Page](./features/materials-page.md)** - ✨ NEW - User-facing materials catalog with search and filtering
+
 ### 📦 Services Documentation
 
 - **[Services Overview](./services/README.md)** - Complete guide to all platform services

@@ -14,8 +14,15 @@ import {
   Brain,
   ArrowLeft,
   Package,
+  Plus,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ProductFormModal } from './ProductFormModal';
+import { ProductDeleteConfirmation } from './ProductDeleteConfirmation';
+import { ProductPreviewModal } from './ProductPreviewModal';
+import { ChunkDetailModal } from './ChunkDetailModal';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +30,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -128,6 +134,19 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
   const [refreshInterval, setRefreshInterval] = useState<number>(30); // seconds
   const { toast } = useToast();
+
+  // Product management modal states
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [productFormMode, setProductFormMode] = useState<'create' | 'edit'>('create');
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<any | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [productToPreview, setProductToPreview] = useState<any | null>(null);
+
+  // Chunk detail modal state
+  const [chunkDetailOpen, setChunkDetailOpen] = useState(false);
+  const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null);
 
   // Use the new API hooks
   const { data: metadataData, loading: metadataLoading, refetch: refetchMetadata } = useKnowledgeBaseMetadata(workspaceId);
@@ -531,6 +550,104 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }
 
     return range;
+  };
+
+  // Product Management Handlers
+  const handleCreateProduct = () => {
+    setProductFormMode('create');
+    setSelectedProduct(null);
+    setProductFormOpen(true);
+  };
+
+  const handleEditProduct = (product: any) => {
+    setProductFormMode('edit');
+    setSelectedProduct(product);
+    setProductFormOpen(true);
+  };
+
+  const handleDeleteProduct = (product: any) => {
+    setProductToDelete(product);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handlePreviewProduct = (product: any) => {
+    setProductToPreview(product);
+    setPreviewModalOpen(true);
+  };
+
+  const handleSaveProduct = async (productData: Partial<any>) => {
+    if (!workspaceId) {
+      toast({
+        title: 'Error',
+        description: 'Workspace not found',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      if (productFormMode === 'create') {
+        // Create new product
+        const { data, error } = await supabase
+          .from('products')
+          .insert({
+            ...productData,
+            workspace_id: workspaceId,
+            created_from_type: 'manual',
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setProducts([data, ...products]);
+        toast({
+          title: 'Success',
+          description: 'Product created successfully',
+        });
+      } else {
+        // Update existing product
+        const { data, error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', selectedProduct.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setProducts(products.map(p => p.id === data.id ? data : p));
+        toast({
+          title: 'Success',
+          description: 'Product updated successfully',
+        });
+      }
+    } catch (error) {
+      console.error('Error saving product:', error);
+      throw error;
+    }
+  };
+
+  const handleConfirmDelete = async (productId: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      setProducts(products.filter(p => p.id !== productId));
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      throw error;
+    }
+  };
+
+  // Chunk detail handler
+  const handleViewChunkDetail = (chunk: DocumentChunk) => {
+    setSelectedChunk(chunk);
+    setChunkDetailOpen(true);
   };
 
   // Cross-tab navigation helpers for Phase 4 (memoized with useCallback)
@@ -973,173 +1090,53 @@ export const MaterialKnowledgeBase: React.FC = () => {
                     const embedding = getEmbeddingByChunk(chunk.id);
 
                     return (
-                      <Collapsible key={chunk.id}>
-                        <CollapsibleTrigger asChild>
-                          <div className="border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                  <Badge variant="outline">Chunk {chunk.chunk_index}</Badge>
-                                  <Badge variant="secondary">
-                                    {getDocumentDisplayName(chunk)}
-                                  </Badge>
-                                  {relatedImages.length > 0 && (
-                                    <Badge variant="outline" className="text-purple-600">
-                                      <ImageIcon className="h-3 w-3 mr-1" />
-                                      {relatedImages.length} images
-                                    </Badge>
-                                  )}
-                                  {embedding && (
-                                    <Badge variant="outline" className="text-orange-600">
-                                      <Brain className="h-3 w-3 mr-1" />
-                                      Embedded
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground line-clamp-2">
-                                  {chunk.content.substring(0, 200)}...
-                                </p>
-                                {/* IMPROVED: Add context information */}
-                                <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-muted-foreground">
-                                  <div>
-                                    <span className="font-medium">Position:</span> {chunk.chunk_index + 1}
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Size:</span> {chunk.content.length} chars
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Quality:</span> {(chunk.metadata as any)?.quality_score ? `${Math.round((chunk.metadata as any).quality_score * 100)}%` : 'N/A'}
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Date:</span> {new Date(chunk.created_at).toLocaleDateString()}
-                                  </div>
-                                </div>
+                      <div
+                        key={chunk.id}
+                        className="border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleViewChunkDetail(chunk)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <Badge variant="outline">Chunk {chunk.chunk_index}</Badge>
+                              <Badge variant="secondary">
+                                {getDocumentDisplayName(chunk)}
+                              </Badge>
+                              {relatedImages.length > 0 && (
+                                <Badge variant="outline" className="text-purple-600">
+                                  <ImageIcon className="h-3 w-3 mr-1" />
+                                  {relatedImages.length} images
+                                </Badge>
+                              )}
+                              {embedding && (
+                                <Badge variant="outline" className="text-orange-600">
+                                  <Brain className="h-3 w-3 mr-1" />
+                                  Embedded
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {chunk.content.substring(0, 200)}...
+                            </p>
+                            {/* IMPROVED: Add context information */}
+                            <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-muted-foreground">
+                              <div>
+                                <span className="font-medium">Position:</span> {chunk.chunk_index + 1}
                               </div>
-                              <ChevronRight className="h-4 w-4" />
+                              <div>
+                                <span className="font-medium">Size:</span> {chunk.content.length} chars
+                              </div>
+                              <div>
+                                <span className="font-medium">Quality:</span> {(chunk.metadata as any)?.quality_score ? `${Math.round((chunk.metadata as any).quality_score * 100)}%` : 'N/A'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Date:</span> {new Date(chunk.created_at).toLocaleDateString()}
+                              </div>
                             </div>
                           </div>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="border-l-2 border-muted ml-4 pl-4 mt-4 space-y-4">
-                            {/* Full Content */}
-                            <div>
-                              <h4 className="font-medium mb-2">Full Content</h4>
-                              <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                {chunk.content}
-                              </div>
-                            </div>
-
-                            {/* IMPROVED: Related Chunks - Show relationships */}
-                            {getRelatedChunks(chunk).length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-2 flex items-center gap-2">
-                                  <Layers className="h-4 w-4" />
-                                  Related Chunks ({getRelatedChunks(chunk).length})
-                                </h4>
-                                <div className="space-y-2">
-                                  {getRelatedChunks(chunk).map((relChunk) => (
-                                    <div key={relChunk.id} className="border rounded-lg p-2 bg-muted/30">
-                                      <div className="flex items-start justify-between mb-1">
-                                        <Badge variant="outline" className="text-xs">
-                                          Chunk {relChunk.chunk_index}
-                                        </Badge>
-                                        <span className="text-xs text-muted-foreground">
-                                          Distance: {Math.abs(relChunk.chunk_index - chunk.chunk_index)} positions
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-muted-foreground line-clamp-2">
-                                        {relChunk.content.substring(0, 150)}...
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Related Images */}
-                            {relatedImages.length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-2">Related Images ({relatedImages.length})</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                  {relatedImages.map((image) => (
-                                    <div key={image.id} className="border rounded-lg p-2">
-                                      <div className="aspect-video bg-muted rounded mb-2 flex items-center justify-center">
-                                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                                      </div>
-                                      <p className="text-xs font-medium">
-                                        {image.contextual_name || image.caption || 'Untitled Image'}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Page {image.page_number} • {Math.round((image.confidence || 0) * 100)}% confidence
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Embedding Info - IMPROVED: Show actual metadata */}
-                            {embedding ? (
-                              <div>
-                                <h4 className="font-medium mb-2 flex items-center gap-2">
-                                  <Brain className="h-4 w-4" />
-                                  Embedding Information
-                                </h4>
-                                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-2">
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <span className="font-medium">Model:</span>
-                                      <p className="text-muted-foreground">{embedding.model_name || 'text-embedding-3-small'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Dimensions:</span>
-                                      <p className="text-muted-foreground">{embedding.dimensions || 1536}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Type:</span>
-                                      <p className="text-muted-foreground">{embedding.embedding_type || 'text'}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Status:</span>
-                                      <Badge variant="outline" className="text-green-600 mt-1">Generated</Badge>
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Generated:</span>
-                                    <p className="text-muted-foreground text-xs">{new Date(embedding.created_at).toLocaleString()}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <h4 className="font-medium mb-2">Embedding Information</h4>
-                                <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                  <p className="text-muted-foreground">No embedding generated for this chunk</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Metadata */}
-                            <div>
-                              <h4 className="font-medium mb-2">Metadata</h4>
-                              <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                <pre className="whitespace-pre-wrap">
-                                  {JSON.stringify(chunk.metadata, null, 2)}
-                                </pre>
-                              </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex gap-2">
-
-                              <Button variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-2" />
-                                Export
-                              </Button>
-                            </div>
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
+                          <Eye className="h-4 w-4" />
+                        </div>
+                      </div>
                     );
                   })}
 
@@ -1472,6 +1469,85 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                     </div>
                                   )}
 
+                                  {/* AI Cost Information */}
+                                  {(() => {
+                                    const [aiCost, setAiCost] = React.useState<any>(null);
+
+                                    React.useEffect(() => {
+                                      const fetchAICost = async () => {
+                                        if (image.id) {
+                                          try {
+                                            // Query ai_call_logs for this image
+                                            const { data, error } = await supabase
+                                              .from('ai_call_logs')
+                                              .select('*')
+                                              .or(`request_data->image_id.eq.${image.id},response_data->image_id.eq.${image.id}`)
+                                              .order('timestamp', { ascending: false });
+
+                                            if (!error && data && data.length > 0) {
+                                              const totalCost = data.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0);
+                                              const clipCalls = data.filter(log => log.task.includes('embedding') || log.model.includes('clip'));
+                                              const llamaCalls = data.filter(log => log.model.includes('llama'));
+                                              const claudeCalls = data.filter(log => log.model.includes('claude'));
+
+                                              setAiCost({
+                                                total: totalCost,
+                                                clip: clipCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
+                                                llama: llamaCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
+                                                claude: claudeCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
+                                                calls: data.length
+                                              });
+                                            }
+                                          } catch (err) {
+                                            console.error('Failed to fetch AI cost:', err);
+                                          }
+                                        }
+                                      };
+
+                                      fetchAICost();
+                                    }, [image.id]);
+
+                                    if (aiCost && aiCost.total > 0) {
+                                      return (
+                                        <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                                          <h4 className="font-semibold mb-3 text-green-900 dark:text-green-100 flex items-center gap-2">
+                                            <DollarSign className="h-4 w-4" />
+                                            AI Processing Cost
+                                          </h4>
+                                          <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                              <span className="text-green-700 dark:text-green-300">Total Cost:</span>
+                                              <span className="font-bold text-green-900 dark:text-green-100">${aiCost.total.toFixed(4)}</span>
+                                            </div>
+                                            {aiCost.clip > 0 && (
+                                              <div className="flex justify-between">
+                                                <span className="text-green-700 dark:text-green-300">CLIP Embedding:</span>
+                                                <span className="font-medium text-green-900 dark:text-green-100">${aiCost.clip.toFixed(4)}</span>
+                                              </div>
+                                            )}
+                                            {aiCost.llama > 0 && (
+                                              <div className="flex justify-between">
+                                                <span className="text-green-700 dark:text-green-300">Llama Analysis:</span>
+                                                <span className="font-medium text-green-900 dark:text-green-100">${aiCost.llama.toFixed(4)}</span>
+                                              </div>
+                                            )}
+                                            {aiCost.claude > 0 && (
+                                              <div className="flex justify-between">
+                                                <span className="text-green-700 dark:text-green-300">Claude Vision:</span>
+                                                <span className="font-medium text-green-900 dark:text-green-100">${aiCost.claude.toFixed(4)}</span>
+                                              </div>
+                                            )}
+                                            <div className="flex justify-between pt-2 border-t border-green-200 dark:border-green-700">
+                                              <span className="text-green-700 dark:text-green-300">AI Calls:</span>
+                                              <span className="font-medium text-green-900 dark:text-green-100">{aiCost.calls}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+
                                   {image.metadata && (
                                     <div className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-950 dark:to-rose-900 rounded-lg p-4 border border-rose-200 dark:border-rose-800">
                                       <h4 className="font-semibold mb-2 text-rose-900 dark:text-rose-100">Metadata</h4>
@@ -1605,21 +1681,33 @@ export const MaterialKnowledgeBase: React.FC = () => {
         <TabsContent value="products" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Products from PDF Chunks
-              </CardTitle>
-              <CardDescription>
-                Products created from real PDF chunks with source tracking and metadata
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Products from PDF Chunks
+                  </CardTitle>
+                  <CardDescription>
+                    Products created from real PDF chunks with source tracking and metadata
+                  </CardDescription>
+                </div>
+                <Button onClick={handleCreateProduct} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Product
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {products.length === 0 ? (
                 <div className="text-center py-8">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground mb-4">
                     No products created yet. Process PDFs and create products from chunks.
                   </p>
+                  <Button onClick={handleCreateProduct} variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Product
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1630,7 +1718,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <div className="flex-1">
                             <h4 className="font-semibold text-lg">{product.name}</h4>
                             <p className="text-sm text-muted-foreground mt-1">
-                              {product.description?.substring(0, 150)}...
+                              {product.description?.substring(0, 150)}
+                              {product.description && product.description.length > 150 ? '...' : ''}
                             </p>
                           </div>
                           <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
@@ -1671,47 +1760,32 @@ export const MaterialKnowledgeBase: React.FC = () => {
                         )}
 
                         <div className="flex gap-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="flex-1">
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>{product.name}</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div>
-                                  <h4 className="font-medium mb-2">Description</h4>
-                                  <p className="text-sm text-muted-foreground">
-                                    {product.long_description || product.description}
-                                  </p>
-                                </div>
-                                {product.properties && (
-                                  <div>
-                                    <h4 className="font-medium mb-2">Properties</h4>
-                                    <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                      <pre className="whitespace-pre-wrap">
-                                        {JSON.stringify(product.properties, null, 2)}
-                                      </pre>
-                                    </div>
-                                  </div>
-                                )}
-                                {product.metadata && (
-                                  <div>
-                                    <h4 className="font-medium mb-2">Metadata</h4>
-                                    <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                                      <pre className="whitespace-pre-wrap">
-                                        {JSON.stringify(product.metadata, null, 2)}
-                                      </pre>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handlePreviewProduct(product)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditProduct(product)}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -3065,6 +3139,39 @@ export const MaterialKnowledgeBase: React.FC = () => {
         </TabsContent>
 
       </Tabs>
+
+      {/* Product Management Modals */}
+      <ProductFormModal
+        open={productFormOpen}
+        onOpenChange={setProductFormOpen}
+        product={selectedProduct}
+        onSave={handleSaveProduct}
+        mode={productFormMode}
+      />
+
+      <ProductDeleteConfirmation
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        product={productToDelete}
+        onConfirm={handleConfirmDelete}
+      />
+
+      <ProductPreviewModal
+        open={previewModalOpen}
+        onOpenChange={setPreviewModalOpen}
+        product={productToPreview}
+      />
+
+      {/* Chunk Detail Modal */}
+      <ChunkDetailModal
+        open={chunkDetailOpen}
+        onOpenChange={setChunkDetailOpen}
+        chunk={selectedChunk}
+        relatedChunks={selectedChunk ? getRelatedChunks(selectedChunk) : []}
+        images={selectedChunk ? getImagesByChunk(selectedChunk.id) : []}
+        embedding={selectedChunk ? getEmbeddingByChunk(selectedChunk.id) : null}
+        documentName={selectedChunk ? getDocumentDisplayName(selectedChunk) : ''}
+      />
     </div>
   );
 };
