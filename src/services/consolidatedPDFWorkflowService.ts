@@ -2911,6 +2911,7 @@ export class ConsolidatedPDFWorkflowService {
 
     const maxAttempts = 120; // 10 minutes max (5 second intervals)
     let attempts = 0;
+    let lastCheckpointStage = '';
 
     while (attempts < maxAttempts) {
       try {
@@ -2940,18 +2941,36 @@ export class ConsolidatedPDFWorkflowService {
           jobId: actualMivaaJobId,
           status: jobData?.status,
           progress: jobData?.progress,
+          checkpoint: jobData?.last_checkpoint?.stage,
         });
 
         // Extract progress details from MIVAA response
         let progressPercentage = jobData?.progress || 0;
-        const currentPage = 0; // Not available in new format
-        const totalPages = 0; // Not available in new format
-        const chunksCreated = 0; // Will be available when completed
-        const imagesExtracted = 0; // Will be available when completed
+        const metadata = jobData?.metadata || {};
+        const lastCheckpoint = jobData?.last_checkpoint;
 
-        // Calculate progress based on pages processed if MIVAA doesn't provide percentage
-        if (!progressPercentage && totalPages > 0 && currentPage > 0) {
-          progressPercentage = Math.round((currentPage / totalPages) * 100);
+        // Extract detailed metrics from metadata
+        const chunksCreated = metadata.chunks_created || 0;
+        const imagesExtracted = metadata.images_extracted || 0;
+        const productsCreated = metadata.products_created || 0;
+        const totalPages = metadata.total_pages || 0;
+
+        // Map checkpoint stages to progress percentages
+        const checkpointProgress: Record<string, number> = {
+          'initialized': 10,
+          'pdf_extracted': 20,
+          'chunks_created': 40,
+          'text_embeddings_generated': 60,
+          'images_extracted': 80,
+          'image_embeddings_generated': 85,
+          'products_detected': 90,
+          'products_created': 95,
+          'completed': 100,
+        };
+
+        // Use checkpoint stage for more accurate progress if available
+        if (lastCheckpoint?.stage && checkpointProgress[lastCheckpoint.stage]) {
+          progressPercentage = Math.max(progressPercentage, checkpointProgress[lastCheckpoint.stage]);
         }
 
         // If still no progress, use attempt-based fallback (but don't clamp it)
@@ -2962,17 +2981,77 @@ export class ConsolidatedPDFWorkflowService {
         // Calculate frontend progress: map MIVAA 0-100% to our 30-90% range
         const frontendProgress = 30 + (progressPercentage / 100) * 60;
 
+        // Build detailed progress messages based on checkpoint stage
+        const progressDetails = [
+          'Initializing MIVAA processing...',
+          'Preparing document for analysis',
+          'Sending document to MIVAA service...',
+          `✅ Job started with ID: ${actualMivaaJobId}`,
+        ];
+
+        // Add checkpoint-specific details
+        if (lastCheckpoint?.stage) {
+          const checkpointData = lastCheckpoint.data || {};
+          const stage = lastCheckpoint.stage;
+
+          // Only add new checkpoint info if it's different from last time
+          if (stage !== lastCheckpointStage) {
+            lastCheckpointStage = stage;
+
+            switch (stage) {
+              case 'initialized':
+                progressDetails.push('✅ Job initialized');
+                break;
+              case 'pdf_extracted':
+                progressDetails.push(`✅ PDF extracted (${checkpointData.total_pages || 0} pages)`);
+                break;
+              case 'chunks_created':
+                progressDetails.push(`✅ Semantic chunks created`);
+                if (checkpointData.images_extracted) {
+                  progressDetails.push(`🖼️ ${checkpointData.images_extracted} images extracted`);
+                }
+                break;
+              case 'text_embeddings_generated':
+                progressDetails.push(`✅ Text embeddings generated (${checkpointData.chunks_created || 0} chunks)`);
+                if (checkpointData.text_embeddings) {
+                  progressDetails.push(`📊 ${checkpointData.text_embeddings} embeddings created`);
+                }
+                break;
+              case 'images_extracted':
+                progressDetails.push(`✅ Images processed (${checkpointData.images_extracted || 0} images)`);
+                break;
+              case 'image_embeddings_generated':
+                progressDetails.push(`✅ Image embeddings generated with CLIP`);
+                break;
+              case 'products_detected':
+                progressDetails.push(`🔍 Product detection started`);
+                break;
+              case 'products_created':
+                progressDetails.push(`✅ Products created (${checkpointData.products_created || 0} products)`);
+                break;
+            }
+          }
+        }
+
+        // Add overall progress
+        progressDetails.push(`⏳ Processing: ${Math.round(progressPercentage)}% complete`);
+
+        // Add metrics if available
+        if (chunksCreated > 0) {
+          progressDetails.push(`📝 ${chunksCreated} chunks created`);
+        }
+        if (imagesExtracted > 0) {
+          progressDetails.push(`🖼️ ${imagesExtracted} images extracted`);
+        }
+        if (productsCreated > 0) {
+          progressDetails.push(`🏭 ${productsCreated} products created`);
+        }
+
         // Update progress with real-time information (only if workflow job ID is available)
         if (workflowJobId) {
           this.updateJobStep(workflowJobId, 'mivaa-processing', {
             progress: Math.round(frontendProgress),
-            details: [
-              'Initializing MIVAA processing...',
-              'Preparing document for analysis',
-              'Sending document to MIVAA service...',
-              `✅ Job started with ID: ${actualMivaaJobId}`,
-              `⏳ Processing PDF (${Math.round(progressPercentage)}% complete)`,
-            ],
+            details: progressDetails,
           });
         }
 
