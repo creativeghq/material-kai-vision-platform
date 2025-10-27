@@ -23,7 +23,7 @@ import { createClient } from '@supabase/supabase-js';
 // Configuration
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
-const MIVAA_API_URL = process.env.VITE_MIVAA_API_URL || 'http://v1api.materialshub.gr';
+const MIVAA_API_URL = process.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
 const TEST_PDF_URL = 'https://www.harmonyfloors.com/wp-content/uploads/2024/08/harmony-signature-book-24-25.pdf';
 const WORKSPACE_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 
@@ -340,7 +340,7 @@ async function runTest() {
     }
     
     // Save results
-    const resultsFile = `scripts/testing/pdf-e2e-test-${Date.now()}.json`;
+    const resultsFile = `pdf-e2e-test-${Date.now()}.json`;
     fs.writeFileSync(resultsFile, JSON.stringify(testResults, null, 2));
     console.log(`\n📁 Results saved to: ${resultsFile}\n`);
     
@@ -357,7 +357,7 @@ async function runTest() {
     };
     
     // Save error results
-    const resultsFile = `scripts/testing/pdf-e2e-test-error-${Date.now()}.json`;
+    const resultsFile = `pdf-e2e-test-error-${Date.now()}.json`;
     fs.writeFileSync(resultsFile, JSON.stringify(testResults, null, 2));
     console.log(`📁 Error results saved to: ${resultsFile}\n`);
     
