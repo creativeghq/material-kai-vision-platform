@@ -1,5 +1,12 @@
 # 🤖 MIVAA Service - Complete Documentation
 
+**Status**: Active
+**Last Updated**: 2025-10-27
+**Category**: Core Platform | Backend Service
+**Service URL**: https://v1api.materialshub.gr
+
+---
+
 ## 🎯 Overview
 
 **MIVAA (Material Intelligence Vision and Analysis Agent)** is the core microservice that powers the Material Kai Vision Platform's document processing, AI analysis, and knowledge extraction capabilities.
@@ -7,11 +14,12 @@
 ### 🏗️ Architecture
 
 - **Framework**: FastAPI + Python 3.9+
-- **Purpose**: PDF processing, RAG system, AI coordination
-- **Features**: Document extraction, vector embeddings, semantic search
-- **AI Integration**: OpenAI, HuggingFace, Replicate APIs
-- **Database**: Supabase PostgreSQL with vector extensions
-- **Deployment**: Docker containers with systemd service management
+- **Purpose**: PDF processing, RAG system, AI coordination, multi-modal analysis
+- **Features**: Document extraction, vector embeddings, semantic search, product classification
+- **AI Integration**: OpenAI, Anthropic Claude, Together AI (Llama 4 Scout Vision), HuggingFace
+- **Database**: Supabase PostgreSQL with pgvector extensions
+- **Deployment**: UV-based package management with systemd service
+- **Port**: 8000 (internal), 443/80 (external via nginx)
 
 ### 🌐 Service Endpoints
 
@@ -23,12 +31,262 @@
 - **ReDoc Documentation**: `https://v1api.materialshub.gr/redoc`
 - **OpenAPI Schema**: `https://v1api.materialshub.gr/openapi.json`
 
-#### **Functional Endpoints**
-- **PDF Processing**: `https://v1api.materialshub.gr/api/v1/pdf/*`
-- **AI Analysis**: `https://v1api.materialshub.gr/api/v1/ai/*`
-- **Vector Search**: `https://v1api.materialshub.gr/api/v1/search/*`
-- **RAG System**: `https://v1api.materialshub.gr/api/v1/rag/*`
-- **Document Management**: `https://v1api.materialshub.gr/api/v1/documents/*`
+#### **Functional Endpoint Categories**
+- **PDF Processing**: `/api/v1/extract/*` - Markdown, tables, images extraction
+- **RAG System**: `/api/v1/rag/*` - Document upload, query, chat, search
+- **AI Analysis**: `/api/semantic-analysis` - LLaMA Vision material analysis
+- **Search APIs**: `/api/search/*` - Semantic, vector, hybrid search
+- **Embedding APIs**: `/api/embeddings/*` - Generate embeddings, batch processing
+- **Chat APIs**: `/api/chat/*` - Chat completions, contextual responses
+- **Document Management**: `/api/documents/*` - Process, analyze, manage documents
+- **Products API**: `/api/products/*` - Product creation, enrichment, management
+- **Admin APIs**: `/api/admin/*` - Chunk quality, monitoring, management
+- **Health & Monitoring**: `/health`, `/metrics`, `/performance/summary`
+
+---
+
+## 📡 API Endpoints Reference
+
+### 1. Vector Similarity Search
+**Path**: `/api/search/semantic`
+**Method**: POST
+**Purpose**: Semantic search using vector embeddings
+**Authentication**: Required (JWT Bearer token)
+
+**Request**:
+```json
+{
+  "query_text": "waterproof ceramic tiles",
+  "similarity_threshold": 0.7,
+  "limit": 10,
+  "search_type": "semantic"
+}
+```
+
+**Response**:
+```json
+{
+  "results": [
+    {
+      "id": "product-uuid",
+      "name": "Ceramic Tile",
+      "similarity_score": 0.92,
+      "metadata": {...}
+    }
+  ],
+  "total": 10,
+  "processing_time_ms": 450
+}
+```
+
+**Performance**: 200-800ms response time
+
+---
+
+### 2. Multi-Modal Analysis
+**Path**: `/api/semantic-analysis`
+**Method**: POST
+**Purpose**: Combined text and image analysis using Llama 4 Scout Vision
+**Authentication**: Required
+
+**Request**:
+```json
+{
+  "text_content": "Material description",
+  "image_url": "https://example.com/image.jpg",
+  "include_entities": true,
+  "include_materials": true
+}
+```
+
+**Response**:
+```json
+{
+  "entities": [...],
+  "materials": [...],
+  "confidence_scores": {...},
+  "analysis_summary": "..."
+}
+```
+
+**Performance**: 1-4 seconds response time
+
+---
+
+### 3. Two-Stage Product Classification ⭐
+**Path**: `/api/products/create-from-chunks`
+**Method**: POST
+**Purpose**: Advanced AI-powered product classification with 60% performance improvement
+**Authentication**: Required
+
+**Request**:
+```json
+{
+  "document_id": "doc-123",
+  "workspace_id": "workspace-uuid",
+  "max_products": 50,
+  "min_chunk_length": 100
+}
+```
+
+**Response**:
+```json
+{
+  "products_created": 15,
+  "processing_time_seconds": 35,
+  "stage_1_time": 12,
+  "stage_2_time": 18,
+  "enrichment_time": 5,
+  "performance_metrics": {...}
+}
+```
+
+**Performance**: 25-55 seconds for 200 chunks → 15 products
+**Features**:
+- Stage 1: Claude Haiku 4.5 for fast initial classification
+- Stage 2: Claude Sonnet 4.5 for deep product enrichment
+- 60% faster than single-stage approach
+- 40% cost reduction through intelligent model selection
+
+---
+
+### 4. RAG Document Upload
+**Path**: `/api/v1/rag/documents/upload`
+**Method**: POST
+**Purpose**: Upload and process PDF documents with full AI pipeline
+**Authentication**: Required
+
+**Request**: Multipart form data with PDF file
+
+**Response**:
+```json
+{
+  "job_id": "job-uuid",
+  "document_id": "doc-uuid",
+  "status": "processing",
+  "estimated_time_seconds": 120
+}
+```
+
+**Processing Pipeline**:
+1. PDF extraction (PyMuPDF4LLM)
+2. Image extraction
+3. Semantic chunking
+4. Quality scoring and validation
+5. Deduplication (hash-based + semantic)
+6. Embedding generation (6 types)
+7. Image analysis (Claude + Llama Vision)
+8. Product detection (two-stage classification)
+9. Product enrichment
+
+---
+
+### 5. Enhanced Job Monitoring
+**Path**: `/api/v1/rag/jobs/{job_id}`
+**Method**: GET
+**Purpose**: Real-time job progress and stage monitoring
+**Authentication**: Required
+
+**Response**:
+```json
+{
+  "job_id": "job-uuid",
+  "status": "processing",
+  "progress_percentage": 65,
+  "current_stage": "Product Detection",
+  "stages_completed": ["PDF Extraction", "Chunking", "Embedding Generation"],
+  "eta_seconds": 45,
+  "metadata": {
+    "chunks_created": 227,
+    "images_extracted": 169,
+    "products_created": 15,
+    "embeddings_generated": 227
+  }
+}
+```
+
+**Performance**: 100-300ms response time
+**Update Frequency**: Polled every 5 seconds during active processing
+
+---
+
+### 6. Chunk Quality Dashboard
+**Path**: `/api/admin/chunk-quality/stats`
+**Method**: GET
+**Purpose**: Comprehensive chunk quality statistics and monitoring
+**Authentication**: Required (Admin only)
+
+**Response**:
+```json
+{
+  "total_chunks": 1500,
+  "quality_distribution": {
+    "high": 1200,
+    "medium": 250,
+    "low": 50
+  },
+  "flagged_chunks": 35,
+  "duplicate_chunks": 12,
+  "semantic_duplicates": 8,
+  "average_quality_score": 0.82
+}
+```
+
+---
+
+### 7. Embedding Generation
+**Path**: `/api/embeddings/generate`
+**Method**: POST
+**Purpose**: Generate embeddings for text or images
+**Authentication**: Required
+
+**Request**:
+```json
+{
+  "text": "Modern bathroom tiles",
+  "embedding_types": ["text", "visual", "color"],
+  "normalize": true
+}
+```
+
+**Response**:
+```json
+{
+  "text_embedding_1536": [0.123, ...],
+  "visual_clip_embedding_512": [0.456, ...],
+  "color_embedding_256": [0.789, ...],
+  "metadata": {
+    "generation_time_ms": 850,
+    "model_versions": {...}
+  }
+}
+```
+
+---
+
+## 🔄 Usage Patterns
+
+### Automatic Triggers
+1. **PDF Upload**: Triggers full AI processing pipeline
+2. **Search Queries**: Similarity search activated for semantic queries
+3. **Job Monitoring**: Real-time progress updates during processing
+4. **Dashboard Load**: Metrics refresh for performance monitoring
+5. **Product Classification**: Two-stage classification during PDF processing
+
+### Manual Invocations
+1. **AI Testing Panel**: Manual testing of all MIVAA capabilities
+2. **Metadata Auto-Population**: Admin-triggered bulk metadata extraction
+3. **System Performance**: Manual refresh of analytics and trends
+4. **Product Classification**: Manual product creation from document chunks
+5. **Chunk Quality Review**: Admin review of flagged low-quality chunks
+
+### Integration Points
+- **mivaa-gateway**: Primary integration via Supabase Edge Function
+- **Search Hub**: Vector similarity search integration
+- **PDF Processor**: Multi-modal analysis during document processing
+- **Admin Panel**: System monitoring and testing interfaces
+- **Products API**: Two-stage product classification integration
+- **Knowledge Base**: Chunk and embedding management
 
 ## 🚀 Deployment Options
 
@@ -244,19 +502,51 @@ git pull origin main
 sudo systemctl restart mivaa-pdf-extractor
 ```
 
+## 📊 Performance Metrics
+
+### Expected Response Times
+- **Similarity Search**: 200-800ms
+- **Multi-Modal Analysis**: 1-4 seconds
+- **Job Details**: 100-300ms
+- **Metrics Analysis**: 1-2 seconds
+- **Auto-Population**: 2-5 seconds per document
+- **Two-Stage Classification**: 25-55 seconds for 200 chunks → 15 products
+- **Embedding Generation**: 1.5-3 seconds per entity
+- **Chunk Quality Analysis**: 500ms - 1 second
+
+### Throughput Capabilities
+- **Concurrent Requests**: Up to 10 simultaneous
+- **Batch Processing**: 100 documents per batch
+- **Daily Volume**: 1000+ document analyses
+- **Embedding Generation**: 5-10 entities per minute (batch mode)
+
+### Quality Metrics
+- **Similarity Accuracy**: 85%+ relevance
+- **Entity Extraction**: 90%+ precision
+- **Material Recognition**: 80%+ accuracy
+- **Processing Success Rate**: 95%+
+- **Product Classification Accuracy**: 85%+ with two-stage system
+- **Chunk Quality Score**: Average 0.82 (scale 0-1)
+
+---
+
 ## 📈 Performance Optimization
 
 ### 🚀 Configuration Tuning
-- **Database Pool Size**: Adjust `DATABASE_POOL_SIZE` based on load
-- **Cache TTL**: Optimize `CACHE_TTL` for your use case
+- **Database Pool Size**: Adjust `DATABASE_POOL_SIZE` based on load (default: 20)
+- **Cache TTL**: Optimize `CACHE_TTL` for your use case (default: 3600s)
 - **Worker Processes**: Configure Uvicorn workers for concurrent requests
 - **Memory Management**: Monitor and adjust Python memory settings
+- **Batch Size**: Configure embedding batch size (default: 5)
+- **Rate Limiting**: 1-second delays between batches to prevent overload
 
 ### 📊 Monitoring Metrics
 - **Response Times**: Track API endpoint response times
-- **Error Rates**: Monitor 4xx/5xx error rates
+- **Error Rates**: Monitor 4xx/5xx error rates (target: <1%)
 - **Resource Usage**: CPU, memory, and disk utilization
 - **Database Performance**: Query times and connection pool usage
+- **AI Model Performance**: Track model response times and accuracy
+- **Embedding Coverage**: Monitor percentage of entities with embeddings
 
 ## 🔗 Integration Points
 
@@ -275,10 +565,71 @@ sudo systemctl restart mivaa-pdf-extractor
 - **HuggingFace**: Embedding models and transformers
 - **Vector Search**: Semantic similarity search with optimized embeddings
 
-## 📚 Additional Resources
+## 🧪 Testing & Validation
 
+### Test Scenarios
+1. **Vector Similarity**: Test semantic search accuracy
+2. **Multi-Modal Analysis**: Validate text+image processing
+3. **Job Monitoring**: Verify real-time progress tracking
+4. **Metadata Extraction**: Test auto-population accuracy
+5. **Product Classification**: Validate two-stage classification performance
+6. **Chunk Quality**: Test quality scoring and flagging
+
+### Validation Methods
+- **AI Testing Panel**: Comprehensive testing interface in admin panel
+- **Confidence Scoring**: Quality validation via confidence thresholds
+- **Performance Monitoring**: Response time and success rate tracking
+- **Error Handling**: Graceful failure and recovery testing
+- **End-to-End Tests**: Complete pipeline validation scripts
+
+### Quality Assurance
+- **Automated Testing**: Continuous integration testing
+- **Manual Validation**: Regular accuracy assessments
+- **Performance Benchmarks**: Response time monitoring
+- **Error Rate Tracking**: Failure analysis and improvement
+- **User Acceptance Testing**: Production validation with real data
+
+---
+
+## 🚨 Error Handling
+
+### Common Errors
+1. **503 Service Unavailable**: MIVAA service down or restarting
+2. **401 Unauthorized**: Invalid authentication token
+3. **429 Rate Limited**: Too many concurrent requests
+4. **500 Internal Error**: Processing failure or AI model error
+5. **502 Bad Gateway**: Nginx proxy error or service not responding
+
+### Error Recovery
+- **Automatic Retry**: 3 attempts with exponential backoff
+- **Graceful Degradation**: Fallback to basic processing when AI models fail
+- **User Notification**: Clear error messages with actionable guidance
+- **Logging**: Comprehensive error tracking with Sentry integration
+- **Auto-Recovery**: Automatic service restart on health check failures
+
+---
+
+## 📚 Related Documentation
+
+### Live Services
 - **API Documentation**: [https://v1api.materialshub.gr/docs](https://v1api.materialshub.gr/docs)
 - **ReDoc Documentation**: [https://v1api.materialshub.gr/redoc](https://v1api.materialshub.gr/redoc)
-- **GitHub Repository**: [Material Kai Vision Platform](https://github.com/creativeghq/material-kai-vision-platform)
-- **Deployment Guide**: See `docs/deployment-guide.md` for comprehensive deployment information
-- **API Reference**: See `docs/api-documentation.md` for complete API documentation
+- **OpenAPI Schema**: [https://v1api.materialshub.gr/openapi.json](https://v1api.materialshub.gr/openapi.json)
+
+### Documentation
+- [Complete API Reference](./api-documentation.md) - All 37+ endpoints documented
+- [Deployment Guide](./deployment-guide.md) - Comprehensive deployment information
+- [PDF Processing Flow](./pdf-processing-complete-flow.md) - Complete PDF processing pipeline
+- [Product Detection](./product-detection-and-chunk-quality-improvements.md) - Two-stage classification details
+- [Multi-Vector Storage](./multi-vector-storage-system.md) - Embedding architecture
+- [Platform Flows](./platform-flows.md) - Integration workflows
+- [Troubleshooting Guide](./troubleshooting.md) - Common issues and solutions
+
+### GitHub
+- **Repository**: [Material Kai Vision Platform](https://github.com/creativeghq/material-kai-vision-platform)
+- **Issues**: Report bugs and request features
+- **Deployment Workflows**: `.github/workflows/deploy.yml`
+
+---
+
+**Note**: This document consolidates information from the previous `mivaa-integration.md` file, which has been merged into this comprehensive guide.
