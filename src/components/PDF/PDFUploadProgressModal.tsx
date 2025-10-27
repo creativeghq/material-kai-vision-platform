@@ -19,6 +19,7 @@ import {
   Link,
   Hash,
   Layers,
+  DollarSign,
 } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';

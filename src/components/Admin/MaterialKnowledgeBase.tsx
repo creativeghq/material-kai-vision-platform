@@ -17,6 +17,7 @@ import {
   Plus,
   Edit,
   Trash2,
+  DollarSign,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProductFormModal } from './ProductFormModal';
