@@ -186,7 +186,7 @@ async function testSearchFlow() {
 
     // Test 3.2: Vector search table exists
     const { data: embeddings, error: embeddingsError } = await supabase
-      .from('document_embeddings')
+      .from('document_vectors')
       .select('*', { count: 'exact', head: true });
 
     const vectorSearchAvailable = !embeddingsError;

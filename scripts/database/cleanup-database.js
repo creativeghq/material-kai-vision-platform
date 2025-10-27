@@ -67,7 +67,7 @@ const TABLES_TO_KEEP = [
 // Tables to CLEAR (PDF Processing & Test Data)
 const TABLES_TO_CLEAR = [
   // PDF Processing (PRIORITY - 30k+ rows)
-  'documents', 'document_chunks', 'document_embeddings', 'document_images',
+  'documents', 'document_chunks', 'document_images',
   'document_vectors', 'embeddings', 'pdf_processing_results',
 
   // Document Analysis

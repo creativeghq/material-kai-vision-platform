@@ -471,6 +471,14 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'Phase 3',
       },
+      {
+        title: 'Chunk Quality Dashboard',
+        description: 'Monitor chunk quality, deduplication, and validation metrics',
+        icon: BarChart3,
+        path: '/admin/chunk-quality',
+        status: 'active',
+        count: 'Quality Control',
+      },
     ],
   };
 

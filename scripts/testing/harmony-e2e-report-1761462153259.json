@@ -1,0 +1,984 @@
+{
+  "timestamp": "2025-10-26T06:45:20.951Z",
+  "documentId": "db17d607-5640-4dc1-8a61-bb97db7b6456",
+  "steps": [
+    {
+      "step": "UPLOAD",
+      "message": "Starting Harmony PDF upload",
+      "type": "step",
+      "timestamp": "2025-10-26T06:45:20.965Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:20.966Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Downloaded 10.72 MB",
+      "type": "success",
+      "timestamp": "2025-10-26T06:45:21.871Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Triggering PDF processing via MIVAA gateway...",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:21.872Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response status: 202",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:31.743Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response body: {\n  \"success\": true,\n  \"data\": {\n    \"job_id\": \"0a1698ad-69fe-4acd-9907-f2deee31ce9e\",\n    \"status\": \"pending\",\n    \"message\": \"Document processing started. Use job_id to check status.\"\n  }\n}",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:31.744Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Job started: 0a1698ad-69fe-4acd-9907-f2deee31ce9e",
+      "type": "success",
+      "timestamp": "2025-10-26T06:45:31.745Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Monitoring job: 0a1698ad-69fe-4acd-9907-f2deee31ce9e",
+      "type": "step",
+      "timestamp": "2025-10-26T06:45:31.746Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 1/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:36.749Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:38.070Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 2/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:43.079Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:44.458Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 3/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:49.463Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:51.267Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 4/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:56.280Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:45:57.969Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 5/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:02.976Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:04.496Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 6/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:09.510Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:10.782Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 7/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:15.793Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:16.997Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 8/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:22.012Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:22.664Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 9/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:27.672Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:29.212Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 10/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:34.213Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:35.526Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 11/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:40.535Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:41.742Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 12/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:46.755Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:48.094Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 13/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:53.100Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:54.367Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 14/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:46:59.376Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:01.365Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 15/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:06.373Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:08.228Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 16/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:13.229Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:14.646Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 17/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:19.659Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:23.036Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 18/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:28.041Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:29.465Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 19/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:34.466Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:37.487Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 20/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:42.495Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:43.622Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 21/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:48.623Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:49.980Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 22/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:55.001Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:47:56.292Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 23/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:48:01.307Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:48:02.514Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 24/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:48:07.526Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:48:08.777Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 25/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:48:13.782Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T06:50:43.897Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 26/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:50:48.900Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T06:53:19.283Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 27/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:53:24.291Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T06:55:54.743Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 28/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:55:59.743Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T06:58:29.905Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 29/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:58:34.917Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:36.365Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 30/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:41.368Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:42.602Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 31/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:47.612Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:48.663Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 32/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:53.667Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:54.807Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 33/120",
+      "type": "info",
+      "timestamp": "2025-10-26T06:59:59.819Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:00.877Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 34/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:05.882Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:07.064Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 35/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:12.066Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:13.301Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 36/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:18.303Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:19.547Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 37/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:24.553Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:26.159Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 38/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:31.172Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:32.345Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 39/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:37.351Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:38.308Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 40/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:43.316Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:45.629Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 41/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:50.630Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:51.173Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 42/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:56.182Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:00:57.360Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 43/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:02.365Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:03.487Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 44/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:08.493Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:10.077Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 45/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:15.084Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:16.276Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 46/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:21.276Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:22.377Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 47/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:27.379Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:28.564Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 48/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:33.567Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:34.633Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 49/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:39.637Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:41.171Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 50/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:46.173Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:47.423Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 51/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:52.435Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:54.086Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 52/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:01:59.100Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T07:02:00.377Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 53/120",
+      "type": "info",
+      "timestamp": "2025-10-26T07:02:05.377Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Processing completed!",
+      "type": "success",
+      "timestamp": "2025-10-26T07:02:18.922Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Waiting 10 seconds for processing to complete...",
+      "type": "info",
+      "timestamp": "2025-10-26T07:02:18.923Z"
+    },
+    {
+      "step": "VALIDATE_CHUNKS",
+      "message": "Validating document chunks",
+      "type": "step",
+      "timestamp": "2025-10-26T07:02:28.934Z"
+    },
+    {
+      "step": "VALIDATE_CHUNKS",
+      "message": "Error: Invalid API key",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:29.079Z"
+    },
+    {
+      "step": "VALIDATE_EMBEDDINGS",
+      "message": "Validating embeddings",
+      "type": "step",
+      "timestamp": "2025-10-26T07:02:29.080Z"
+    },
+    {
+      "step": "VALIDATE_EMBEDDINGS",
+      "message": "Error: Invalid API key",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:29.149Z"
+    },
+    {
+      "step": "VALIDATE_IMAGES",
+      "message": "Validating images",
+      "type": "step",
+      "timestamp": "2025-10-26T07:02:29.150Z"
+    },
+    {
+      "step": "VALIDATE_IMAGES",
+      "message": "Error: Invalid API key",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:29.180Z"
+    },
+    {
+      "step": "VALIDATE_PRODUCTS",
+      "message": "Validating products",
+      "type": "step",
+      "timestamp": "2025-10-26T07:02:29.180Z"
+    },
+    {
+      "step": "VALIDATE_PRODUCTS",
+      "message": "Error: Invalid API key",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:29.220Z"
+    },
+    {
+      "step": "TEST_SEARCH",
+      "message": "Testing search functionality",
+      "type": "step",
+      "timestamp": "2025-10-26T07:02:29.220Z"
+    },
+    {
+      "step": "TEST_SEARCH",
+      "message": "Query \"flooring\" failed: Invalid API key",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:29.286Z"
+    },
+    {
+      "step": "TEST_SEARCH",
+      "message": "Query \"FOLD collection\" failed: Invalid API key",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:29.367Z"
+    },
+    {
+      "step": "TEST_SEARCH",
+      "message": "Query \"dimensions 15x38\" failed: Invalid API key",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:29.476Z"
+    },
+    {
+      "step": "TEST_ADMIN_KB",
+      "message": "Testing admin-kb endpoints",
+      "type": "step",
+      "timestamp": "2025-10-26T07:02:29.477Z"
+    },
+    {
+      "step": "TEST_ADMIN_KB",
+      "message": "admin-kb-metadata: 200",
+      "type": "success",
+      "timestamp": "2025-10-26T07:02:31.001Z"
+    },
+    {
+      "step": "TEST_ADMIN_KB",
+      "message": "admin-kb-quality-scores: 200",
+      "type": "success",
+      "timestamp": "2025-10-26T07:02:31.479Z"
+    },
+    {
+      "step": "TEST_ADMIN_KB",
+      "message": "admin-kb-embeddings-stats: 500",
+      "type": "error",
+      "timestamp": "2025-10-26T07:02:31.838Z"
+    },
+    {
+      "step": "TEST_ADMIN_KB",
+      "message": "admin-kb-detections: 200",
+      "type": "success",
+      "timestamp": "2025-10-26T07:02:32.175Z"
+    },
+    {
+      "step": "TEST_ADMIN_KB",
+      "message": "admin-kb-quality-dashboard: 200",
+      "type": "success",
+      "timestamp": "2025-10-26T07:02:32.570Z"
+    },
+    {
+      "step": "TEST_ADMIN_KB",
+      "message": "admin-kb-patterns: 200",
+      "type": "success",
+      "timestamp": "2025-10-26T07:02:33.241Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Test completed in 1032.3s",
+      "type": "success",
+      "timestamp": "2025-10-26T07:02:33.243Z"
+    }
+  ],
+  "validations": {
+    "chunks": {
+      "passed": false,
+      "details": {}
+    },
+    "embeddings": {
+      "passed": false,
+      "details": {}
+    },
+    "images": {
+      "passed": false,
+      "details": {}
+    },
+    "products": {
+      "passed": false,
+      "details": {}
+    },
+    "search": {
+      "passed": true,
+      "details": {
+        "queriesTested": 0,
+        "queriesPassed": 0,
+        "results": [
+          {
+            "query": "flooring",
+            "error": "Invalid API key",
+            "passed": false
+          },
+          {
+            "query": "FOLD collection",
+            "error": "Invalid API key",
+            "passed": false
+          },
+          {
+            "query": "dimensions 15x38",
+            "error": "Invalid API key",
+            "passed": false
+          }
+        ]
+      }
+    },
+    "quality": {
+      "passed": false,
+      "details": {}
+    },
+    "adminKB": {
+      "passed": false,
+      "details": {
+        "endpointsTested": 6,
+        "endpointsPassed": 5,
+        "results": [
+          {
+            "endpoint": "admin-kb-metadata",
+            "status": 200,
+            "passed": true,
+            "dataKeys": [
+              "workspace_id",
+              "metadata",
+              "summary"
+            ]
+          },
+          {
+            "endpoint": "admin-kb-quality-scores",
+            "status": 200,
+            "passed": true,
+            "dataKeys": [
+              "workspace_id",
+              "kpis",
+              "distributions",
+              "trends"
+            ]
+          },
+          {
+            "endpoint": "admin-kb-embeddings-stats",
+            "status": 500,
+            "passed": false,
+            "dataKeys": [
+              "error"
+            ]
+          },
+          {
+            "endpoint": "admin-kb-detections",
+            "status": 200,
+            "passed": true,
+            "dataKeys": [
+              "workspace_id",
+              "total_detections",
+              "detections",
+              "summary",
+              "timeline"
+            ]
+          },
+          {
+            "endpoint": "admin-kb-quality-dashboard",
+            "status": 200,
+            "passed": true,
+            "dataKeys": [
+              "workspace_id",
+              "period",
+              "current_kpis",
+              "trends",
+              "daily_metrics",
+              "alerts"
+            ]
+          },
+          {
+            "endpoint": "admin-kb-patterns",
+            "status": 200,
+            "passed": true,
+            "dataKeys": [
+              "workspace_id",
+              "patterns",
+              "anomalies",
+              "summary"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "errors": [
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T06:50:43.897Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T06:53:19.283Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T06:55:54.744Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T06:58:29.906Z"
+    },
+    {
+      "step": "VALIDATE_CHUNKS",
+      "error": "Invalid API key",
+      "timestamp": "2025-10-26T07:02:29.080Z"
+    },
+    {
+      "step": "VALIDATE_EMBEDDINGS",
+      "error": "Invalid API key",
+      "timestamp": "2025-10-26T07:02:29.149Z"
+    },
+    {
+      "step": "VALIDATE_IMAGES",
+      "error": "Invalid API key",
+      "timestamp": "2025-10-26T07:02:29.180Z"
+    },
+    {
+      "step": "VALIDATE_PRODUCTS",
+      "error": "Invalid API key",
+      "timestamp": "2025-10-26T07:02:29.220Z"
+    }
+  ],
+  "summary": {
+    "duration": "1032.3s",
+    "documentId": "db17d607-5640-4dc1-8a61-bb97db7b6456",
+    "totalSteps": 134,
+    "totalErrors": 8
+  }
+}

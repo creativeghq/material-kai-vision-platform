@@ -1,0 +1,1589 @@
+{
+  "timestamp": "2025-10-26T17:25:03.537Z",
+  "documentId": null,
+  "steps": [
+    {
+      "step": "UPLOAD",
+      "message": "Starting Harmony PDF upload",
+      "type": "step",
+      "timestamp": "2025-10-26T17:25:03.551Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:03.551Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Downloaded 10.72 MB",
+      "type": "success",
+      "timestamp": "2025-10-26T17:25:04.506Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Triggering PDF processing via MIVAA gateway...",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:04.507Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response status: 202",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:13.372Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response body: {\n  \"success\": true,\n  \"data\": {\n    \"job_id\": \"7c87623b-f9e1-408a-a98c-08c98da6358d\",\n    \"status\": \"pending\",\n    \"message\": \"Document processing started. Use job_id to check status.\"\n  }\n}",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:13.372Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Job started: 7c87623b-f9e1-408a-a98c-08c98da6358d",
+      "type": "success",
+      "timestamp": "2025-10-26T17:25:13.373Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Monitoring job: 7c87623b-f9e1-408a-a98c-08c98da6358d",
+      "type": "step",
+      "timestamp": "2025-10-26T17:25:13.373Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 1/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:18.375Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:19.864Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 2/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:24.876Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:26.167Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 3/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:31.173Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:32.429Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 4/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:37.446Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:38.346Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 5/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:43.355Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:44.754Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 6/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:49.764Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:51.125Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 7/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:56.139Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:25:57.336Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 8/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:02.338Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:03.649Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 9/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:08.656Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:09.800Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 10/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:14.805Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:15.978Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 11/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:20.989Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:22.413Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 12/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:27.415Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:28.587Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 13/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:33.596Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:34.783Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 14/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:39.798Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:40.987Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 15/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:45.993Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:47.385Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 16/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:52.390Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:53.646Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 17/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:26:58.654Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:00.295Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 18/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:05.294Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:07.150Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 19/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:12.155Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:13.383Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 20/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:18.388Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:19.811Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 21/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:24.813Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:27.014Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 22/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:32.025Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:33.167Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 23/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:38.179Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:39.383Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 24/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:44.390Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:46.711Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 25/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:51.721Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:52.426Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 26/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:57.430Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:27:59.438Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 27/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:04.449Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:06.081Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 28/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:11.083Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:12.178Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 29/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:17.186Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:19.002Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 30/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:24.015Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:25.613Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 31/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:30.619Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:31.900Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 32/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:36.906Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:38.024Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 33/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:28:43.039Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:31:13.152Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 34/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:31:18.166Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:33:48.482Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 35/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:33:53.487Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:36:23.672Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 36/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:36:28.673Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:38:59.066Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 37/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:39:04.085Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:41:34.475Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 38/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:41:39.480Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:44:10.525Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 39/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:15.537Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:24.445Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 40/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:29.450Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:30.707Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 41/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:35.711Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:37.276Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 42/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:42.280Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:43.738Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 43/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:48.748Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:49.802Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 44/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:54.816Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:44:56.284Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 45/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:01.294Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:02.378Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 46/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:07.381Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:13.604Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 47/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:18.617Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:19.789Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 48/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:24.794Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:26.132Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 49/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:31.145Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:32.322Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 50/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:37.326Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:38.569Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 51/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:43.613Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:45.297Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 52/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:50.305Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:51.535Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 53/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:56.544Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:45:57.627Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 54/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:46:02.637Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:46:03.479Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 55/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:46:08.492Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:46:09.901Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 56/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:46:14.904Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:46:16.215Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 57/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:46:21.218Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:48:51.451Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 58/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:48:56.468Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:51:26.784Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 59/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:51:31.795Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Error: Unexpected end of JSON input",
+      "type": "error",
+      "timestamp": "2025-10-26T17:54:02.231Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 60/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:54:07.232Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:19.345Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 61/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:24.350Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:25.139Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 62/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:30.141Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:31.316Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 63/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:36.316Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:37.142Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 64/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:42.148Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: undefined (0%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:42.942Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 65/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:47.950Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:49.048Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 66/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:54.058Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:55:55.185Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 67/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:00.188Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:01.315Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 68/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:06.315Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:07.380Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 69/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:12.389Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:14.366Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 70/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:19.372Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:26.479Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 71/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:31.479Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:32.569Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 72/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:37.569Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:38.669Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 73/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:43.682Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:45.233Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 74/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:50.247Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:51.286Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 75/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:56.295Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:56:57.530Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 76/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:02.544Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:03.683Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 77/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:08.694Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:09.209Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 78/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:14.215Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:16.289Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 79/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:21.303Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:22.377Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 80/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:27.384Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:27.937Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 81/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:32.944Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:34.385Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 82/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:39.390Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:40.624Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 83/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:45.626Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:47.309Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 84/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:52.315Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:53.796Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 85/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:58.810Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:57:59.938Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 86/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:04.949Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:06.118Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 87/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:11.125Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:12.727Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 88/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:17.733Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:18.874Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 89/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:23.874Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:24.924Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 90/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:29.934Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:30.965Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 91/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:35.966Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:37.141Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 92/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:42.147Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:43.252Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 93/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:48.257Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:49.366Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 94/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:54.373Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:58:55.391Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 95/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:00.393Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:01.513Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 96/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:06.519Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:07.751Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 97/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:12.764Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:13.846Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 98/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:18.855Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:20.327Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 99/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:25.331Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:26.361Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 100/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:31.369Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:32.421Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 101/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:37.435Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:38.693Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 102/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:43.706Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:45.083Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 103/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:50.090Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:51.282Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 104/120",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:56.293Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T17:59:57.362Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 105/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:02.375Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:03.278Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 106/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:08.290Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:09.331Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 107/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:14.341Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:15.481Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 108/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:20.483Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:22.323Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 109/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:27.329Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:28.427Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 110/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:33.429Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:34.546Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 111/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:39.553Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:40.253Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 112/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:45.254Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:46.279Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 113/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:51.293Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:53.855Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 114/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:00:58.859Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:00.132Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 115/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:05.145Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:06.309Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 116/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:11.325Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:12.497Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 117/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:17.505Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:18.682Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 118/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:23.699Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:25.116Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 119/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:30.126Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:31.663Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 120/120",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:36.671Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: interrupted (80%)",
+      "type": "info",
+      "timestamp": "2025-10-26T18:01:37.742Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Error: Job monitoring timeout",
+      "type": "error",
+      "timestamp": "2025-10-26T18:01:37.744Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Test execution failed",
+      "type": "error",
+      "timestamp": "2025-10-26T18:01:37.746Z"
+    }
+  ],
+  "validations": {
+    "chunks": {
+      "passed": false,
+      "details": {}
+    },
+    "embeddings": {
+      "passed": false,
+      "details": {}
+    },
+    "images": {
+      "passed": false,
+      "details": {}
+    },
+    "products": {
+      "passed": false,
+      "details": {}
+    },
+    "search": {
+      "passed": false,
+      "details": {}
+    },
+    "quality": {
+      "passed": false,
+      "details": {}
+    },
+    "adminKB": {
+      "passed": false,
+      "details": {}
+    }
+  },
+  "errors": [
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:31:13.153Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:33:48.483Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:36:23.673Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:38:59.067Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:41:34.476Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:44:10.525Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:48:51.453Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:51:26.784Z"
+    },
+    {
+      "step": "MONITOR",
+      "error": "Unexpected end of JSON input",
+      "timestamp": "2025-10-26T17:54:02.232Z"
+    },
+    {
+      "step": "MAIN",
+      "error": "Job monitoring timeout",
+      "timestamp": "2025-10-26T18:01:37.746Z"
+    }
+  ],
+  "summary": {}
+}

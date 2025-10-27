@@ -48,6 +48,7 @@ import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMet
 import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
+import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
 
 // Coverage page component
@@ -325,6 +326,15 @@ const App = () => (
                 <AdminGuard>
                   <Layout>
                     <Phase3MetricsPanel />
+                  </Layout>
+                </AdminGuard>
+              </AuthGuard>
+            } />
+            <Route path="/admin/chunk-quality" element={
+              <AuthGuard>
+                <AdminGuard>
+                  <Layout>
+                    <ChunkQualityDashboard />
                   </Layout>
                 </AdminGuard>
               </AuthGuard>

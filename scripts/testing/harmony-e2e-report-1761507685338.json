@@ -1,0 +1,79 @@
+{
+  "timestamp": "2025-10-26T19:41:24.483Z",
+  "documentId": null,
+  "steps": [
+    {
+      "step": "UPLOAD",
+      "message": "Starting Harmony PDF upload",
+      "type": "step",
+      "timestamp": "2025-10-26T19:41:24.496Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf",
+      "type": "info",
+      "timestamp": "2025-10-26T19:41:24.497Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Error: Failed to fetch PDF: Bad Request",
+      "type": "error",
+      "timestamp": "2025-10-26T19:41:25.325Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Error: Upload failed",
+      "type": "error",
+      "timestamp": "2025-10-26T19:41:25.326Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Test execution failed",
+      "type": "error",
+      "timestamp": "2025-10-26T19:41:25.326Z"
+    }
+  ],
+  "validations": {
+    "chunks": {
+      "passed": false,
+      "details": {}
+    },
+    "embeddings": {
+      "passed": false,
+      "details": {}
+    },
+    "images": {
+      "passed": false,
+      "details": {}
+    },
+    "products": {
+      "passed": false,
+      "details": {}
+    },
+    "search": {
+      "passed": false,
+      "details": {}
+    },
+    "quality": {
+      "passed": false,
+      "details": {}
+    },
+    "adminKB": {
+      "passed": false,
+      "details": {}
+    }
+  },
+  "errors": [
+    {
+      "step": "UPLOAD",
+      "error": "Failed to fetch PDF: Bad Request",
+      "timestamp": "2025-10-26T19:41:25.326Z"
+    },
+    {
+      "step": "MAIN",
+      "error": "Upload failed",
+      "timestamp": "2025-10-26T19:41:25.326Z"
+    }
+  ],
+  "summary": {}
+}

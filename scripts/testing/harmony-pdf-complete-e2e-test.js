@@ -36,7 +36,7 @@ if (!SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf';
+const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/49f683ad-ebf2-4296-a410-0d8c011ce0be/harmony-signature-book-24-25.pdf';
 const WORKSPACE_ID = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e';
 
 // Expected Harmony PDF products (for validation)
@@ -164,33 +164,60 @@ async function uploadHarmonyPDF() {
 
 async function monitorProcessingJob(jobId) {
   log('MONITOR', `Monitoring job: ${jobId}`, 'step');
-  
+
   const maxAttempts = 120; // 10 minutes
   const pollInterval = 5000; // 5 seconds
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
-      
-      log('MONITOR', `Attempt ${attempt}/${maxAttempts}`, 'info');
-      
-      // Check job status via MIVAA gateway
-      const statusResponse = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'get_job_status',
-          payload: { job_id: jobId }
-        })
-      });
-      
-      const statusData = await statusResponse.json();
 
-      // MIVAA returns { success, message, data: { status, progress, metadata, ... } }
-      const jobData = statusData.data || statusData;
+      log('MONITOR', `Attempt ${attempt}/${maxAttempts}`, 'info');
+
+      // ✅ FIX: Check database directly instead of relying on API
+      const { data: jobData, error: dbError } = await supabase
+        .from('background_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
+
+      if (dbError) {
+        log('MONITOR', `Database error: ${dbError.message}`, 'error');
+
+        // Fallback to API if database fails
+        try {
+          const statusResponse = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              action: 'get_job_status',
+              payload: { job_id: jobId }
+            })
+          });
+
+          if (!statusResponse.ok) {
+            throw new Error(`API returned ${statusResponse.status}`);
+          }
+
+          const statusData = await statusResponse.json();
+          const apiJobData = statusData.data || statusData;
+
+          // Use API data
+          status = apiJobData.status;
+          progress = apiJobData.progress || 0;
+          documentId = apiJobData.document_id;
+          error = apiJobData.error;
+          metadata = apiJobData.metadata || {};
+        } catch (apiError) {
+          log('MONITOR', `API also failed: ${apiError.message}`, 'error');
+          continue; // Skip this attempt
+        }
+      }
+
+      // Extract job data from database
       const status = jobData.status;
       const progress = jobData.progress || 0;
       const documentId = jobData.document_id;
@@ -761,6 +788,77 @@ async function testAdminKBEndpoints() {
 }
 
 // ============================================================================
+// COMPREHENSIVE SUMMARY
+// ============================================================================
+
+async function generateComprehensiveSummary(documentId) {
+  log('SUMMARY', 'Generating comprehensive summary...', 'step');
+
+  try {
+    // Get all data from database
+    const [chunksResult, embeddingsResult, imagesResult, productsResult, vectorsResult] = await Promise.all([
+      supabase.from('document_chunks').select('*').eq('document_id', documentId),
+      supabase.from('embeddings').select('*').eq('workspace_id', WORKSPACE_ID),
+      supabase.from('document_images').select('*').eq('document_id', documentId),
+      supabase.from('products').select('*').eq('workspace_id', WORKSPACE_ID),
+      supabase.from('document_vectors').select('*').eq('document_id', documentId)
+    ]);
+
+    console.log('\n' + '='.repeat(100));
+    console.log('📊 COMPREHENSIVE PROCESSING SUMMARY');
+    console.log('='.repeat(100));
+
+    // Chunks Summary
+    console.log('\n📄 CHUNKS:');
+    console.log(`   Total: ${chunksResult.data?.length || 0}`);
+    if (chunksResult.data && chunksResult.data.length > 0) {
+      const avgLength = chunksResult.data.reduce((sum, c) => sum + (c.content?.length || 0), 0) / chunksResult.data.length;
+      console.log(`   Average length: ${avgLength.toFixed(0)} characters`);
+      console.log(`   Has Claude analysis: ${chunksResult.data.filter(c => c.has_claude).length}`);
+      console.log(`   Has Llama analysis: ${chunksResult.data.filter(c => c.has_llama).length}`);
+    }
+
+    // Embeddings Summary
+    console.log('\n🔢 EMBEDDINGS:');
+    console.log(`   Total in 'embeddings' table: ${embeddingsResult.data?.length || 0}`);
+    console.log(`   Total in 'document_vectors' table: ${vectorsResult.data?.length || 0}`);
+    if (embeddingsResult.data && embeddingsResult.data.length > 0) {
+      const models = [...new Set(embeddingsResult.data.map(e => e.model_name))];
+      console.log(`   Models used: ${models.join(', ')}`);
+      const dimensions = [...new Set(embeddingsResult.data.map(e => e.dimensions))];
+      console.log(`   Dimensions: ${dimensions.join(', ')}`);
+    }
+
+    // Images Summary
+    console.log('\n🖼️  IMAGES:');
+    console.log(`   Total: ${imagesResult.data?.length || 0}`);
+    if (imagesResult.data && imagesResult.data.length > 0) {
+      console.log(`   Has Claude analysis: ${imagesResult.data.filter(i => i.has_claude).length}`);
+      console.log(`   Has Llama analysis: ${imagesResult.data.filter(i => i.has_llama).length}`);
+      console.log(`   Has CLIP embeddings: ${imagesResult.data.filter(i => i.visual_clip_embedding_512).length}`);
+      const imageTypes = [...new Set(imagesResult.data.map(i => i.image_type))];
+      console.log(`   Image types: ${imageTypes.join(', ')}`);
+    }
+
+    // Products Summary
+    console.log('\n📦 PRODUCTS:');
+    console.log(`   Total: ${productsResult.data?.length || 0}`);
+    if (productsResult.data && productsResult.data.length > 0) {
+      const productNames = productsResult.data.map(p => p.name).slice(0, 10);
+      console.log(`   Sample products: ${productNames.join(', ')}${productsResult.data.length > 10 ? '...' : ''}`);
+      const avgQuality = productsResult.data.reduce((sum, p) => sum + (p.quality_score || 0), 0) / productsResult.data.length;
+      console.log(`   Average quality score: ${avgQuality.toFixed(3)}`);
+      console.log(`   Has embeddings: ${productsResult.data.filter(p => p.text_embedding_1536).length}`);
+    }
+
+    console.log('\n' + '='.repeat(100));
+
+  } catch (error) {
+    recordError('SUMMARY', error);
+  }
+}
+
+// ============================================================================
 // GENERATE COMPREHENSIVE REPORT
 // ============================================================================
 
@@ -895,6 +993,9 @@ async function runCompleteE2ETest() {
     };
 
     log('MAIN', `Test completed in ${duration}s`, 'success');
+
+    // ✅ NEW: Generate comprehensive final summary
+    await generateComprehensiveSummary(testResults.documentId);
 
   } catch (error) {
     recordError('MAIN', error);
