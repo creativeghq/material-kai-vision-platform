@@ -1,66 +1,66 @@
 {
-  "timestamp": "2025-10-28T11:56:14.139Z",
+  "timestamp": "2025-10-28T17:44:46.631Z",
   "documentId": null,
   "steps": [
     {
       "step": "UPLOAD",
       "message": "Starting Harmony PDF upload",
       "type": "step",
-      "timestamp": "2025-10-28T11:56:14.149Z"
+      "timestamp": "2025-10-28T17:44:46.643Z"
     },
     {
       "step": "UPLOAD",
       "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/49f683ad-ebf2-4296-a410-0d8c011ce0be/harmony-signature-book-24-25.pdf",
       "type": "info",
-      "timestamp": "2025-10-28T11:56:14.150Z"
+      "timestamp": "2025-10-28T17:44:46.643Z"
     },
     {
       "step": "UPLOAD",
       "message": "Downloaded 10.72 MB",
       "type": "success",
-      "timestamp": "2025-10-28T11:56:16.760Z"
+      "timestamp": "2025-10-28T17:44:47.591Z"
     },
     {
       "step": "UPLOAD",
       "message": "Triggering PDF processing via MIVAA gateway...",
       "type": "info",
-      "timestamp": "2025-10-28T11:56:16.762Z"
+      "timestamp": "2025-10-28T17:44:47.592Z"
     },
     {
       "step": "UPLOAD",
       "message": "Response status: 500",
       "type": "info",
-      "timestamp": "2025-10-28T11:56:21.138Z"
+      "timestamp": "2025-10-28T17:44:51.077Z"
     },
     {
       "step": "UPLOAD",
       "message": "Response text length: 232",
       "type": "info",
-      "timestamp": "2025-10-28T11:56:21.141Z"
+      "timestamp": "2025-10-28T17:44:51.080Z"
     },
     {
       "step": "UPLOAD",
       "message": "Response body: {\n  \"error\": \"Invalid response from MIVAA\",\n  \"details\": \"<html>\\r\\n<head><title>502 Bad Gateway</title></head>\\r\\n<body>\\r\\n<center><h1>502 Bad Gateway</h1></center>\\r\\n<hr><center>nginx/1.24.0 (Ubuntu)</center>\\r\\n</body>\\r\\n</html>\\r\\n\"\n}",
       "type": "info",
-      "timestamp": "2025-10-28T11:56:21.142Z"
+      "timestamp": "2025-10-28T17:44:51.081Z"
     },
     {
       "step": "UPLOAD",
       "message": "Error: Processing failed: Invalid response from MIVAA",
       "type": "error",
-      "timestamp": "2025-10-28T11:56:21.142Z"
+      "timestamp": "2025-10-28T17:44:51.081Z"
     },
     {
       "step": "MAIN",
       "message": "Error: Upload failed",
       "type": "error",
-      "timestamp": "2025-10-28T11:56:21.143Z"
+      "timestamp": "2025-10-28T17:44:51.082Z"
     },
     {
       "step": "MAIN",
       "message": "Test execution failed",
       "type": "error",
-      "timestamp": "2025-10-28T11:56:21.143Z"
+      "timestamp": "2025-10-28T17:44:51.083Z"
     }
   ],
   "validations": {
@@ -97,12 +97,12 @@
     {
       "step": "UPLOAD",
       "error": "Processing failed: Invalid response from MIVAA",
-      "timestamp": "2025-10-28T11:56:21.143Z"
+      "timestamp": "2025-10-28T17:44:51.082Z"
     },
     {
       "step": "MAIN",
       "error": "Upload failed",
-      "timestamp": "2025-10-28T11:56:21.143Z"
+      "timestamp": "2025-10-28T17:44:51.083Z"
     }
   ],
   "summary": {}

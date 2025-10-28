@@ -416,6 +416,14 @@ const AdminDashboard: React.FC = () => {
     ],
     'System Monitoring': [
       {
+        title: 'Async Job Queue Monitor',
+        description: 'Monitor image processing and AI analysis job queues in real-time',
+        icon: Activity,
+        path: '/admin/async-queue-monitor',
+        status: 'active',
+        count: 'Real-time',
+      },
+      {
         title: 'PDF Processing Monitor',
         description: 'Monitor PDF processing pipeline - embeddings, images, products, and metrics',
         icon: Activity,

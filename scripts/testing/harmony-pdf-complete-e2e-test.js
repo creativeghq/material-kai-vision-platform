@@ -177,7 +177,7 @@ async function uploadHarmonyPDF() {
 async function monitorProcessingJob(jobId) {
   log('MONITOR', `Monitoring job: ${jobId}`, 'step');
 
-  const maxAttempts = 120; // 10 minutes
+  const maxAttempts = 240; // 20 minutes
   const pollInterval = 5000; // 5 seconds
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {

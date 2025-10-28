@@ -48,6 +48,7 @@ import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMet
 import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
+import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
 import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
@@ -344,6 +345,15 @@ const App = () => (
                 <AdminGuard>
                   <Layout>
                     <ChunkQualityDashboard />
+                  </Layout>
+                </AdminGuard>
+              </AuthGuard>
+            } />
+            <Route path="/admin/async-queue-monitor" element={
+              <AuthGuard>
+                <AdminGuard>
+                  <Layout>
+                    <AsyncJobQueueMonitor />
                   </Layout>
                 </AdminGuard>
               </AuthGuard>
