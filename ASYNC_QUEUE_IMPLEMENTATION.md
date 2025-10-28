@@ -186,7 +186,7 @@ After implementation:
 - RLS policies enabled ✅
 - Indexes created ✅
 
-⏳ **IN PROGRESS: Backend Implementation**
+✅ **COMPLETE: Backend Implementation**
 - AsyncQueueService created ✅
 - Modify PDF extraction to queue jobs ✅
   - Stage 1: Extraction progress tracking ✅
@@ -194,7 +194,9 @@ After implementation:
   - Stage 3: Chunking progress tracking ✅
   - Stage 4: AI analysis jobs queued ✅
   - Stage 5: Product creation progress tracking ✅
-- Deploy Edge Functions (NEXT)
+- Edge Functions created ✅
+  - process-image-queue: OCR + CLIP embeddings ✅
+  - process-ai-analysis-queue: Classification + Metadata + Product detection ✅
 - Test with Harmony PDF (NEXT)
 
 ## Implementation Details
@@ -231,6 +233,65 @@ After implementation:
 - Admin users can view all queue data
 - Service role can manage all queue operations
 - Proper access control for security
+
+### Edge Functions for Queue Processing
+
+#### process-image-queue (supabase/functions/process-image-queue/index.ts)
+- Polls `image_processing_queue` for pending jobs
+- Processes images with OCR via MIVAA API
+- Generates CLIP embeddings via enhanced-clip-integration
+- Updates `document_images` with OCR text and embeddings
+- Handles retries (up to 3 attempts)
+- Updates progress in `job_progress` table
+- Batch processing (default 10 images per run)
+
+#### process-ai-analysis-queue (supabase/functions/process-ai-analysis-queue/index.ts)
+- Polls `ai_analysis_queue` for pending jobs
+- Performs analysis based on type:
+  - `classification`: Calls classify-content edge function
+  - `metadata`: Calls canonical-metadata-extraction edge function
+  - `product_detection`: Calls enhanced-product-processing edge function
+- Stores results in chunk metadata
+- Handles retries (up to 3 attempts)
+- Updates progress in `job_progress` table
+- Batch processing (default 10 chunks per run)
+
+## How It Works
+
+### Complete Flow
+
+1. **User uploads PDF** → Frontend calls `/documents/upload-async`
+2. **Backend processes PDF** (Stage 1: 0-20%)
+   - Extracts text and images
+   - Updates progress to 20%
+3. **Backend queues image jobs** (Stage 2: 20-40%)
+   - Creates jobs in `image_processing_queue`
+   - Returns immediately to user
+4. **Edge Function processes images** (async)
+   - Runs OCR on each image
+   - Generates CLIP embeddings
+   - Updates progress in real-time
+5. **Backend creates chunks** (Stage 3: 40-60%)
+   - Creates semantic chunks from text
+   - Updates progress to 60%
+6. **Backend queues AI jobs** (Stage 4: 60-90%)
+   - Creates jobs in `ai_analysis_queue`
+   - Returns immediately
+7. **Edge Function analyzes content** (async)
+   - Classifies chunks
+   - Extracts metadata
+   - Detects products
+   - Updates progress in real-time
+8. **Backend creates products** (Stage 5: 90-100%)
+   - Creates product records
+   - Updates progress to 100%
+
+### Admin Monitoring
+
+- Visit `/admin/async-queue-monitor` to see real-time progress
+- View pending, processing, completed, and failed jobs
+- See progress percentage for each document
+- Monitor error messages and retry attempts
 
 ## Notes
 
