@@ -928,36 +928,7 @@ export class MultiVectorSearchService {
     return magnitude === 0 ? 0 : dotProduct / magnitude;
   }
 
-  /**
-   * Get search performance statistics
-   */
-  static async getSearchStatistics(): Promise<{
-    totalSearches: number;
-    averageSearchTime: number;
-    embeddingTypeUsage: Record<string, number>;
-    searchTypeDistribution: Record<string, number>;
-  }> {
-    // This would typically be stored in a search analytics table
-    // For now, return mock data
-    return {
-      totalSearches: 0,
-      averageSearchTime: 0,
-      embeddingTypeUsage: {
-        text: 0,
-        visual: 0,
-        multimodal: 0,
-        color: 0,
-        texture: 0,
-        application: 0,
-      },
-      searchTypeDistribution: {
-        products: 0,
-        chunks: 0,
-        images: 0,
-        all: 0,
-      },
-    };
-  }
+
 
   /**
    * Calculate cosine similarity between two vectors

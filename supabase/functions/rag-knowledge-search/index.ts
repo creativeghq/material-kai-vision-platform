@@ -196,6 +196,26 @@ serve(async (req) => {
       );
     }
 
+    // Extract user from auth header
+    const authHeader = req.headers.get('Authorization');
+    let userId: string | undefined;
+    let workspaceId: string | undefined;
+
+    if (authHeader) {
+      const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+      userId = user?.id;
+
+      // Get user's workspace
+      if (userId) {
+        const { data: workspace } = await supabase
+          .from('workspaces')
+          .select('id')
+          .eq('user_id', userId)
+          .single();
+        workspaceId = workspace?.id;
+      }
+    }
+
     // Use unified vector search with caching
     const searchRequest: UnifiedSearchRequest = {
       query: requestBody.query,
@@ -204,8 +224,8 @@ serve(async (req) => {
       matchThreshold: requestBody.match_threshold || 0.7,
       matchCount: requestBody.match_count || 10,
       includeContext: requestBody.include_context,
-      workspaceId: undefined, // TODO: Extract from auth context
-      userId: undefined, // TODO: Extract from auth context
+      workspaceId,
+      userId,
     };
 
     const unifiedResponse = await performUnifiedVectorSearch(searchRequest, supabase);

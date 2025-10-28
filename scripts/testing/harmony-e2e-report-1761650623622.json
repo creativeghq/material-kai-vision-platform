@@ -1,0 +1,1550 @@
+{
+  "timestamp": "2025-10-28T11:12:43.385Z",
+  "documentId": null,
+  "steps": [
+    {
+      "step": "UPLOAD",
+      "message": "Starting Harmony PDF upload",
+      "type": "step",
+      "timestamp": "2025-10-28T11:12:43.388Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/49f683ad-ebf2-4296-a410-0d8c011ce0be/harmony-signature-book-24-25.pdf",
+      "type": "info",
+      "timestamp": "2025-10-28T11:12:43.388Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Downloaded 10.72 MB",
+      "type": "success",
+      "timestamp": "2025-10-28T11:12:44.365Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Triggering PDF processing via MIVAA gateway...",
+      "type": "info",
+      "timestamp": "2025-10-28T11:12:44.365Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response status: 202",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:23.170Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response text length: 161",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:23.173Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response body: {\n  \"success\": true,\n  \"data\": {\n    \"job_id\": \"5c5f771c-f318-4c12-8551-8f8fd49e9434\",\n    \"status\": \"pending\",\n    \"message\": \"Document processing started. Use job_id to check status.\"\n  }\n}",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:23.174Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Job started: 5c5f771c-f318-4c12-8551-8f8fd49e9434",
+      "type": "success",
+      "timestamp": "2025-10-28T11:13:23.175Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Monitoring job: 5c5f771c-f318-4c12-8551-8f8fd49e9434",
+      "type": "step",
+      "timestamp": "2025-10-28T11:13:23.176Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 1/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:28.183Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:28.437Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 2/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:33.452Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:33.684Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 3/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:38.691Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:38.868Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 4/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:43.883Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:44.050Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 5/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:49.063Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:49.187Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 6/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:54.196Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:54.344Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 7/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:59.356Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:13:59.577Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 8/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:04.578Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:04.726Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 9/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:09.732Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:09.874Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 10/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:14.887Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:15.018Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 11/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:20.019Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:20.401Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 12/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:25.405Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:25.872Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 13/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:30.880Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:31.046Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 14/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:36.055Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:36.205Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 15/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:41.210Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:41.361Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 16/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:46.370Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:46.640Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 17/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:51.646Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:51.792Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 18/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:56.800Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:14:56.902Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 19/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:01.914Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:02.040Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 20/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:07.047Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:07.325Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 21/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:12.339Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:12.454Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 22/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:17.457Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:17.591Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 23/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:22.601Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:22.754Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 24/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:27.759Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:27.931Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 25/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:32.939Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:33.070Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 26/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:38.085Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:38.206Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 27/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:43.215Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:43.327Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 28/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:48.343Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:48.571Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 29/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:53.581Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:53.783Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 30/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:58.789Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:15:58.921Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 31/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:03.929Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:04.111Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 32/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:09.121Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:09.252Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 33/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:14.265Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:14.394Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 34/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:19.402Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:19.542Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 35/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:24.551Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:24.675Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 36/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:29.692Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:29.806Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 37/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:34.811Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:34.954Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 38/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:39.956Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:40.127Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 39/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:45.141Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:45.252Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 40/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:50.262Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:50.525Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 41/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:55.530Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:16:55.677Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 42/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:00.692Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:00.806Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 43/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:05.818Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:05.918Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 44/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:10.931Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:11.041Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 45/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:16.043Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:16.196Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 46/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:21.199Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:21.315Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 47/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:26.328Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:26.439Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 48/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:31.441Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:31.907Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 49/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:36.916Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:37.043Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 50/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:42.048Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:42.287Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 51/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:47.289Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:47.443Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 52/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:52.452Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:52.557Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 53/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:57.563Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:17:57.721Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 54/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:02.731Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:02.887Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 55/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:07.894Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:08.026Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 56/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:13.030Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:13.181Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 57/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:18.186Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:18.364Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 58/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:23.376Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:23.489Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 59/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:28.493Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:28.637Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 60/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:33.640Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:33.762Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 61/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:38.770Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:38.912Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 62/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:43.917Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:44.046Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 63/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:49.058Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:49.182Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 64/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:54.185Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:54.326Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 65/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:59.328Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:18:59.557Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 66/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:04.567Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:04.699Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 67/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:09.711Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:09.876Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 68/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:14.880Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:15.058Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 69/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:20.068Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:20.185Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 70/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:25.196Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:25.320Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 71/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:30.332Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:30.489Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 72/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:35.504Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:35.625Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 73/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:40.633Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:40.778Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 74/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:45.786Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:45.917Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 75/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:50.929Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:51.050Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 76/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:56.060Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:19:56.200Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 77/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:01.201Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:01.341Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 78/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:06.343Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:06.476Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 79/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:11.488Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:11.661Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 80/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:16.671Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:16.786Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 81/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:21.792Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:21.933Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 82/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:26.940Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:27.075Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 83/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:32.076Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:32.301Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 84/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:37.317Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:37.428Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 85/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:42.431Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:42.550Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 86/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:47.556Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:47.920Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 87/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:52.927Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:53.050Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 88/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:58.063Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:20:58.190Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 89/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:03.198Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:03.333Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 90/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:08.344Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:08.542Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 91/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:13.557Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:13.668Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 92/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:18.676Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:18.871Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 93/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:23.875Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:23.996Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 94/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:29.002Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:29.134Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 95/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:34.140Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:34.321Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 96/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:39.331Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:39.439Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 97/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:44.451Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:44.577Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 98/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:49.593Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:49.761Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 99/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:54.771Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:54.908Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 100/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:21:59.919Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:00.128Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 101/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:05.137Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:05.306Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 102/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:10.310Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:10.419Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 103/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:15.424Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:15.583Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 104/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:20.587Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:20.734Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 105/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:25.737Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:25.857Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 106/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:30.861Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:31.096Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 107/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:36.101Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:36.422Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 108/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:41.430Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:41.549Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 109/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:46.557Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:46.761Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 110/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:51.770Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:51.984Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 111/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:56.991Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:22:57.133Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 112/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:02.149Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:02.268Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 113/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:07.279Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:07.429Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 114/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:12.431Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:12.576Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 115/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:17.585Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:17.716Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 116/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:22.722Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:22.917Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 117/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:27.930Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:28.058Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 118/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:33.068Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:33.279Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 119/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:38.293Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:38.451Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Attempt 120/120",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:43.455Z"
+    },
+    {
+      "step": "MONITOR",
+      "message": "Status: processing (20%) - Extracting text and images from PDF",
+      "type": "info",
+      "timestamp": "2025-10-28T11:23:43.601Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Error: Job monitoring timeout",
+      "type": "error",
+      "timestamp": "2025-10-28T11:23:43.604Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Test execution failed",
+      "type": "error",
+      "timestamp": "2025-10-28T11:23:43.605Z"
+    }
+  ],
+  "validations": {
+    "chunks": {
+      "passed": false,
+      "details": {}
+    },
+    "embeddings": {
+      "passed": false,
+      "details": {}
+    },
+    "images": {
+      "passed": false,
+      "details": {}
+    },
+    "products": {
+      "passed": false,
+      "details": {}
+    },
+    "search": {
+      "passed": false,
+      "details": {}
+    },
+    "quality": {
+      "passed": false,
+      "details": {}
+    },
+    "adminKB": {
+      "passed": false,
+      "details": {}
+    }
+  },
+  "errors": [
+    {
+      "step": "MAIN",
+      "error": "Job monitoring timeout",
+      "timestamp": "2025-10-28T11:23:43.605Z"
+    }
+  ],
+  "summary": {}
+}

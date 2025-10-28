@@ -1,0 +1,109 @@
+{
+  "timestamp": "2025-10-28T12:15:10.092Z",
+  "documentId": null,
+  "steps": [
+    {
+      "step": "UPLOAD",
+      "message": "Starting Harmony PDF upload",
+      "type": "step",
+      "timestamp": "2025-10-28T12:15:10.102Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/49f683ad-ebf2-4296-a410-0d8c011ce0be/harmony-signature-book-24-25.pdf",
+      "type": "info",
+      "timestamp": "2025-10-28T12:15:10.103Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Downloaded 10.72 MB",
+      "type": "success",
+      "timestamp": "2025-10-28T12:15:11.423Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Triggering PDF processing via MIVAA gateway...",
+      "type": "info",
+      "timestamp": "2025-10-28T12:15:11.427Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response status: 500",
+      "type": "info",
+      "timestamp": "2025-10-28T12:15:13.798Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response text length: 287",
+      "type": "info",
+      "timestamp": "2025-10-28T12:15:13.799Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response body: {\n  \"error\": \"File upload failed\",\n  \"message\": \"error sending request for url (https://v1api.materialshub.gr/api/rag/documents/upload-async): client error (Connect): tcp connect error: Connection refused (os error 111): Connection refused (os error 111)\",\n  \"timestamp\": \"2025-10-28T12:15:12.854Z\"\n}",
+      "type": "info",
+      "timestamp": "2025-10-28T12:15:13.800Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Error: Processing failed: File upload failed",
+      "type": "error",
+      "timestamp": "2025-10-28T12:15:13.800Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Error: Upload failed",
+      "type": "error",
+      "timestamp": "2025-10-28T12:15:13.801Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Test execution failed",
+      "type": "error",
+      "timestamp": "2025-10-28T12:15:13.801Z"
+    }
+  ],
+  "validations": {
+    "chunks": {
+      "passed": false,
+      "details": {}
+    },
+    "embeddings": {
+      "passed": false,
+      "details": {}
+    },
+    "images": {
+      "passed": false,
+      "details": {}
+    },
+    "products": {
+      "passed": false,
+      "details": {}
+    },
+    "search": {
+      "passed": false,
+      "details": {}
+    },
+    "quality": {
+      "passed": false,
+      "details": {}
+    },
+    "adminKB": {
+      "passed": false,
+      "details": {}
+    }
+  },
+  "errors": [
+    {
+      "step": "UPLOAD",
+      "error": "Processing failed: File upload failed",
+      "timestamp": "2025-10-28T12:15:13.801Z"
+    },
+    {
+      "step": "MAIN",
+      "error": "Upload failed",
+      "timestamp": "2025-10-28T12:15:13.801Z"
+    }
+  ],
+  "summary": {}
+}

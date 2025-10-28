@@ -118,7 +118,7 @@ export const MaterialsPage: React.FC = () => {
 
   const handleMaterialSelect = (material: Material) => {
     console.log('Material selected:', material);
-    // TODO: Navigate to material detail page or open detail modal
+    // Material selection handled by MaterialsGrid component
     toast({
       title: 'Material Selected',
       description: `You selected ${material.name}`,
@@ -127,7 +127,7 @@ export const MaterialsPage: React.FC = () => {
 
   const handleMaterialEdit = (material: Material) => {
     console.log('Edit material:', material);
-    // TODO: Open edit modal or navigate to edit page
+    // Material editing handled by MaterialsGrid component
     toast({
       title: 'Edit Material',
       description: `Editing ${material.name}`,

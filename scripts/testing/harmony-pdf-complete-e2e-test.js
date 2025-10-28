@@ -127,10 +127,22 @@ async function uploadHarmonyPDF() {
       },
       body: formData
     });
-    
-    const result = await processingResponse.json();
 
     log('UPLOAD', `Response status: ${processingResponse.status}`, 'info');
+
+    // Get response text first to debug
+    const responseText = await processingResponse.text();
+    log('UPLOAD', `Response text length: ${responseText.length}`, 'info');
+
+    let result;
+    try {
+      result = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      log('UPLOAD', `Failed to parse JSON: ${parseError.message}`, 'error');
+      log('UPLOAD', `Response text: ${responseText.substring(0, 500)}`, 'error');
+      throw new Error(`Invalid JSON response: ${parseError.message}`);
+    }
+
     log('UPLOAD', `Response body: ${JSON.stringify(result, null, 2)}`, 'info');
 
     if (!processingResponse.ok) {

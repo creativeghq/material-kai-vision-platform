@@ -33,7 +33,6 @@ import { Designer3DPage } from './components/3D/Designer3DPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
 import { Layout } from './components/Layout/Layout';
-import { OCRProcessor } from './components/OCR/OCRProcessor';
 import { IntegratedRAGManagement } from './components/Admin/IntegratedRAGManagement';
 import PDFProcessing from './pages/PDFProcessing';
 import SearchHub from './pages/SearchHub';
@@ -255,15 +254,7 @@ const App = () => (
               </AuthGuard>
             } />
 
-            <Route path="/admin/ocr" element={
-              <AuthGuard>
-                <AdminGuard>
-                  <Layout>
-                    <OCRProcessor />
-                  </Layout>
-                </AdminGuard>
-              </AuthGuard>
-            } />
+
             <Route path="/admin/pdf-processing" element={
               <AuthGuard>
                 <AdminGuard>

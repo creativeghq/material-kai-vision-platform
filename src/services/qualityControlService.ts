@@ -1116,8 +1116,15 @@ export class QualityControlService {
   }
 
   private static calculateImprovementRate(assessments: unknown[]): number {
-    // TODO: Implement improvement rate calculation
-    return 0;
+    // Calculate improvement rate by comparing first and last assessments
+    if (assessments.length < 2) return 0;
+
+    const firstScore = (assessments[0] as any)?.overall_score || 0;
+    const lastScore = (assessments[assessments.length - 1] as any)?.overall_score || 0;
+
+    if (firstScore === 0) return 0;
+
+    return Math.round(((lastScore - firstScore) / firstScore) * 100) / 100;
   }
 
   private static aggregateIssueTypes(assessments: unknown[]): Record<string, number> {

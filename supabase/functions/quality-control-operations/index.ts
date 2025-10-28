@@ -518,7 +518,7 @@ async function getQualityStats(supabase: any, request: QualityControlRequest) {
 
   const qualityTrends = {
     avgQualityScore: calculateAvgQualityScore(assessments || []),
-    improvementRate: 0, // TODO: Calculate improvement rate
+    improvementRate: calculateImprovementRate(assessments || []),
     issueTypes: aggregateIssueTypes(assessments || []),
   };
 
@@ -911,6 +911,20 @@ function calculateAvgQualityScore(assessments: any[]): number {
 
   const totalScore = assessments.reduce((sum, assessment) => sum + assessment.overall_score, 0);
   return Math.round((totalScore / assessments.length) * 100) / 100;
+}
+
+/**
+ * Calculate improvement rate
+ */
+function calculateImprovementRate(assessments: any[]): number {
+  if (assessments.length < 2) return 0;
+
+  const firstScore = assessments[0]?.overall_score || 0;
+  const lastScore = assessments[assessments.length - 1]?.overall_score || 0;
+
+  if (firstScore === 0) return 0;
+
+  return Math.round(((lastScore - firstScore) / firstScore) * 100) / 100;
 }
 
 /**

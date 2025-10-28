@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { ImageElement, TextBlock } from './htmlDOMAnalyzer';
 import type { DocumentChunk } from './layoutAwareChunker';
 import { UnifiedMLService } from './ml/unifiedMLService';
+import { ColorAnalysisEngine } from './ml/colorAnalysisEngine';
 
 /**
  * Call MIVAA Gateway directly using fetch to avoid CORS issues
@@ -496,12 +497,30 @@ export class ImageTextMapper {
   }
 
   /**
-   * Extract text from image using OCR
+   * Extract text from image using OCR via MIVAA backend
    */
   private async extractTextFromImage(image: ImageElement): Promise<string | undefined> {
     try {
-      // OCR processing temporarily disabled
-      return 'OCR temporarily disabled'; // Temporarily return placeholder
+      // Use MIVAA backend OCR service (EasyOCR)
+      const response = await callMivaaGatewayDirect('ocr_extract', {
+        image_url: image.src,
+        languages: ['en'],
+        preprocessing_enabled: true,
+      });
+
+      if (!response.success || !response.data) {
+        console.warn(`OCR extraction failed for image ${image.id}`);
+        return undefined;
+      }
+
+      // Extract text from OCR results
+      const ocrResults = response.data.ocr_results || [];
+      const extractedText = ocrResults
+        .map((result: any) => result.text)
+        .filter((text: string) => text && text.trim())
+        .join(' ');
+
+      return extractedText || undefined;
     } catch (error) {
       console.warn(`OCR failed for image ${image.id}:`, error);
       return undefined;
@@ -523,12 +542,36 @@ export class ImageTextMapper {
 
       const analysisResult = await this.mlService.analyzeMaterial(file);
 
+      // Extract real colors using ColorAnalysisEngine
+      let dominantColors: string[] = [];
+      let colorScheme = 'neutral';
+      let materialFinish = 'unknown';
+
+      try {
+        const colorEngine = ColorAnalysisEngine.createInstance();
+        await colorEngine.initialize();
+        const colorAnalysis = await colorEngine.analyzeImage(file);
+
+        dominantColors = colorAnalysis.dominantColors
+          .slice(0, 5)
+          .map(color => color.hex);
+
+        // Determine color scheme from dominant colors
+        if (colorAnalysis.psychologicalProfile.warmth > 0.5) {
+          colorScheme = 'warm';
+        } else if (colorAnalysis.psychologicalProfile.warmth < -0.5) {
+          colorScheme = 'cool';
+        }
+      } catch (error) {
+        console.warn(`Color analysis failed for image ${image.id}:`, error);
+      }
+
       return {
         materialTypes: (analysisResult as unknown as Record<string, unknown>).results ? ((analysisResult as unknown as Record<string, unknown>).results as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => r.label as string) : [],
         colorAnalysis: {
-          dominantColors: ['#8B4513', '#D2B48C'], // Mock colors
-          colorScheme: 'warm',
-          materialFinish: 'matte',
+          dominantColors,
+          colorScheme,
+          materialFinish,
         },
       };
     } catch (error) {
