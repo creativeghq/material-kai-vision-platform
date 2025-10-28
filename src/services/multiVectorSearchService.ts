@@ -368,12 +368,78 @@ export class MultiVectorSearchService {
       `;
 
       console.log('🔍 Executing product search query...');
-      const { data: products, error } = await supabase.rpc('execute_raw_sql', { query });
+
+      // Use native Supabase query instead of RPC
+      // Fetch all products with embeddings and calculate similarity in-memory
+      let productsQuery = supabase
+        .from('products')
+        .select('id, name, description, long_description, category_id, metadata, text_embedding_1536, visual_clip_embedding_512, multimodal_fusion_embedding_2048, color_embedding_256, texture_embedding_256, application_embedding_512');
+
+      // Apply filters
+      if (options.filters?.categories && options.filters.categories.length > 0) {
+        productsQuery = productsQuery.in('category_id', options.filters.categories);
+      }
+      if (options.filters?.sourceDocuments && options.filters.sourceDocuments.length > 0) {
+        productsQuery = productsQuery.in('source_document_id', options.filters.sourceDocuments);
+      }
+
+      const { data: allProducts, error } = await productsQuery;
 
       if (error) {
         console.error('❌ Product search error:', error);
         return [];
       }
+
+      // Calculate similarity scores in-memory
+      const scoredProducts = (allProducts || [])
+        .map((product: any) => {
+          let totalSimilarity = 0;
+          let weightSum = 0;
+
+          // Calculate weighted similarities for each embedding type
+          if (embeddings.text && product.text_embedding_1536) {
+            const similarity = this.cosineSimilarity(embeddings.text, product.text_embedding_1536);
+            totalSimilarity += similarity * (weights.text || 0);
+            weightSum += weights.text || 0;
+          }
+          if (embeddings.visual && product.visual_clip_embedding_512) {
+            const similarity = this.cosineSimilarity(embeddings.visual, product.visual_clip_embedding_512);
+            totalSimilarity += similarity * (weights.visual || 0);
+            weightSum += weights.visual || 0;
+          }
+          if (embeddings.multimodal && product.multimodal_fusion_embedding_2048) {
+            const similarity = this.cosineSimilarity(embeddings.multimodal, product.multimodal_fusion_embedding_2048);
+            totalSimilarity += similarity * (weights.multimodal || 0);
+            weightSum += weights.multimodal || 0;
+          }
+          if (embeddings.color && product.color_embedding_256) {
+            const similarity = this.cosineSimilarity(embeddings.color, product.color_embedding_256);
+            totalSimilarity += similarity * (weights.color || 0);
+            weightSum += weights.color || 0;
+          }
+          if (embeddings.texture && product.texture_embedding_256) {
+            const similarity = this.cosineSimilarity(embeddings.texture, product.texture_embedding_256);
+            totalSimilarity += similarity * (weights.texture || 0);
+            weightSum += weights.texture || 0;
+          }
+          if (embeddings.application && product.application_embedding_512) {
+            const similarity = this.cosineSimilarity(embeddings.application, product.application_embedding_512);
+            totalSimilarity += similarity * (weights.application || 0);
+            weightSum += weights.application || 0;
+          }
+
+          const overallSimilarity = weightSum > 0 ? totalSimilarity / weightSum : 0;
+
+          return {
+            ...product,
+            overall_similarity: overallSimilarity
+          };
+        })
+        .filter(p => p.overall_similarity >= (options.similarityThreshold || 0))
+        .sort((a, b) => b.overall_similarity - a.overall_similarity)
+        .slice(0, options.maxResults);
+
+      const products = scoredProducts;
 
       // Transform results
       return (products || []).map((product: any) => ({
@@ -463,12 +529,51 @@ export class MultiVectorSearchService {
         LIMIT ${options.maxResults}
       `;
 
-      const { data: chunks, error } = await supabase.rpc('execute_raw_sql', { query });
+      // Use native Supabase query instead of RPC
+      // Note: document_vectors table might not exist, using document_chunks instead
+      let chunksQuery = supabase
+        .from('document_chunks')
+        .select('id, content, document_id, metadata, text_embedding_1536');
+
+      // Apply filters
+      if (filters.sourceDocuments && filters.sourceDocuments.length > 0) {
+        chunksQuery = chunksQuery.in('document_id', filters.sourceDocuments);
+      }
+
+      const { data: allChunks, error } = await chunksQuery;
 
       if (error) {
         console.error('❌ Chunk search error:', error);
         return [];
       }
+
+      // Calculate similarity scores in-memory
+      const scoredChunks = (allChunks || [])
+        .map((chunk: any) => {
+          let totalSimilarity = 0;
+          let weightSum = 0;
+          let textSimilarity = 0;
+
+          // Calculate weighted similarities for each embedding type
+          if (queryEmbeddings.text && chunk.text_embedding_1536) {
+            textSimilarity = this.cosineSimilarity(queryEmbeddings.text, chunk.text_embedding_1536);
+            totalSimilarity += textSimilarity * (weights.text || 0);
+            weightSum += weights.text || 0;
+          }
+
+          const overallSimilarity = weightSum > 0 ? totalSimilarity / weightSum : 0;
+
+          return {
+            ...chunk,
+            overall_similarity: overallSimilarity,
+            text_similarity: textSimilarity
+          };
+        })
+        .filter(c => c.overall_similarity >= (options.similarityThreshold || 0))
+        .sort((a, b) => b.overall_similarity - a.overall_similarity)
+        .slice(0, options.maxResults);
+
+      const chunks = scoredChunks;
 
       return (chunks || []).map((chunk: unknown) => ({
         id: (chunk as any).id,
@@ -529,43 +634,64 @@ export class MultiVectorSearchService {
         return [];
       }
 
-      const similarityCalculation = embeddingComparisons.join(' + ');
-      const overallSimilarity = `(${similarityCalculation}) as overall_similarity`;
+      // Use native Supabase query instead of RPC
+      let imagesQuery = supabase
+        .from('document_images')
+        .select('id, image_url, caption, alt_text, image_type, source_document_id, metadata, visual_clip_embedding_512, color_embedding_256, texture_embedding_256');
 
-      let whereConditions = ['1=1'];
-
+      // Apply filters
       if (filters.sourceDocuments && filters.sourceDocuments.length > 0) {
-        whereConditions.push(`source_document_id IN ('${filters.sourceDocuments.join("','")}')`);
+        imagesQuery = imagesQuery.in('source_document_id', filters.sourceDocuments);
       }
 
-      if (filters.minConfidence) {
-        whereConditions.push(`(${similarityCalculation}) >= ${filters.minConfidence}`);
-      }
-
-      const query = `
-        SELECT
-          id,
-          image_url,
-          caption,
-          alt_text,
-          image_type,
-          source_document_id,
-          metadata,
-          ${embeddingComparisons.join(',\n          ')},
-          ${overallSimilarity}
-        FROM document_images
-        WHERE ${whereConditions.join(' AND ')}
-          AND (${embeddingComparisons.map(comp => comp.split(' as ')[0].replace(/\* \d+\.?\d*/, '')).join(' IS NOT NULL OR ')}) IS NOT NULL
-        ORDER BY overall_similarity DESC
-        LIMIT ${options.maxResults}
-      `;
-
-      const { data: images, error } = await supabase.rpc('execute_raw_sql', { query });
+      const { data: allImages, error } = await imagesQuery;
 
       if (error) {
         console.error('❌ Image search error:', error);
         return [];
       }
+
+      // Calculate similarity scores in-memory
+      const scoredImages = (allImages || [])
+        .map((image: any) => {
+          let totalSimilarity = 0;
+          let weightSum = 0;
+          let visualSimilarity = 0;
+          let colorSimilarity = 0;
+          let textureSimilarity = 0;
+
+          // Calculate weighted similarities for each embedding type
+          if (queryEmbeddings.visual && image.visual_clip_embedding_512) {
+            visualSimilarity = this.cosineSimilarity(queryEmbeddings.visual, image.visual_clip_embedding_512);
+            totalSimilarity += visualSimilarity * (weights.visual || 0);
+            weightSum += weights.visual || 0;
+          }
+          if (queryEmbeddings.color && image.color_embedding_256) {
+            colorSimilarity = this.cosineSimilarity(queryEmbeddings.color, image.color_embedding_256);
+            totalSimilarity += colorSimilarity * (weights.color || 0);
+            weightSum += weights.color || 0;
+          }
+          if (queryEmbeddings.texture && image.texture_embedding_256) {
+            textureSimilarity = this.cosineSimilarity(queryEmbeddings.texture, image.texture_embedding_256);
+            totalSimilarity += textureSimilarity * (weights.texture || 0);
+            weightSum += weights.texture || 0;
+          }
+
+          const overallSimilarity = weightSum > 0 ? totalSimilarity / weightSum : 0;
+
+          return {
+            ...image,
+            overall_similarity: overallSimilarity,
+            visual_similarity: visualSimilarity,
+            color_similarity: colorSimilarity,
+            texture_similarity: textureSimilarity
+          };
+        })
+        .filter(i => i.overall_similarity >= (options.similarityThreshold || 0))
+        .sort((a, b) => b.overall_similarity - a.overall_similarity)
+        .slice(0, options.maxResults);
+
+      const images = scoredImages;
 
       return (images || []).map((image: any) => ({
         id: image.id,
@@ -831,5 +957,33 @@ export class MultiVectorSearchService {
         all: 0,
       },
     };
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  private static cosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (!vecA || !vecB || vecA.length !== vecB.length) {
+      return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    normA = Math.sqrt(normA);
+    normB = Math.sqrt(normB);
+
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (normA * normB);
   }
 }
