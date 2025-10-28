@@ -664,9 +664,13 @@ export class UnifiedMLService extends BaseService<UnifiedMLServiceConfig> {
    */
   private async checkSupabaseHealth(): Promise<void> {
     try {
-      const { error } = await supabase.from('health_check').select('*').limit(1);
-      if (error && error.code !== 'PGRST116') { // PGRST116 = table not found, which is OK
+      // Use workspaces table instead of non-existent health_check table
+      const { data, error } = await supabase.from('workspaces').select('id').limit(1);
+      if (error) {
         throw new Error(`Supabase health check failed: ${error.message}`);
+      }
+      if (!data || data.length === 0) {
+        throw new Error('Supabase health check failed: No workspaces found');
       }
     } catch (error) {
       throw new Error(`Supabase connectivity check failed: ${error}`);

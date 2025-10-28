@@ -33,11 +33,11 @@ import { useToast } from '@/hooks/use-toast';
  * Call MIVAA Gateway directly using fetch to avoid CORS issues
  */
 async function callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
-  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
-  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
+  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase configuration not found');
+    throw new Error('CRITICAL: Supabase configuration missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
   }
 
   const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;

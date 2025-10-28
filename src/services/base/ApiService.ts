@@ -259,6 +259,13 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
+        console.log(`🔄 API Request attempt ${attempt + 1}/${retries + 1}:`, {
+          model: modelId,
+          url,
+          method,
+          timestamp: new Date().toISOString()
+        });
+
         const response = await fetch(url, {
           method,
           headers: this.getHeaders(),
@@ -267,23 +274,57 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const errorText = await response.text().catch(() => response.statusText);
+          console.error(`❌ API Error (${response.status}):`, {
+            model: modelId,
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+            attempt: attempt + 1,
+            timestamp: new Date().toISOString()
+          });
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
         const result = await response.json();
+        console.log(`✅ API Success:`, {
+          model: modelId,
+          attempt: attempt + 1,
+          timestamp: new Date().toISOString()
+        });
         return result as TResponse;
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
 
+        console.error(`❌ API Request failed:`, {
+          model: modelId,
+          attempt: attempt + 1,
+          maxAttempts: retries + 1,
+          error: lastError.message,
+          errorType: lastError.constructor.name,
+          timestamp: new Date().toISOString()
+        });
+
         if (attempt < retries) {
           // Exponential backoff
           const delay = Math.pow(2, attempt) * 1000;
+          console.log(`⏳ Retrying in ${delay}ms...`, {
+            model: modelId,
+            nextAttempt: attempt + 2,
+            timestamp: new Date().toISOString()
+          });
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
 
+    console.error(`❌ All retry attempts exhausted:`, {
+      model: modelId,
+      totalAttempts: retries + 1,
+      finalError: lastError.message,
+      timestamp: new Date().toISOString()
+    });
     this.handleApiError(lastError, `${modelId} after ${retries + 1} attempts`);
   }
 
