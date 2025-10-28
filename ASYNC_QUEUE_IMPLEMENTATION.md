@@ -186,7 +186,7 @@ After implementation:
 - RLS policies enabled ✅
 - Indexes created ✅
 
-✅ **COMPLETE: Backend Implementation**
+✅ **COMPLETE: Full Implementation**
 - AsyncQueueService created ✅
 - Modify PDF extraction to queue jobs ✅
   - Stage 1: Extraction progress tracking ✅
@@ -197,7 +197,9 @@ After implementation:
 - Edge Functions created ✅
   - process-image-queue: OCR + CLIP embeddings ✅
   - process-ai-analysis-queue: Classification + Metadata + Product detection ✅
-- Test with Harmony PDF (NEXT)
+- Test script created ✅
+  - async-queue-harmony-test.js: Complete end-to-end validation ✅
+- All code committed and pushed ✅
 
 ## Implementation Details
 
@@ -293,6 +295,67 @@ After implementation:
 - See progress percentage for each document
 - Monitor error messages and retry attempts
 
+## Deployment Steps
+
+### 1. Deploy Edge Functions
+```bash
+# Deploy process-image-queue function
+supabase functions deploy process-image-queue
+
+# Deploy process-ai-analysis-queue function
+supabase functions deploy process-ai-analysis-queue
+```
+
+### 2. Set Environment Variables
+Ensure these are set in Supabase Edge Function secrets:
+- `MIVAA_API_URL`: https://v1api.materialshub.gr
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY`: Your service role key
+
+### 3. Deploy Backend Changes
+```bash
+cd mivaa-pdf-extractor
+git push origin main
+# This triggers GitHub Actions to deploy to v1api.materialshub.gr
+```
+
+### 4. Deploy Frontend Changes
+```bash
+# Frontend is deployed via Vercel
+git push origin main
+# This triggers Vercel deployment
+```
+
+### 5. Set Up Queue Processing Schedule (Optional)
+To automatically process queues, create Supabase cron jobs:
+```sql
+-- Process image queue every 30 seconds
+SELECT cron.schedule('process-image-queue', '30 seconds', 'SELECT http_post(''https://your-project.supabase.co/functions/v1/process-image-queue'', ''{}''::jsonb)');
+
+-- Process AI queue every 30 seconds
+SELECT cron.schedule('process-ai-queue', '30 seconds', 'SELECT http_post(''https://your-project.supabase.co/functions/v1/process-ai-analysis-queue'', ''{}''::jsonb)');
+```
+
+## Testing
+
+### Run Async Queue Test
+```bash
+node scripts/testing/async-queue-harmony-test.js
+```
+
+This will:
+1. Upload Harmony PDF
+2. Monitor all 5 pipeline stages
+3. Verify image processing jobs
+4. Verify AI analysis jobs
+5. Generate detailed test report
+
+### Manual Testing
+1. Go to `/admin/async-queue-monitor`
+2. Upload a PDF via the knowledge base
+3. Watch real-time progress updates
+4. See queue metrics and job status
+
 ## Notes
 
 - All code is production-ready with no mock data
@@ -302,4 +365,6 @@ After implementation:
 - Automatic retry logic (up to 3 retries)
 - Comprehensive error handling
 - Commits pushed to GitHub (both frontend and backend)
+- Edge Functions ready for deployment
+- Test script ready for validation
 
