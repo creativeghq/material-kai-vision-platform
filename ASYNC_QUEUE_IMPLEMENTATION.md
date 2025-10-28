@@ -197,6 +197,41 @@ After implementation:
 - Deploy Edge Functions (NEXT)
 - Test with Harmony PDF (NEXT)
 
+## Implementation Details
+
+### AsyncQueueService (app/services/async_queue_service.py)
+- `queue_image_processing_jobs()` - Queue image processing jobs for all extracted images
+- `queue_ai_analysis_jobs()` - Queue AI analysis jobs for all chunks
+- `update_progress()` - Update progress for each pipeline stage
+- `get_queue_metrics()` - Get current queue statistics for monitoring
+- `mark_job_failed()` - Handle job failures with automatic retry logic (up to 3 retries)
+
+### PDF Extraction Integration (app/services/llamaindex_service.py)
+- Stage 1: Extraction (0-20%) - Updates progress after PDF extraction
+- Stage 2: Image Processing (20-40%) - Queues image processing jobs instead of processing synchronously
+- Stage 3: Chunking (40-60%) - Updates progress after chunk creation
+- Stage 4: AI Analysis (60-90%) - Queues AI analysis jobs for all chunks
+- Stage 5: Product Creation (90-100%) - Updates progress for product creation stage
+
+### Admin Monitoring Dashboard (src/components/Admin/AsyncJobQueueMonitor.tsx)
+- Real-time queue metrics (pending, processing, completed, failed)
+- Image processing queue status with recent jobs
+- AI analysis queue status with recent jobs
+- Progress tracking visualization
+- Error logging and display
+- Auto-refresh every 5 seconds
+- Manual refresh button
+
+### Database Tables (Created via Supabase MCP)
+- `image_processing_queue` - Tracks image processing jobs
+- `ai_analysis_queue` - Tracks AI analysis jobs
+- `job_progress` - Tracks progress for each document stage
+
+### RLS Policies (Created via Supabase MCP)
+- Admin users can view all queue data
+- Service role can manage all queue operations
+- Proper access control for security
+
 ## Notes
 
 - All code is production-ready with no mock data
@@ -205,4 +240,5 @@ After implementation:
 - Real-time monitoring via admin dashboard
 - Automatic retry logic (up to 3 retries)
 - Comprehensive error handling
+- Commits pushed to GitHub (both frontend and backend)
 
