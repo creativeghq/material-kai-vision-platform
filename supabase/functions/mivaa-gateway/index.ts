@@ -1,7 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 // Environment variables
-const MIVAA_SERVICE_URL = 'https://v1api.materialshub.gr';
+// Try to use local API first (for server environment), fall back to external domain
+const MIVAA_LOCAL_URL = Deno.env.get('MIVAA_LOCAL_URL') || 'http://127.0.0.1:8000';
+const MIVAA_EXTERNAL_URL = 'https://v1api.materialshub.gr';
+const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_SERVICE_URL') || MIVAA_EXTERNAL_URL;
 const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || 'your-mivaa-api-key';
 
 // CORS headers
@@ -60,6 +63,7 @@ async function handleFileUpload(req: Request): Promise<Response> {
     }
 
     // Forward the form data to MIVAA RAG async upload endpoint
+    // Try local API first (for server environment), then fall back to external
     const mivaaUrl = `${MIVAA_SERVICE_URL}/api/rag/documents/upload-async`;
     console.log(`📡 Forwarding to MIVAA async endpoint: POST ${mivaaUrl}`);
 
