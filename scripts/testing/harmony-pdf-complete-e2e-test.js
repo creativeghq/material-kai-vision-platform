@@ -29,6 +29,11 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.s
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTkwNjAzMSwiZXhwIjoyMDY3NDgyMDMxfQ.KCfP909Qttvs3jr4t1pTYMjACVz2-C-Ga4Xm_ZyecwM';
 
+// MIVAA API configuration - try local first, then external
+const MIVAA_LOCAL_API = process.env.MIVAA_LOCAL_API || 'http://127.0.0.1:8000';
+const MIVAA_EXTERNAL_API = 'https://v1api.materialshub.gr';
+const MIVAA_API = process.env.MIVAA_API || MIVAA_EXTERNAL_API;
+
 if (!SUPABASE_SERVICE_KEY) {
   console.error('❌ SUPABASE_SERVICE_ROLE_KEY environment variable is required');
   process.exit(1);
@@ -106,8 +111,8 @@ async function uploadHarmonyPDF() {
     const sizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(2);
     log('UPLOAD', `Downloaded ${sizeMB} MB`, 'success');
     
-    // Trigger processing via MIVAA gateway (RAG upload endpoint)
-    log('UPLOAD', 'Triggering PDF processing via MIVAA gateway...', 'info');
+    // Trigger processing via MIVAA API directly (RAG upload endpoint)
+    log('UPLOAD', `Triggering PDF processing via MIVAA API: ${MIVAA_API}`, 'info');
 
     // Create form data with the PDF
     const FormData = (await import('form-data')).default;
@@ -119,14 +124,42 @@ async function uploadHarmonyPDF() {
     formData.append('workspace_id', WORKSPACE_ID);
     formData.append('title', 'Harmony Signature Book 24-25 - E2E Test');
 
-    const processingResponse = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        ...formData.getHeaders()
-      },
-      body: formData
-    });
+    // Try direct MIVAA API first, then fall back to Edge Function gateway
+    let processingResponse;
+    let usedDirectAPI = false;
+
+    try {
+      log('UPLOAD', `Attempting direct MIVAA API call: POST ${MIVAA_API}/api/rag/documents/upload-async`, 'info');
+      processingResponse = await fetch(`${MIVAA_API}/api/rag/documents/upload-async`, {
+        method: 'POST',
+        headers: {
+          ...formData.getHeaders()
+        },
+        body: formData
+      });
+      usedDirectAPI = true;
+      log('UPLOAD', 'Using direct MIVAA API', 'success');
+    } catch (directError) {
+      log('UPLOAD', `Direct API failed: ${directError.message}, trying Edge Function gateway...`, 'warn');
+
+      // Re-create formData for gateway call
+      const formData2 = new FormData();
+      formData2.append('file', pdfBuffer, {
+        filename: 'harmony-signature-book-24-25.pdf',
+        contentType: 'application/pdf'
+      });
+      formData2.append('workspace_id', WORKSPACE_ID);
+      formData2.append('title', 'Harmony Signature Book 24-25 - E2E Test');
+
+      processingResponse = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          ...formData2.getHeaders()
+        },
+        body: formData2
+      });
+    }
 
     log('UPLOAD', `Response status: ${processingResponse.status}`, 'info');
 
