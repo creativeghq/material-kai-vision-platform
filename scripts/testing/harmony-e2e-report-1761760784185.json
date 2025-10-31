@@ -1,0 +1,127 @@
+{
+  "timestamp": "2025-10-29T17:59:41.041Z",
+  "documentId": null,
+  "steps": [
+    {
+      "step": "UPLOAD",
+      "message": "Starting Harmony PDF upload",
+      "type": "step",
+      "timestamp": "2025-10-29T17:59:41.043Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Fetching PDF from: https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/49f683ad-ebf2-4296-a410-0d8c011ce0be/harmony-signature-book-24-25.pdf",
+      "type": "info",
+      "timestamp": "2025-10-29T17:59:41.043Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Downloaded 10.72 MB",
+      "type": "success",
+      "timestamp": "2025-10-29T17:59:41.836Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Triggering PDF processing via MIVAA API: https://v1api.materialshub.gr",
+      "type": "info",
+      "timestamp": "2025-10-29T17:59:41.836Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Attempting direct MIVAA API call: POST https://v1api.materialshub.gr/api/rag/documents/upload-async",
+      "type": "info",
+      "timestamp": "2025-10-29T17:59:41.863Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Using direct MIVAA API",
+      "type": "success",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response status: 502",
+      "type": "info",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response text length: 166",
+      "type": "info",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Failed to parse JSON: Unexpected token '<', \"<html>\r\n<h\"... is not valid JSON",
+      "type": "error",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Response text: <html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n<hr><center>nginx/1.24.0 (Ubuntu)</center>\r\n</body>\r\n</html>\r\n",
+      "type": "error",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "UPLOAD",
+      "message": "Error: Invalid JSON response: Unexpected token '<', \"<html>\r\n<h\"... is not valid JSON",
+      "type": "error",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Error: Upload failed",
+      "type": "error",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "MAIN",
+      "message": "Test execution failed",
+      "type": "error",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    }
+  ],
+  "validations": {
+    "chunks": {
+      "passed": false,
+      "details": {}
+    },
+    "embeddings": {
+      "passed": false,
+      "details": {}
+    },
+    "images": {
+      "passed": false,
+      "details": {}
+    },
+    "products": {
+      "passed": false,
+      "details": {}
+    },
+    "search": {
+      "passed": false,
+      "details": {}
+    },
+    "quality": {
+      "passed": false,
+      "details": {}
+    },
+    "adminKB": {
+      "passed": false,
+      "details": {}
+    }
+  },
+  "errors": [
+    {
+      "step": "UPLOAD",
+      "error": "Invalid JSON response: Unexpected token '<', \"<html>\r\n<h\"... is not valid JSON",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    },
+    {
+      "step": "MAIN",
+      "error": "Upload failed",
+      "timestamp": "2025-10-29T17:59:44.184Z"
+    }
+  ],
+  "summary": {}
+}

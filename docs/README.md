@@ -57,6 +57,8 @@
 - **[Services Overview](./services/README.md)** - Complete guide to all platform services
 - **[MIVAA Integration](./services/ai-ml/mivaa-integration.md)** - AI processing engine
 - **[Search Hub](./services/search/search-hub.md)** - Unified search system
+- **[PDF Processing - Product Discovery Architecture](./pdf-processing-product-discovery-architecture.md)** - ✨ NEW - Revolutionary 5-stage pipeline with AI-first discovery, focused extraction, and 63% memory reduction
+- **[PDF Processing - Complete Flow](./pdf-processing-complete-flow.md)** - Legacy checkpoint-based processing (deprecated)
 - **[PDF Processing](./services/pdf-processing/pdf-processor.md)** - Document analysis
 - **[Admin Panel](./services/frontend/admin-panel.md)** - System management
 - **[API Gateway](./services/backend/api-gateway.md)** - API management

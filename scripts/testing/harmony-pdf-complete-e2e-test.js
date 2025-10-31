@@ -219,50 +219,17 @@ async function monitorProcessingJob(jobId) {
 
       log('MONITOR', `Attempt ${attempt}/${maxAttempts}`, 'info');
 
-      // ✅ FIX: Check database directly instead of relying on API
-      const { data: jobData, error: dbError } = await supabase
-        .from('background_jobs')
-        .select('*')
-        .eq('id', jobId)
-        .single();
+      // ✅ ALWAYS use MIVAA API endpoint, never direct Supabase queries
+      const statusResponse = await fetch(`${MIVAA_API}/api/rag/documents/job/${jobId}`);
 
-      if (dbError) {
-        log('MONITOR', `Database error: ${dbError.message}`, 'error');
-
-        // Fallback to API if database fails
-        try {
-          const statusResponse = await fetch(`${SUPABASE_URL}/functions/v1/mivaa-gateway`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              action: 'get_job_status',
-              payload: { job_id: jobId }
-            })
-          });
-
-          if (!statusResponse.ok) {
-            throw new Error(`API returned ${statusResponse.status}`);
-          }
-
-          const statusData = await statusResponse.json();
-          const apiJobData = statusData.data || statusData;
-
-          // Use API data
-          status = apiJobData.status;
-          progress = apiJobData.progress || 0;
-          documentId = apiJobData.document_id;
-          error = apiJobData.error;
-          metadata = apiJobData.metadata || {};
-        } catch (apiError) {
-          log('MONITOR', `API also failed: ${apiError.message}`, 'error');
-          continue; // Skip this attempt
-        }
+      if (!statusResponse.ok) {
+        log('MONITOR', `API returned ${statusResponse.status}`, 'error');
+        continue; // Try again
       }
 
-      // Extract job data from database
+      const jobData = await statusResponse.json();
+
+      // Extract job data from API response
       const status = jobData.status;
       const progress = jobData.progress || 0;
       const documentId = jobData.document_id;
@@ -978,6 +945,66 @@ function generateReport() {
 }
 
 // ============================================================================
+// RESUME FROM LATEST JOB
+// ============================================================================
+
+async function getLatestJob() {
+  log('RESUME', 'Checking for latest job via API', 'step');
+
+  try {
+    // Get latest job from API (sorted by created_at DESC)
+    const response = await fetch(`${MIVAA_API}/api/rag/documents/jobs?limit=1&sort=created_at:desc`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to get latest job: ${response.statusText}`);
+    }
+
+    const jobs = await response.json();
+
+    if (!jobs || jobs.length === 0) {
+      log('RESUME', 'No jobs found', 'warning');
+      return null;
+    }
+
+    const latestJob = jobs[0];
+    log('RESUME', `Found latest job: ${latestJob.id}`, 'success');
+    log('RESUME', `  Status: ${latestJob.status}`, 'info');
+    log('RESUME', `  Progress: ${latestJob.progress}%`, 'info');
+    log('RESUME', `  Document ID: ${latestJob.document_id}`, 'info');
+    log('RESUME', `  Created: ${latestJob.created_at}`, 'info');
+
+    return latestJob;
+  } catch (error) {
+    recordError('RESUME', error);
+    return null;
+  }
+}
+
+async function resumeJob(jobId) {
+  log('RESUME', `Resuming job ${jobId} via API`, 'step');
+
+  try {
+    // Call resume endpoint
+    const response = await fetch(`${MIVAA_API}/api/rag/documents/job/${jobId}/resume`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to resume job: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    log('RESUME', `Job resumed successfully`, 'success');
+    log('RESUME', `  Message: ${result.message}`, 'info');
+
+    return { success: true, jobId: jobId, documentId: result.document_id };
+  } catch (error) {
+    recordError('RESUME', error);
+    return { success: false };
+  }
+}
+
+// ============================================================================
 // MAIN EXECUTION
 // ============================================================================
 
@@ -991,11 +1018,36 @@ async function runCompleteE2ETest() {
 
   const startTime = Date.now();
 
+  // Check for --resume flag
+  const shouldResume = process.argv.includes('--resume');
+
   try {
-    // Step 1: Upload PDF
-    const uploadResult = await uploadHarmonyPDF();
+    let uploadResult;
+
+    if (shouldResume) {
+      // Try to resume latest job
+      log('MAIN', 'Resume mode enabled - checking for latest job', 'info');
+      const latestJob = await getLatestJob();
+
+      if (latestJob && (latestJob.status === 'processing' || latestJob.status === 'interrupted' || latestJob.status === 'failed')) {
+        log('MAIN', `Resuming job ${latestJob.id} from ${latestJob.progress}%`, 'info');
+        uploadResult = await resumeJob(latestJob.id);
+
+        if (!uploadResult.success) {
+          log('MAIN', 'Resume failed, starting new upload', 'warning');
+          uploadResult = await uploadHarmonyPDF();
+        }
+      } else {
+        log('MAIN', 'No resumable job found, starting new upload', 'info');
+        uploadResult = await uploadHarmonyPDF();
+      }
+    } else {
+      // Step 1: Upload PDF
+      uploadResult = await uploadHarmonyPDF();
+    }
+
     if (!uploadResult.success) {
-      throw new Error('Upload failed');
+      throw new Error('Upload/Resume failed');
     }
 
     // Step 2: Monitor job (if job-based processing)
