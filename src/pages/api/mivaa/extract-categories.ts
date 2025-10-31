@@ -29,26 +29,14 @@ export default async function handler(
       return res.status(400).json({ error: 'Content and documentId are required' });
     }
 
-    // Call Supabase Edge Function for category extraction
-    const { data, error } = await supabase.functions.invoke('extract-categories', {
-      body: {
-        content,
-        documentId,
-        extractionTypes,
-        options,
-      },
+    // NOTE: This is a legacy Next.js API route not used in Vite app.
+    // The extract-categories Edge Function has been removed.
+    // Category extraction should be done through MIVAA API directly.
+    return res.status(501).json({
+      success: false,
+      error: 'This legacy API route is no longer supported. Use MIVAA API directly.',
+      categories: [],
     });
-
-    if (error) {
-      console.error('Category extraction error:', error);
-      return res.status(500).json({
-        success: false,
-        error: error.message,
-        categories: [],
-      });
-    }
-
-    return res.status(200).json(data);
 
   } catch (error) {
     console.error('API error:', error);

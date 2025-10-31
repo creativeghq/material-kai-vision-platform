@@ -302,17 +302,17 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   // Check provider availability (calls edge function)
   static async checkProviderAvailability(): Promise<Record<string, boolean>> {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
+      const { mivaaApi } = await import('@/services/mivaaApiClient');
 
-      const { data, error } = await supabase.functions.invoke('hybrid-material-analysis', {
-        body: { check_availability: true },
+      const response = await mivaaApi.analyzeMaterial({
+        analysis_type: 'hybrid',
       });
 
-      if (error) {
+      if (!response.success) {
         return { openai: false, claude: false };
       }
 
-      return data.availability || { openai: false, claude: false };
+      return response.data?.availability || { openai: false, claude: false };
     } catch {
       return { openai: false, claude: false };
     }

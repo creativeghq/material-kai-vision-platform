@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 import { RAGSearchRequest, RAGSearchResult, RAGResponse } from '../types/rag';
 
@@ -50,16 +51,18 @@ class RAGKnowledgeService {
     try {
       console.log('Starting RAG knowledge search:', request.query);
 
-      const { data, error } = await supabase.functions.invoke('rag-knowledge-search', {
-        body: request,
+      const response = await mivaaApi.searchSemantic({
+        query: request.query,
+        limit: request.limit,
+        filters: request.filters,
       });
 
-      if (error) {
-        console.error('RAG search error:', error);
-        throw new Error(`RAG search failed: ${error.message}`);
+      if (!response.success || !response.data) {
+        console.error('RAG search error:', response.error);
+        throw new Error(`RAG search failed: ${response.error || 'Unknown error'}`);
       }
 
-      return data as RAGResponse;
+      return response.data as RAGResponse;
 
     } catch (error) {
       console.error('Error in RAG search:', error);
@@ -224,17 +227,12 @@ class RAGKnowledgeService {
 
   /**
    * Start model training on Hugging Face
+   *
+   * NOTE: This feature has been removed as the Edge Function returned MOCK data.
+   * Real model training should be implemented in MIVAA backend if needed.
    */
   async startTraining(request: TrainingRequest): Promise<TrainingResponse> {
-    const { data, error } = await supabase.functions.invoke('huggingface-model-trainer', {
-      body: request,
-    });
-
-    if (error) {
-      throw new Error(`Training setup failed: ${error.message}`);
-    }
-
-    return data;
+    throw new Error('Model training feature is not yet implemented. The previous implementation returned mock data.');
   }
 
   /**

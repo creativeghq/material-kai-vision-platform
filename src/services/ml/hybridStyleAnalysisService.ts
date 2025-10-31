@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import { styleAnalysisService, StyleAnalysisResult, StyleAnalysisOptions } from './styleAnalysisService';
-import { huggingFaceService } from './huggingFaceService';
 
 export interface HybridStyleAnalysisOptions extends StyleAnalysisOptions {
   preferServerAnalysis?: boolean;
@@ -50,6 +49,9 @@ export class HybridStyleAnalysisService {
 
   /**
    * Perform comprehensive style analysis using optimal processing method
+   *
+   * NOTE: Server analysis has been removed as it returned MOCK data.
+   * All analysis is now done client-side using real computer vision algorithms.
    */
   async analyzeStyle(
     imageSource: string | File | Blob,
@@ -59,13 +61,8 @@ export class HybridStyleAnalysisService {
     const startTime = performance.now();
 
     try {
-      const useServerAnalysis = options.preferServerAnalysis || options.includeAIInsights;
-
-      if (useServerAnalysis) {
-        return await this.performServerAnalysis(imageSource, options, materialId);
-      } else {
-        return await this.performClientAnalysis(imageSource, options);
-      }
+      // Always use client-side analysis (server analysis returned MOCK data)
+      return await this.performClientAnalysis(imageSource, options);
 
     } catch (error) {
       console.error('Hybrid style analysis failed:', error);
@@ -89,72 +86,6 @@ export class HybridStyleAnalysisService {
   /**
    * Perform server-side AI analysis
    */
-  private async performServerAnalysis(
-    imageSource: string | File | Blob,
-    options: HybridStyleAnalysisOptions,
-    materialId?: string,
-  ): Promise<HybridStyleResult> {
-    const startTime = performance.now();
-
-    try {
-      // Upload image if it's a file/blob
-      let imageUrl: string;
-
-      if (typeof imageSource === 'string') {
-        imageUrl = imageSource;
-      } else {
-        imageUrl = await this.uploadImageForAnalysis(imageSource);
-      }
-
-      // Call style analysis edge function
-      const { data, error } = await supabase.functions.invoke('style-analysis', {
-        body: {
-          material_id: materialId,
-          image_url: imageUrl,
-          analysis_type: 'full',
-          target_rooms: options.targetRooms,
-          style_preferences: [],
-        },
-      });
-
-      if (error) {
-        throw new Error(`Server analysis failed: ${error.message}`);
-      }
-
-      const processingTime = performance.now() - startTime;
-
-      // Transform server response to match client format
-      const serverAnalysis = data.analysis;
-      const clientFormatAnalysis: StyleAnalysisResult = {
-        primaryStyle: serverAnalysis.primaryStyle,
-        styleConfidence: serverAnalysis.styleConfidence,
-        colorPalette: serverAnalysis.colorPalette,
-        roomSuitability: serverAnalysis.roomSuitability,
-        aestheticProperties: serverAnalysis.aestheticProperties,
-        trendScore: serverAnalysis.trendScore,
-        designTags: serverAnalysis.designTags,
-      };
-
-      return {
-        success: true,
-        analysis: {
-          ...clientFormatAnalysis,
-          aiInsights: {
-            marketingDescription: serverAnalysis.marketingDescription,
-            designerNotes: serverAnalysis.designerNotes,
-            luxuryLevel: serverAnalysis.aestheticProperties.luxuryLevel,
-          },
-        },
-        processingMethod: 'server',
-        processingTime: Math.round(processingTime),
-      };
-
-    } catch (error) {
-      console.error('Server style analysis error:', error);
-      throw error;
-    }
-  }
-
   /**
    * Perform client-side analysis
    */
@@ -168,54 +99,7 @@ export class HybridStyleAnalysisService {
       // Try client-side analysis first
       const result = await styleAnalysisService.analyzeStyle(imageSource, options);
 
-      if (result.success && (result.confidence || 0) > 0.7) {
-        const processingTime = performance.now() - startTime;
-        return {
-          success: true,
-          analysis: result.data as any,
-          processingMethod: 'client',
-          processingTime: Math.round(processingTime),
-        };
-      }
-
-      console.log('Client style analysis confidence low, trying HuggingFace...');
-
-      // Try HuggingFace style analysis as fallback
-      try {
-        await huggingFaceService.initialize();
-        const styleResults = await huggingFaceService.analyzeImageStyle(imageSource as string | File);
-
-        if (styleResults.length > 0) {
-          const topResult = styleResults[0];
-          if (topResult) {
-            const processingTime = performance.now() - startTime;
-
-            return {
-              success: true,
-              analysis: {
-                primaryStyle: topResult.label,
-                styleConfidence: topResult.score,
-                colorPalette: { dominantColors: [], colorHarmony: 'unknown', warmthScore: 0 },
-                roomSuitability: {},
-                aestheticProperties: {
-                  texture: 'smooth' as const,
-                  finish: 'matte' as const,
-                  pattern: 'solid' as const,
-                  modernityScore: 0.5,
-                },
-                trendScore: topResult.score,
-                designTags: [topResult.label],
-              },
-              processingMethod: 'client',
-              processingTime: Math.round(processingTime),
-            };
-          }
-        }
-      } catch (hfError) {
-        console.log('HuggingFace style analysis failed:', hfError);
-      }
-
-      // Return original client result even if confidence is low
+      // Return client result
       const processingTime = performance.now() - startTime;
       return {
         success: result.success,

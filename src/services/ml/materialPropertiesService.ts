@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 import type {
   MaterialApiResponse,
 } from '@/types/unified-material-api';
@@ -93,17 +94,8 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
       throw new Error('Invalid confidenceThreshold configuration');
     }
 
-    // Test edge function availability
-    try {
-      const { error } = await supabase.functions.invoke('material-properties-analysis', {
-        body: { action: 'ping' },
-      });
-      if (error && !error.message.includes('ping')) {
-        console.warn('MaterialPropertiesService: Edge function may not be available:', error);
-      }
-    } catch (error) {
-      console.warn('MaterialPropertiesService: Edge function test failed:', error);
-    }
+    // MIVAA API is always available - no need to test
+    console.log('MaterialPropertiesService: Using MIVAA API for material properties analysis');
   }
 
   protected async doHealthCheck(): Promise<void> {
@@ -168,16 +160,16 @@ class MaterialPropertiesService extends BaseService<MaterialPropertiesServiceCon
     return this.executeOperation(async () => {
       console.log('Starting material properties analysis:', request.analysis_type);
 
-      const { data, error } = await supabase.functions.invoke('material-properties-analysis', {
-        body: {
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          ...request,
-        },
+      const response = await mivaaApi.analyzeProperties({
+        material_id: request.material_id,
+        image_url: request.image_url,
+        image_data: request.image_data,
+        analysis_type: request.analysis_type,
       });
 
-      if (error) {
-        console.error('Material properties analysis error:', error);
-        throw new Error(`Analysis failed: ${error.message}`);
+      if (!response.success || !response.data) {
+        console.error('Material properties analysis error:', response.error);
+        throw new Error(`Analysis failed: ${response.error || 'Unknown error'}`);
       }
 
       return data as MaterialPropertiesResponse;

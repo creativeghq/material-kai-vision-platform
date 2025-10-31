@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 export interface UserPreferences {
   style?: string;
@@ -99,16 +100,15 @@ class SpaceformerAnalysisService {
     try {
       console.log('Starting Spaceformer analysis:', request.room_type);
 
-      const { data, error } = await supabase.functions.invoke('spaceformer-analysis', {
-        body: {
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          ...request,
-        },
+      const response = await mivaaApi.analyzeSpaceformer({
+        image_url: request.image_url,
+        image_data: request.image_data,
+        room_type: request.room_type,
       });
 
-      if (error) {
-        console.error('Spaceformer analysis error:', error);
-        throw new Error(`Spaceformer analysis failed: ${error.message}`);
+      if (!response.success || !response.data) {
+        console.error('Spaceformer analysis error:', response.error);
+        throw new Error(`Spaceformer analysis failed: ${response.error || 'Unknown error'}`);
       }
 
       return data as SpaceformerResult;

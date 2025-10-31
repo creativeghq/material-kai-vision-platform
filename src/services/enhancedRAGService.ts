@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 import { ErrorHandler } from '../utils/errorHandler';
 // Note: Embedding config imports removed as they're not used in this service
@@ -138,16 +139,17 @@ export class EnhancedRAGService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { data, error } = await supabase.functions.invoke('enhanced-rag-search', {
-        body: {
-          ...request,
-          userId: user?.id,
-        },
+      const response = await mivaaApi.searchSemantic({
+        query: request.query,
+        limit: request.maxResults || 10,
+        filters: request.context,
       });
 
-      if (error) {
-        throw error;
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Enhanced RAG search failed');
       }
+
+      const data = response.data;
 
       return data as EnhancedRAGResponse;
     } catch (error) {
@@ -221,17 +223,17 @@ export class EnhancedRAGService {
         throw new Error('User not authenticated');
       }
 
-      // Generate embeddings and semantic analysis via edge function
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-knowledge-content', {
-        body: {
-          title: entry.title,
-          content: entry.content,
-          contentType: entry.contentType,
-        },
+      // Generate embeddings and semantic analysis via MIVAA
+      const response = await mivaaApi.analyzeKnowledge({
+        content: `${entry.title}\n\n${entry.content}`,
+        content_type: entry.contentType,
       });
 
-      if (analysisError) {
-        console.warn('Knowledge analysis failed, proceeding without ML enhancement:', analysisError);
+      let analysisData = null;
+      if (!response.success) {
+        console.warn('Knowledge analysis failed, proceeding without ML enhancement:', response.error);
+      } else {
+        analysisData = response.data;
       }
 
       const { data, error } = await supabase
@@ -490,18 +492,17 @@ export class EnhancedRAGService {
         }
       }
 
-      // Trigger knowledge extraction via edge function
-      const { data, error } = await supabase.functions.invoke('extract-material-knowledge', {
-        body: {
-          materialId,
-          userId: user.id,
-          forceReextraction,
-        },
+      // Trigger knowledge extraction via MIVAA
+      const response = await mivaaApi.extractKnowledge({
+        // Note: materialId may need to be converted to document_id or content
+        document_id: materialId,
       });
 
-      if (error) {
-        throw error;
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Knowledge extraction failed');
       }
+
+      const data = response.data;
 
       return data;
     } catch (error) {

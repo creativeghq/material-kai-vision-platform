@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 export interface SVBRDFExtractionRequest {
   user_id: string;
@@ -52,15 +53,13 @@ export class SVBRDFExtractionAPI {
         throw new Error('User not authenticated');
       }
 
-      const { data, error } = await supabase.functions.invoke('svbrdf-extractor', {
-        body: {
-          ...request,
-          user_id: user.id,
-        },
+      const response = await mivaaApi.extractSvbrdf({
+        image_url: request.image_url,
+        image_data: request.image_data,
       });
 
-      if (error) {
-        throw error;
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'SVBRDF extraction failed');
       }
 
       return data as SVBRDFExtractionResult;

@@ -1,20 +1,162 @@
 # Material Kai Vision Platform - Documentation
 
-> Comprehensive AI-powered material intelligence system combining document processing, material recognition, 3D generation, and knowledge management.
+**AI-Powered Material Intelligence System**
 
-## 🏗️ Architecture Overview
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalog PDFs into searchable knowledge using 12 AI models across a 14-stage processing pipeline.
 
-### Core Components
+---
 
-- **Frontend**: React + TypeScript + Vite with advanced UI components
-- **Backend**: Supabase Edge Functions (TypeScript/Deno)
-- **Database**: PostgreSQL with pgvector extension and Row-Level Security
-- **AI Services**: MIVAA (Material Intelligence Vision and Analysis Agent)
-- **AI/ML Providers**: OpenAI, HuggingFace, Replicate
-- **3D Processing**: SVBRDF extraction and AI-powered generation
-- **Authentication**: JWT-based with Supabase Auth and RBAC
+## 📚 Documentation Index
 
-### Key Features
+### Core Documentation
+
+#### [Overview](overview.md) ⭐
+**Complete platform overview for blog posts and presentations**
+- Executive summary
+- Platform architecture
+- AI models and intelligence
+- PDF processing pipeline (14 stages)
+- Search and discovery
+- Database architecture
+- Frontend features
+- API ecosystem
+- Production metrics
+
+#### [Architecture](architecture.md)
+**System architecture and technology stack**
+- System overview
+- Technology stack (Frontend, Backend, Database, AI)
+- Key components
+- Data flow
+- Security architecture
+- Deployment architecture
+- Performance metrics
+- Monitoring and observability
+
+#### [AI Models](ai-models.md)
+**AI model inventory and integration**
+- 12 AI models across 7 pipeline stages
+- Anthropic Claude (Sonnet 4.5, Haiku 4.5)
+- OpenAI (GPT-4o, text-embedding-3-small)
+- Together AI (Llama 4 Scout 17B Vision)
+- CLIP visual embeddings
+- Multi-vector embeddings (6 types)
+- Model selection strategy
+- Performance benchmarks
+
+#### [PDF Processing](pdf-processing.md)
+**14-stage PDF processing pipeline**
+- Pipeline architecture
+- Stage-by-stage breakdown
+- Product discovery (two-stage AI)
+- Checkpoint recovery system
+- Image processing and analysis
+- API endpoints
+- Performance metrics
+- Error handling
+
+#### [API Reference](api-reference.md)
+**Complete API documentation (74+ endpoints)**
+- RAG & Document Processing (15 endpoints)
+- Search APIs (6 endpoints)
+- Embedding APIs (5 endpoints)
+- Products API (8 endpoints)
+- Images API (6 endpoints)
+- AI Services (7 endpoints)
+- Background Jobs (5 endpoints)
+- Admin & Monitoring (12 endpoints)
+- Error responses and rate limits
+
+#### [Database Schema](database-schema.md)
+**Supabase PostgreSQL database**
+- Core tables (workspaces, documents, chunks, images, products)
+- Storage buckets
+- Vector indexes (pgvector)
+- Row-Level Security (RLS)
+- Functions and triggers
+
+#### [Deployment](deployment.md)
+**Production deployment guide**
+- Frontend deployment (Vercel)
+- MIVAA API deployment (Docker)
+- Supabase deployment
+- Health checks and monitoring
+- Rollback procedures
+- Secrets management
+- Backup and recovery
+
+---
+
+## 🎯 Quick Start
+
+### For Users
+1. Read [Overview](overview.md) for platform capabilities
+2. Check [PDF Processing](pdf-processing.md) for upload guidelines
+3. Explore [API Reference](api-reference.md) for integration
+
+### For Developers
+1. Review [Architecture](architecture.md) for system design
+2. Study [AI Models](ai-models.md) for model integration
+3. Check [Database Schema](database-schema.md) for data structure
+4. Follow [Deployment](deployment.md) for setup
+
+### For Administrators
+1. Read [Deployment](deployment.md) for infrastructure
+2. Check [API Reference](api-reference.md) for monitoring endpoints
+3. Review [Database Schema](database-schema.md) for data management
+
+---
+
+## 🔧 Technical Specifications
+
+### Platform Metrics
+- **Users**: 5,000+
+- **Uptime**: 99.5%+
+- **API Endpoints**: 74+
+- **AI Models**: 12
+- **Processing Stages**: 14
+- **Embedding Types**: 6
+
+### Performance
+- **Search Response**: 200-800ms
+- **PDF Processing**: 1-15 minutes
+- **Product Detection**: 95%+ accuracy
+- **Search Accuracy**: 85%+
+- **Material Recognition**: 90%+
+
+### Technology Stack
+- **Frontend**: React 18 + TypeScript + Vite + Shadcn/ui
+- **Backend**: FastAPI + Python 3.11
+- **Database**: Supabase PostgreSQL 15 + pgvector
+- **AI**: OpenAI, Anthropic, Together AI, CLIP
+- **Deployment**: Vercel + Docker + Supabase Cloud
+
+---
+
+## 📖 Additional Documentation
+
+### Features
+- [Materials Page](features/materials-page.md) - User-facing materials catalog
+- [Product Management](features/product-management.md) - Product CRUD operations
+- [Chunk Management](features/chunk-management.md) - Chunk operations
+
+### Services
+- [Backend Services](services/backend/) - MIVAA API services
+- [Frontend Services](services/frontend/) - React components and services
+- [Database Services](services/database/) - Supabase operations
+- [AI/ML Services](services/ai-ml/) - AI model integrations
+- [PDF Processing Services](services/pdf-processing/) - PDF pipeline services
+- [Search Services](services/search/) - Search and discovery
+
+### Legacy Documentation
+- [Old API Documentation](api-documentation.md) - Deprecated, use [API Reference](api-reference.md)
+- [Old Deployment Guide](deployment-guide.md) - Deprecated, use [Deployment](deployment.md)
+- [PDF Processing Flow](pdf-processing-complete-flow.md) - Deprecated, use [PDF Processing](pdf-processing.md)
+- [AI Models Inventory](ai-models-inventory.md) - Deprecated, use [AI Models](ai-models.md)
+
+---
+
+## 🚀 Key Features
 
 - 🔍 **Vector Similarity Search** - Semantic search with 40% better accuracy
 - 🏷️ **Entity-Based Filtering** - Smart content filtering

@@ -7,6 +7,7 @@
 import { performance } from 'perf_hooks';
 
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 import { AppError } from '../utils/errorHandler';
 import { DEFAULT_EMBEDDING_CONFIG } from '../config/embeddingConfig';
@@ -421,19 +422,18 @@ export class DocumentVectorStoreService {
       }
       embeddingTime = performance.now() - embeddingStart;
 
-      // Perform vector search via Supabase function
+      // Perform vector search via MIVAA API
       const searchStart = performance.now();
-      const { data, error } = await supabase.functions.invoke('document-vector-search', {
-        body: {
-          embedding: queryEmbedding,
-          workspace_id: request.workspaceId,
-          document_ids: request.documentIds,
-          match_threshold: request.threshold || this.config.search.defaultThreshold,
-          match_count: Math.min(
-            request.limit || this.config.search.defaultLimit,
-            this.config.search.maxLimit,
-          ),
-          metadata_filter: request.metadata,
+      const response = await mivaaApi.searchVector({
+        embedding: queryEmbedding,
+        workspace_id: request.workspaceId,
+        document_ids: request.documentIds,
+        match_threshold: request.threshold || this.config.search.defaultThreshold,
+        match_count: Math.min(
+          request.limit || this.config.search.defaultLimit,
+          this.config.search.maxLimit,
+        ),
+        metadata_filter: request.metadata,
         },
       });
       searchTime = performance.now() - searchStart;

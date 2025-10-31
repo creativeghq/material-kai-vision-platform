@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 import {
   ValidationError,
   APIError,
@@ -135,16 +136,17 @@ export class MaterialAgentOrchestratorAPI {
         throw authError;
       }
 
-      const { data, error } = await supabase.functions.invoke('material-agent-orchestrator', {
-        body: {
-          ...request,
-          user_id: user.id,
-        },
+      const response = await mivaaApi.orchestrateAgent({
+        query: request.query || '',
+        context: request,
+        tools: request.tools,
       });
 
-      if (error) {
-        throw error;
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Agent orchestration failed');
       }
+
+      const data = response.data;
 
       // Add runtime validation for the response data
       if (!data) {
@@ -281,16 +283,17 @@ export class SpaceFormerAPI {
         throw new Error('User not authenticated');
       }
 
-      const { data, error } = await supabase.functions.invoke('spaceformer-analysis', {
-        body: {
-          ...request,
-          user_id: user.id,
-        },
+      const response = await mivaaApi.analyzeSpaceformer({
+        image_url: request.image_url,
+        image_data: request.image_data,
+        room_type: request.room_type,
       });
 
-      if (error) {
-        throw error;
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Spaceformer analysis failed');
       }
+
+      const data = response.data;
 
       return data as SpaceFormerResult;
     } catch (error) {

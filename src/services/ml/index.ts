@@ -1,17 +1,12 @@
 // Main ML services exports - CONSOLIDATED
-export { unifiedMLService, UnifiedMLService } from './unifiedMLService';
-export type { UnifiedMLServiceConfig, UnifiedMLOptions, UnifiedMLResult } from './unifiedMLService';
+// Note: unifiedMLService removed - use MIVAA API directly via mivaaApiClient
 
-// Style analysis services
+// Style analysis services (client-side)
 export { styleAnalysisService, StyleAnalysisService } from './styleAnalysisService';
 export { hybridStyleAnalysisService, HybridStyleAnalysisService } from './hybridStyleAnalysisService';
 
-// Individual service components
-export { ImageClassifierService } from './imageClassifier';
-export { TextEmbedderService } from './textEmbedder';
-export { MaterialAnalyzerService } from './materialAnalyzer';
+// Utility services
 export { DeviceDetector } from './deviceDetector';
-export { huggingFaceService, HuggingFaceService } from './huggingFaceService';
 
 // Types
 export type * from './types';
@@ -19,10 +14,6 @@ export type * from './types';
 // Convenience exports for common use cases
 export {
   type MLResult,
-  type ImageClassificationResult,
-  type TextEmbeddingResult,
-  type MaterialAnalysisResult,
-  type FeatureExtractionOptions,
   type DeviceType,
 } from './types';
 
@@ -37,25 +28,3 @@ export {
   type StyleAnalysisResult,
   type StyleAnalysisOptions,
 } from './styleAnalysisService';
-
-
-
-// Import for utility functions
-import { unifiedMLService } from './unifiedMLService';
-
-/**
- * Quick access to the recommended ML service for most use cases
- * This intelligently chooses between client and server processing
- *
- * UPDATED: Now uses the new UnifiedMLService instead of hybridMLService
- */
-export const mlService = unifiedMLService;
-
-/**
- * Utility function to check all ML services status
- *
- * UPDATED: Now uses the new UnifiedMLService
- */
-export function getMLStatus() {
-  return unifiedMLService.getStatus();
-}
