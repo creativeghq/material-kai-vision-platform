@@ -1,10 +1,15 @@
 # MIVAA API Endpoints Reference
 
 **Last Updated:** 2025-11-01
-**Total Endpoints:** 112
-**Status:** ✅ Complete Audit in Progress
+**Total Endpoints:** 108
+**Status:** ✅ Production-Ready (Cleaned)
 
-Complete reference of all 112 API endpoints across 13 categories with detailed usage information, database operations, and integration points.
+Complete reference of all 108 API endpoints across 13 categories with detailed usage information, database operations, and integration points.
+
+**Recent Cleanup:**
+- ✅ Removed 4 test/legacy endpoints from Documents routes
+- ✅ All remaining endpoints are actively used in production
+- ✅ No duplicate or unused endpoints
 
 ---
 
@@ -13,7 +18,7 @@ Complete reference of all 112 API endpoints across 13 categories with detailed u
 1. [RAG Routes](#1-rag-routes-25-endpoints) - 25 endpoints
 2. [Admin Routes](#2-admin-routes-18-endpoints) - 18 endpoints
 3. [Search Routes](#3-search-routes-18-endpoints) - 18 endpoints
-4. [Documents Routes](#4-documents-routes-10-endpoints) - 10 endpoints
+4. [Documents Routes](#4-documents-routes-11-endpoints) - 11 endpoints ✅ (cleaned: removed 4 test endpoints)
 5. [AI Services Routes](#5-ai-services-routes-10-endpoints) - 10 endpoints
 6. [Images Routes](#6-images-routes-5-endpoints) - 5 endpoints
 7. [PDF Routes](#7-pdf-routes-4-endpoints) - 4 endpoints
