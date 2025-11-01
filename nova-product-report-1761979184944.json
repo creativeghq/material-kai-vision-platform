@@ -1,0 +1,757 @@
+{
+  "timestamp": "2025-11-01T06:39:44.920Z",
+  "product": {
+    "name": "NOVA",
+    "designer": "SG NY",
+    "searchTerms": [
+      "NOVA",
+      "SG NY",
+      "SGNY"
+    ]
+  },
+  "job": {
+    "id": "8cb7989c-ddd3-4098-a201-06e10a8aa4e9",
+    "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+    "status": "completed",
+    "progress": 100,
+    "metadata": {
+      "result": {
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "pages_skipped": 4,
+        "product_names": [
+          "VALENOVA",
+          "FOLD",
+          "PIQUÉ",
+          "ONA",
+          "CASTELLO",
+          "MARE",
+          "LOG",
+          "BOW",
+          "LINS",
+          "RAS",
+          "MAISON"
+        ],
+        "chunks_created": 16,
+        "pages_processed": 7,
+        "confidence_score": 0.88,
+        "images_processed": 0,
+        "products_created": 11,
+        "claude_validations": 0,
+        "focused_extraction": true,
+        "products_discovered": 11,
+        "metafields_extracted": 0
+      },
+      "errors_count": 0,
+      "pages_failed": 0,
+      "images_stored": 0,
+      "pages_skipped": 4,
+      "chunks_created": 16,
+      "warnings_count": 4,
+      "pages_completed": 0,
+      "products_created": 11,
+      "knowledge_base_entries": 16,
+      "database_records_created": 0
+    }
+  },
+  "data": {
+    "chunks": [
+      {
+        "id": "03595258-826b-47e9-ba8b-2e9eca92b745",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "RENDIMIENTO MEDIOAMBIENTAL\nEl respeto por el entorno y el compromiso con la sostenibilidad son fundamentales para HARMONY. Buscamos que nuestras actividades sean cada vez más sostenibles, implementando procesos innovadores y eficientes que minimicen los impactos ambientales.\nNuestros valores y pautas de comportamiento incluyen:\n•Certificación de gestión medioambiental ISO /one.LP/four.LP/zero.LP/zero.LP/one.LP: Cumplimos \ncon los estándares internacionales de gestión ambiental.\n•Protección del medioambiente: Nos esforzamos en la reducción y prevención de la contaminación mediante el uso responsable de materias primas, una gestión eficiente de residuos y la minimización de emisiones.\n•Cumplimiento legislativo: Adherimos rigurosamente a la legislación vigente y a los requisitos legales aplicables.\n•Eficiencia energética: Promovemos el uso responsable de la energía a través de tecnologías y prácticas eficientes.\n•Innovación: Fomentamos procesos innovadores que mejoran nuestra eficiencia y reducen el impacto ambiental.\n•Economía circular: Reutilizamos recursos como aguas residuales y restos de materiales, contribuyendo a la disminución del uso de recursos naturales.\nCOMPROMISO REAL CON EL MEDIO AMBIENTEEn HARMONY comprendemos la importancia de equilibrar la actividad productiva con el respeto medioambiental. Por ello, hemos implementado diversas acciones para construir una sociedad más sostenible, enfocando nuestros esfuerzos en:\n/one.LP. Vida útil\nLos productos cerámicos son altamente duraderos, con una vida útil que puede alcanzar los /five.LP/zero.LP años. Esta durabilidad se traduce en menores impactos ambientales comparados con otros materiales de construcción.\n/two.LP. Eficiencia energética y reducción de emisiones de CO2\nHemos implementado medidas significativas para mejorar la eficiencia energética y reducir las emisiones de CO2, tales como:\n•Instalación de quemadores de alta eficiencia e intercambiadores de calor.\n•Protocolos de detección de fugas de calor.\n•Uso de carretillas elevadoras eléctricas en toda la cadena de producción.\n•Montaje de luminarias LED en todas nuestras instalaciones con un ahorro energético de /two.LP/five.LP/zero.LP./zero.LP/zero.LP/zero.LP kWh/año.\n• Instalación de /one.LP/five.LP./zero.LP/zero.LP/zero.LP m/uni00B2 de placas fotovoltaicas, reduciendo la emisión de /six.LP/three.LP/seven.LP toneladas de CO2 anualmente.\n/three.LP. Economía circularNuestro proceso de fabricación sigue un modelo sostenible que reduce residuos y fomenta la reutilización y el reciclaje:\n•Reutilización del /one.LP/zero.LP/zero.LP% de restos de polvo atomizado y otros residuos, siendo aproximadamente /five.LP./zero.LP/zero.LP/zero.LP./zero.LP/zero.LP/zero.LP kg anuales\n•Utilización de material cocido y partículas de polvo de la rectificadora en seco como materias primas recicladas en la fabricación de nuestras baldosas.\n•Aprovechamiento del /one.LP/zero.LP/zero.LP% de las aguas residuales, logrando un vertido cero: más de 14 millones de litros anuales reciclados./four.LP.",
+        "chunk_index": 2,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_2",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "2",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.897,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 3031
+        },
+        "created_at": "2025-11-01T06:37:59.19144+00:00",
+        "updated_at": "2025-11-01T06:37:59.19144+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "product_description",
+        "chunk_type_confidence": 0.85,
+        "chunk_type_metadata": {
+          "colors": [
+            "red",
+            "natural"
+          ],
+          "materials": [
+            "fabric"
+          ],
+          "keyFeatures": [
+            "Certificación de gestión medioambiental ISO /one.LP/four.LP/zero.LP/zero.LP/one.LP: Cumplimos",
+            "Protección del medioambiente: Nos esforzamos en la reducción y prevención de la contaminación mediante el uso responsable de materias primas, una gestión eficiente de residuos y la minimización de emisiones.",
+            "Cumplimiento legislativo: Adherimos rigurosamente a la legislación vigente y a los requisitos legales aplicables.",
+            "Eficiencia energética: Promovemos el uso responsable de la energía a través de tecnologías y prácticas eficientes.",
+            "Innovación: Fomentamos procesos innovadores que mejoran nuestra eficiencia y reducen el impacto ambiental.",
+            "Economía circular: Reutilizamos recursos como aguas residuales y restos de materiales, contribuyendo a la disminución del uso de recursos naturales.",
+            "Instalación de quemadores de alta eficiencia e intercambiadores de calor.",
+            "Protocolos de detección de fugas de calor.",
+            "Uso de carretillas elevadoras eléctricas en toda la cadena de producción.",
+            "Montaje de luminarias LED en todas nuestras instalaciones con un ahorro energético de /two.LP/five.LP/zero.LP./zero.LP/zero.LP/zero.LP kWh/año.",
+            "Instalación de /one.LP/five.LP./zero.LP/zero.LP/zero.LP m/uni00B2 de placas fotovoltaicas, reduciendo la emisión de /six.LP/three.LP/seven.LP toneladas de CO2 anualmente.",
+            "Reutilización del /one.LP/zero.LP/zero.LP% de restos de polvo atomizado y otros residuos, siendo aproximadamente /five.LP./zero.LP/zero.LP/zero.LP./zero.LP/zero.LP/zero.LP kg anuales",
+            "Utilización de material cocido y partículas de polvo de la rectificadora en seco como materias primas recicladas en la fabricación de nuestras baldosas.",
+            "Aprovechamiento del /one.LP/zero.LP/zero.LP% de las aguas residuales, logrando un vertido cero: más de 14 millones de litros anuales reciclados./four.LP."
+          ],
+          "productName": "RENDIMIENTO MEDIOAMBIENTAL"
+        },
+        "content_hash": "577479a9fb9f51e8a23226cd39d9e2a4e6d6c9c0b2578d93d577f5886789b8a8"
+      },
+      {
+        "id": "8af0f03d-9844-49b7-b5e8-db8e02485228",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "ENVIRONMENTAL PERFORMANCE\nRespect for the environment and commitment to sustainability are fundamental for HARMONY. We strive to make our activities increasingly sustainable by implementing innovative and efficient processes that minimize environmental impacts.\nOur values and behavioral guidelines include:\n• ISO /one.LP/four.LP/zero.LP/zero.LP/one.LP Environmental Management Certification: We \ncomply with international environmental management standards.\n•Environmental Protection: We strive to reduce and prevent \npollution through responsible use of raw materials, efficient waste management, and minimizing emissions.\n•Legislative Compliance: We strictly adhere to current legislation and applicable legal requirements.\n•Energy Efficiency: We promote the responsible use of energy through efficient technologies and practices.\n•Innovation: We encourage innovative processes that improve our efficiency and reduce environmental impact.\n•Circular Economy: We reuse resources such as wastewater and material remnants, contributing to the reduction of natural resource usage.\nREAL COMMITMENT TO THE ENVIRONMENTAt HARMONY, we understand the importance of balancing productive activity with environmental respect. Therefore, we have implemented various actions to build a more sustainable society, focusing our efforts on:\n/one.LP. Service life\nCeramic products are highly durable, with a lifespan that can reach up to /five.LP/zero.LP years. This durability translates to lower environmental impacts compared to other construction materials.\n/two.LP. Energy Efficiency and CO2 Emissions Reduction\nWe have implemented significant measures to improve energy efficiency and reduce CO2 emissions, such as:\n•Installing high-efficiency burners and heat exchangers.\n•Implementing heat leak detection protocols.\n•Using electric forklifts throughout the production chain.\n•Installing LED lighting across all our facilities, saving 250,000 kWh/year.\n•Installing 15,000 m/uni00B2 of photovoltaic panels, reducing CO2 emissions by 637 tons annually.\n/three.LP. Circular EconomyOur manufacturing process follows a sustainable model that reduces waste and promotes reuse and recycling:\n•Reusing 100% of atomized powder remnants and other waste, approximately 5,000,000 kg annually.\n•Using fired material and dry grinder dust particles as recycled raw materials in our tile production.\n•Reusing 100% of wastewater, achieving zero discharge: over 14 million liters recycled annually.\n/four.LP. Atmospheric EmissionsWe minimize particle emissions through continuous air purification systems, such as bag filters, which also allow for particle recovery and reuse in the manufacturing process./five.LP. Waste Management\nWe reintroduce 100% of clay waste and industrial water into the production process and efficiently manage cardboard packaging through the SIG-ECOEMBES system.\n6. Eco-Design\nOur products and processes include:\n•Tiles with a minimum of 20% recycled material.\n•Clean digital decoration technology using water-based inks without generating solvent waste.\n•Tile packaging made from 100% recycled and recyclable cardboard.\n•Pallet packaging made from 50% recycled plastic.\n/seven.LP. Sustainable BuildingOur tiles contribute to sustainable construction thanks to:\n•Zero VOC (volatile organic compound) emissions.\n•Ease of cleaning.\n•High solar reflectance, reducing the \"heat island\" effect.\n•Durability and recyclability.\n•Positive impact on energy efficiency.\n•Environmental Product Declaration (EPD).\n8. System and Process CertificationsWe have certifications:\n•ISO /one.LP/four.LP/zero.LP/zero.LP/one.LP: Environmental Management.\n•ISO /nine.LP/zero.LP/zero.LP/one.LP: Quality Management.\n/nine.LP. Product CertificationsOur products have certifications such as:\n•GlobalEPD.\n•ISO 14021.\nETHICAL AND SOCIAL COMMITMENTWe maintain an equality policy, an employee conduct manual, and a code of ethics that guide our social behavior.\nOur values include:\n•Equal opportunities without discrimination.\n•An equitable work environment.\n•Continuous training for professional development.\n•Commitment against child labor.\n•Respect for current legislation, human rights, and ethics.\n•Guarantee of occupational safety and health.\n•Respect for people and dignified work.\n•Good governance and ethical behavior.",
+        "chunk_index": 0,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_0",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "1",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.85,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 4295
+        },
+        "created_at": "2025-11-01T06:37:55.770951+00:00",
+        "updated_at": "2025-11-01T06:37:55.770951+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "product_description",
+        "chunk_type_confidence": 0.85,
+        "chunk_type_metadata": {
+          "colors": [
+            "red",
+            "natural"
+          ],
+          "materials": [
+            "ceramic",
+            "plastic"
+          ],
+          "keyFeatures": [
+            "ISO /one.LP/four.LP/zero.LP/zero.LP/one.LP Environmental Management Certification: We",
+            "Environmental Protection: We strive to reduce and prevent",
+            "Legislative Compliance: We strictly adhere to current legislation and applicable legal requirements.",
+            "Energy Efficiency: We promote the responsible use of energy through efficient technologies and practices.",
+            "Innovation: We encourage innovative processes that improve our efficiency and reduce environmental impact.",
+            "Circular Economy: We reuse resources such as wastewater and material remnants, contributing to the reduction of natural resource usage.",
+            "Installing high-efficiency burners and heat exchangers.",
+            "Implementing heat leak detection protocols.",
+            "Using electric forklifts throughout the production chain.",
+            "Installing LED lighting across all our facilities, saving 250,000 kWh/year.",
+            "Installing 15,000 m/uni00B2 of photovoltaic panels, reducing CO2 emissions by 637 tons annually.",
+            "Reusing 100% of atomized powder remnants and other waste, approximately 5,000,000 kg annually.",
+            "Using fired material and dry grinder dust particles as recycled raw materials in our tile production.",
+            "Reusing 100% of wastewater, achieving zero discharge: over 14 million liters recycled annually.",
+            "ECOEMBES system.",
+            "Design",
+            "Tiles with a minimum of 20% recycled material.",
+            "Clean digital decoration technology using water-based inks without generating solvent waste.",
+            "Tile packaging made from 100% recycled and recyclable cardboard.",
+            "Pallet packaging made from 50% recycled plastic.",
+            "Zero VOC (volatile organic compound) emissions.",
+            "Ease of cleaning.",
+            "High solar reflectance, reducing the \"heat island\" effect.",
+            "Durability and recyclability.",
+            "Positive impact on energy efficiency.",
+            "Environmental Product Declaration (EPD).",
+            "ISO /one.LP/four.LP/zero.LP/zero.LP/one.LP: Environmental Management.",
+            "ISO /nine.LP/zero.LP/zero.LP/one.LP: Quality Management.",
+            "GlobalEPD.",
+            "ISO 14021.",
+            "Equal opportunities without discrimination.",
+            "An equitable work environment.",
+            "Continuous training for professional development.",
+            "Commitment against child labor.",
+            "Respect for current legislation, human rights, and ethics.",
+            "Guarantee of occupational safety and health.",
+            "Respect for people and dignified work.",
+            "Good governance and ethical behavior.",
+            "Eco-Design",
+            "System and Process CertificationsWe have certifications:",
+            "ETHICAL AND SOCIAL COMMITMENTWe maintain an equality policy, an employee conduct manual, and a code of ethics that guide our social behavior."
+          ],
+          "productName": "ENVIRONMENTAL PERFORMANCE"
+        },
+        "content_hash": "32e1d9fb0d77b0a591063fdcb5aa1d76a1e63cda51ecc932497acf13f4cd382c"
+      },
+      {
+        "id": "efed8082-1693-4c7a-ad0e-565d4f7fe617",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "/eight.LP x /one.LP/five.LP./seven.LP \"\nColors:\n      /emdash.cap  /one.LP/one.LP/zero.LP\nLINS\nby YONOH\nWhite body tile\n/two.LP/zero.LP x /two.LP/zero.LP cm\n/seven.LP. /eight.LP x /seven.LP. /eight.LP \"\nColors:\n          \n          /emdash.cap  /nine.LP/eight.LP\nVALENOVA\nby SG NY\nWhite body tile\n/one.LP/one.LP,/eight.LP x /one.LP/one.LP,/eight.LP cm\n/four.LP./six.LP/five.LP x /four.LP./six.LP/five.LP \"\nColors:\n      /emdash.cap  /two.LP/four.LP\nFOLD\nby ESTUDI{H}AC/emdash.cap  /three.LP/two.LP\nWhite body tile\n/one.LP/five.LP x /three.LP/eight.LP cm\n/six.LP x /one.LP/five.LP \"\nColors:\n    ONA\nby DSIGNIO/emdash.cap  /five.LP/two.LP\nWhite body tile\n/one.LP/two.LPx45cm\n/four.LP./seven.LP x /one.LP/seven.LP./seven.LP \"\nColors:\n    \nMAISON   \nby ONSET\nPorcelain tile\n/two.LP/two.LP,/three.LP x /two.LP/two.LP,/three.LP cm\n/eight.LP./seven.LP x /eight.LP./seven.LP \"\nColors:\n  \n/emdash.cap  /one.LP/two.LP/zero.LPCOLLECTIONS INDEX\n/two.LP/zero.LP  ― /two.LP/one.LP  ―",
+        "chunk_index": 7,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_7",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "4",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.88,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 969
+        },
+        "created_at": "2025-11-01T06:38:07.440381+00:00",
+        "updated_at": "2025-11-01T06:38:07.440381+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "product_description",
+        "chunk_type_confidence": 0.85,
+        "chunk_type_metadata": {
+          "colors": [
+            "white"
+          ],
+          "productName": "LP"
+        },
+        "content_hash": "35601eea83e83568557e9c3852027c7370efc43cd90358fc41d03b59a343206b"
+      },
+      {
+        "id": "22350f5d-9036-4977-abd5-c57320a056ce",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "VALENOVA  by SG NY\nWhite Body Tile \n/one.LP/one.LP,/eight.LPx/one.LP/one.LP,/eight.LP cm /threequarteremdash /four.LP./six.LP/five.LPx /four.LP./six.LP/five.LP \"\nclay · sand · white · taupe\nVALENOVA TAUPE LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LP VALENOVA WHITE LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LP /periodcentered.cap VALENOVA SAND LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LP\n/two.LP/four.LP  ― /two.LP/five.LP  ―",
+        "chunk_index": 9,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_9",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "6",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.85,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 450
+        },
+        "created_at": "2025-11-01T06:38:10.750085+00:00",
+        "updated_at": "2025-11-01T06:38:10.750085+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "supporting_content",
+        "chunk_type_confidence": 0.6,
+        "chunk_type_metadata": {},
+        "content_hash": "043684b1187bdd76e7dad0c1f6aa2f8ce0a1613ef6b5521be0e117ce0a5d284c"
+      },
+      {
+        "id": "412ac12a-4fb5-482b-b8d0-0a55b31da332",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "VALENOVA \nby SG NYVALENOVA by SG NY is the new Signature collaboration from Harmony. Stacy Garcia, a New York-based designer, draws inspiration from the elegance of folded paper, redefining the aesthetics of wall covering. Each tile captures the unique essence of textures, reliefs, and shapes that only paper can offer, creating a tactile and visual experience.\nThe collection offers a palette of /four.LP  different colors ranging from vibrant tones that awaken the \nimagination to soft hues that add a touch of serenity for a masterpiece of creativity. With a /one.LP/two.LP x/one.LP/two.LP\nformat, this collection adapts to any space, providing versatility and endless possibilities for the \ncreation of unique designs. Creating spaces with authenticity and style that only the collaboration with Stacy Garcia can deliver.VALENOVA by SG NY, es la nueva colaboración Signature de Harmony. Stacy Garcia, diseñadora neoyorquina, se inspira en la elegancia del doblaje de papel, esta colección redefine la estética del revestimiento. Cada azulejo captura la esencia única de las texturas, relieves y formas que sólo el papel puede ofrecer, creando una experiencia táctil y visual.\nLa colección ofrece una paleta de /four.LP  colores diferentes que van desde tonos vibrantes que despier -\ntan la imaginación hasta colores suaves que añaden un toque de serenidad para una obra maestra \nde la creatividad. Con un formato /one.LP/two.LP x/one.LP/two.LP, esta colección se adapta a cualquier espacio, brindando \nversatilidad y posibilidades infinitas para la creación de diseños únicos. Creando espacios desde la autenticidad y el estilo que solo la colaboración con Stacy Garcia puede ofrecer.\nVALENOVA CLAY LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LP\n/two.LP/six.LP  ― /two.LP/seven.LP  ―",
+        "chunk_index": 10,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_10",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "7",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.88,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 1794
+        },
+        "created_at": "2025-11-01T06:38:12.384942+00:00",
+        "updated_at": "2025-11-01T06:38:12.384942+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "product_description",
+        "chunk_type_confidence": 0.85,
+        "chunk_type_metadata": {
+          "colors": [
+            "red"
+          ],
+          "keyFeatures": [
+            "based designer, draws inspiration from the elegance of folded paper, redefining the aesthetics of wall covering. Each tile captures the unique essence of textures, reliefs, and shapes that only paper can offer, creating a tactile and visual experience.",
+            "tan la imaginación hasta colores suaves que añaden un toque de serenidad para una obra maestra"
+          ],
+          "productName": "VALENOVA"
+        },
+        "content_hash": "3c695764d5804980bf009ec2768c2f8fcda5a6e96a38fe0250f036ff1f3facec"
+      },
+      {
+        "id": "70d5776b-a6ed-4a57-81eb-e01fc30167a9",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "VALENOVA\n by SG NYwhite body tile  ―  /one.LP/one.LP,/eight.LP  x/one.LP/one.LP,/eight.LP  /  /four.LP./six.LP/five.LP x /four.LP./six.LP/five.LP\"\n/three.LP/nine.LP/six.LP/five.LP/six.LP   VALENOVA WHITE LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LP\nQ/five.LP/nine.LP /parenleft.cap/one.LP/one.LP,/eight.LPx /one.LP/one.LP,/eight.LP cm /minus.cap /four.LP/five.LP//eight.LPx/four.LP/five.LP//eight.LP”/parenright.cap\n/one.LP/two.LP patterns  /periodcentered.cap * /one.LP/zero.LP/zero.LP M apei\n/three.LP/nine.LP/six.LP/six.LP/zero.LP   VALENOVA SAND LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LPQ/five.LP/nine.LP /parenleft.cap/one.LP/one.LP,/eight.LPx /one.LP/one.LP,/eight.LP cm /minus.cap /four.LP\n/five.LP//eight.LPx/four.LP/five.LP//eight.LP”/parenright.cap\n/one.LP/two.LP patterns  /periodcentered.cap * /one.LP/three.LP/two.LP M apei/three.LP/nine.LP/six.LP/six.LP/one.LP   VALENOVA TAUPE LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LPQ/five.LP/nine.LP /parenleft.cap/one.LP/one.LP,/eight.LPx /one.LP/one.LP,/eight.LP cm /minus.cap /four.LP\n/five.LP//eight.LPx/four.LP/five.LP//eight.LP”/parenright.cap\n/one.LP/two.LP patterns  /periodcentered.cap ** /four.LP/three.LP Kerakoll\n/three.LP/nine.LP/six.LP/five.LP/nine.LP   VALENOVA CLA Y LT//one.LP/one.LP,/eight.LPX/one.LP/one.LP,/eight.LPQ/five.LP/nine.LP /parenleft.cap/one.LP/one.LP,/eight.LPx /one.LP/one.LP,/eight.LP cm /minus.cap /four.LP\n/five.LP//eight.LPx/four.LP/five.LP//eight.LP”/parenright.cap\n/one.LP/two.LP patterns  /periodcentered.cap ** /four.LP/zero.LP Kerakoll/one.LP/two.LP pieces\n/one.LP/two.LP pieces /one.LP/two.LP pieces\nRecommended joint color  ·  Color de junta recomendado\n* MAPEI | ULTRACOLOR  PLUS  /threequarteremdash  ** KERAKOLL | FUGABELLA\n/one.LP/two.",
+        "chunk_index": 11,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_11",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "8",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 1,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 1763
+        },
+        "created_at": "2025-11-01T06:38:13.996508+00:00",
+        "updated_at": "2025-11-01T06:38:13.996508+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "supporting_content",
+        "chunk_type_confidence": 0.6,
+        "chunk_type_metadata": {},
+        "content_hash": "405d2bf8874ca40fbc2b92b490686dc72be37509e9d95341421ea5bec5aa9902"
+      },
+      {
+        "id": "cdde58fc-5ee4-4b29-be08-1b84bd014a7e",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "LPX/one.LP/one.LP,/eight.LPQ/five.LP/nine.LP /parenleft.cap/one.LP/one.LP,/eight.LPx /one.LP/one.LP,/eight.LP cm /minus.cap /four.LP\n/five.LP//eight.LPx/four.LP/five.LP//eight.LP”/parenright.cap\n/one.LP/two.LP patterns  /periodcentered.cap ** /four.LP/zero.LP Kerakoll/one.LP/two.LP pieces\n/one.LP/two.LP pieces /one.LP/two.LP pieces\nRecommended joint color  ·  Color de junta recomendado\n* MAPEI | ULTRACOLOR  PLUS  /threequarteremdash  ** KERAKOLL | FUGABELLA\n/one.LP/two.LP pieces\nTECHNICAL CHARACTERISTICS PACKING\nMATT GLOSSSHADE  \nVARIATIONSHOWER\nWALLSHOWER\nFLOORFLOOR\nTRAFFIC UNIT m2PIECES \nm2PIECES \nsq fPIECES \nBOXm2 \nBOXsq ft\nBOXWEIGHT \nBOXWEIGHT \nBOX (Ib)BOXES \nPALLETm2\nPALLETsq ft\nPALLETWEIGHT \nPALLETWEIGHT \nPALLET (Ib)cm \nPALLETTHICKNESS\n(mm)THICKNESS\n(inch)\nVALENOVA • • • • 72,00 6.69 36,00 0,50 5.38 7,40 16.32 126 63 678.13 956,2 2108.42 120X80X91 8,30 0.33\n/two.LP/eight.LP  ― /two.LP/nine.LP  ―",
+        "chunk_index": 12,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_12",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "8",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.88,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 914
+        },
+        "created_at": "2025-11-01T06:38:15.63672+00:00",
+        "updated_at": "2025-11-01T06:38:15.63672+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "technical_specs",
+        "chunk_type_confidence": 0.9,
+        "chunk_type_metadata": {
+          "technicalDetails": [
+            "* /four.LP/zero.LP Kerakoll/one.LP/two.LP pieces",
+            "MAPEI | ULTRACOLOR  PLUS  /threequarteremdash  ** KERAKOLL | FUGABELLA",
+            "• • • 72,00 6.69 36,00 0,50 5.38 7,40 16.32 126 63 678.13 956,2 2108.42 120X80X91 8,30 0.33",
+            "69 36,00 0,50 5.38 7,40 16.32 126 63 678.13 956,2 2108.42 120X80X91 8,30 0.33"
+          ]
+        },
+        "content_hash": "5a9a37958d72298592326a30f62b7b293619124550c8bd8232e76e94375608a7"
+      },
+      {
+        "id": "78653452-e941-4cdd-b3e0-2ae426f7530d",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "ALT Design\nAlexandre Touguet\nAlexandre Touguet es un diseñador francés que se graduó en /two.LP/zero.LP/one.LP/zero.LP  en la Escuela \nde Diseño Kedge tras obtener el título de Ingeniero Industrial. Comenzó su \ncarrera junto a algunos de los diseñadores más inﬂuyentes de nuestro tiempo como Ora-ïto, Christophe Pillet o Philippe Starck, durante más de /one.LP/zero.LP  años. \nTras estas experiencias, Alexandre creó la Agencia de ALT  Design en Nantes (Francia). Allí trabaja en proyectos de sectores tan diversos como el mobiliario, el lujo, la tecnología o la medicina.\n LA FUNCIÓN HACE LA FORMA. La Agencia sitúa la función en el centro de \nsu reﬂexión y comienza cada nuevo proyecto con un análisis en profundidad del uso y la ergonomía, parámetros que la mayoría de las veces constituyen el punto de partida de un esbozo formal y estilístico. Inﬂuido por diseñadores como Charles y Ray Eames o Dieter Rams por el rigor y su visión innovadora del diseño industrial, Alexandre está siempre a la búsqueda de nuevos procesos, materiales o tecnologías susceptibles de dar lugar a nuevas pautas de consumo. \nPresta especial atención a las cuestiones medioambientales y se considera un \nactor importante del cambio a través de los productos que diseña. El uso y la elección del material son una verdadera responsabilidad y él se esfuerza por sacarle el máximo partido.Alexandre Touguet is a French Designer, graduated in /two.LP/zero.LP/one.LP/zero.LP from Kedge \nDesign School a/f_ter obtaining a degree in Industrial Engineering. He began his \ncareer alongside some of the most inﬂuential designers of our time such as Ora-ïto, Christophe Pillet or Philippe Starck for more than /one.LP/zero.LP years. A/f_ter these \nexperiences, Alexandre created the ALT Design Agency in Nantes, France. He works there on projects in quite a variety of sectors such as furniture, luxury, technology and medical. \nFORM FOLLOWS FUNCTION. The Agency puts function at the heart of its \nthinking and begins each new project with an in-depth analysis of use and ergonomics, parameters which most of the time constitute the starting point for a formal and stylistic outline. Inﬂuenced by designers such as Charles and Ray Eames or Dieter Rams for the rigor and their innovative vision of industrial design, Alexandre is always on the lookout for new processes, materials or technologies likely to give rise to new consumption pa/t_terns. \nParticularly a/t_tentive to environmental issues, he sees himself as a major actor \nin change through the products he designs. The use and choice of the material is a real responsibility and he strives to make the most of it.\n/seven.LP/three.LP  ―",
+        "chunk_index": 13,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_13",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "9",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.813,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 2665
+        },
+        "created_at": "2025-11-01T06:38:17.29943+00:00",
+        "updated_at": "2025-11-01T06:38:17.29943+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "product_description",
+        "chunk_type_confidence": 0.85,
+        "chunk_type_metadata": {
+          "keyFeatures": [
+            "ïto, Christophe Pillet o Philippe Starck, durante más de /one.LP/zero.LP  años.",
+            "ïto, Christophe Pillet or Philippe Starck for more than /one.LP/zero.LP years. A/f_ter these",
+            "depth analysis of use and ergonomics, parameters which most of the time constitute the starting point for a formal and stylistic outline. Inﬂuenced by designers such as Charles and Ray Eames or Dieter Rams for the rigor and their innovative vision of industrial design, Alexandre is always on the lookout for new processes, materials or technologies likely to give rise to new consumption pa/t_terns."
+          ],
+          "productName": "ALT"
+        },
+        "content_hash": "019900f7e7acec3e585f4c9f752ee57b50206686838082c7acfa3022b37718b9"
+      },
+      {
+        "id": "843607f6-6fa9-40c4-bddd-2485f437087e",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "Collection by furniture and interior designer Francisco Segarra for HARMONY. This porcelain tile \ncollection has transformed aged looking ceramic tiles into a chic upper class design tool. Sold by the square metre, the collection’s white field tiles have a worn-looking charm. They can be combined with geometrically patterned decors featuring the same white background and triangles, circles or squares. By mixing and matching the different shapes, innovative new design effects can be achieved.Colección del diseñador de interiores y mobiliario Francisco Segarra para HARMONY. MAISON by ONSET toma como referencia la cerámica envejecida y la lleva a la alta decoración de venta por metro cuadrado. Su base de tonalidad blanca con aspecto desgastado, se combina con el decorado geométrico que combina la base con motivos grises. Triángulos, círculos y cuadrados que combinados entre sí aportan un resultado novedoso y fresco en el mundo de la decoración.\nMAISON by ONSET\nMAISON PLAIN//nine.LP /periodcentered.cap MAISON DECOR//nine.LP\n/one.LP/two.LP/two.LP  ― /one.LP/two.LP/three.LP  ―",
+        "chunk_index": 14,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_14",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "10",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 0.88,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 1087
+        },
+        "created_at": "2025-11-01T06:38:18.920649+00:00",
+        "updated_at": "2025-11-01T06:38:18.920649+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "product_description",
+        "chunk_type_confidence": 0.85,
+        "chunk_type_metadata": {
+          "colors": [
+            "white",
+            "red"
+          ],
+          "materials": [
+            "ceramic"
+          ],
+          "keyFeatures": [
+            "looking charm. They can be combined with geometrically patterned decors featuring the same white background and triangles, circles or squares. By mixing and matching the different shapes, innovative new design effects can be achieved.Colección del diseñador de interiores y mobiliario Francisco Segarra para HARMONY. MAISON by ONSET toma como referencia la cerámica envejecida y la lleva a la alta decoración de venta por metro cuadrado. Su base de tonalidad blanca con aspecto desgastado, se combina con el decorado geométrico que combina la base con motivos grises. Triángulos, círculos y cuadrados que combinados entre sí aportan un resultado novedoso y fresco en el mundo de la decoración."
+          ],
+          "productName": "HARMONY"
+        },
+        "content_hash": "1440e0902bd858d910aba16c71f2a5c956c5daf799df098c6d666abc68c218ba"
+      },
+      {
+        "id": "87f06586-04ef-4591-a824-86d7fac270ec",
+        "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "workspace_id": null,
+        "content": "We create stunning new living spaces to envelop people in their amazing beauty and \nmoments. We give free rein to designers and architects so that they can channel their \ncreativity into eyecatching innovate, surprising and exclusive collections. HARMONY \nis design, it’s avant-garde, it’s an author. It’s the creative vision of Peronda Group, a \nbusiness founded in  1827 , specializing in bona fide quality products. \n \nCreamos espacios nuevos para llenarlos de vida y de momentos, apostando por \nel diseño y las tendencias. Trabajamos de la mano de diseñadores, arquitectos e \ninterioristas que aportan su visión y la transforman en productos innovadores, \nsorprendentes y exclusivos. HARMONY es diseño, es vanguardia, es autor. Es el \nconcepto creativo de Peronda Group, empresa familiar que nació en 1827  con el \nobjetivo de ofrecer producto genuino y auténtico.",
+        "chunk_index": 15,
+        "metadata": {
+          "title": "NOVA Product Extraction - Focused Test",
+          "source": "pdf",
+          "chunk_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171_chunk_15",
+          "filename": "harmony-signature-book-24-25.pdf",
+          "file_name": "tmp9br0i11b.pdf",
+          "chunk_size": 1000,
+          "has_parent": false,
+          "page_count": 11,
+          "page_label": "11",
+          "document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+          "has_children": false,
+          "total_chunks": 16,
+          "chunk_overlap": 200,
+          "product_pages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "quality_score": 1,
+          "chunk_strategy": "hierarchical",
+          "chunk_size_actual": 868
+        },
+        "created_at": "2025-11-01T06:38:20.501842+00:00",
+        "updated_at": "2025-11-01T06:38:20.501842+00:00",
+        "coherence_score": null,
+        "coherence_metrics": null,
+        "quality_assessment": null,
+        "quality_recommendations": null,
+        "processing_metadata": null,
+        "quality_score": null,
+        "boundary_quality": null,
+        "semantic_completeness": null,
+        "chunk_type": "product_description",
+        "chunk_type_confidence": 0.85,
+        "chunk_type_metadata": {
+          "keyFeatures": [
+            "garde, it’s an author. It’s the creative vision of Peronda Group, a"
+          ],
+          "productName": "HARMONY"
+        },
+        "content_hash": "f39b2020520ecc298fa886835d2f04fb92e4543c41f4a522addc38994e2aaddf"
+      }
+    ],
+    "images": [],
+    "products": [
+      {
+        "id": "5030dcf5-002f-4ec9-b40a-bc9c8364662a",
+        "name": "VALENOVA",
+        "description": "",
+        "long_description": null,
+        "category_id": null,
+        "source_document_id": "fcf9b55b-268e-4c4f-b8f4-680ed0697171",
+        "source_chunks": null,
+        "properties": null,
+        "specifications": null,
+        "metadata": {
+          "studio": "Stacy Garcia",
+          "category": "tiles",
+          "designer": "SG NY",
+          "variants": [
+            {
+              "type": "color",
+              "value": "clay"
+            },
+            {
+              "type": "color",
+              "value": "sand"
+            },
+            {
+              "type": "color",
+              "value": "white"
+            },
+            {
+              "type": "color",
+              "value": "taupe"
+            },
+            {
+              "type": "finish",
+              "value": "matte"
+            }
+          ],
+          "confidence": 0.98,
+          "dimensions": [
+            "11.8×11.8"
+          ],
+          "metafields": {
+            "patterns": "12 patterns",
+            "body_type": "White Body Tile",
+            "grout_mapei": [
+              "100",
+              "132"
+            ],
+            "grout_kerakoll": [
+              "40",
+              "43"
+            ]
+          },
+          "page_range": [
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "embedding": null,
+        "embedding_model": "text-embedding-3-small",
+        "status": "draft",
+        "created_from_type": null,
+        "created_by": null,
+        "created_at": "2025-11-01T06:39:31.031949+00:00",
+        "updated_at": "2025-11-01T06:39:31.031949+00:00",
+        "quality_score": null,
+        "quality_metrics": null,
+        "quality_assessment": null,
+        "confidence_score": null,
+        "completeness_score": null,
+        "text_embedding_1536": null,
+        "visual_clip_embedding_512": null,
+        "multimodal_fusion_embedding_2048": null,
+        "color_embedding_256": null,
+        "texture_embedding_256": null,
+        "application_embedding_512": null,
+        "embedding_metadata": {},
+        "workspace_id": "ffafc28b-1b8b-4b0d-b226-9f9a6154004e"
+      }
+    ],
+    "embeddings": {
+      "text": [],
+      "image": []
+    }
+  },
+  "summary": {
+    "total_chunks": 10,
+    "total_images": 0,
+    "total_products": 1,
+    "total_text_embeddings": 0,
+    "total_image_embeddings": 0
+  }
+}

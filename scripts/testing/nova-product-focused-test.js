@@ -299,34 +299,37 @@ async function retrieveNovaProductData(documentId) {
   const chunksResponse = await fetch(`${MIVAA_API}/api/rag/chunks?document_id=${documentId}`);
   if (chunksResponse.ok) {
     const chunksData = await chunksResponse.json();
-    novaData.chunks = chunksData.filter(chunk => 
+    const chunks = chunksData.chunks || [];
+    novaData.chunks = chunks.filter(chunk =>
       chunk.content?.toLowerCase().includes('nova') ||
       chunk.metadata?.product_name?.toLowerCase().includes('nova')
     );
     log('RETRIEVE', `Found ${novaData.chunks.length} NOVA-related chunks`, 'success');
   }
-  
+
   // Retrieve images
   const imagesResponse = await fetch(`${MIVAA_API}/api/rag/images?document_id=${documentId}`);
   if (imagesResponse.ok) {
     const imagesData = await imagesResponse.json();
-    novaData.images = imagesData.filter(img =>
+    const images = imagesData.images || [];
+    novaData.images = images.filter(img =>
       img.metadata?.product_name?.toLowerCase().includes('nova') ||
       img.caption?.toLowerCase().includes('nova')
     );
     log('RETRIEVE', `Found ${novaData.images.length} NOVA-related images`, 'success');
   }
-  
+
   // Retrieve products
   const productsResponse = await fetch(`${MIVAA_API}/api/rag/products?document_id=${documentId}`);
   if (productsResponse.ok) {
     const productsData = await productsResponse.json();
-    novaData.products = productsData.filter(p => 
+    const products = productsData.products || [];
+    novaData.products = products.filter(p =>
       p.name?.toLowerCase().includes('nova')
     );
     log('RETRIEVE', `Found ${novaData.products.length} NOVA products`, 'success');
   }
-  
+
   return novaData;
 }
 
