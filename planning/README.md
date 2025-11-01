@@ -68,9 +68,67 @@ This directory contains comprehensive planning documentation for the **Category-
 
 ---
 
-## Documentation Files
+## 🎯 Core Question Answered
 
-### **1. category-based-extraction-architecture.md**
+**"How do we extract metafields that appear on non-product pages?"**
+
+**Answer**: Use **three separate extraction scopes**:
+1. **Content Processing** (selected pages) - Create chunks and images
+2. **Global Metafield Search** (ALL pages) - Find universal metafields
+3. **Category-Specific Metafield Search** (selected pages) - Find category-specific metafields
+
+---
+
+## 📚 Documentation Files
+
+### **START HERE** ⭐
+
+### **1. COMPLETE-EXTRACTION-ARCHITECTURE.md** ⭐⭐⭐
+**Purpose**: Full system design answering all core questions
+
+**Contents**:
+- Three-scope extraction model
+- Complete processing pipeline (Stages 0-4)
+- Behavior when categories="all"
+- Consistency guarantees
+- Database schema updates
+- API endpoint specifications
+
+**Read this first** to understand the complete architecture.
+
+---
+
+### **2. METAFIELD-STRATEGY-SUMMARY.md** ⭐⭐
+**Purpose**: Quick reference with visual diagrams
+
+**Contents**:
+- Core question answered
+- Three-layer metafield extraction
+- How it works: complete flow
+- Key differences from current approach
+- Implementation checklist
+- Benefits and next steps
+
+**Read this second** for a quick overview.
+
+---
+
+### **3. metafield-dynamic-extraction-strategy.md** ⭐
+**Purpose**: Detailed implementation guide
+
+**Contents**:
+- Problem statement
+- Architecture overview
+- Three-layer metafield extraction
+- Implementation strategy for all stages
+- Metafield hierarchy
+- Real-world NOVA product example
+
+**Read this third** for implementation details.
+
+---
+
+### **4. category-based-extraction-architecture.md**
 **Purpose**: High-level architecture and design decisions
 
 **Contents**:
@@ -85,7 +143,7 @@ This directory contains comprehensive planning documentation for the **Category-
 - Success criteria
 - Timeline
 
-**Read this first** to understand the overall vision.
+**Reference this** for architectural decisions.
 
 ---
 
