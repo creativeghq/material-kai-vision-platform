@@ -147,22 +147,25 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
     }
   }, [job?.id, job?.status]);
 
-  // Real-time polling for job status updates
+  // Real-time polling for job status updates using MIVAA API
   useEffect(() => {
     if (enablePolling && job && isOpen && (job.status === 'running' || job.status === 'pending')) {
       const startPolling = () => {
         const interval = setInterval(async () => {
           try {
-            // Poll MIVAA gateway for job status
-            const response = await supabase.functions.invoke('mivaa-gateway', {
-              body: {
-                action: 'get_job_status',
-                payload: { job_id: job.id },
+            // Use MIVAA API endpoint directly instead of edge function
+            const mivaaApiUrl = import.meta.env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr';
+            const jobStatusEndpoint = `${mivaaApiUrl}/api/documents/job/${job.id}`;
+
+            const response = await fetch(jobStatusEndpoint, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
               },
             });
 
-            if (response.data?.success && response.data.data) {
-              const statusData = response.data.data;
+            if (response.ok) {
+              const statusData = await response.json();
 
               // Update job status based on polling response
               // This would typically trigger a callback to update the parent component
@@ -175,11 +178,32 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                   setPollingInterval(null);
                 }
               }
+            } else {
+              console.error('❌ Failed to poll job status:', response.status);
+
+              // Fallback to Supabase direct query if API fails
+              const { data: fallbackData, error } = await supabase
+                .from('background_jobs')
+                .select('*')
+                .eq('id', job.id)
+                .single();
+
+              if (!error && fallbackData) {
+                console.log('📊 Job status update (fallback):', fallbackData);
+
+                // Stop polling if job is completed or failed
+                if (fallbackData.status === 'completed' || fallbackData.status === 'failed') {
+                  if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    setPollingInterval(null);
+                  }
+                }
+              }
             }
           } catch (error) {
             console.error('Polling error:', error);
           }
-        }, 2000); // Poll every 2 seconds
+        }, 5000); // Poll every 5 seconds (increased from 2s to reduce load)
 
         setPollingInterval(interval);
       };

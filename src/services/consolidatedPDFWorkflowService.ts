@@ -5,10 +5,8 @@ import { categoryExtractionService, updateDocumentCategories } from './categoryE
 import { dynamicCategoryManagementService } from './dynamicCategoryManagementService';
 import { pdfProcessingWebSocketService } from './realtime/PDFProcessingWebSocketService';
 import { chunkQualityService } from './chunkQualityService';
-import { MetafieldService } from './metafieldService';
 import { EntityRelationshipService } from './entityRelationshipService';
 import { MultiModalImageProductAssociationService } from './multiModalImageProductAssociationService';
-import { CanonicalMetadataSchemaService } from './canonicalMetadataSchemaService';
 import multiVectorGenerationService from './multiVectorGenerationService';
 import enhancedClipIntegrationService from './enhancedClipIntegrationService';
 import { ProductEnrichmentService } from './ProductEnrichmentService';
@@ -334,13 +332,6 @@ export class ConsolidatedPDFWorkflowService {
         id: 'multi-modal-association',
         name: 'Multi-Modal Image-Product Association',
         description: 'Create intelligent image-product links using spatial, caption, and CLIP similarity',
-        status: 'pending',
-        details: [],
-      },
-      {
-        id: 'canonical-metadata-extraction',
-        name: 'Canonical Metadata Extraction',
-        description: 'Extract comprehensive metadata using canonical schema with 120+ fields',
         status: 'pending',
         details: [],
       },
@@ -1215,116 +1206,7 @@ export class ConsolidatedPDFWorkflowService {
         }
       });
 
-      // Step 12: Canonical Metadata Extraction
-      await this.executeStep(jobId, 'canonical-metadata-extraction', async () => {
-        try {
-          const job = this.jobs.get(jobId);
-          const documentId = job?.metadata.documentId as string;
-
-          if (!documentId) {
-            return {
-              details: [
-                this.createInfoDetail('No document ID available for canonical metadata extraction'),
-              ],
-              metadata: {
-                canonicalMetadataSkipped: true,
-              },
-            };
-          }
-
-          // Get all products for this document
-          const { data: products, error: productsError } = await supabase
-            .from('products')
-            .select('id, name, description, long_description')
-            .eq('source_document_id', documentId);
-
-          if (productsError) {
-            throw new Error(`Failed to get products: ${productsError.message}`);
-          }
-
-          if (!products || products.length === 0) {
-            return {
-              details: [
-                this.createInfoDetail('No products found for canonical metadata extraction'),
-              ],
-              metadata: {
-                canonicalMetadataSkipped: true,
-              },
-            };
-          }
-
-          let totalProductsProcessed = 0;
-          let totalFieldsExtracted = 0;
-          let averageConfidence = 0;
-
-          // Extract canonical metadata for each product
-          for (const product of products) {
-            try {
-              const content = [
-                product.name,
-                product.description,
-                product.long_description,
-              ].filter(Boolean).join('\n\n');
-
-              if (content.trim()) {
-                const extractionResult = await CanonicalMetadataSchemaService.extractCanonicalMetadata(
-                  content,
-                  product.id,
-                  {
-                    confidenceThreshold: 0.6,
-                    extractionMethod: 'ai_extraction',
-                    validateRequired: true,
-                  },
-                );
-
-                totalProductsProcessed++;
-                totalFieldsExtracted += extractionResult.extractedFields;
-                averageConfidence += extractionResult.confidence;
-              }
-            } catch (productError) {
-              console.warn(`⚠️ Failed to extract metadata for product ${product.id}:`, productError);
-            }
-          }
-
-          // Calculate final metrics
-          if (totalProductsProcessed > 0) {
-            averageConfidence = averageConfidence / totalProductsProcessed;
-          }
-
-          const details = [
-            this.createInfoDetail(`Processed ${totalProductsProcessed} products for canonical metadata extraction`),
-            this.createInfoDetail(`Extracted ${totalFieldsExtracted} total metadata fields`),
-            this.createInfoDetail(`Average extraction confidence: ${(averageConfidence * 100).toFixed(1)}%`),
-          ];
-
-          if (totalProductsProcessed > 0) {
-            details.push(this.createInfoDetail('✅ Canonical metadata extraction completed successfully'));
-          }
-
-          return {
-            details,
-            metadata: {
-              productsProcessed: totalProductsProcessed,
-              fieldsExtracted: totalFieldsExtracted,
-              averageConfidence,
-              canonicalMetadataCompleted: true,
-            },
-          };
-
-        } catch (error) {
-          console.error('❌ Canonical metadata extraction error:', error);
-          return {
-            details: [
-              this.createInfoDetail(`Canonical metadata extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`),
-            ],
-            metadata: {
-              canonicalMetadataError: true,
-            },
-          };
-        }
-      });
-
-      // Step 12.5: Validation Rules Enforcement
+      // Step 12: Validation Rules Enforcement
       await this.executeStep(jobId, 'validation-rules', async () => {
         try {
           const job = this.jobs.get(jobId);
@@ -2501,53 +2383,7 @@ export class ConsolidatedPDFWorkflowService {
         }
       }
 
-      // Extract metafields for chunks
-      console.log(`🏷️ Starting metafield extraction for ${chunksStored} chunks...`);
-      try {
-        // Get applicable metafield definitions
-        const { data: metafieldDefs } = await supabase
-          .from('material_metadata_fields')
-          .select('*')
-          .order('sort_order', { ascending: true });
-
-        if (metafieldDefs && metafieldDefs.length > 0) {
-          const fieldDefinitionsMap = new Map();
-          metafieldDefs.forEach(field => {
-            fieldDefinitionsMap.set(field.id, field);
-          });
-
-          // Extract metafields for each chunk
-          for (let i = 0; i < Math.min(chunks.length, 10); i++) {
-            const chunk = chunks[i];
-            const chunkId = `${documentId}_chunk_${i}`;
-            const chunkContent = typeof chunk === 'string' ? chunk : chunk.content || chunk.text || '';
-
-            try {
-              console.log(`🏷️ Extracting metafields for chunk ${i + 1}...`);
-              const metafields = await MetafieldService.extractMetafieldsFromText(
-                chunkContent,
-                metafieldDefs,
-              );
-
-              if (Object.keys(metafields).length > 0) {
-                await MetafieldService.saveChunkMetafields(
-                  chunkId,
-                  metafields,
-                  fieldDefinitionsMap,
-                  'pdf_extraction',
-                );
-                console.log(`✅ Saved metafields for chunk ${i + 1}`);
-              }
-            } catch (metafieldError) {
-              console.warn(`⚠️ Metafield extraction failed for chunk ${i + 1}:`, metafieldError);
-              // Continue processing even if metafield extraction fails
-            }
-          }
-          console.log('✅ Metafield extraction completed for chunks');
-        }
-      } catch (metafieldError) {
-        console.warn('⚠️ Metafield extraction setup failed:', metafieldError);
-      }
+      // Metafield extraction removed - using chunks-first architecture
 
       // Store document images
       if (images.length > 0) {
@@ -2639,61 +2475,7 @@ export class ConsolidatedPDFWorkflowService {
         console.log('⚠️ No images to store (images.length = 0)');
       }
 
-      // Extract metafields for images
-      console.log(`🏷️ Starting metafield extraction for ${imagesStored} images...`);
-      try {
-        // Get applicable metafield definitions
-        const { data: metafieldDefs } = await supabase
-          .from('material_metadata_fields')
-          .select('*')
-          .order('sort_order', { ascending: true });
-
-        if (metafieldDefs && metafieldDefs.length > 0) {
-          const fieldDefinitionsMap = new Map();
-          metafieldDefs.forEach((field: any) => {
-            fieldDefinitionsMap.set(field.id, field);
-          });
-
-          // Get stored images and extract metafields
-          const { data: storedImages } = await supabase
-            .from('document_images')
-            .select('id, image_url')
-            .eq('document_id', documentId)
-            .limit(10);
-
-          if (storedImages && storedImages.length > 0) {
-            for (const image of storedImages) {
-              try {
-                if (!image.image_url || image.image_url.startsWith('missing_')) {
-                  console.log(`⏭️ Skipping image ${image.id} - no valid URL`);
-                  continue;
-                }
-
-                console.log(`🏷️ Extracting metafields for image ${image.id}...`);
-                const metafields = await MetafieldService.extractMetafieldsFromImage(
-                  image.image_url,
-                  metafieldDefs,
-                );
-
-                if (Object.keys(metafields).length > 0) {
-                  await MetafieldService.saveImageMetafields(
-                    image.id,
-                    metafields,
-                    fieldDefinitionsMap,
-                    'visual_analysis',
-                  );
-                  console.log(`✅ Saved metafields for image ${image.id}`);
-                }
-              } catch (metafieldError) {
-                console.warn(`⚠️ Metafield extraction failed for image ${image.id}:`, metafieldError);
-              }
-            }
-          }
-          console.log('✅ Metafield extraction completed for images');
-        }
-      } catch (metafieldError) {
-        console.warn('⚠️ Image metafield extraction setup failed:', metafieldError);
-      }
+      // Metafield extraction removed - using chunks-first architecture
 
       console.log(`✅ Storage completed: ${chunksStored} chunks, ${imagesStored} images, ${embeddingsStored} embeddings stored in database`);
 
@@ -2914,51 +2696,48 @@ export class ConsolidatedPDFWorkflowService {
     let attempts = 0;
     let lastCheckpointStage = '';
 
+    // MIVAA API base URL
+    const mivaaApiUrl = (import.meta as any).env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr';
+    const jobStatusEndpoint = `${mivaaApiUrl}/api/documents/job/${actualMivaaJobId}`;
+
     console.log(`🔄 [Job Polling] Starting to poll job: ${actualMivaaJobId}`);
+    console.log(`🔄 [Job Polling] Endpoint: ${jobStatusEndpoint}`);
 
     while (attempts < maxAttempts) {
       try {
         attempts++;
 
-        // Query background_jobs table directly for real-time status
-        const { data: jobData, error: jobError } = await supabase
-          .from('background_jobs')
-          .select('*')
-          .eq('id', actualMivaaJobId)
-          .single();
+        // Use MIVAA API endpoint instead of direct Supabase query
+        const statusResponse = await fetch(jobStatusEndpoint, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        if (jobError) {
-          console.error(`❌ [Job Polling] Failed to query background_jobs: ${jobError.message}`);
+        let jobData: any;
 
-          // Fallback to edge function endpoint if direct query fails
-          const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
-          const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+        if (!statusResponse.ok) {
+          console.error(`❌ [Job Polling] API returned ${statusResponse.status}`);
 
-          const statusUrl = `${supabaseUrl}/functions/v1/mivaa-gateway/job-status/${actualMivaaJobId}`;
+          // If API fails, fallback to direct Supabase query
+          console.log(`⚠️ [Job Polling] Falling back to direct Supabase query...`);
+          const { data: fallbackData, error: jobError } = await supabase
+            .from('background_jobs')
+            .select('*')
+            .eq('id', actualMivaaJobId)
+            .single();
 
-          const statusResponse = await fetch(statusUrl, {
-            headers: {
-              'Authorization': `Bearer ${supabaseKey}`,
-            },
-          });
-
-          if (!statusResponse.ok) {
-            console.error(`❌ Failed to get job status: ${statusResponse.status}`);
+          if (jobError) {
+            console.error(`❌ [Job Polling] Fallback query failed: ${jobError.message}`);
             await new Promise(resolve => setTimeout(resolve, 5000));
             continue;
           }
 
-          const responseData = await statusResponse.json();
-          const fallbackJobData = responseData.data;
-
-          console.log(`🔍 [Job Polling] Fallback job status (attempt ${attempts}):`, {
-            jobId: actualMivaaJobId,
-            status: fallbackJobData?.status,
-            progress: fallbackJobData?.progress,
-          });
-
-          // Continue with fallback data
-          Object.assign(jobData || {}, fallbackJobData);
+          jobData = fallbackData;
+        } else {
+          // Parse successful API response
+          jobData = await statusResponse.json();
         }
 
         console.log(`🔍 [Job Polling] Job status check (attempt ${attempts}):`, {
@@ -2968,7 +2747,7 @@ export class ConsolidatedPDFWorkflowService {
           metadata: jobData?.metadata,
         });
 
-        // Extract progress details from background_jobs table
+        // Extract progress details from job data
         let progressPercentage = jobData?.progress || 0;
         const metadata = jobData?.metadata || {};
         const jobStatus = jobData?.status;
@@ -3715,7 +3494,7 @@ export class ConsolidatedPDFWorkflowService {
   }
 
   /**
-   * Create products from chunks with metafield extraction
+   * Create products from chunks (metafield extraction removed - using chunks-first architecture)
    */
   async createProductsFromChunksWithMetafields(
     chunks: unknown[],
@@ -3725,33 +3504,15 @@ export class ConsolidatedPDFWorkflowService {
   ): Promise<{ productsCreated: number; metafieldsExtracted: number }> {
     // ✅ FIXED: No limit - process all chunks as products (was hardcoded to 5)
     const maxProducts = options.maxProducts || chunks.length;
-    const extractMetafields = options.extractMetafields !== false;
 
-    console.log('📦 Creating products from chunks with metafield extraction...');
+    console.log('📦 Creating products from chunks...');
     console.log(`   Max products: ${maxProducts}`);
-    console.log(`   Extract metafields: ${extractMetafields}`);
 
     let productsCreated = 0;
     let metafieldsExtracted = 0;
 
     try {
-      // Get metafield definitions if extraction is enabled
-      let metafieldDefs: unknown[] = [];
-      let fieldDefinitionsMap = new Map();
-
-      if (extractMetafields) {
-        const { data: defs } = await supabase
-          .from('material_metadata_fields')
-          .select('*')
-          .order('sort_order', { ascending: true });
-
-        if (defs && defs.length > 0) {
-          metafieldDefs = defs as any;
-          defs.forEach((field: any) => {
-            fieldDefinitionsMap.set(field.id, field);
-          });
-        }
-      }
+      // Metafield extraction removed - using chunks-first architecture
 
       // Create products from chunks
       for (let i = 0; i < Math.min(chunks.length, maxProducts); i++) {
@@ -3803,31 +3564,7 @@ export class ConsolidatedPDFWorkflowService {
           productsCreated++;
           console.log(`✅ Product created: ${product.id}`);
 
-          // Extract and save metafields if enabled
-          if (extractMetafields && metafieldDefs.length > 0) {
-            try {
-              console.log(`🏷️ Extracting metafields for product ${i + 1}...`);
-
-              const productText = `${product.name} ${product.description} ${product.long_description}`;
-              const metafields = await MetafieldService.extractMetafieldsFromText(
-                productText,
-                metafieldDefs as any,
-              );
-
-              if (Object.keys(metafields).length > 0) {
-                await MetafieldService.saveProductMetafields(
-                  product.id,
-                  metafields,
-                  fieldDefinitionsMap,
-                  'product_extraction',
-                );
-                metafieldsExtracted++;
-                console.log(`✅ Metafields extracted for product ${i + 1}`);
-              }
-            } catch (metafieldError) {
-              console.warn(`⚠️ Metafield extraction failed for product ${i + 1}:`, metafieldError);
-            }
-          }
+          // Metafield extraction removed - using chunks-first architecture
 
           // Link chunk to product
           try {
