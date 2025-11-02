@@ -1,5 +1,85 @@
 # Deployment Guide
 
+## 🔐 **Complete Secrets Reference**
+
+**All secrets required for deployment across all platforms.**
+
+### **Supabase Secrets**
+
+| Secret Name | Type | Where Used | Description | Example/Format |
+|------------|------|------------|-------------|----------------|
+| `SUPABASE_URL` | Public | Frontend, Backend, Edge Functions | Supabase project URL | `https://bgbavxtjlbvgplozizxu.supabase.co` |
+| `SUPABASE_ANON_KEY` | Public | Frontend, Backend | Public anonymous key for client-side | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Secret** | Backend, Edge Functions | Service role key (admin access) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SUPABASE_JWT_SECRET` | **Secret** | Backend | JWT verification secret | `your-super-secret-jwt-secret-with-at-least-32-characters` |
+| `SUPABASE_DB_PASSWORD` | **Secret** | Direct DB access (optional) | Database password | `your-secure-db-password` |
+
+### **GitHub Secrets**
+
+| Secret Name | Type | Where Used | Description | Example/Format |
+|------------|------|------------|-------------|----------------|
+| `GH_TOKEN` | **Secret** | GitHub Actions | Personal access token for deployments | `ghp_xxxxxxxxxxxxxxxxxxxx` |
+| `VERCEL_TOKEN` | **Secret** | GitHub Actions | Vercel deployment token | `xxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VERCEL_ORG_ID` | Public | GitHub Actions | Vercel organization ID | `team_xxxxxxxxxxxxxxxx` |
+| `VERCEL_PROJECT_ID` | Public | GitHub Actions | Vercel project ID | `prj_xxxxxxxxxxxxxxxx` |
+| `SSH_PRIVATE_KEY` | **Secret** | GitHub Actions | SSH key for server deployment | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `SSH_HOST` | Public | GitHub Actions | Server hostname | `v1api.materialshub.gr` |
+| `SSH_USER` | Public | GitHub Actions | SSH username | `root` or `deploy` |
+
+### **Vercel Environment Variables**
+
+| Secret Name | Type | Environment | Description | Example/Format |
+|------------|------|-------------|-------------|----------------|
+| `SUPABASE_URL` | Public | Production, Preview | Supabase project URL | `https://bgbavxtjlbvgplozizxu.supabase.co` |
+| `SUPABASE_ANON_KEY` | Public | Production, Preview | Supabase anonymous key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Secret** | Production | Service role key for Edge Functions | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `MIVAA_GATEWAY_URL` | Public | Production, Preview | MIVAA API endpoint | `https://v1api.materialshub.gr` |
+| `MIVAA_API_KEY` | **Secret** | Production | MIVAA JWT token | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `VITE_OPENAI_API_KEY` | **Secret** | Production | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
+| `VITE_ANTHROPIC_API_KEY` | **Secret** | Production | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
+| `VITE_TOGETHER_AI_API_KEY` | **Secret** | Production | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VITE_REPLICATE_API_TOKEN` | **Secret** | Production | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
+| `NODE_ENV` | Public | Production | Node environment | `production` |
+| `VITE_DEBUG` | Public | Production, Preview | Debug mode | `false` (production), `true` (preview) |
+
+### **Backend/MIVAA Service Secrets**
+
+| Secret Name | Type | Where Set | Description | Example/Format |
+|------------|------|-----------|-------------|----------------|
+| `SUPABASE_URL` | Public | Server ENV | Supabase project URL | `https://bgbavxtjlbvgplozizxu.supabase.co` |
+| `SUPABASE_ANON_KEY` | Public | Server ENV | Supabase anonymous key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Secret** | Server ENV | Service role key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `JWT_SECRET_KEY` | **Secret** | Server ENV | JWT signing secret | `your-super-secret-jwt-secret-with-at-least-32-characters` |
+| `OPENAI_API_KEY` | **Secret** | Server ENV | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
+| `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
+| `TOGETHER_AI_API_KEY` | **Secret** | Server ENV | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
+| `SENTRY_DSN` | **Secret** | Server ENV | Sentry error tracking DSN | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
+| `CORS_ORIGINS` | Public | Server ENV | Allowed CORS origins | `https://your-domain.com,https://preview.vercel.app` |
+| `ENVIRONMENT` | Public | Server ENV | Environment name | `production`, `staging`, `development` |
+| `DEBUG` | Public | Server ENV | Debug mode | `false` (production), `true` (development) |
+| `LOG_LEVEL` | Public | Server ENV | Logging level | `ERROR`, `WARNING`, `INFO`, `DEBUG` |
+
+### **AI Service API Keys**
+
+| Service | Secret Name | Where Used | How to Get | Pricing |
+|---------|------------|------------|------------|---------|
+| **OpenAI** | `OPENAI_API_KEY` | Frontend, Backend | https://platform.openai.com/api-keys | Pay-per-use |
+| **Anthropic** | `ANTHROPIC_API_KEY` | Backend | https://console.anthropic.com/ | Pay-per-use |
+| **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use |
+| **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
+
+### **Optional Monitoring & Analytics Secrets**
+
+| Secret Name | Type | Where Used | Description | Example/Format |
+|------------|------|------------|-------------|----------------|
+| `SENTRY_DSN` | **Secret** | Backend | Sentry error tracking | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
+| `SENTRY_AUTH_TOKEN` | **Secret** | GitHub Actions | Sentry release tracking | `sntrys_xxxxxxxxxxxxxxxx` |
+| `GOOGLE_ANALYTICS_ID` | Public | Frontend | Google Analytics tracking | `G-XXXXXXXXXX` |
+| `POSTHOG_API_KEY` | **Secret** | Frontend | PostHog analytics | `phc_xxxxxxxxxxxxxxxx` |
+
+---
+
 ## 🚀 Deployment Architecture
 
 The Material Kai Vision Platform uses a multi-service deployment strategy:
@@ -7,7 +87,7 @@ The Material Kai Vision Platform uses a multi-service deployment strategy:
 1. **Frontend**: Vercel (Static hosting + Edge functions)
 2. **MIVAA Service**: Docker containers (Self-hosted or cloud)
 3. **Database**: Supabase (Managed PostgreSQL)
-4. **External APIs**: Third-party services (OpenAI, HuggingFace, Replicate)
+4. **External APIs**: Third-party services (OpenAI, Anthropic, Together AI, Replicate)
 
 ## 🏗️ Infrastructure Overview
 
