@@ -123,19 +123,34 @@ const KnowledgeBaseManagement: React.FC = () => {
   const fetchRelatedDocuments = async (documentId: string) => {
     setLoadingRelated(true);
     try {
+      // Use RAG search to find related documents based on similarity
+      // First, get the document content to use as query
+      const { data: document } = await supabase
+        .from('documents')
+        .select('title, description')
+        .eq('id', documentId)
+        .single();
+
+      if (!document) {
+        throw new Error('Document not found');
+      }
+
+      // Use the document title/description as search query
+      const searchQuery = `${document.title || ''} ${document.description || ''}`.trim();
+
       const response = await supabase.functions.invoke('mivaa-gateway', {
         body: {
-          action: 'get_related_documents',
+          action: 'rag_search',
           payload: {
-            document_id: documentId,
-            limit: 10,
-            similarity_threshold: 0.7,
+            query: searchQuery,
+            top_k: 10,
+            strategy: 'semantic',
           },
         },
       });
 
-      if (response.data?.related_documents) {
-        setRelatedDocs(response.data.related_documents);
+      if (response.data?.results) {
+        setRelatedDocs(response.data.results);
       }
     } catch (error) {
       console.error('Error fetching related documents:', error);
@@ -247,25 +262,15 @@ const KnowledgeBaseManagement: React.FC = () => {
 
     setComparingDocs(true);
     try {
-      const response = await supabase.functions.invoke('mivaa-gateway', {
-        body: {
-          action: 'compare_documents',
-          payload: {
-            document_ids: selectedDocsForComparison,
-            comparison_type: 'comprehensive',
-            include_similarities: true,
-            include_differences: true,
-          },
-        },
+      // Document comparison feature removed - use RAG search to find similarities instead
+      toast({
+        title: 'Feature Not Available',
+        description: 'Document comparison has been removed. Use the search feature to find similar documents.',
+        variant: 'default',
       });
 
-      if (response.data) {
-        setComparisonResult(response.data);
-        toast({
-          title: 'Success',
-          description: 'Document comparison completed',
-        });
-      }
+      // Clear selection
+      setSelectedDocsForComparison([]);
     } catch (error) {
       console.error('Error comparing documents:', error);
       toast({

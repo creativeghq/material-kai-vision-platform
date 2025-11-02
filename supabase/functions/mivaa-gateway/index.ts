@@ -71,15 +71,14 @@ const MIVAA_ENDPOINTS = {
   'admin_prompts_history': { path: '/api/admin/prompts/history/{prompt_id}', method: 'GET' },  // Prompt history
   'admin_prompts_test': { path: '/api/admin/prompts/test', method: 'POST' },  // Test prompt
 
-  // ==================== DOCUMENTS ROUTES ====================
-  'documents_analyze': { path: '/api/documents/analyze', method: 'POST' },  // Analyze document
-  'documents_health': { path: '/api/documents/health', method: 'GET' },  // Documents service health
-  'documents_list': { path: '/api/documents/documents', method: 'GET' },  // List documents
-  'documents_get': { path: '/api/documents/documents/{document_id}', method: 'GET' },  // Get document metadata
-  'documents_get_content': { path: '/api/documents/documents/{document_id}/content', method: 'GET' },  // Get document content
-  'documents_get_chunks': { path: '/api/documents/documents/{document_id}/chunks', method: 'GET' },  // Get document chunks
-  'documents_get_images': { path: '/api/documents/documents/{document_id}/images', method: 'GET' },  // Get document images
-  'documents_delete': { path: '/api/documents/documents/{document_id}', method: 'DELETE' },  // Delete document
+  // ==================== DOCUMENTS ROUTES (Migrated to RAG) ====================
+  // Legacy /api/documents/* endpoints removed - use /api/rag/* instead
+  'documents_list': { path: '/api/rag/documents', method: 'GET' },  // List documents
+  'documents_get_content': { path: '/api/rag/documents/documents/{document_id}/content', method: 'GET' },  // Get document content
+  'documents_get_chunks': { path: '/api/rag/chunks', method: 'GET' },  // Get document chunks (use ?document_id={id})
+  'documents_get_images': { path: '/api/rag/images', method: 'GET' },  // Get document images (use ?document_id={id})
+  'documents_delete': { path: '/api/rag/documents/{document_id}', method: 'DELETE' },  // Delete document
+  'documents_health': { path: '/api/rag/health', method: 'GET' },  // RAG service health
 
   // ==================== DOCUMENT ENTITIES ====================
   'entities_list': { path: '/api/document-entities/', method: 'GET' },  // List entities (certificates, logos, specs)
