@@ -438,6 +438,33 @@ export class MivaaApiClient {
       body: JSON.stringify(payload),
     });
   }
+
+  // ==================== PDF PROCESSING ====================
+
+  /**
+   * Upload PDF for processing
+   */
+  async uploadPDF(formData: FormData): Promise<MivaaApiResponse> {
+    return this.requestFormData('/api/documents/upload', formData);
+  }
+
+  /**
+   * Get job status
+   */
+  async getJobStatus(jobId: string): Promise<MivaaApiResponse> {
+    return this.request(`/api/jobs/${jobId}/status`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get job result
+   */
+  async getJobResult(jobId: string): Promise<MivaaApiResponse> {
+    return this.request(`/api/jobs/${jobId}/result`, {
+      method: 'GET',
+    });
+  }
 }
 
 // Export singleton instance

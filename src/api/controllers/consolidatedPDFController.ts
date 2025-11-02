@@ -4,8 +4,7 @@ import { MivaaIntegrationService, PdfExtractionRequest, defaultMivaaConfig } fro
 import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
 import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAuthMiddleware';
 import { supabase } from '../../integrations/supabase/client';
-import { DocumentVectorStoreService, createDocumentVectorStoreService } from '../../services/documentVectorStoreService';
-import { EmbeddingGenerationService, defaultEmbeddingConfig } from '../../services/embeddingGenerationService';
+import { mivaaApi } from '../../services/mivaaApiClient';
 
 /**
  * Request/Response types for unified PDF API
@@ -357,14 +356,10 @@ export class RateLimitHelper {
  */
 export class ConsolidatedPDFController {
   private mivaaService: MivaaIntegrationService;
-  private vectorStoreService: DocumentVectorStoreService;
   private activeJobs: Map<string, ProcessingJob> = new Map();
 
   constructor() {
     this.mivaaService = new MivaaIntegrationService(defaultMivaaConfig);
-    // Initialize vector store service with embedding service
-    const embeddingService = new EmbeddingGenerationService(defaultEmbeddingConfig);
-    this.vectorStoreService = createDocumentVectorStoreService(embeddingService);
   }
 
   /**
@@ -878,31 +873,38 @@ export class ConsolidatedPDFController {
         };
       }
 
-      // Perform real vector search using DocumentVectorStoreService
-      const searchResults = await this.vectorStoreService.search({
+      // Perform vector search using MIVAA API
+      const searchResponse = await mivaaApi.searchSemantic({
         query: request.query,
-        workspaceId: request.workspaceId,
         limit: request.options?.limit || 10,
-        threshold: request.options?.threshold || 0.7,
-        metadata: request.options?.includeMetadata ? {} : undefined,
+        filters: {
+          workspace_id: request.workspaceId,
+          threshold: request.options?.threshold || 0.7,
+        },
       });
+
+      if (!searchResponse.success || !searchResponse.data) {
+        throw new Error(searchResponse.error || 'Search failed');
+      }
+
+      const searchResults = searchResponse.data;
 
       // Transform results to match DocumentSearchResponse format
       const transformedResults: DocumentSearchResponse = {
-        results: searchResults.results.map(result => ({
-          documentId: result.documentId,
-          chunkId: result.chunkId,
-          content: result.content,
-          similarity: result.similarity,
+        results: (searchResults.results || []).map((result: any) => ({
+          documentId: result.document_id || result.documentId || '',
+          chunkId: result.chunk_id || result.chunkId || '',
+          content: result.content || '',
+          similarity: result.similarity || result.score || 0,
           metadata: {
-            filename: (result.metadata?.filename as string) || 'unknown',
-            pageNumber: (result.metadata?.pageNumber as number) || 0,
-            chunkIndex: (result.metadata?.chunkIndex as number) || 0,
-            tags: (result.metadata?.tags as string[]) || [],
+            filename: result.metadata?.filename || 'unknown',
+            pageNumber: result.metadata?.page_number || result.metadata?.pageNumber || 0,
+            chunkIndex: result.metadata?.chunk_index || result.metadata?.chunkIndex || 0,
+            tags: result.metadata?.tags || [],
           },
-  })),
-        totalResults: searchResults.totalMatches,
-        searchTime: searchResults.processingTime,
+        })),
+        totalResults: searchResults.total || searchResults.totalMatches || 0,
+        searchTime: searchResponse.processing_time || 0,
       };
 
       // Log usage
