@@ -442,16 +442,29 @@ export const AITestingPanel: React.FC = () => {
     setResults([]);
 
     try {
-      // Mock test file data since uploaded_files table doesn't exist
-      const testFile = {
-        id: 'test-file-' + Date.now(),
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        file_name: 'test-image.jpg',
-        file_type: 'image',
-        storage_path: testImageUrl,
-        file_size: 0,
-        metadata: { test: true, original_url: testImageUrl },
-      };
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User authentication required');
+      }
+
+      // Create test file record in uploaded_files table
+      const { data: testFile, error: uploadError } = await supabase
+        .from('uploaded_files')
+        .insert({
+          user_id: user.id,
+          file_name: 'test-image.jpg',
+          file_type: 'image',
+          storage_path: testImageUrl,
+          file_size: 0,
+          metadata: { test: true, original_url: testImageUrl },
+        })
+        .select()
+        .single();
+
+      if (uploadError || !testFile) {
+        throw new Error(`Failed to create test file record: ${uploadError?.message || 'Unknown error'}`);
+      }
 
       // Test hybrid analysis
       const apiService = BrowserApiIntegrationService.getInstance();

@@ -305,16 +305,11 @@ export const Designer3DPage: React.FC = () => {
 
     const poll = async () => {
       try {
-        // TODO: Implement generation_3d table or replace with proper backend
-        // const { data, error } = await supabase
-        //   .from('generation_3d')
-        //   .select('*')
-        //   .eq('id', generationId)
-        //   .single();
-
-        // Mock response for now to prevent build errors
-        const data: unknown = null;
-        const error = { message: 'generation_3d table not implemented' };
+        const { data, error } = await supabase
+          .from('generation_3d')
+          .select('*')
+          .eq('id', _generationId)
+          .single();
 
         if (error) {
           // eslint-disable-next-line no-console

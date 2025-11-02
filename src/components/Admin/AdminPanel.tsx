@@ -59,20 +59,16 @@ export const AdminPanel: React.FC = () => {
       setLoading(true);
 
       // Fetch all AI-related analytics events
-      // TODO: Create analytics_events table in database schema
-      // const { data, error } = await supabase
-      //   .from('analytics_events')
-      //   .select('*')
-      //   .or('event_type.ilike.%ai%,event_type.ilike.%hybrid%')
-      //   .order('created_at', { ascending: false })
-      //   .limit(100);
+      const { data, error } = await supabase
+        .from('analytics_events')
+        .select('*')
+        .or('event_type.ilike.%ai%,event_type.ilike.%hybrid%')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-      // if (error) {
-      //   throw error;
-      // }
-
-      // Mock response until analytics_events table is created
-      const data: unknown = null;
+      if (error) {
+        throw error;
+      }
 
       const filteredData = Array.isArray(data)
         ? data.filter((item: unknown) =>

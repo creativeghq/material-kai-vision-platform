@@ -55,22 +55,12 @@ const AgentMLCoordination: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      // TODO: Create agent_tasks table in database schema
-      // const [agentTasksResult, mlTasksResult] = await Promise.all([
-      //   supabase
-      //     .from('agent_tasks')
-      //     .select('*')
-      //     .order('created_at', { ascending: false })
-      //     .limit(50),
-      //   supabase
-      //     .from('agent_ml_tasks')
-      //     .select('*')
-      //     .order('created_at', { ascending: false })
-
-      // Mock response for agent_tasks until table is created
-      const agentTasksResult: { data: null; error: null } = { data: null, error: null };
-
-      const [mlTasksResult] = await Promise.all([
+      const [agentTasksResult, mlTasksResult] = await Promise.all([
+        supabase
+          .from('agent_tasks')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50),
         supabase
           .from('agent_ml_tasks')
           .select('*')
