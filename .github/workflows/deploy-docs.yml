@@ -65,8 +65,11 @@ jobs:
           # Create build directory
           mkdir -p docs-temp/build
 
-          # Create index.html
-          cat > docs-temp/build/index.html << 'EOF'
+          # Generate dynamic index.html based on actual files
+          echo "Scanning docs folder for markdown files..."
+
+          # Start building the index.html
+          cat > docs-temp/build/index.html << 'HEADER'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -78,99 +81,85 @@ jobs:
                   .container { max-width: 1200px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
                   h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
                   h2 { color: #34495e; margin-top: 30px; }
-                  .docs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px; }
-                  .doc-card { background: #f8f9fa; padding: 20px; border-radius: 6px; border-left: 4px solid #3498db; }
-                  .doc-card h3 { margin-top: 0; color: #2c3e50; }
-                  .doc-card a { color: #3498db; text-decoration: none; font-weight: 500; }
-                  .doc-card a:hover { text-decoration: underline; }
-                  .services-section { margin-top: 40px; }
-                  .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }
-                  .service-item { background: #e8f4fd; padding: 15px; border-radius: 4px; }
-                  .service-item a { color: #2980b9; }
+                  .docs-list { margin-top: 30px; }
+                  .doc-item { background: #f8f9fa; padding: 15px 20px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #3498db; }
+                  .doc-item a { color: #3498db; text-decoration: none; font-weight: 500; font-size: 16px; }
+                  .doc-item a:hover { text-decoration: underline; }
+                  .doc-item .description { color: #7f8c8d; font-size: 14px; margin-top: 5px; }
+                  .api-links { display: flex; gap: 15px; margin-bottom: 30px; }
+                  .api-link { background: #27ae60; color: white; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .api-link.redoc { background: #e74c3c; }
+                  .stats { background: #ecf0f1; padding: 20px; border-radius: 6px; margin-bottom: 30px; }
+                  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+                  .stat-item { text-align: center; }
+                  .stat-value { font-size: 32px; font-weight: bold; color: #2c3e50; }
+                  .stat-label { color: #7f8c8d; font-size: 14px; }
               </style>
           </head>
           <body>
               <div class="container">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                      <div>
-                          <h1 style="margin: 0;">🚀 Material Kai Vision Platform Documentation</h1>
-                          <p style="margin: 10px 0 0 0;">AI-powered material intelligence system with comprehensive documentation and services.</p>
-                      </div>
-                      <div style="display: flex; gap: 15px;">
-                          <a href="https://v1api.materialshub.gr/docs" target="_blank" style="background: #27ae60; color: white; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;">
-                              📡 API Docs
-                          </a>
-                          <a href="https://v1api.materialshub.gr/redoc" target="_blank" style="background: #e74c3c; color: white; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.3s ease;">
-                              📋 ReDoc
-                          </a>
+                  <h1>🚀 Material Kai Vision Platform Documentation</h1>
+                  <p style="color: #7f8c8d; font-size: 16px;">AI-powered material intelligence system - Complete documentation and API reference</p>
+
+                  <div class="api-links">
+                      <a href="https://v1api.materialshub.gr/docs" target="_blank" class="api-link">📡 API Docs (Swagger)</a>
+                      <a href="https://v1api.materialshub.gr/redoc" target="_blank" class="api-link redoc">📋 ReDoc</a>
+                  </div>
+
+                  <div class="stats">
+                      <div class="stats-grid">
+                          <div class="stat-item">
+                              <div class="stat-value">113</div>
+                              <div class="stat-label">API Endpoints</div>
+                          </div>
+                          <div class="stat-item">
+                              <div class="stat-value">14</div>
+                              <div class="stat-label">Endpoint Categories</div>
+                          </div>
+                          <div class="stat-item">
+                              <div class="stat-value">12</div>
+                              <div class="stat-label">AI Models</div>
+                          </div>
+                          <div class="stat-item">
+                              <div class="stat-value">5,000+</div>
+                              <div class="stat-label">Active Users</div>
+                          </div>
                       </div>
                   </div>
 
-                  <div class="docs-grid">
-                      <div class="doc-card">
-                          <h3>📋 Platform Overview</h3>
-                          <a href="README.html">Platform README</a><br>
-                          <a href="platform-flows.html">Platform Flows</a><br>
-                          <a href="platform-functionality.html">Platform Functionality</a>
-                      </div>
+                  <h2>📚 Documentation Files</h2>
+                  <div class="docs-list">
+          HEADER
 
-                      <div class="doc-card">
-                          <h3>⚙️ Setup & Configuration</h3>
-                          <a href="setup-configuration.html">Setup Configuration</a><br>
-                          <a href="deployment-guide.html">Deployment Guide</a><br>
-                          <a href="troubleshooting.html">Troubleshooting</a>
-                      </div>
+          # Generate links for all markdown files
+          find docs -name "*.md" | sort | while read file; do
+              filename=$(basename "$file" .md)
+              filepath="${file#docs/}"
+              htmlpath="${filepath%.md}.html"
 
-                      <div class="doc-card">
-                          <h3>📡 API & Architecture</h3>
-                          <a href="api-documentation.html">API Documentation</a><br>
-                          <a href="architecture-services.html">Architecture Services</a><br>
-                          <a href="database-schema.html">Database Schema</a>
-                      </div>
+              # Create friendly title from filename
+              title=$(echo "$filename" | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
 
-                      <div class="doc-card">
-                          <h3>🔒 Security & Auth</h3>
-                          <a href="security-authentication.html">Security Authentication</a><br>
-                          <a href="admin-panel-guide.html">Admin Panel Guide</a>
-                      </div>
+              echo "                      <div class=\"doc-item\">" >> docs-temp/build/index.html
+              echo "                          <a href=\"$htmlpath\">$title</a>" >> docs-temp/build/index.html
+              echo "                      </div>" >> docs-temp/build/index.html
+          done
 
-                      <div class="doc-card">
-                          <h3>🤖 AI & ML Services</h3>
-                          <a href="ai-ml-services.html">AI/ML Services</a><br>
-                          <a href="mivaa-service.html">MIVAA Service</a><br>
-                          <a href="services-ai-agents.html">AI Agents</a>
-                      </div>
-
-                      <div class="doc-card">
-                          <h3>📄 Processing & Search</h3>
-                          <a href="services-pdf-processing.html">PDF Processing</a><br>
-                          <a href="services-search.html">Search Services</a><br>
-                          <a href="services-rag-knowledge.html">RAG Knowledge</a>
-                      </div>
-
-                      <div class="doc-card">
-                          <h3>✨ Feature Documentation</h3>
-                          <a href="features/product-management.html">Product Management</a><br>
-                          <a href="features/chunk-management.html">Chunk Management</a><br>
-                          <a href="features/materials-page.html">Materials Page</a>
-                      </div>
+          # Close the HTML
+          cat >> docs-temp/build/index.html << 'FOOTER'
                   </div>
 
-                  <div class="services-section">
-                      <h2>🔧 Detailed Services</h2>
-                      <div class="services-grid">
-                          <div class="service-item"><a href="services/README.html">Services Overview</a></div>
-                          <div class="service-item"><a href="services-material-recognition.html">Material Recognition</a></div>
-                          <div class="service-item"><a href="services-utility-infrastructure.html">Utility Infrastructure</a></div>
-                          <div class="service-item"><a href="complete-service-inventory.html">Complete Service Inventory</a></div>
-                          <div class="service-item"><a href="testing-strategy.html">Testing Strategy</a></div>
-                          <div class="service-item"><a href="changes-log.html">Changes Log</a></div>
-                      </div>
+                  <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #ecf0f1; color: #7f8c8d; text-align: center;">
+                      <p><strong>Material Kai Vision Platform v2.1.0</strong></p>
+                      <p>Last updated: $(date +"%Y-%m-%d %H:%M:%S UTC")</p>
+                      <p>This documentation is automatically generated and deployed from the main repository.</p>
                   </div>
               </div>
           </body>
           </html>
-          EOF
+          FOOTER
+
+          echo "✅ Dynamic index.html created with all available documentation files"
 
           # Convert all markdown files to HTML
           npm install -g marked
@@ -220,8 +209,8 @@ jobs:
               echo '</div></body></html>' >> "$html_file"
           done
 
-          # Create a proper README.md for GitHub
-          cat > docs-temp/build/README.md << 'EOF'
+          # Create a proper README.md for GitHub with dynamic links
+          cat > docs-temp/build/README.md << 'READMEHEADER'
           # 🚀 Material Kai Vision Platform Documentation
 
           Welcome to the Material Kai Vision Platform documentation site!
@@ -232,57 +221,64 @@ jobs:
 
           ## 🔗 Quick Links
 
-          - **[📡 API Documentation](https://v1api.materialshub.gr/docs)** - Interactive API documentation
+          - **[📡 API Documentation](https://v1api.materialshub.gr/docs)** - Interactive Swagger API documentation (113 endpoints)
           - **[📋 ReDoc API](https://v1api.materialshub.gr/redoc)** - Alternative API documentation format
 
-          ## 📋 Documentation Sections
+          ## 📊 Platform Stats
 
-          ### Core Platform
-          - [Platform Overview](https://basilakis.github.io/README.html)
-          - [Platform Flows](https://basilakis.github.io/platform-flows.html)
-          - [Platform Functionality](https://basilakis.github.io/platform-functionality.html)
+          - **113** API Endpoints across **14** categories
+          - **12** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-4o, Llama 4 Scout 17B Vision, CLIP, etc.)
+          - **6** Embedding Types (text, visual, color, texture, application, multimodal)
+          - **5,000+** Active Users
+          - **99.5%+** Uptime
 
-          ### Setup & Configuration
-          - [Setup Configuration](https://basilakis.github.io/setup-configuration.html)
-          - [Deployment Guide](https://basilakis.github.io/deployment-guide.html)
-          - [Troubleshooting](https://basilakis.github.io/troubleshooting.html)
+          ## 📋 Available Documentation
 
-          ### API & Architecture
-          - [API Documentation](https://basilakis.github.io/api-documentation.html)
-          - [Architecture Services](https://basilakis.github.io/architecture-services.html)
-          - [Database Schema](https://basilakis.github.io/database-schema.html)
+          READMEHEADER
 
-          ### AI & ML Services
-          - [AI/ML Services](https://basilakis.github.io/ai-ml-services.html)
-          - [MIVAA Service](https://basilakis.github.io/mivaa-service.html)
-          - [AI Agents](https://basilakis.github.io/services-ai-agents.html)
+          # Generate dynamic list of all documentation files
+          find docs -name "*.md" | sort | while read file; do
+              filename=$(basename "$file" .md)
+              filepath="${file#docs/}"
+              htmlpath="${filepath%.md}.html"
 
-          ### Processing & Search
-          - [PDF Processing](https://basilakis.github.io/services-pdf-processing.html)
-          - [Search Services](https://basilakis.github.io/services-search.html)
-          - [RAG Knowledge](https://basilakis.github.io/services-rag-knowledge.html)
+              # Create friendly title from filename
+              title=$(echo "$filename" | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
 
-          ## 🔧 Services
+              echo "- [$title](https://basilakis.github.io/$htmlpath)" >> docs-temp/build/README.md
+          done
 
-          - [Services Overview](https://basilakis.github.io/services/README.html)
-          - [Material Recognition](https://basilakis.github.io/services-material-recognition.html)
-          - [Utility Infrastructure](https://basilakis.github.io/services-utility-infrastructure.html)
-          - [Complete Service Inventory](https://basilakis.github.io/complete-service-inventory.html)
-
-          ## 🛡️ Security & Testing
-
-          - [Security Authentication](https://basilakis.github.io/security-authentication.html)
-          - [Admin Panel Guide](https://basilakis.github.io/admin-panel-guide.html)
-          - [Testing Strategy](https://basilakis.github.io/testing-strategy.html)
+          # Add footer
+          cat >> docs-temp/build/README.md << 'READMEFOOTER'
 
           ---
 
-          **Material Kai Vision Platform** - AI-powered material intelligence system
+          ## 🏗️ Architecture
+
+          - **Frontend**: React + TypeScript + Vite (Vercel)
+          - **Backend**: FastAPI + Python 3.11 (Docker)
+          - **Database**: Supabase PostgreSQL with pgvector
+          - **AI Services**: OpenAI, Anthropic, Together AI, Replicate
+          - **Vector Search**: OpenAI embeddings (1536D), CLIP (512D)
+
+          ## 🚀 Key Features
+
+          - **PDF Processing**: 14-stage AI pipeline with checkpoint recovery
+          - **Products + Metadata**: Inseparable extraction with JSONB storage
+          - **Document Entities**: Certificates, logos, specifications as separate knowledge base
+          - **Multi-Vector Search**: 6 specialized embeddings for comprehensive search
+          - **Agentic Queries**: Factory/group filtering for intelligent queries
+          - **Material Recognition**: Llama 4 Scout 17B Vision (69.4% MMMU, #1 OCR)
+
+          ---
+
+          **Material Kai Vision Platform v2.1.0** - AI-powered material intelligence system
 
           *This documentation is automatically generated and deployed from the main repository.*
-          EOF
+          *Last updated: $(date +"%Y-%m-%d %H:%M:%S UTC")*
+          READMEFOOTER
 
-          echo "✅ Simple documentation site created"
+          echo "✅ Dynamic documentation site created with all available files"
 
       - name: 🔍 Checkout target repository
         uses: actions/checkout@v4
