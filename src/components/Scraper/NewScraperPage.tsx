@@ -166,8 +166,17 @@ Return a list of materials found on the page.`);
           throw new Error('Invalid scraping mode');
       }
 
-      // Get current user (for now using a placeholder - this should be replaced with actual auth)
-      const currentUserId = 'user-placeholder-id'; // TODO: Replace with actual user ID from auth
+      // Get current user from Supabase auth
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        toast({
+          title: 'Authentication Error',
+          description: 'You must be logged in to create scraping jobs',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const currentUserId = user.id;
 
       // Create session in Supabase database
       const sessionId = crypto.randomUUID();
