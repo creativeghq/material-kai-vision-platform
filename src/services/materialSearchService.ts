@@ -35,6 +35,7 @@ export interface SearchParams {
   includeImages?: boolean;
   includeMetafields?: boolean;
   includeRelationships?: boolean;
+  filters?: Record<string, unknown>;
 }
 
 export class MaterialSearchService {
@@ -77,15 +78,15 @@ export class MaterialSearchService {
           success: false,
           data: [],
           metadata: {},
-          error: error.message || 'Search failed',
+          error: response.error || 'Search failed',
         };
       }
 
       return {
-        success: data.success,
-        data: data.data || [],
-        metadata: data.metadata || {},
-        error: data.error,
+        success: response.success,
+        data: response.data || [],
+        metadata: {},
+        error: response.error,
       };
     } catch (error) {
       console.error('Material search service error:', error);
@@ -124,14 +125,14 @@ export class MaterialSearchService {
         return {
           success: false,
           data: [],
-          error: error.message || 'Failed to get suggestions',
+          error: response.error || 'Failed to get suggestions',
         };
       }
 
       return {
-        success: data.success,
-        data: data.data || [],
-        error: data.error,
+        success: response.success,
+        data: response.data || [],
+        error: response.error,
       };
     } catch (error) {
       console.error('Suggestions error:', error);
@@ -146,7 +147,7 @@ export class MaterialSearchService {
   /**
    * Get material by ID using unified materials API
    */
-  async getMaterialById(_materialId: string): Promise<{
+  async getMaterialById(materialId: string): Promise<{
     success: boolean;
     data?: MaterialSearchResult;
     error?: string;
@@ -166,9 +167,9 @@ export class MaterialSearchService {
       }
 
       return {
-        success: data.success,
-        data: data.data,
-        error: data.error,
+        success: response.success,
+        data: response.data?.[0],
+        error: response.error,
       };
     } catch (error) {
       console.error('Get material error:', error);
@@ -185,7 +186,7 @@ export class MaterialSearchService {
   async uploadMaterialImage(
     materialId: string,
     imageFile: File,
-    options: {
+    _options: {
       imageType?: 'primary' | 'variant' | 'texture' | 'analysis' | 'reference';
       isFeatured?: boolean;
       displayOrder?: number;
@@ -197,54 +198,34 @@ export class MaterialSearchService {
     error?: string;
   }> {
     try {
-      // Convert file to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(imageFile);
-      });
+      // For now, use Supabase storage directly
+      // TODO: Implement MIVAA API image upload endpoint with options support
+      const fileName = `${materialId}/${Date.now()}_${imageFile.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('material-images')
+        .upload(fileName, imageFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
-      const base64Data = await base64Promise;
-
-      const response = await mivaaApi.searchImages({
-        material_id: materialId,
-        limit: 1,
-      });
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to upload image');
-      }
-
-      // Upload image to MIVAA API using the images upload endpoint
-      const uploadResponse = await this.mivaaClient.request(
-        '/api/images/upload-and-analyze',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            image_data: base64Data,
-            material_id: materialId,
-            image_type: options.imageType || 'primary',
-            is_featured: options.isFeatured || false,
-            display_order: options.displayOrder || 0,
-            file_name: imageFile.name,
-            metadata: options.metadata || {},
-            analysis_types: ['description', 'material_recognition'],
-          }),
-        },
-      );
-
-      if (!uploadResponse.success) {
+      if (uploadError) {
         return {
           success: false,
-          error: uploadResponse.error || 'Failed to upload image to MIVAA',
+          error: uploadError.message || 'Failed to upload image',
         };
       }
 
+      // Get public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('material-images').getPublicUrl(fileName);
+
       return {
-        success: data.success,
-        data: data.data,
-        error: data.error,
+        success: true,
+        data: {
+          url: publicUrl,
+          path: uploadData.path,
+        },
       };
     } catch (error) {
       console.error('Image upload error:', error);
