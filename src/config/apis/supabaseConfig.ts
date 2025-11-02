@@ -200,9 +200,6 @@ export const supabaseConfig: SupabaseApiConfig = {
       timeout: 120000, // 2 minutes for SVBRDF extraction
     },
 
-    // 'nerf-processor': Removed - Edge Function not implemented
-    // TODO: Implement NeRF processing Edge Function if needed
-
     'spaceformer-analysis': {
       inputSchema: z.object({
         image_url: z.string().url('Please enter a valid image URL'),
