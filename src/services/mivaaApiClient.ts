@@ -220,9 +220,11 @@ export class MivaaApiClient {
   }
 
   // ==================== SEARCH ====================
+  // All search methods now use the consolidated /api/rag/search endpoint with strategy parameter
 
   /**
    * Semantic search
+   * Uses consolidated /api/rag/search endpoint with strategy="semantic"
    * Replaces: semantic-search, enhanced-rag-search, rag-knowledge-search Edge Functions
    */
   async searchSemantic(payload: {
@@ -230,7 +232,7 @@ export class MivaaApiClient {
     limit?: number;
     filters?: any;
   }): Promise<MivaaApiResponse> {
-    return this.request('/api/search/semantic', {
+    return this.request('/api/rag/search?strategy=semantic', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -238,6 +240,7 @@ export class MivaaApiClient {
 
   /**
    * Vector similarity search
+   * Uses consolidated /api/rag/search endpoint with strategy="vector"
    * Replaces: vector-similarity-search, document-vector-search Edge Functions
    */
   async searchVector(payload: {
@@ -245,7 +248,7 @@ export class MivaaApiClient {
     query_text?: string;
     limit?: number;
   }): Promise<MivaaApiResponse> {
-    return this.request('/api/search/vector-similarity', {
+    return this.request('/api/rag/search?strategy=vector', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -253,6 +256,7 @@ export class MivaaApiClient {
 
   /**
    * Unified material search
+   * Uses consolidated /api/rag/search endpoint with strategy="material"
    * Replaces: unified-material-search, unified-materials-api Edge Functions
    */
   async searchMaterials(payload: {
@@ -261,7 +265,7 @@ export class MivaaApiClient {
     limit?: number;
     filters?: any;
   }): Promise<MivaaApiResponse> {
-    return this.request('/api/search/unified', {
+    return this.request('/api/rag/search?strategy=material', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -269,6 +273,7 @@ export class MivaaApiClient {
 
   /**
    * Visual search (image-based)
+   * Uses consolidated /api/rag/search endpoint with strategy="image"
    * Replaces: visual-search-analyze Edge Function
    */
   async searchVisual(payload: {
@@ -276,7 +281,7 @@ export class MivaaApiClient {
     image_data?: string;
     limit?: number;
   }): Promise<MivaaApiResponse> {
-    return this.request('/api/images/visual-search', {
+    return this.request('/api/rag/search?strategy=image', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -284,6 +289,7 @@ export class MivaaApiClient {
 
   /**
    * Material images search
+   * Uses consolidated /api/rag/search endpoint with strategy="image"
    * Replaces: material-images-api Edge Function
    */
   async searchImages(payload: {
@@ -291,7 +297,7 @@ export class MivaaApiClient {
     material_id?: string;
     limit?: number;
   }): Promise<MivaaApiResponse> {
-    return this.request('/api/images/search', {
+    return this.request('/api/rag/search?strategy=image', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -455,9 +461,11 @@ export class MivaaApiClient {
 
   /**
    * Upload PDF for processing
+   * Uses consolidated /api/rag/documents/upload endpoint
+   * Supports both file upload and URL-based processing
    */
   async uploadPDF(formData: FormData): Promise<MivaaApiResponse> {
-    return this.requestFormData('/api/documents/upload', formData);
+    return this.requestFormData('/api/rag/documents/upload', formData);
   }
 
   /**

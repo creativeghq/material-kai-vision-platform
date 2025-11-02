@@ -1,65 +1,144 @@
 # MIVAA API Endpoints Reference
 
 **Last Updated:** 2025-11-02
-**Total Endpoints:** 113
-**Status:** ✅ Production-Ready
+**Total Endpoints:** ~70 (Consolidated from 113)
+**Status:** ✅ Production-Ready - API Consolidation Complete
 
-Complete reference of all 113 API endpoints across 14 categories with detailed usage information, database operations, and integration points.
+Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates:**
-- ✅ Added 5 new Document Entities endpoints for certificates, logos, specifications
-- ✅ Updated Products table to use metadata JSONB field (Products + Metadata = Inseparable)
-- ✅ Removed 4 test/legacy endpoints from Documents routes
-- ✅ All endpoints are actively used in production
+**Recent Updates (API Consolidation - Phase 1):**
+- ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
+- ✅ **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
+- ✅ **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
+- ✅ **REMOVED:** All deprecated endpoints (`/process`, `/process-url`, `/unified-search`)
+- ✅ **REMOVED:** All test endpoints (4 from documents, 1 from main)
+- ✅ **DATABASE CLEANUP:** Removed 12 legacy tables (style analysis, visual search, property analysis)
+- ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
+- ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
 
 ---
 
 ## 📋 Table of Contents
 
-1. [RAG Routes](#1-rag-routes-25-endpoints) - 25 endpoints
-2. [Admin Routes](#2-admin-routes-18-endpoints) - 18 endpoints
-3. [Search Routes](#3-search-routes-18-endpoints) - 18 endpoints
-4. [Documents Routes](#4-documents-routes-11-endpoints) - 11 endpoints
-5. [AI Services Routes](#5-ai-services-routes-10-endpoints) - 10 endpoints
-6. [Images Routes](#6-images-routes-5-endpoints) - 5 endpoints
-7. [Document Entities Routes](#7-document-entities-routes-5-endpoints) - 5 endpoints ✨ NEW
-8. [PDF Routes](#8-pdf-routes-4-endpoints) - 4 endpoints
-9. [Products Routes](#9-products-routes-3-endpoints) - 3 endpoints
-10. [Embeddings Routes](#10-embeddings-routes-3-endpoints) - 3 endpoints
-11. [Together AI Routes](#11-together-ai-routes-3-endpoints) - 3 endpoints
-12. [Anthropic Routes](#12-anthropic-routes-3-endpoints) - 3 endpoints
-13. [Monitoring Routes](#13-monitoring-routes-3-endpoints) - 3 endpoints
-14. [AI Metrics Routes](#14-ai-metrics-routes-2-endpoints) - 2 endpoints
+**✨ CONSOLIDATED ENDPOINTS (One Endpoint, One Purpose, No Duplicates)**
+
+1. [Core Endpoints](#1-core-endpoints) - Health, Status
+2. [RAG Routes](#2-rag-routes) - Document Upload, Search, Query (CONSOLIDATED)
+3. [Admin Routes](#3-admin-routes) - Admin management
+4. [Documents Routes](#4-documents-routes) - Document management
+5. [AI Services Routes](#5-ai-services-routes) - AI processing
+6. [Images Routes](#6-images-routes) - Image processing
+7. [Document Entities Routes](#7-document-entities-routes) - Certificates, Logos, Specifications
+8. [PDF Routes](#8-pdf-routes) - PDF extraction
+9. [Products Routes](#9-products-routes) - Product management
+10. [Embeddings Routes](#10-embeddings-routes) - Embedding generation
+11. [Together AI Routes](#11-together-ai-routes) - TogetherAI integration
+12. [Anthropic Routes](#12-anthropic-routes) - Anthropic integration
+13. [Monitoring Routes](#13-monitoring-routes) - System monitoring
+14. [AI Metrics Routes](#14-ai-metrics-routes) - AI performance metrics
 
 ---
 
-## 1. RAG Routes (25 endpoints)
+## 1. Core Endpoints
 
-**Base Path:** `/api/rag` or `/api/v1/rag`
-**Purpose:** Core RAG (Retrieval-Augmented Generation) functionality for document processing, querying, and management
-**Used In:** Main PDF upload flow, Knowledge Base, Search functionality
+### 1.1 GET /health
 
-### 1.1 POST /documents/upload-with-discovery
-
-**Purpose:** Upload PDF with intelligent product discovery and focused extraction
-**Used In:** Main PDF upload modal, Product catalog processing
-**Flow:** User uploads PDF → Product discovery → Focused extraction → Chunking → Image processing → Product creation
+**Purpose:** Unified health check for all MIVAA services
+**Replaces:** 10+ individual health check endpoints (`/api/pdf/health`, `/api/documents/health`, `/api/search/health`, etc.)
 
 **Request:**
 ```http
-POST /api/rag/documents/upload-with-discovery
+GET /health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-11-02T10:00:00Z",
+  "services": {
+    "database": {"status": "healthy", "response_time_ms": 5},
+    "storage": {"status": "healthy", "response_time_ms": 10},
+    "ai_models": {
+      "claude": {"status": "healthy", "response_time_ms": 150},
+      "gpt": {"status": "healthy", "response_time_ms": 120},
+      "llama": {"status": "healthy", "response_time_ms": 200}
+    },
+    "llamaindex": {"status": "healthy", "response_time_ms": 8}
+  },
+  "version": "1.0.0"
+}
+```
+
+**Benefits:**
+- ✅ Single request instead of 10+ requests
+- ✅ Complete system status overview
+- ✅ Individual service health details
+- ✅ Response time metrics for each service
+
+---
+
+## 2. RAG Routes (CONSOLIDATED)
+
+**Base Path:** `/api/rag` or `/api/v1/rag`
+**Purpose:** Core RAG (Retrieval-Augmented Generation) functionality for document processing, querying, and management
+**Philosophy:** One endpoint per function with parameters for different modes/strategies
+
+### 2.1 POST /documents/upload
+
+**Purpose:** CONSOLIDATED upload endpoint for all document processing scenarios
+**Replaces:**
+- `/api/documents/process` (deprecated)
+- `/api/documents/process-url` (deprecated)
+- `/api/documents/upload` (old version)
+- `/api/rag/documents/upload-with-discovery` (merged)
+- `/api/rag/documents/upload-async` (merged)
+- `/api/rag/documents/upload-focused` (merged)
+
+**Used In:** Main PDF upload modal, Product catalog processing, Simple document upload
+**Flow:** User uploads PDF → AI discovery → Category extraction → Chunking → Image processing → Product creation
+
+**Request:**
+```http
+POST /api/rag/documents/upload
 Content-Type: multipart/form-data
 
-Parameters:
-- file: PDF file (required)
+Parameters (Form Data):
+# File Upload (choose one)
+- file: PDF file (for file upload)
+- file_url: URL to PDF (for URL-based upload)
+
+# Processing Mode (choose one)
+- processing_mode: "quick" | "standard" | "deep" (default: "standard")
+  * quick: Extract only (no embeddings, no AI analysis)
+  * standard: Full RAG processing (embeddings + basic AI)
+  * deep: Complete analysis (embeddings + advanced AI + validation)
+
+# Category Extraction (choose one or more)
+- categories: "products" | "certificates" | "logos" | "specifications" | "all" | "extract_only"
+  * products: Extract product information
+  * certificates: Extract certificates (async)
+  * logos: Extract logos (async)
+  * specifications: Extract specifications (async)
+  * all: Extract all categories
+  * extract_only: No category extraction, just chunks
+
+# AI Model Selection
+- discovery_model: "claude" | "gpt" | "haiku" (default: "claude")
+
+# Prompt Enhancement System (PRESERVED)
+- agent_prompt: Custom prompt for AI processing (optional)
+- enable_prompt_enhancement: true | false (default: true)
+
+# Document Metadata
 - title: Document title (optional)
 - description: Document description (optional)
 - tags: Comma-separated tags (optional)
-- chunk_size: Chunk size (default: 2048)
-- chunk_overlap: Chunk overlap (default: 200)
-- enable_product_discovery: Enable AI product discovery (default: true)
-- focused_extraction: Process only product pages (default: true)
-- discovery_model: AI model for discovery - "claude" or "gpt" (default: "claude")
+- workspace_id: Workspace ID (default: system workspace)
+
+# Chunking Configuration
+- chunk_size: Chunk size in characters (default: 2048)
+- chunk_overlap: Overlap between chunks (default: 200)
 ```
 
 **Response:**
@@ -1113,11 +1192,144 @@ GET /api/admin/jobs?status=processing&limit=20&offset=0
 
 ---
 
-## 3. Search Routes (18 endpoints)
+## 3. Search Routes (CONSOLIDATED)
 
-**Base Path:** `/api/search`
-**Purpose:** Search and query functionality across documents
-**Used In:** Search interface, knowledge base, document discovery
+**Base Path:** `/api/rag`
+**Purpose:** Unified search and query functionality across documents
+**Philosophy:** Single search endpoint with strategy parameter instead of multiple separate endpoints
+
+### 3.1 POST /search
+
+**Purpose:** CONSOLIDATED search endpoint for all search strategies
+**Replaces:**
+- `/api/search/semantic` (deprecated)
+- `/api/search/similarity` (deprecated)
+- `/api/search/multimodal` (deprecated)
+- `/api/unified-search` (deprecated)
+- `/api/search/materials/visual` (deprecated)
+
+**Request:**
+```http
+POST /api/rag/search?strategy={strategy}
+Content-Type: application/json
+
+Query Parameters:
+- strategy: "semantic" | "vector" | "multi_vector" | "hybrid" | "material" | "image"
+  * semantic: Text-based semantic search using embeddings
+  * vector: Pure vector similarity search
+  * multi_vector: Multi-modal search (text + image)
+  * hybrid: Combines semantic + keyword search
+  * material: Material-specific search
+  * image: Image-based visual search
+
+Body:
+{
+  "query": "search query text",
+  "limit": 20,
+  "threshold": 0.7,
+  "workspace_id": "uuid",
+  "filters": {
+    "document_id": "uuid",
+    "category": "products",
+    "date_range": {"start": "2024-01-01", "end": "2024-12-31"}
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "query": "search query",
+  "results": [
+    {
+      "id": "uuid",
+      "content": "chunk content",
+      "similarity_score": 0.95,
+      "metadata": {
+        "document_id": "uuid",
+        "page_number": 5,
+        "category": "products"
+      },
+      "embedding_type": "text",
+      "source_type": "chunk"
+    }
+  ],
+  "total_found": 15,
+  "search_time_ms": 45,
+  "strategy_used": "semantic"
+}
+```
+
+**Usage Examples:**
+
+**Semantic Search (Text-based):**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=semantic" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "sustainable materials", "limit": 10}'
+```
+
+**Image Search (Visual):**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=image" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "image_url_or_base64", "limit": 10}'
+```
+
+**Material Search:**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=material" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "wood flooring", "limit": 10}'
+```
+
+**Database Operations:**
+- SELECT FROM document_chunks (for text search)
+- SELECT FROM document_images (for image search)
+- SELECT FROM products (for material search)
+- Uses pgvector for similarity search
+
+**Frontend Integration:**
+- Used in: `SearchInterface.tsx`, `KnowledgeBase.tsx`
+- API Client: `mivaaApiClient.searchSemantic()`, `mivaaApiClient.searchVector()`, etc.
+
+---
+
+### 3.2 POST /query
+
+**Purpose:** CONSOLIDATED query endpoint with auto-detecting modality
+**Replaces:** Multiple query endpoints with different modalities
+
+**Request:**
+```http
+POST /api/rag/query
+Content-Type: application/json
+
+{
+  "query": "What are the dimensions of Nova?",
+  "modality": "auto",  // "auto" | "text" | "image" | "multimodal"
+  "limit": 10,
+  "workspace_id": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "answer": "Nova has dimensions of 120cm x 80cm x 2cm",
+  "sources": [
+    {
+      "chunk_id": "uuid",
+      "content": "Nova dimensions: 120cm x 80cm x 2cm",
+      "relevance_score": 0.98
+    }
+  ],
+  "modality_detected": "text",
+  "processing_time_ms": 150
+}
+```
 
 **Extract Tables**
 ```http
