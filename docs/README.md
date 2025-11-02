@@ -29,7 +29,7 @@
 - Hybrid architecture pattern
 - Technology stack
 - Authentication & security
-- API endpoints (74+)
+- API endpoints (113)
 - Scalability & monitoring
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
@@ -43,26 +43,36 @@
 
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - PDF processing pipeline
 - 14-stage pipeline breakdown
+- Products + Metadata extraction (inseparable)
+- Document entities (certificates, logos, specs)
 - Stage-by-stage details
 - Checkpoint recovery (9 checkpoints)
 - Performance metrics
 - API endpoint
 
 **[api-endpoints.md](api-endpoints.md)** - API reference
-- 74+ endpoints across 9 categories
-- PDF Processing (12)
-- Document Management (13)
-- Search APIs (8)
-- Image Analysis (5)
-- RAG System (7)
-- Embeddings (3)
-- Products (6)
-- Admin & Monitoring (8)
-- AI Services (11+)
+- 113 endpoints across 14 categories
+- RAG Routes (25)
+- Admin Routes (18)
+- Search Routes (18)
+- Documents Routes (11)
+- AI Services Routes (10)
+- Images Routes (5)
+- Document Entities Routes (5) ✨ NEW
+- PDF Routes (4)
+- Products Routes (3)
+- Embeddings Routes (3)
+- Together AI Routes (3)
+- Anthropic Routes (3)
+- Monitoring Routes (3)
+- AI Metrics Routes (2)
 
 **[database-schema-complete.md](database-schema-complete.md)** - Database schema
-- Core tables
-- Relationships
+- Core tables (products, chunks, images, document_entities)
+- Products + Metadata architecture (JSONB)
+- Document entities (certificates, logos, specifications)
+- Product-document relationships
+- Relationship tables with relevance scores
 - Row-Level Security (RLS)
 - Indexes & performance
 - Storage capacity
@@ -105,6 +115,14 @@
 - Common issues (PDF processing, search, latency, auth)
 - Performance optimization
 - Support resources
+
+**[product-discovery-architecture.md](product-discovery-architecture.md)** - Product discovery system
+- Products + Metadata architecture (inseparable)
+- Document entities (certificates, logos, specifications)
+- Factory/group identification for agentic queries
+- Product-document relationships
+- API endpoints for entity management
+- Future extensibility (marketing, bank statements)
 
 ---
 

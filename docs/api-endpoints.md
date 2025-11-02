@@ -1,15 +1,16 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-01
-**Total Endpoints:** 108
-**Status:** ✅ Production-Ready (Cleaned)
+**Last Updated:** 2025-11-02
+**Total Endpoints:** 113
+**Status:** ✅ Production-Ready
 
-Complete reference of all 108 API endpoints across 13 categories with detailed usage information, database operations, and integration points.
+Complete reference of all 113 API endpoints across 14 categories with detailed usage information, database operations, and integration points.
 
-**Recent Cleanup:**
+**Recent Updates:**
+- ✅ Added 5 new Document Entities endpoints for certificates, logos, specifications
+- ✅ Updated Products table to use metadata JSONB field (Products + Metadata = Inseparable)
 - ✅ Removed 4 test/legacy endpoints from Documents routes
-- ✅ All remaining endpoints are actively used in production
-- ✅ No duplicate or unused endpoints
+- ✅ All endpoints are actively used in production
 
 ---
 
@@ -18,16 +19,17 @@ Complete reference of all 108 API endpoints across 13 categories with detailed u
 1. [RAG Routes](#1-rag-routes-25-endpoints) - 25 endpoints
 2. [Admin Routes](#2-admin-routes-18-endpoints) - 18 endpoints
 3. [Search Routes](#3-search-routes-18-endpoints) - 18 endpoints
-4. [Documents Routes](#4-documents-routes-11-endpoints) - 11 endpoints ✅ (cleaned: removed 4 test endpoints)
+4. [Documents Routes](#4-documents-routes-11-endpoints) - 11 endpoints
 5. [AI Services Routes](#5-ai-services-routes-10-endpoints) - 10 endpoints
 6. [Images Routes](#6-images-routes-5-endpoints) - 5 endpoints
-7. [PDF Routes](#7-pdf-routes-4-endpoints) - 4 endpoints
-8. [Products Routes](#8-products-routes-3-endpoints) - 3 endpoints
-9. [Embeddings Routes](#9-embeddings-routes-3-endpoints) - 3 endpoints
-10. [Together AI Routes](#10-together-ai-routes-3-endpoints) - 3 endpoints
-11. [Anthropic Routes](#11-anthropic-routes-3-endpoints) - 3 endpoints
-12. [Monitoring Routes](#12-monitoring-routes-3-endpoints) - 3 endpoints
-13. [AI Metrics Routes](#13-ai-metrics-routes-2-endpoints) - 2 endpoints
+7. [Document Entities Routes](#7-document-entities-routes-5-endpoints) - 5 endpoints ✨ NEW
+8. [PDF Routes](#8-pdf-routes-4-endpoints) - 4 endpoints
+9. [Products Routes](#9-products-routes-3-endpoints) - 3 endpoints
+10. [Embeddings Routes](#10-embeddings-routes-3-endpoints) - 3 endpoints
+11. [Together AI Routes](#11-together-ai-routes-3-endpoints) - 3 endpoints
+12. [Anthropic Routes](#12-anthropic-routes-3-endpoints) - 3 endpoints
+13. [Monitoring Routes](#13-monitoring-routes-3-endpoints) - 3 endpoints
+14. [AI Metrics Routes](#14-ai-metrics-routes-2-endpoints) - 2 endpoints
 
 ---
 
@@ -1616,6 +1618,210 @@ Response: { summary_stats }
 
 ---
 
+## 7. Document Entities Routes (5 endpoints)
+
+**Base Path:** `/api/document-entities`
+**Purpose:** Manage document entities (certificates, logos, specifications) as separate knowledge base
+**Used In:** Docs Admin Page, Agentic queries, Product-document relationships
+**Architecture:** Document entities are stored separately from products and linked via relationships
+
+### 7.1 GET /api/document-entities/
+
+**Purpose:** Get all document entities for a workspace with filtering
+**Used In:** Docs Admin Page, Agentic queries
+**Flow:** Query entities → Apply filters → Return paginated results
+
+**Request:**
+```http
+GET /api/document-entities/?workspace_id={uuid}&entity_type=certificate&factory_name=Castellón Factory&limit=100&offset=0
+
+Query Parameters:
+- workspace_id: UUID (required)
+- entity_type: certificate | logo | specification | marketing | bank_statement (optional)
+- factory_name: Filter by factory name (optional)
+- factory_group: Filter by factory group (optional)
+- limit: Maximum results (default: 100)
+- offset: Pagination offset (default: 0)
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "entity_type": "certificate",
+    "name": "ISO 9001:2015",
+    "description": "Quality Management System certification",
+    "page_range": [45, 46],
+    "factory_name": "Castellón Factory",
+    "factory_group": "Harmony Group",
+    "manufacturer": "Harmony Materials",
+    "metadata": {
+      "certificate_type": "quality_management",
+      "issue_date": "2024-01-15",
+      "expiry_date": "2027-01-15",
+      "certifying_body": "TÜV SÜD",
+      "standards": ["ISO 9001:2015"]
+    },
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+**Database Operations:**
+- SELECT FROM document_entities WHERE workspace_id = ? AND entity_type = ? AND factory_name = ?
+
+**Frontend Integration:** DocsManagement.tsx (Docs Admin Page)
+
+**Agentic Query Examples:**
+- "Get all certifications for Castellón Factory" → `?entity_type=certificate&factory_name=Castellón Factory`
+- "Get logos for Harmony Group" → `?entity_type=logo&factory_group=Harmony Group`
+
+---
+
+### 7.2 GET /api/document-entities/{entity_id}
+
+**Purpose:** Get a specific document entity by ID
+**Used In:** Entity detail view, relationship management
+**Flow:** Fetch entity by ID → Return entity details
+
+**Request:**
+```http
+GET /api/document-entities/{entity_id}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "entity_type": "certificate",
+  "name": "ISO 9001:2015",
+  "description": "Quality Management System certification",
+  "page_range": [45, 46],
+  "factory_name": "Castellón Factory",
+  "metadata": {...},
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+
+**Database Operations:**
+- SELECT FROM document_entities WHERE id = ?
+
+**Frontend Integration:** EntityDetailModal.tsx
+
+---
+
+### 7.3 GET /api/document-entities/product/{product_id}
+
+**Purpose:** Get all document entities linked to a specific product
+**Used In:** Product detail page, agentic queries
+**Flow:** Fetch product relationships → Get linked entities → Return entities
+
+**Request:**
+```http
+GET /api/document-entities/product/{product_id}?entity_type=certificate
+
+Query Parameters:
+- entity_type: Filter by entity type (optional)
+```
+
+**Response:**
+```json
+[
+  {
+    "entity_type": "certificate",
+    "name": "ISO 9001:2015",
+    "description": "Quality Management System certification",
+    "page_range": [45, 46],
+    "factory_name": "Castellón Factory",
+    "metadata": {...}
+  }
+]
+```
+
+**Database Operations:**
+- SELECT document_entities.* FROM product_document_relationships JOIN document_entities WHERE product_id = ?
+
+**Frontend Integration:** ProductDetailPage.tsx
+
+**Agentic Query Example:**
+- "Get certifications for product NOVA" → First get product ID, then `/product/{nova_id}?entity_type=certificate`
+
+---
+
+### 7.4 GET /api/document-entities/factory/{factory_name}
+
+**Purpose:** Get all document entities for a specific factory
+**Used In:** Factory-specific queries, compliance reports
+**Flow:** Query by factory name → Filter by entity type → Return entities
+
+**Request:**
+```http
+GET /api/document-entities/factory/Castellón Factory?entity_type=certificate
+
+Query Parameters:
+- entity_type: Filter by entity type (optional)
+```
+
+**Response:**
+```json
+[
+  {
+    "entity_type": "certificate",
+    "name": "ISO 9001:2015",
+    "factory_name": "Castellón Factory",
+    "factory_group": "Harmony Group",
+    "metadata": {...}
+  }
+]
+```
+
+**Database Operations:**
+- SELECT FROM document_entities WHERE factory_name = ? AND entity_type = ?
+
+**Frontend Integration:** FactoryComplianceReport.tsx
+
+**Agentic Query Example:**
+- "Get all certifications for Castellón Factory" → `/factory/Castellón Factory?entity_type=certificate`
+
+---
+
+### 7.5 GET /api/document-entities/relationships/product/{product_id}
+
+**Purpose:** Get all product-document relationships for a product
+**Used In:** Relationship management, linking visualization
+**Flow:** Fetch relationships → Return relationship details with scores
+
+**Request:**
+```http
+GET /api/document-entities/relationships/product/{product_id}
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "product_id": "uuid",
+    "document_entity_id": "uuid",
+    "relationship_type": "certification",
+    "relevance_score": 0.95,
+    "metadata": {
+      "linking_method": "ai_discovery",
+      "confidence": 0.95
+    },
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+**Database Operations:**
+- SELECT FROM product_document_relationships WHERE product_id = ?
+
+**Frontend Integration:** RelationshipViewer.tsx
+
+---
+
 ## 🔐 Authentication
 
 All endpoints require one of:
@@ -1660,7 +1866,7 @@ All endpoints return JSON:
 
 ---
 
-**Total Endpoints**: 74+  
-**Last Updated**: October 31, 2025  
+**Total Endpoints**: 113
+**Last Updated**: November 2, 2025
 **API Version**: v1
 

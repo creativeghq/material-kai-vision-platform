@@ -8,10 +8,17 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 0: Product Discovery (0-15%)                              │
+│ STAGE 0A: Product Discovery (0-10%)                             │
 │ AI Model: Claude Sonnet 4.5 / GPT-4o                           │
-│ Purpose: Analyze entire PDF to identify products               │
-│ Output: Product catalog with metafields & image mappings       │
+│ Purpose: Extract products with ALL metadata (inseparable)      │
+│ Output: Products with metadata JSONB (factory, specs, etc.)    │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STAGE 0B: Document Entity Discovery (10-15%) - OPTIONAL         │
+│ AI Model: Claude Sonnet 4.5 / GPT-4o                           │
+│ Purpose: Extract certificates, logos, specifications           │
+│ Output: Document entities stored separately with relationships │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -63,15 +70,15 @@
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 12: Metafield Extraction (95-97%)                         │
-│ Process: Extract structured metadata                           │
-│ Output: Metafield values linked to products                    │
+│ STAGE 12: Entity Linking (95-97%)                               │
+│ Process: Link products, chunks, images, document entities      │
+│ Output: Relationships with relevance scores                    │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 13: Quality Enhancement (97-100%) - ASYNC                 │
 │ Model: Claude Sonnet 4.5                                       │
-│ Output: Enhanced product records                               │
+│ Output: Enhanced product records & validated entities          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -79,9 +86,9 @@
 
 ## 📋 Detailed Stage Breakdown
 
-### Stage 0: Product Discovery (0-15%)
+### Stage 0A: Product Discovery (0-10%)
 
-**Purpose**: Analyze entire PDF to identify products before extraction
+**Purpose**: Extract products with ALL metadata (Products + Metadata = Inseparable)
 
 **AI Model**: Claude Sonnet 4.5 or GPT-4o
 
@@ -89,18 +96,36 @@
 1. Extract full PDF text
 2. Analyze content structure
 3. Identify product boundaries
-4. Extract product names, metafields, image mappings
-5. Create product catalog
+4. Extract products WITH all metadata in one pass
+5. Store in products table with metadata JSONB
 
 **Output**:
 ```json
 {
   "products": [
     {
-      "name": "Product Name",
-      "page_range": "1-5",
-      "metafields": { "material": "...", "color": "..." },
-      "images": ["page_2_image_1", "page_3_image_2"]
+      "name": "NOVA",
+      "description": "Modern ceramic tile collection",
+      "page_range": [12, 13, 14],
+      "metadata": {
+        "designer": "SG NY",
+        "studio": "SG NY",
+        "category": "tiles",
+        "dimensions": ["15×38", "20×40"],
+        "variants": [{"type": "color", "value": "beige"}],
+        "factory": "Castellón Factory",
+        "factory_group": "Harmony Group",
+        "manufacturer": "Harmony Materials",
+        "country_of_origin": "Spain",
+        "slip_resistance": "R11",
+        "fire_rating": "A1",
+        "thickness": "8mm",
+        "water_absorption": "Class 3",
+        "finish": "matte",
+        "material": "ceramic"
+      },
+      "image_indices": [12, 13],
+      "confidence": 0.95
     }
   ],
   "total_products": 14,
@@ -108,10 +133,79 @@
 }
 ```
 
+**Database Storage**:
+- Table: `products`
+- ALL metadata stored in `metadata` JSONB column
+- Products and metadata are inseparable
+
 **Example (Harmony PDF)**:
 - 14 distinct products identified
 - 95% confidence score
 - Processing time: 3-5 seconds
+
+---
+
+### Stage 0B: Document Entity Discovery (10-15%) - OPTIONAL
+
+**Purpose**: Extract certificates, logos, specifications as separate knowledge base
+
+**AI Model**: Claude Sonnet 4.5 or GPT-4o
+
+**Process**:
+1. Analyze PDF for document entities
+2. Extract certificates (ISO, CE, quality certifications)
+3. Extract logos (company, brand, certification marks)
+4. Extract specifications (technical docs, installation guides)
+5. Identify factory/group for each entity
+6. Store in document_entities table
+
+**Output**:
+```json
+{
+  "certificates": [
+    {
+      "name": "ISO 9001:2015",
+      "certificate_type": "quality_management",
+      "issuer": "TÜV SÜD",
+      "issue_date": "2024-01-15",
+      "expiry_date": "2027-01-15",
+      "standards": ["ISO 9001:2015"],
+      "page_range": [45, 46],
+      "factory_name": "Castellón Factory",
+      "factory_group": "Harmony Group",
+      "confidence": 0.92
+    }
+  ],
+  "logos": [
+    {
+      "name": "Company Logo",
+      "logo_type": "company",
+      "description": "Main company brand logo",
+      "page_range": [1, 2],
+      "confidence": 0.98
+    }
+  ],
+  "specifications": [
+    {
+      "name": "Installation Guide",
+      "spec_type": "installation",
+      "description": "Step-by-step installation instructions",
+      "page_range": [50, 52],
+      "confidence": 0.90
+    }
+  ]
+}
+```
+
+**Database Storage**:
+- Table: `document_entities`
+- Linked to products via `product_document_relationships`
+- Supports factory/group filtering for agentic queries
+
+**Agentic Query Examples**:
+- "Get certifications for Castellón Factory"
+- "Get logos for Harmony Group"
+- "Get specifications for product NOVA"
 
 ---
 

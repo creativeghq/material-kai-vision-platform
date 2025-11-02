@@ -34,7 +34,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 
 **Backend**:
 - MIVAA API: FastAPI + Python 3.11
-- 74+ REST API endpoints
+- 113 REST API endpoints (14 categories)
 - Docker containerized
 - Self-hosted on dedicated server
 
@@ -61,19 +61,18 @@ Supabase Edge Function (mivaa-gateway)
 MIVAA API (FastAPI) → Creates background job
     ↓
 14-Stage Processing Pipeline:
-  1. PDF Analysis (PyMuPDF4LLM)
-  2. Product Discovery (Claude Haiku → Sonnet)
-  3. Text Extraction (focused on product pages)
-  4. Semantic Chunking (Anthropic)
-  5. Text Embeddings (OpenAI 1536D)
-  6. Image Extraction
-  7. Image Analysis (Llama Vision)
-  8. CLIP Embeddings (512D)
-  9. Product Creation (Two-stage AI)
-  10. Metafield Extraction
-  11. Deferred AI Analysis (async)
-  12. Specialized Embeddings (color, texture, application)
-  13. Quality Validation (Claude)
+  0A. Product Discovery (Claude/GPT-4o) - Products + Metadata extraction
+  0B. Document Entity Discovery (Optional) - Certificates, Logos, Specs
+  1. Focused Extraction (product pages only)
+  2. Text Extraction (PyMuPDF4LLM)
+  3. Semantic Chunking (Anthropic)
+  4. Text Embeddings (OpenAI 1536D)
+  5. Image Extraction
+  6. Image Analysis (Llama Vision)
+  7-10. Multi-Vector CLIP Embeddings (512D)
+  11. Product Creation & Entity Linking
+  12. Entity Relationship Mapping
+  13. Quality Enhancement (async)
   14. Cleanup & Completion
     ↓
 Data stored in Supabase → Available for search

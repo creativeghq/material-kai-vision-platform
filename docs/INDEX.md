@@ -42,7 +42,7 @@ Complete documentation for Material Kai Vision Platform.
 - Hybrid architecture pattern
 - Database schema overview
 - Authentication & security
-- API endpoints (74+)
+- API endpoints (113)
 - AI integration
 - Scalability
 - Data flow
@@ -52,8 +52,11 @@ Complete documentation for Material Kai Vision Platform.
 - Production metrics
 
 **[database-schema-complete.md](database-schema-complete.md)** - Database schema reference
-- Core tables (workspaces, documents, chunks, products, images, metafields, embeddings)
-- Relationships (product-chunk, product-image associations)
+- Core tables (workspaces, documents, chunks, products, images, embeddings)
+- Products + Metadata architecture (JSONB)
+- Document entities (certificates, logos, specifications)
+- Product-document relationships
+- Relationship tables (chunk-product, chunk-image, product-image, product-document)
 - Row-Level Security (RLS)
 - Indexes for performance
 - Storage capacity
@@ -93,7 +96,8 @@ Complete documentation for Material Kai Vision Platform.
 
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - 14-stage PDF processing
 - Pipeline overview
-- Stage 0: Product Discovery (0-15%)
+- Stage 0A: Product Discovery (0-10%) - Products + Metadata extraction
+- Stage 0B: Document Entity Discovery (10-15%) - Certificates, Logos, Specs
 - Stage 1: Focused Extraction (15-30%)
 - Stage 2: Text Extraction (30-40%)
 - Stage 3: Semantic Chunking (40-50%)
@@ -108,20 +112,35 @@ Complete documentation for Material Kai Vision Platform.
 - Performance metrics
 - API endpoint
 
+**[product-discovery-architecture.md](product-discovery-architecture.md)** - Product discovery system
+- Products + Metadata architecture (inseparable)
+- Document entities (certificates, logos, specifications)
+- Factory/group identification for agentic queries
+- Product-document relationships
+- API endpoints for entity management
+- Future extensibility (marketing, bank statements)
+- Database schema (document_entities, product_document_relationships)
+
 ---
 
 ### 🔌 API Reference
 
 **[api-endpoints.md](api-endpoints.md)** - Complete API reference
-- 74+ endpoints across 9 categories
-- PDF Processing (12 endpoints)
-- Document Management (13 endpoints)
-- Search APIs (8 endpoints)
-- Image Analysis (5 endpoints)
-- RAG System (7 endpoints)
-- Embeddings (3 endpoints)
-- Products (6 endpoints)
-- Admin & Monitoring (8 endpoints)
+- 113 endpoints across 14 categories
+- RAG Routes (25 endpoints)
+- Admin Routes (18 endpoints)
+- Search Routes (18 endpoints)
+- Documents Routes (11 endpoints)
+- AI Services Routes (10 endpoints)
+- Images Routes (5 endpoints)
+- Document Entities Routes (5 endpoints) ✨ NEW
+- PDF Routes (4 endpoints)
+- Products Routes (3 endpoints)
+- Embeddings Routes (3 endpoints)
+- Together AI Routes (3 endpoints)
+- Anthropic Routes (3 endpoints)
+- Monitoring Routes (3 endpoints)
+- AI Metrics Routes (2 endpoints)
 - Authentication methods
 - Response format
 - Rate limiting
