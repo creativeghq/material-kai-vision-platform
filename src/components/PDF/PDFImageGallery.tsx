@@ -78,7 +78,6 @@ export interface PDFImage {
   ocr_extracted_text?: string;
   ocr_confidence_score?: number;
   image_analysis_results?: unknown;
-  image_embedding?: unknown;
   visual_features?: unknown;
   processing_status: string;
   multimodal_metadata?: unknown;
